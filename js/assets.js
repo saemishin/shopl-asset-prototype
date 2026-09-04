@@ -182,13 +182,6 @@
     scope.querySelectorAll("tbody tr.clickable").forEach(tr =>
       tr.onclick = () => location.href = `asset-detail.html?id=${tr.dataset.id}`);
   }
-  function paintTable() {
-    const v = currentView();
-    const tw = document.querySelector(".table-wrap");
-    tw.innerHTML = tableInner(v);
-    document.querySelector(".countrow .total b").textContent = v.count;
-    bindRows(tw);
-  }
 
   function render() {
     const c = document.getElementById("content");
@@ -217,8 +210,12 @@
       </div>
 
       <div class="searchrow">
-        <input class="search${state.search ? ' expanded' : ''}" id="search-input"
-          placeholder="${state.search ? '고유관리번호 / 제품명' : '검색'}" value="${state.search.replace(/"/g, '&quot;')}">
+        <div class="searchbox${state.search ? ' has-term' : ''}">
+          <input class="search${state.search ? ' expanded' : ''}" id="search-input"
+            placeholder="${state.search ? '고유관리번호 / 제품명' : '검색'}" value="${state.search.replace(/"/g, '&quot;')}">
+          <button class="search-clear" id="search-clear" type="button" aria-label="검색어 지우기">✕</button>
+        </div>
+        <button class="btn sm" id="btn-search">검색</button>
         <button class="filter-btn ${nAct ? 'set' : ''}" id="btn-filter">▤ 필터${nAct ? ` <b>${nAct}</b>` : ""}</button>
         <div class="right">
           <button class="btn sm" id="btn-qr-dl">▦ QR 다운로드</button>
@@ -245,10 +242,14 @@
       el.onclick = () => toast(`"${el.dataset.stub}" — 이후 단계에서 정의`));
 
     const si = document.getElementById("search-input");
+    const sbox = si.closest(".searchbox");
+    const commit = () => { state.search = si.value.trim(); render(); };
     si.onfocus = () => { si.classList.add("expanded"); si.placeholder = "고유관리번호 / 제품명"; };
-    si.onblur = () => { if (!si.value) { si.classList.remove("expanded"); si.placeholder = "검색"; } };
-    // 검색은 전체 re-render 없이 표만 갱신 (input 엘리먼트 유지 → 한글 IME 정상)
-    si.oninput = e => { state.search = e.target.value; paintTable(); };
+    si.onblur = () => { if (!si.value && !state.search) { si.classList.remove("expanded"); si.placeholder = "검색"; } };
+    si.oninput = () => sbox.classList.toggle("has-term", !!si.value);   // ✕ 노출만, 검색 실행 X
+    si.onkeydown = e => { if (e.key === "Enter") commit(); };
+    document.getElementById("btn-search").onclick = commit;
+    document.getElementById("search-clear").onclick = () => { si.value = ""; state.search = ""; render(); };
     c.querySelectorAll("[data-clear]").forEach(b =>
       b.onclick = () => { state.filters[JSON.parse(b.dataset.clear).k] = []; render(); });
     const clearAll = document.getElementById("fclear-all");

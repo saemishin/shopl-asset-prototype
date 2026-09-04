@@ -200,8 +200,18 @@ input { font: inherit; }
 .countrow .total b { color: var(--primary); }
 .searchrow { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
 .searchrow .right { margin-left: auto; display: flex; gap: 8px; }
-.searchrow .search { width: 260px; transition: width .15s ease; }
-.searchrow .search.expanded { width: 380px; }
+.searchbox { position: relative; display: inline-flex; }
+.searchbox .search { width: 260px; transition: width .15s ease; }
+.searchbox .search.expanded { width: 380px; }
+.searchbox.has-term .search { padding-right: 30px; }
+.search-clear {
+  position: absolute; right: 7px; top: 50%; transform: translateY(-50%);
+  width: 18px; height: 18px; border-radius: 50%; display: none;
+  align-items: center; justify-content: center; font-size: 9px; line-height: 1;
+  color: var(--text-sub); background: #e6e8eb;
+}
+.search-clear:hover { color: var(--text); background: #d8dbdf; }
+.searchbox.has-term .search-clear { display: flex; }
 .search {
   height: 32px; width: 220px; border: 1px solid var(--line-strong); border-radius: var(--radius);
   padding: 0 10px 0 30px; background: var(--panel) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%239aa0a6' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m21 21-4.3-4.3'/%3E%3C/svg%3E") no-repeat 9px center;
