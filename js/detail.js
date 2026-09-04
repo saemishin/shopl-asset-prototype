@@ -82,15 +82,12 @@
     }
 
     c.innerHTML = `
-      <div class="tabs">
-        <a href="assets.html" class="active">현황</a>
-        <a href="category.html">분류</a>
-        <a href="settings.html">설정</a>
+      <div class="detail-topbar">
+        <a href="assets.html" class="backbtn" aria-label="뒤로">‹</a>
       </div>
 
       <div class="detail-head">
         <div>
-          <div class="back"><a href="assets.html">‹ 자산 목록</a></div>
           <h1>${a.product}</h1>
           <div class="meta">${a.id}${a.assetNo ? " · " + a.assetNo : ""}</div>
         </div>

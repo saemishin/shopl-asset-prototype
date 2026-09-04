@@ -306,6 +306,15 @@ th.c, td.c { text-align: center; width: 52px; }
 .seg button.active { background: var(--primary); color: #fff; }
 
 /* ============ detail page ============ */
+.detail-topbar {
+  display: flex; align-items: center;
+  border-bottom: 1px solid var(--line); margin: 0 -28px 18px; padding: 6px 20px;
+}
+.backbtn {
+  width: 30px; height: 30px; border-radius: 7px; display: flex; align-items: center;
+  justify-content: center; font-size: 18px; color: var(--text-sub); line-height: 1;
+}
+.backbtn:hover { background: #f0f1f3; color: var(--text); }
 .detail-head { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 18px; }
 .detail-head .back { font-size: 13px; color: var(--text-sub); }
 .detail-head h1 { font-size: 18px; }
