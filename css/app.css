@@ -238,6 +238,18 @@ td .sub { color: var(--text-mut); font-size: 11px; margin-top: 2px; }
   opacity: .5; margin-right: 3px; }
 .hcnt { color: var(--text-sub); margin-left: 2px; font-variant-numeric: tabular-nums; }
 
+/* product cell: thumbnail + name + memo flag */
+.prodcell { display: flex; align-items: center; gap: 9px; }
+.thumb {
+  width: 34px; height: 34px; border-radius: 6px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; overflow: hidden;
+}
+.thumb svg { width: 16px; height: 16px; }
+.thumb.empty { background: #f0f1f3; color: var(--text-mut); }
+.prodcell .pname { min-width: 0; }
+.memo-flag { display: inline-flex; vertical-align: -2px; color: var(--text-mut); }
+.memo-flag .memo-ic { width: 13px; height: 13px; }
+
 /* ============ chips / badges ============ */
 .chip {
   display: inline-flex; align-items: center; height: 20px; padding: 0 7px; border-radius: 5px;

@@ -46,7 +46,7 @@
 
     const infoRows = `
       <dl class="kv">
-        <dt>분류</dt><dd>${a.group} › ${a.sub} <span class="type-pill">${isIndiv ? "개별형" : "수량형"}</span></dd>
+        <dt>분류</dt><dd>${a.group} › ${a.sub} <span class="type-pill">${isIndiv ? "개별 자산" : "수량 자산"}</span></dd>
         <dt>제품명</dt><dd>${a.product}</dd>
         ${isIndiv ? `<dt>고유관리번호</dt><dd>${a.assetNo || "—"}</dd>` : ""}
         ${isIndiv ? `<dt>S/N</dt><dd>${a.serial || '<span class="muted">—</span>'}</dd>` : ""}

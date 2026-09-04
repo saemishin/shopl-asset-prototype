@@ -8,7 +8,7 @@
     lost: ["분실", "lost"], disposed: ["폐기", "disposed"],
   };
   const STATUS_ORDER = ["stock", "assigned", "repair", "lost", "disposed"];
-  const TYPE_LABEL = { individual: "개별형", quantity: "수량형" };
+  const TYPE_LABEL = { individual: "개별 자산", quantity: "수량 자산" };
   const EXP_LABEL = { valid: "유효", soon: "임박", over: "지남", none: "미설정" };
 
   function expiryKey(d) {
@@ -44,6 +44,15 @@
     if (ws) out += ` <span class="hcnt">${IC_WS}${ws}</span>`;
     if (emp) out += ` <span class="hcnt">${IC_EMP}${emp}</span>`;
     return out;
+  }
+  const MEMO_IC = `<svg class="memo-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L18.5 9.5a2 2 0 0 0-3-3L5 17v3z"/><path d="M13.5 6.5l3 3"/></svg>`;
+  function thumb(a) {
+    if (a.photo) return `<span class="thumb" style="background:${a.photo}"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10" r="1.6"/><path d="m21 16-5-5-9 8"/></svg></span>`;
+    return `<span class="thumb empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 15 5-4 4 3 4-4 5 4"/></svg></span>`;
+  }
+  function prodCell(a) {
+    const memo = a.note ? ` <span class="memo-flag" title="${String(a.note).replace(/"/g, '&quot;')}">${MEMO_IC}</span>` : "";
+    return `<div class="prodcell">${thumb(a)}<span class="pname">${a.product}${memo}</span></div>`;
   }
   function labelsCell(labels) {
     if (!labels || !labels.length) return '<span class="muted">—</span>';
@@ -103,7 +112,7 @@
         : `<span class="badge ${STATUS_LABEL[a.status][1]}">${STATUS_LABEL[a.status][0]}</span>`;
       return `<tr class="clickable" data-id="${a.id}">
         <td>${a.assetNo || '<span class="muted">—</span>'}</td>
-        <td>${a.product}</td>
+        <td>${prodCell(a)}</td>
         <td>${a.group} <span class="muted">›</span> ${a.sub}</td>
         <td><span class="type-pill">${TYPE_LABEL[a.type]}</span></td>
         <td>${st}</td>
@@ -157,7 +166,7 @@
       else (a.stocks || []).forEach(x => bump(x[axis], "qty", x.qty));
     });
     const label = axis === "employee" ? "구성원" : "근무지";
-    const head = `<tr><th>${label}</th><th class="num">배정 자산 수(개별형)</th><th class="num">보유 수량(수량형)</th></tr>`;
+    const head = `<tr><th>${label}</th><th class="num">배정 자산 수</th><th class="num">보유 수량</th></tr>`;
     const rows = [...map.values()].map(r => `<tr>
       <td>${r.name}</td>
       <td class="num">${r.indiv || '<span class="muted">0</span>'}</td>
@@ -323,8 +332,8 @@
   function statsHtml() {
     const s = computeStats();
     const row1 = [
-      statTile({ k: "개별형", v: s.indivN, sub: "대", filter: { k: "type", v: ["individual"] } }),
-      statTile({ k: "수량형", v: s.qtyN, sub: `품목 · 총 ${s.totalQty}개`, filter: { k: "type", v: ["quantity"] } }),
+      statTile({ k: "개별 자산", v: s.indivN, sub: "대", filter: { k: "type", v: ["individual"] } }),
+      statTile({ k: "수량 자산", v: s.qtyN, sub: `품목 · 총 ${s.totalQty}개`, filter: { k: "type", v: ["quantity"] } }),
       statTile({ k: "배정중", v: s.assigned, filter: { k: "status", v: ["assigned"] } }),
       statTile({ k: "재고(미배정)", v: s.stock, filter: { k: "status", v: ["stock"] } }),
       statTile({ k: "배정률", v: s.rate + "%" }),
@@ -421,7 +430,7 @@
       } else if (group === "type") {
         box.innerHTML = Object.entries(TYPE_LABEL).map(([v, l]) => optRow(draft.type.includes(v), l, v)).join("");
       } else if (group === "status") {
-        box.innerHTML = `<p class="hint" style="margin-bottom:6px">개별형 자산에만 적용</p>` +
+        box.innerHTML = `<p class="hint" style="margin-bottom:6px">개별 자산에만 적용</p>` +
           STATUS_ORDER.map(v => optRow(draft.status.includes(v), STATUS_LABEL[v][0], v)).join("");
       } else if (group === "expiry") {
         box.innerHTML = Object.entries(EXP_LABEL).map(([v, l]) => optRow(draft.expiry.includes(v), l, v)).join("");
@@ -501,8 +510,8 @@
           <div class="field">
             <label>자산 유형 <span class="req">*</span></label>
             <div class="seg" id="type-seg">
-              <button class="active" data-t="individual">개별형</button>
-              <button data-t="quantity">수량형</button>
+              <button class="active" data-t="individual">개별 자산</button>
+              <button data-t="quantity">수량 자산</button>
             </div>
             <div class="hint">유형은 선택한 소분류에서 상속됩니다. (구조안 3.4)</div>
           </div>
