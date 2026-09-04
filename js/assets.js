@@ -174,6 +174,22 @@
     return `<div class="filterbar">${chips.join("")}<button class="fclear" id="fclear-all">전체 해제</button></div>`;
   }
 
+  function tableInner(v) {
+    const empty = `<tr><td colspan="8" style="text-align:center;color:var(--text-mut);padding:32px">조건에 맞는 자산이 없습니다</td></tr>`;
+    return `<table><thead>${v.head}</thead><tbody>${v.rows || empty}</tbody></table>`;
+  }
+  function bindRows(scope) {
+    scope.querySelectorAll("tbody tr.clickable").forEach(tr =>
+      tr.onclick = () => location.href = `asset-detail.html?id=${tr.dataset.id}`);
+  }
+  function paintTable() {
+    const v = currentView();
+    const tw = document.querySelector(".table-wrap");
+    tw.innerHTML = tableInner(v);
+    document.querySelector(".countrow .total b").textContent = v.count;
+    bindRows(tw);
+  }
+
   function render() {
     const c = document.getElementById("content");
     const v = currentView();
@@ -212,9 +228,7 @@
 
       ${filterChips()}
 
-      <div class="table-wrap">
-        <table><thead>${v.head}</thead><tbody>${v.rows || `<tr><td colspan="8" style="text-align:center;color:var(--text-mut);padding:32px">조건에 맞는 자산이 없습니다</td></tr>`}</tbody></table>
-      </div>
+      <div class="table-wrap">${tableInner(v)}</div>
 
       <div class="pager">
         <button>«</button><button>‹</button>
@@ -226,20 +240,15 @@
 
     c.querySelectorAll(".subtabs button").forEach(b =>
       b.onclick = () => { state.view = b.dataset.view; render(); });
-    c.querySelectorAll("tbody tr.clickable").forEach(tr =>
-      tr.onclick = () => location.href = `asset-detail.html?id=${tr.dataset.id}`);
+    bindRows(c);
     c.querySelectorAll("[data-stub]").forEach(el =>
       el.onclick = () => toast(`"${el.dataset.stub}" — 이후 단계에서 정의`));
 
     const si = document.getElementById("search-input");
-    si.onfocus = () => { state._sf = true; si.classList.add("expanded"); si.placeholder = "고유관리번호 / 제품명"; };
-    si.onblur = () => { state._sf = false; if (!si.value) { si.classList.remove("expanded"); si.placeholder = "검색"; } };
-    si.oninput = e => { state.search = e.target.value; state._caret = e.target.selectionStart; render(); };
-    if (state._sf) {
-      si.focus();
-      const p = state._caret != null ? state._caret : si.value.length;
-      try { si.setSelectionRange(p, p); } catch (e) {}
-    }
+    si.onfocus = () => { si.classList.add("expanded"); si.placeholder = "고유관리번호 / 제품명"; };
+    si.onblur = () => { if (!si.value) { si.classList.remove("expanded"); si.placeholder = "검색"; } };
+    // 검색은 전체 re-render 없이 표만 갱신 (input 엘리먼트 유지 → 한글 IME 정상)
+    si.oninput = e => { state.search = e.target.value; paintTable(); };
     c.querySelectorAll("[data-clear]").forEach(b =>
       b.onclick = () => { state.filters[JSON.parse(b.dataset.clear).k] = []; render(); });
     const clearAll = document.getElementById("fclear-all");
