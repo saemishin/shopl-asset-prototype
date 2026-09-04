@@ -23,23 +23,23 @@
   }
   const IC_EMP = `<svg class="hi" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5.5 20c0-4 3-6.5 6.5-6.5s6.5 2.5 6.5 6.5"/></svg>`;
   const IC_WS = `<svg class="hi" viewBox="0 0 24 24"><path d="M4 20V9.5L12 4l8 5.5V20"/><path d="M9.5 20v-5h5v5"/></svg>`;
-  function holderOne(x) {
-    const p = [];
-    if (x.employee) p.push(`${IC_EMP}${x.employee}`);
-    if (x.worksite) p.push(`${IC_WS}${x.worksite}`);
-    return p.join(" ");
-  }
   function holderText(a) {
     if (a.type === "individual") {
       const as = a.assignments || [];
-      if (!as.length) return '<span class="muted">미배정</span>';
-      const first = holderOne(as[0]);
-      return as.length > 1 ? `${first} <span class="muted">+${as.length - 1}</span>` : first;
+      if (!as.length) return '<span class="muted">재고</span>';
+      // 배정 대상(구성원/근무지)을 레코드 순서대로 평탄화 — 복합 레코드는 구성원→근무지
+      const targets = [];
+      as.forEach(x => {
+        if (x.employee) targets.push(`${IC_EMP}${x.employee}`);
+        if (x.worksite) targets.push(`${IC_WS}${x.worksite}`);
+      });
+      if (as.length === 1) return targets.join(" ");                 // 단일 배정(복합이면 둘 다 표시)
+      return `${targets[0]} <span class="muted">+${targets.length - 1}</span>`;  // 공동 배정: 첫 대상 + N
     }
     const stocks = a.stocks || [];
     const total = stocks.reduce((s, x) => s + x.qty, 0);
-    const ws = new Set(stocks.filter(x => x.worksite).map(x => x.worksite)).size;
-    const emp = new Set(stocks.filter(x => x.employee).map(x => x.employee)).size;
+    const ws = stocks.filter(x => x.worksite).length;
+    const emp = stocks.filter(x => x.employee).length;
     let out = `${total}개`;
     if (ws) out += ` <span class="hcnt">${IC_WS}${ws}</span>`;
     if (emp) out += ` <span class="hcnt">${IC_EMP}${emp}</span>`;
