@@ -91,17 +91,20 @@ input { font: inherit; }
 /* ============ content ============ */
 .content { padding: 20px 28px 60px; flex: 1; }
 .tabs {
-  display: flex; gap: 22px; border-bottom: 1px solid var(--line); margin-bottom: 18px;
+  display: flex; gap: 24px; border-bottom: 1px solid var(--line); margin-bottom: 16px;
 }
 .tabs a {
-  padding: 10px 2px 12px; font-size: 14px; font-weight: 600; color: var(--text-mut);
-  border-bottom: 2px solid transparent; margin-bottom: -1px;
+  padding: 12px 2px; font-size: 15px; font-weight: 600; color: var(--text-mut);
 }
-.tabs a.active { color: var(--text); border-bottom-color: var(--text); }
+.tabs a.active { color: var(--text); font-weight: 700; }
 
-.subtabs { display: flex; gap: 16px; margin-bottom: 18px; }
+.subtabs {
+  display: flex; gap: 18px;
+  background: #f6f7f8; border-bottom: 1px solid var(--line);
+  margin: -16px -28px 18px; padding: 9px 28px;
+}
 .subtabs button {
-  font-size: 14px; font-weight: 600; color: var(--text-mut); padding: 4px 0;
+  font-size: 12.5px; font-weight: 600; color: var(--text-mut); padding: 2px 0;
 }
 .subtabs button.active { color: var(--text); }
 
