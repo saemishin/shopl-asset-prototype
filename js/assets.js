@@ -45,14 +45,16 @@
     if (emp) out += ` <span class="hcnt">${IC_EMP}${emp}</span>`;
     return out;
   }
-  const MEMO_IC = `<svg class="memo-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L18.5 9.5a2 2 0 0 0-3-3L5 17v3z"/><path d="M13.5 6.5l3 3"/></svg>`;
   function thumb(a) {
     if (a.photo) return `<span class="thumb" style="background:${a.photo}"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10" r="1.6"/><path d="m21 16-5-5-9 8"/></svg></span>`;
     return `<span class="thumb empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 15 5-4 4 3 4-4 5 4"/></svg></span>`;
   }
   function prodCell(a) {
-    const memo = a.note ? ` <span class="memo-flag" title="${String(a.note).replace(/"/g, '&quot;')}">${MEMO_IC}</span>` : "";
-    return `<div class="prodcell">${thumb(a)}<span class="pname">${a.product}${memo}</span></div>`;
+    return `<div class="prodcell">${thumb(a)}<span class="pname">${a.product}</span></div>`;
+  }
+  function memoCell(a) {
+    if (!a.note) return "";
+    return `<span class="memo-flag" title="${String(a.note).replace(/"/g, '&quot;')}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M9 13h5M9 17h4"/></svg></span>`;
   }
   function labelsCell(labels) {
     if (!labels || !labels.length) return '<span class="muted">—</span>';
@@ -105,7 +107,7 @@
   function view_all(list) {
     const head = `<tr>
       <th>고유관리번호</th><th>제품명</th><th>분류</th><th>자산 유형</th><th>상태</th>
-      <th>배정·보유 현황</th><th>기한</th><th>라벨</th></tr>`;
+      <th>배정·보유 현황</th><th>기한</th><th>라벨</th><th class="c">메모</th></tr>`;
     const rows = list.map(a => {
       const st = a.type === "quantity"
         ? '<span class="muted">—</span>'
@@ -119,6 +121,7 @@
         <td>${holderText(a)}</td>
         <td>${expiryCell(a.expiry)}</td>
         <td>${labelsCell(a.labels)}</td>
+        <td class="c">${memoCell(a)}</td>
       </tr>`;
     }).join("");
     return { head, rows, count: list.length };
@@ -199,7 +202,7 @@
   }
 
   function tableInner(v) {
-    const empty = `<tr><td colspan="8" style="text-align:center;color:var(--text-mut);padding:32px">조건에 맞는 자산이 없습니다</td></tr>`;
+    const empty = `<tr><td colspan="9" style="text-align:center;color:var(--text-mut);padding:32px">조건에 맞는 자산이 없습니다</td></tr>`;
     return `<table><thead>${v.head}</thead><tbody>${v.rows || empty}</tbody></table>`;
   }
   function bindRows(scope) {

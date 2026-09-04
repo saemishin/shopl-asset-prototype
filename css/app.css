@@ -247,8 +247,10 @@ td .sub { color: var(--text-mut); font-size: 11px; margin-top: 2px; }
 .thumb svg { width: 11px; height: 11px; }
 .thumb.empty { background: #eef0f2; color: var(--text-mut); }
 .prodcell .pname { min-width: 0; }
-.memo-flag { display: inline-flex; vertical-align: -2px; color: var(--text-mut); }
-.memo-flag .memo-ic { width: 13px; height: 13px; }
+th.c, td.c { text-align: center; width: 52px; }
+.memo-flag { display: inline-flex; color: var(--text-mut); cursor: default; }
+.memo-flag svg { width: 15px; height: 15px; }
+.memo-flag:hover { color: var(--text-sub); }
 
 /* ============ chips / badges ============ */
 .chip {
