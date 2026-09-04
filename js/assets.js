@@ -49,11 +49,13 @@
 
   const state = {
     view: "all",
+    search: "",
     filters: { category: [], type: [], status: [], expiry: [], labels: [], labelMode: "or" },
   };
 
   function getFiltered() {
     const f = state.filters;
+    const q = state.search.trim().toLowerCase();
     return assets.filter(a => {
       if (f.category.length && !f.category.includes(`${a.group}/${a.sub}`)) return false;
       if (f.type.length && !f.type.includes(a.type)) return false;
@@ -66,6 +68,7 @@
         const has = f.labels.filter(l => (a.labels || []).includes(l));
         if (f.labelMode === "and" ? has.length !== f.labels.length : has.length === 0) return false;
       }
+      if (q && !(`${a.product} ${a.assetNo || ""}`.toLowerCase().includes(q))) return false;
       return true;
     });
   }
@@ -198,7 +201,8 @@
       </div>
 
       <div class="searchrow">
-        <input class="search" placeholder="검색" data-stub="검색">
+        <input class="search${state.search ? ' expanded' : ''}" id="search-input"
+          placeholder="${state.search ? '고유관리번호 / 제품명' : '검색'}" value="${state.search.replace(/"/g, '&quot;')}">
         <button class="filter-btn ${nAct ? 'set' : ''}" id="btn-filter">▤ 필터${nAct ? ` <b>${nAct}</b>` : ""}</button>
         <div class="right">
           <button class="btn sm" id="btn-qr-dl">▦ QR 다운로드</button>
@@ -226,6 +230,16 @@
       tr.onclick = () => location.href = `asset-detail.html?id=${tr.dataset.id}`);
     c.querySelectorAll("[data-stub]").forEach(el =>
       el.onclick = () => toast(`"${el.dataset.stub}" — 이후 단계에서 정의`));
+
+    const si = document.getElementById("search-input");
+    si.onfocus = () => { state._sf = true; si.classList.add("expanded"); si.placeholder = "고유관리번호 / 제품명"; };
+    si.onblur = () => { state._sf = false; if (!si.value) { si.classList.remove("expanded"); si.placeholder = "검색"; } };
+    si.oninput = e => { state.search = e.target.value; state._caret = e.target.selectionStart; render(); };
+    if (state._sf) {
+      si.focus();
+      const p = state._caret != null ? state._caret : si.value.length;
+      try { si.setSelectionRange(p, p); } catch (e) {}
+    }
     c.querySelectorAll("[data-clear]").forEach(b =>
       b.onclick = () => { state.filters[JSON.parse(b.dataset.clear).k] = []; render(); });
     const clearAll = document.getElementById("fclear-all");

@@ -200,7 +200,8 @@ input { font: inherit; }
 .countrow .total b { color: var(--primary); }
 .searchrow { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
 .searchrow .right { margin-left: auto; display: flex; gap: 8px; }
-.searchrow .search { width: 280px; }
+.searchrow .search { width: 260px; transition: width .15s ease; }
+.searchrow .search.expanded { width: 380px; }
 .search {
   height: 32px; width: 220px; border: 1px solid var(--line-strong); border-radius: var(--radius);
   padding: 0 10px 0 30px; background: var(--panel) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%239aa0a6' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m21 21-4.3-4.3'/%3E%3C/svg%3E") no-repeat 9px center;
