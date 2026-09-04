@@ -141,8 +141,9 @@ input { font: inherit; }
 }
 
 /* ============ table ============ */
-.table-wrap { border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; background: var(--panel); }
-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.table-wrap { border: 1px solid var(--line); border-radius: var(--radius); overflow-x: auto; background: var(--panel); }
+table { width: 100%; border-collapse: collapse; font-size: 12.5px; min-width: 880px; }
+tbody td:nth-child(3), thead th:nth-child(3) { white-space: nowrap; }
 thead th {
   text-align: left; padding: 10px 12px; background: #fafbfc; color: var(--text-sub);
   font-weight: 600; border-bottom: 1px solid var(--line); white-space: nowrap;
