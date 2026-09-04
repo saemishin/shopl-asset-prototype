@@ -99,14 +99,15 @@ input { font: inherit; }
 .tabs a.active { color: var(--text); font-weight: 700; }
 
 .subtabs {
-  display: flex; gap: 18px;
+  display: flex; align-items: center; gap: 18px;
   background: #f6f7f8; border-bottom: 1px solid var(--line);
-  margin: -16px -28px 18px; padding: 10px 28px;
+  margin: -16px -28px 16px; padding: 8px 28px;
 }
-.subtabs button {
+.subtabs > button {
   font-size: 15px; font-weight: 600; color: var(--text-mut); padding: 2px 0;
 }
-.subtabs button.active { color: var(--text); font-weight: 700; }
+.subtabs > button.active { color: var(--text); font-weight: 700; }
+.subtabs .sub-actions { margin-left: auto; display: flex; gap: 8px; }
 
 /* ============ toolbar ============ */
 .toolbar {
@@ -175,11 +176,28 @@ input { font: inherit; }
 }
 .dropdown-menu button:hover { background: var(--primary-weak); color: var(--primary); }
 
+/* ============ stats ============ */
+.statwrap { margin-bottom: 18px; }
+.statwrap h5 { font-size: 11px; color: var(--text-mut); font-weight: 700; letter-spacing: .02em; margin: 12px 0 6px; }
+.statwrap h5:first-child { margin-top: 0; }
+.statgrid { display: flex; gap: 8px; flex-wrap: wrap; }
+.stat {
+  flex: 1; min-width: 116px; border: 1px solid var(--line); border-radius: 8px;
+  background: var(--panel); padding: 10px 12px;
+}
+.stat.click { cursor: pointer; }
+.stat.click:hover { border-color: var(--primary); background: var(--primary-weak); }
+.stat .k { font-size: 11.5px; color: var(--text-sub); }
+.stat .v { font-size: 19px; font-weight: 700; margin-top: 3px; font-variant-numeric: tabular-nums; }
+.stat .v small { font-size: 11px; font-weight: 500; color: var(--text-mut); margin-left: 3px; }
+.stat.alert .v { color: var(--danger); }
+.stat.warn .v { color: var(--warn); }
+
 /* ============ count / search rows ============ */
 .countrow { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
 .countrow .total { font-size: 13px; font-weight: 600; }
 .countrow .total b { color: var(--primary); }
-.searchrow { display: flex; align-items: center; margin-bottom: 10px; }
+.searchrow { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
 .searchrow .right { margin-left: auto; display: flex; gap: 8px; }
 .searchrow .search { width: 280px; }
 .search {

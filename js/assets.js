@@ -185,17 +185,13 @@
       <div class="subtabs">
         ${[["all","전체"],["product","제품별"],["employee","구성원별"],["worksite","근무지별"]]
           .map(([k,t]) => `<button data-view="${k}" class="${state.view===k?'active':''}">${t}</button>`).join("")}
-      </div>
-
-      <div class="toolbar">
-        <button class="filter-btn ${nAct ? 'set' : ''}" id="btn-filter">▤ 필터${nAct ? ` <b>${nAct}</b>` : ""}</button>
-        <div class="right">
-          <button class="btn primary" id="btn-add">＋ 자산 추가 <span class="chev">▾</span></button>
-          <button class="btn" id="btn-bulk">일괄 작업 <span class="chev">▾</span></button>
+        <div class="sub-actions">
+          <button class="btn primary sm" id="btn-add">＋ 자산 추가 <span class="chev">▾</span></button>
+          <button class="btn sm" id="btn-bulk">일괄 작업 <span class="chev">▾</span></button>
         </div>
       </div>
 
-      ${filterChips()}
+      ${statsHtml()}
 
       <div class="countrow">
         <span class="total">전체 <b>${v.count}</b></span>
@@ -203,11 +199,14 @@
 
       <div class="searchrow">
         <input class="search" placeholder="검색" data-stub="검색">
+        <button class="filter-btn ${nAct ? 'set' : ''}" id="btn-filter">▤ 필터${nAct ? ` <b>${nAct}</b>` : ""}</button>
         <div class="right">
           <button class="btn sm" id="btn-qr-dl">▦ QR 다운로드</button>
           <button class="btn sm" data-stub="자산 목록 엑셀 다운로드">⬇ 다운로드</button>
         </div>
       </div>
+
+      ${filterChips()}
 
       <div class="table-wrap">
         <table><thead>${v.head}</thead><tbody>${v.rows || `<tr><td colspan="8" style="text-align:center;color:var(--text-mut);padding:32px">조건에 맞는 자산이 없습니다</td></tr>`}</tbody></table>
@@ -235,6 +234,12 @@
       render();
     };
 
+    c.querySelectorAll(".stat.click").forEach(el => el.onclick = () => {
+      const p = JSON.parse(el.dataset.filter);
+      state.filters[p.k] = p.v;
+      render();
+    });
+
     document.getElementById("btn-filter").onclick = openFilterModal;
     document.getElementById("btn-add").onclick = openAddModal;
     document.getElementById("btn-qr-dl").onclick = openQrDownloadModal;
@@ -242,6 +247,56 @@
       { label: "일괄 자산 추가", fn: () => location.href = "batch-register.html" },
       { label: "일괄 배정·보유 변경", fn: () => location.href = "batch-assign.html" },
     ]);
+  }
+
+  /* ---------- stats (분류 필터까지만 반영) ---------- */
+  function catScoped() {
+    const cat = state.filters.category;
+    return cat.length ? assets.filter(a => cat.includes(`${a.group}/${a.sub}`)) : assets;
+  }
+  function computeStats() {
+    const list = catScoped();
+    const indiv = list.filter(a => a.type === "individual");
+    const qty = list.filter(a => a.type === "quantity");
+    const cnt = k => indiv.filter(a => a.status === k).length;
+    const totalQty = qty.reduce((s, a) => s + (a.stocks || []).reduce((t, x) => t + x.qty, 0), 0);
+    const zeroStocks = qty.reduce((s, a) => s + (a.stocks || []).filter(x => x.qty === 0).length, 0);
+    const expOver = list.filter(a => a.expiry && expiryKey(a.expiry) === "over").length;
+    const expSoon = list.filter(a => a.expiry && expiryKey(a.expiry) === "soon").length;
+    const assignable = indiv.length - cnt("disposed");
+    return {
+      indivN: indiv.length, qtyN: qty.length, totalQty,
+      stock: cnt("stock"), assigned: cnt("assigned"), repair: cnt("repair"),
+      lost: cnt("lost"), disposed: cnt("disposed"),
+      zeroStocks, expOver, expSoon,
+      rate: assignable ? Math.round(cnt("assigned") / assignable * 100) : 0,
+    };
+  }
+  function statTile({ k, v, sub, cls = "", filter }) {
+    const attr = filter ? ` class="stat click ${cls}" data-filter='${JSON.stringify(filter)}'` : ` class="stat ${cls}"`;
+    return `<div${attr}><div class="k">${k}</div><div class="v">${v}${sub ? ` <small>${sub}</small>` : ""}</div></div>`;
+  }
+  function statsHtml() {
+    const s = computeStats();
+    const row1 = [
+      statTile({ k: "개별형", v: s.indivN, sub: "대", filter: { k: "type", v: ["individual"] } }),
+      statTile({ k: "수량형", v: s.qtyN, sub: `품목 · 총 ${s.totalQty}개`, filter: { k: "type", v: ["quantity"] } }),
+      statTile({ k: "배정중", v: s.assigned, filter: { k: "status", v: ["assigned"] } }),
+      statTile({ k: "재고(미배정)", v: s.stock, filter: { k: "status", v: ["stock"] } }),
+      statTile({ k: "배정률", v: s.rate + "%" }),
+    ].join("");
+    const row2 = [
+      statTile({ k: "기한 지남", v: s.expOver, cls: "alert", filter: { k: "expiry", v: ["over"] } }),
+      statTile({ k: "기한 임박", v: s.expSoon, cls: "warn", filter: { k: "expiry", v: ["soon"] } }),
+      statTile({ k: "분실", v: s.lost, cls: "alert", filter: { k: "status", v: ["lost"] } }),
+      statTile({ k: "수리중", v: s.repair, cls: "warn", filter: { k: "status", v: ["repair"] } }),
+      statTile({ k: "소진 보유처", v: s.zeroStocks, cls: s.zeroStocks ? "warn" : "" }),
+    ].join("");
+    return `
+      <div class="statwrap">
+        <h5>자산 현황</h5><div class="statgrid">${row1}</div>
+        <h5>조치 필요</h5><div class="statgrid">${row2}</div>
+      </div>`;
   }
 
   function dropdown(anchor, items) {
