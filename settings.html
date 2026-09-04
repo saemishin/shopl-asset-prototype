@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>자산 · 설정 — Shopl 프로토타입</title>
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<div class="app" id="app"></div>
+<script src="js/shell.js"></script>
+<script>
+  Shell.mount({ active: "assets", title: "자산" });
+  document.getElementById("content").innerHTML = `
+    <div class="tabs">
+      <a href="assets.html">현황</a>
+      <a href="category.html">분류</a>
+      <a class="active">설정</a>
+    </div>
+    <div class="notice">자산관리 권한 설정(설정-1) — 전역. 이후 단계에서 설계.</div>
+    <div class="card" style="max-width:560px">
+      <h4>자산관리 권한</h4>
+      <div class="card-body">
+        <div class="field">
+          <label>권한 범위</label>
+          <select>
+            <option>관리자만</option>
+            <option>관리자 및 모든 리더</option>
+            <option>관리자 및 특정 리더</option>
+          </select>
+          <div class="hint">대분류·소분류 CRUD, 자산 등록·수정·삭제 / 모든 소분류에 대해 조회·배정·보유 변경 권한 자동 부여</div>
+        </div>
+      </div>
+    </div>`;
+</script>
+</body>
+</html>

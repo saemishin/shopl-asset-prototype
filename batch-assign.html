@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>일괄 배정·보유 변경 — Shopl 프로토타입</title>
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<div class="app" id="app"></div>
+<script src="js/shell.js"></script>
+<script>
+  Shell.mount({ active: "assets", title: "자산" });
+  document.getElementById("content").innerHTML = `
+    <div class="detail-head">
+      <div>
+        <div class="back"><a href="assets.html">‹ 자산 목록</a></div>
+        <h1>일괄 배정·보유 변경</h1>
+        <div class="meta">현황-7 · 페이지</div>
+      </div>
+    </div>
+    <div class="notice">선택 자산의 현재 배정/보유 상태 엑셀 다운로드 → 수정 → 업로드 → 일괄 반영. 이후 단계에서 설계.</div>
+    <div class="card" style="max-width:640px"><div class="card-body">
+      <div style="display:flex;gap:8px;margin-bottom:14px">
+        <button class="btn">① 현재 상태 다운로드</button>
+        <button class="btn primary">② 수정본 업로드</button>
+      </div>
+      <div class="ph" style="width:100%;height:120px;border:1px dashed var(--line-strong)">엑셀 파일을 여기에 드롭</div>
+    </div></div>`;
+</script>
+</body>
+</html>

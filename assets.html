@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>자산 · 현황 — Shopl 프로토타입</title>
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<div class="app" id="app"></div>
+<script src="js/shell.js"></script>
+<script src="js/data.js"></script>
+<script src="js/assets.js"></script>
+<script>
+  Shell.mount({ active: "assets", title: "자산" });
+  AssetsScreen.render();
+</script>
+</body>
+</html>

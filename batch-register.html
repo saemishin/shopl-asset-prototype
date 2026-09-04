@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>일괄 자산 등록 — Shopl 프로토타입</title>
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<div class="app" id="app"></div>
+<script src="js/shell.js"></script>
+<script>
+  Shell.mount({ active: "assets", title: "자산" });
+  document.getElementById("content").innerHTML = `
+    <div class="detail-head">
+      <div>
+        <div class="back"><a href="assets.html">‹ 자산 목록</a></div>
+        <h1>일괄 자산 등록</h1>
+        <div class="meta">현황-6 · 페이지</div>
+      </div>
+    </div>
+    <div class="notice">템플릿 다운로드 → 작성 → 업로드 → 검증 리포트 → 반영. 소분류 필드 노출 설정·필수/선택 동일 적용(사진 제외). 이후 단계에서 설계.</div>
+    <div class="card" style="max-width:640px"><div class="card-body">
+      <div style="display:flex;gap:8px;margin-bottom:14px">
+        <button class="btn">① 템플릿 다운로드</button>
+        <button class="btn primary">② 파일 업로드</button>
+      </div>
+      <div class="ph" style="width:100%;height:120px;border:1px dashed var(--line-strong)">엑셀 파일을 여기에 드롭</div>
+    </div></div>`;
+</script>
+</body>
+</html>
