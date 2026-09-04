@@ -43,7 +43,7 @@
 
   function view_all() {
     const head = `<tr>
-      <th>관리번호</th><th>제품명</th><th>분류</th><th>유형</th><th>상태</th>
+      <th>고유관리번호</th><th>제품명</th><th>분류</th><th>유형</th><th>상태</th>
       <th>배정·보유 현황</th><th>기한</th><th>라벨</th></tr>`;
     const rows = assets.map(a => {
       const st = a.type === "quantity"
