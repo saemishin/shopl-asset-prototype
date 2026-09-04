@@ -32,8 +32,8 @@
     const isIndiv = a.type === "individual";
 
     const headActions = isIndiv
-      ? actionBtns(["신규 배정", "반납", "재배정·이동", "공동 배정 추가", "상태 변경", "사진", "소분류 이동", "수정", "삭제"])
-      : actionBtns(["보유 변경", "보유 대상 추가", "사진", "소분류 이동", "수정", "삭제"]);
+      ? actionBtns(["신규 배정", "반납", "재배정·이동", "공동 배정 추가", "상태 변경", "자산 사진 등록·관리", "소분류 이동", "자산 수정", "자산 삭제"])
+      : actionBtns(["보유 변경", "보유 대상 추가", "보유 대상 제외", "자산 사진 등록·관리", "소분류 이동", "자산 수정", "자산 삭제"]);
 
     const infoRows = `
       <dl class="kv">
@@ -43,9 +43,11 @@
         ${isIndiv ? `<dt>S/N</dt><dd>${a.serial || '<span class="muted">—</span>'}</dd>` : ""}
         ${isIndiv ? `<dt>상태</dt><dd><span class="badge ${STATUS_LABEL[a.status][1]}">${STATUS_LABEL[a.status][0]}</span></dd>` : ""}
         <dt>구매일</dt><dd>${a.purchaseDate || "—"}</dd>
-        <dt>${isIndiv ? "구매가격" : "품목 단가"}</dt><dd>${a.price ? a.price.toLocaleString() + "원" : "—"}</dd>
+        <dt>${isIndiv ? "구매가격" : "구매가격 (품목 단가)"}</dt><dd>${a.price ? a.price.toLocaleString() + "원" : "—"}</dd>
+        <dt>제조연월일</dt><dd>${a.manufactured || '<span class="muted">—</span>'}</dd>
         <dt>기한</dt><dd>${expiryBadge(a.expiry)}</dd>
         <dt>라벨</dt><dd>${chips(a.labels)}</dd>
+        <dt>메모</dt><dd>${a.note || '<span class="muted">—</span>'}</dd>
       </dl>`;
 
     let rightCard;

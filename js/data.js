@@ -15,7 +15,8 @@ window.DATA = (function () {
   // 수량형 자산: stocks 행별 수량.
   const assets = [
     { id: "A001", type: "individual", assetNo: "IT-2024-0012", product: "그램 16 (2024)", group: "전자기기류", sub: "노트북",
-      status: "assigned", serial: "SN-8842-AA", purchaseDate: "2024-03-11", price: 1890000, expiry: "2027-03-10",
+      status: "assigned", serial: "SN-8842-AA", purchaseDate: "2024-03-11", price: 1890000, manufactured: "2024-01-20",
+      expiry: "2027-03-10", note: "키보드 자판 일부 마모 — 2025-06 교체 요청 이력",
       labels: ["본사", "개발팀"], assignments: [{ employee: "김민수", worksite: null, since: "2024-03-15" }] },
     { id: "A002", type: "individual", assetNo: "IT-2024-0013", product: "그램 16 (2024)", group: "전자기기류", sub: "노트북",
       status: "stock", serial: "SN-8842-AB", purchaseDate: "2024-03-11", price: 1890000, expiry: "2027-03-10",
@@ -43,7 +44,8 @@ window.DATA = (function () {
       labels: ["판교점"], assignments: [{ employee: null, worksite: "판교점", since: "2025-02-01" }] },
 
     { id: "A101", type: "quantity", assetNo: "", product: "2026 하복 유니폼", group: "소모품", sub: "유니폼",
-      status: null, serial: "", purchaseDate: "2026-04-01", price: 18000, expiry: "2027-04-01",
+      status: null, serial: "", purchaseDate: "2026-04-01", price: 18000, manufactured: "2026-03-15",
+      expiry: "2027-04-01", note: "L/XL 사이즈 위주 소진 빠름",
       labels: ["하복"], stocks: [
         { worksite: "강남점", employee: null, qty: 60 },
         { worksite: "판교점", employee: null, qty: 40 },

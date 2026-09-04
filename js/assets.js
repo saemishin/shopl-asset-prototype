@@ -43,7 +43,7 @@
 
   function view_all() {
     const head = `<tr>
-      <th>고유관리번호</th><th>제품명</th><th>분류</th><th>유형</th><th>상태</th>
+      <th>고유관리번호</th><th>제품명</th><th>분류</th><th>자산 유형</th><th>상태</th>
       <th>배정·보유 현황</th><th>기한</th><th>라벨</th></tr>`;
     const rows = assets.map(a => {
       const st = a.type === "quantity"
@@ -70,7 +70,7 @@
       if (!map.has(key)) map.set(key, { product: a.product, group: a.group, sub: a.sub, type: a.type, list: [] });
       map.get(key).list.push(a);
     });
-    const head = `<tr><th>제품명</th><th>분류</th><th>유형</th><th class="num">자산 수</th>
+    const head = `<tr><th>제품명</th><th>분류</th><th>자산 유형</th><th class="num">자산 수</th>
       <th>상태 분포</th><th class="num">총 수량</th></tr>`;
     const rows = [...map.values()].map(g => {
       let dist = "—", totalQty = "—";
