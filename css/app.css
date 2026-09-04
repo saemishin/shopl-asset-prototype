@@ -158,17 +158,30 @@ input { font: inherit; }
 .fmodal .groups .g-name .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--primary); }
 .fmodal .groups .g-sum { font-size: 11px; color: var(--text-mut); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fmodal .opts { flex: 1; overflow-y: auto; padding: 12px 16px; }
-.fmodal .opt { display: flex; align-items: center; gap: 8px; padding: 7px 2px; font-size: 12.5px; cursor: pointer; border-radius: 4px; }
-.fmodal .opt:hover { background: #f7f8f9; }
-.fmodal .opt.child { padding-left: 22px; }
-.fmodal .opt input { width: 15px; height: 15px; accent-color: var(--primary); }
+.opt { display: flex; align-items: center; gap: 8px; padding: 7px 2px; font-size: 12.5px; cursor: pointer; border-radius: 4px; }
+.opt:hover { background: #f7f8f9; }
+.opt.child { padding-left: 22px; }
+.opt input { width: 15px; height: 15px; accent-color: var(--primary); flex-shrink: 0; }
 .foot .sum { margin-right: auto; font-size: 12px; color: var(--text-sub); align-self: center; }
 
-/* ============ count row ============ */
-.countrow { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+/* ============ dropdown ============ */
+.dropdown-menu {
+  background: var(--panel); border: 1px solid var(--line-strong); border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.12); padding: 4px; z-index: 150;
+}
+.dropdown-menu button {
+  display: block; width: 100%; text-align: left; padding: 8px 12px; font-size: 12.5px;
+  border-radius: 6px; white-space: nowrap;
+}
+.dropdown-menu button:hover { background: var(--primary-weak); color: var(--primary); }
+
+/* ============ count / search rows ============ */
+.countrow { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
 .countrow .total { font-size: 13px; font-weight: 600; }
 .countrow .total b { color: var(--primary); }
-.countrow .right { margin-left: auto; display: flex; gap: 8px; }
+.searchrow { display: flex; align-items: center; margin-bottom: 10px; }
+.searchrow .right { margin-left: auto; display: flex; gap: 8px; }
+.searchrow .search { width: 280px; }
 .search {
   height: 32px; width: 220px; border: 1px solid var(--line-strong); border-radius: var(--radius);
   padding: 0 10px 0 30px; background: var(--panel) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%239aa0a6' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m21 21-4.3-4.3'/%3E%3C/svg%3E") no-repeat 9px center;

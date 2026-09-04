@@ -189,12 +189,9 @@
 
       <div class="toolbar">
         <button class="filter-btn ${nAct ? 'set' : ''}" id="btn-filter">▤ 필터${nAct ? ` <b>${nAct}</b>` : ""}</button>
-        <input class="search" placeholder="검색" data-stub="검색">
         <div class="right">
           <button class="btn primary" id="btn-add">＋ 자산 추가 <span class="chev">▾</span></button>
-          <button class="btn" id="btn-bulk-add">일괄 자산 추가</button>
-          <button class="btn" id="btn-bulk-assign">일괄 배정·보유 변경</button>
-          <button class="btn" id="btn-qr">QR 라벨</button>
+          <button class="btn" id="btn-bulk">일괄 작업 <span class="chev">▾</span></button>
         </div>
       </div>
 
@@ -202,9 +199,13 @@
 
       <div class="countrow">
         <span class="total">전체 <b>${v.count}</b></span>
+      </div>
+
+      <div class="searchrow">
+        <input class="search" placeholder="검색" data-stub="검색">
         <div class="right">
-          <button class="btn sm" data-stub="보기 설정">▤ 보기 설정</button>
-          <button class="btn sm" data-stub="다운로드">⬇ 다운로드</button>
+          <button class="btn sm" id="btn-qr-dl">▦ QR 다운로드</button>
+          <button class="btn sm" data-stub="자산 목록 엑셀 다운로드">⬇ 다운로드</button>
         </div>
       </div>
 
@@ -236,9 +237,26 @@
 
     document.getElementById("btn-filter").onclick = openFilterModal;
     document.getElementById("btn-add").onclick = openAddModal;
-    document.getElementById("btn-qr").onclick = openQrModal;
-    document.getElementById("btn-bulk-add").onclick = () => location.href = "batch-register.html";
-    document.getElementById("btn-bulk-assign").onclick = () => location.href = "batch-assign.html";
+    document.getElementById("btn-qr-dl").onclick = openQrDownloadModal;
+    document.getElementById("btn-bulk").onclick = e => dropdown(e.currentTarget, [
+      { label: "일괄 자산 추가", fn: () => location.href = "batch-register.html" },
+      { label: "일괄 배정·보유 변경", fn: () => location.href = "batch-assign.html" },
+    ]);
+  }
+
+  function dropdown(anchor, items) {
+    document.querySelectorAll(".dropdown-menu").forEach(m => m.remove());
+    const menu = document.createElement("div");
+    menu.className = "dropdown-menu";
+    menu.innerHTML = items.map((it, i) => `<button data-i="${i}">${it.label}</button>`).join("");
+    const r = anchor.getBoundingClientRect();
+    menu.style.cssText = `position:fixed;top:${r.bottom + 4}px;left:${r.left}px;min-width:${Math.max(r.width, 160)}px`;
+    document.body.appendChild(menu);
+    menu.querySelectorAll("button").forEach(b => b.onclick = () => { menu.remove(); items[+b.dataset.i].fn(); });
+    setTimeout(() => {
+      const close = e => { if (!menu.contains(e.target)) { menu.remove(); document.removeEventListener("click", close); } };
+      document.addEventListener("click", close);
+    });
   }
 
   /* ---------- filter modal ---------- */
@@ -410,22 +428,41 @@
     m.querySelector("#save").addEventListener("click", () => toast("저장되었습니다 (프로토타입 — 반영 없음)"));
   }
 
-  function openQrModal() {
-    modal(`
-      <div class="modal">
-        <h3>QR 라벨 조회·다운로드</h3>
-        <div class="body">
-          <div class="notice">선택한 자산이 없어 <b>전체 기준 예시</b>를 표시합니다. 실제로는 목록에서 선택한 자산의 라벨을 일괄 다운로드합니다.</div>
-          <div class="photos" style="justify-content:center;margin:8px 0 4px">
-            <div class="ph" style="width:150px;height:150px;font-size:12px">QR</div>
-          </div>
-          <p class="hint" style="text-align:center">자산 등록 시 자동 생성 · payload = 앱 자산 상세 딥링크</p>
+  function openQrDownloadModal() {
+    const list = getFiltered();
+    const rows = list.map(a => `<label class="opt">
+      <input type="checkbox" data-id="${a.id}">
+      <span style="flex:1">${a.product} <span class="muted">${a.assetNo || a.id}</span></span>
+      <span class="type-pill">${TYPE_LABEL[a.type]}</span></label>`).join("");
+    const m = modal(`
+      <div class="modal lg">
+        <h3>QR 라벨 다운로드</h3>
+        <div class="body" style="max-height:52vh;overflow:auto;padding-top:6px">
+          <div class="hint" style="margin-bottom:6px">현재 목록 기준 ${list.length}건. QR 라벨을 내려받을 자산을 선택하세요.</div>
+          <label class="opt" style="border-bottom:1px solid var(--line);font-weight:600">
+            <input type="checkbox" id="qr-all"> 전체 선택</label>
+          ${rows || '<p class="muted" style="padding:16px 0">대상 자산이 없습니다</p>'}
         </div>
         <div class="foot">
-          <button class="btn" data-close>닫기</button>
-          <button class="btn primary" data-close>PDF 다운로드</button>
+          <span class="sum" id="qr-sum">선택 0건</span>
+          <button class="btn" data-close>취소</button>
+          <button class="btn primary" id="qr-go" disabled>다운로드</button>
         </div>
       </div>`);
+    const boxes = () => [...m.querySelectorAll('.body input[data-id]')];
+    const upd = () => {
+      const n = boxes().filter(b => b.checked).length;
+      m.querySelector("#qr-sum").textContent = `선택 ${n}건`;
+      m.querySelector("#qr-go").disabled = !n;
+      const all = m.querySelector("#qr-all");
+      all.checked = n > 0 && n === boxes().length;
+    };
+    m.querySelector("#qr-all").onchange = e => { boxes().forEach(b => b.checked = e.target.checked); upd(); };
+    boxes().forEach(b => b.onchange = upd);
+    m.querySelector("#qr-go").onclick = () => {
+      toast(`QR 라벨 ${boxes().filter(b => b.checked).length}건 다운로드 (프로토타입)`);
+      m.remove();
+    };
   }
 
   function toast(msg) {
