@@ -236,7 +236,8 @@
 
     c.querySelectorAll(".stat.click").forEach(el => el.onclick = () => {
       const p = JSON.parse(el.dataset.filter);
-      state.filters[p.k] = p.v;
+      const base = { category: state.filters.category, type: [], status: [], expiry: [], labels: [], labelMode: state.filters.labelMode };
+      state.filters = cardActive(p) ? base : { ...base, [p.k]: p.v };
       render();
     });
 
@@ -272,8 +273,14 @@
       rate: assignable ? Math.round(cnt("assigned") / assignable * 100) : 0,
     };
   }
+  function arrEq(a, b) { a = a || []; b = b || []; return a.length === b.length && a.every(x => b.includes(x)); }
+  function cardActive(f) {
+    const s = state.filters;
+    return ["type", "status", "expiry", "labels"].every(d => d === f.k ? arrEq(s[d], f.v) : !(s[d] || []).length);
+  }
   function statTile({ k, v, sub, cls = "", filter }) {
-    const attr = filter ? ` class="stat click ${cls}" data-filter='${JSON.stringify(filter)}'` : ` class="stat ${cls}"`;
+    const on = filter && cardActive(filter) ? " active" : "";
+    const attr = filter ? ` class="stat click ${cls}${on}" data-filter='${JSON.stringify(filter)}'` : ` class="stat ${cls}"`;
     return `<div${attr}><div class="k">${k}</div><div class="v">${v}${sub ? ` <small>${sub}</small>` : ""}</div></div>`;
   }
   function statsHtml() {
