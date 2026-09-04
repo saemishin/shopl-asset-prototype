@@ -7,20 +7,19 @@
     stock: ["재고", "stock"], assigned: ["배정중", "assigned"], repair: ["수리중", "repair"],
     lost: ["분실", "lost"], disposed: ["폐기", "disposed"],
   };
+  const STATUS_ORDER = ["stock", "assigned", "repair", "lost", "disposed"];
   const TYPE_LABEL = { individual: "개별형", quantity: "수량형" };
+  const EXP_LABEL = { valid: "유효", soon: "임박", over: "지남", none: "미설정" };
 
-  function expiryBucket(d) {
-    if (!d) return null;
-    const dt = new Date(d);
-    const days = Math.ceil((dt - TODAY) / 86400000);
-    if (days < 0) return { k: "over", t: "지남", c: "exp-over" };
-    if (days <= 7) return { k: "soon", t: "임박", c: "exp-soon" };
-    return { k: "valid", t: "유효", c: "exp-valid" };
+  function expiryKey(d) {
+    if (!d) return "none";
+    const days = Math.ceil((new Date(d) - TODAY) / 86400000);
+    return days < 0 ? "over" : days <= 7 ? "soon" : "valid";
   }
   function expiryCell(d) {
     if (!d) return '<span class="muted">—</span>';
-    const b = expiryBucket(d);
-    return `${d} <span class="badge ${b.c}">${b.t}</span>`;
+    const k = expiryKey(d);
+    return `${d} <span class="badge exp-${k}">${EXP_LABEL[k]}</span>`;
   }
   function holderText(a) {
     if (a.type === "individual") {
@@ -29,23 +28,58 @@
       return names.length === 1 ? names[0] : `${names[0]} <span class="muted">외 ${names.length - 1}</span>`;
     }
     const total = (a.stocks || []).reduce((s, x) => s + x.qty, 0);
-    const places = (a.stocks || []).length;
-    return `${total}개 <span class="muted">/ ${places}곳</span>`;
+    return `${total}개 <span class="muted">/ ${(a.stocks || []).length}곳</span>`;
   }
   function labelsCell(labels) {
     if (!labels || !labels.length) return '<span class="muted">—</span>';
     const show = labels.slice(0, 2).map(l => `<span class="tag">${l}</span>`).join("");
-    const more = labels.length > 2 ? `<span class="muted">+${labels.length - 2}</span>` : "";
-    return show + more;
+    return show + (labels.length > 2 ? `<span class="muted">+${labels.length - 2}</span>` : "");
   }
 
-  const state = { view: "all", page: 1 };
+  /* ---------- state & filtering ---------- */
+  const ALL_LABELS = [...new Set(assets.flatMap(a => a.labels || []))].sort();
+  const CAT_GROUPS = (() => {
+    const m = new Map();
+    window.DATA.categories.forEach(c => {
+      if (!m.has(c.group)) m.set(c.group, []);
+      m.get(c.group).push(c.sub);
+    });
+    return m;
+  })();
 
-  function view_all() {
+  const state = {
+    view: "all",
+    filters: { category: [], type: [], status: [], expiry: [], labels: [], labelMode: "or" },
+  };
+
+  function getFiltered() {
+    const f = state.filters;
+    return assets.filter(a => {
+      if (f.category.length && !f.category.includes(`${a.group}/${a.sub}`)) return false;
+      if (f.type.length && !f.type.includes(a.type)) return false;
+      if (f.status.length) {
+        if (a.type !== "individual") return false;
+        if (!f.status.includes(a.status)) return false;
+      }
+      if (f.expiry.length && !f.expiry.includes(expiryKey(a.expiry))) return false;
+      if (f.labels.length) {
+        const has = f.labels.filter(l => (a.labels || []).includes(l));
+        if (f.labelMode === "and" ? has.length !== f.labels.length : has.length === 0) return false;
+      }
+      return true;
+    });
+  }
+  function activeFilterCount() {
+    const f = state.filters;
+    return f.category.length + f.type.length + f.status.length + f.expiry.length + f.labels.length;
+  }
+
+  /* ---------- views ---------- */
+  function view_all(list) {
     const head = `<tr>
       <th>고유관리번호</th><th>제품명</th><th>분류</th><th>자산 유형</th><th>상태</th>
       <th>배정·보유 현황</th><th>기한</th><th>라벨</th></tr>`;
-    const rows = assets.map(a => {
+    const rows = list.map(a => {
       const st = a.type === "quantity"
         ? '<span class="muted">—</span>'
         : `<span class="badge ${STATUS_LABEL[a.status][1]}">${STATUS_LABEL[a.status][0]}</span>`;
@@ -60,12 +94,12 @@
         <td>${labelsCell(a.labels)}</td>
       </tr>`;
     }).join("");
-    return { head, rows, count: assets.length };
+    return { head, rows, count: list.length };
   }
 
-  function view_product() {
+  function view_product(list) {
     const map = new Map();
-    assets.forEach(a => {
+    list.forEach(a => {
       const key = a.sub + "|" + a.product;
       if (!map.has(key)) map.set(key, { product: a.product, group: a.group, sub: a.sub, type: a.type, list: [] });
       map.get(key).list.push(a);
@@ -77,7 +111,7 @@
       if (g.type === "individual") {
         const c = {};
         g.list.forEach(a => c[a.status] = (c[a.status] || 0) + 1);
-        dist = Object.entries(c).map(([k, v]) => `${STATUS_LABEL[k][0]} ${v}`).join(" · ");
+        dist = STATUS_ORDER.filter(k => c[k]).map(k => `${STATUS_LABEL[k][0]} ${c[k]}`).join(" · ");
       } else {
         totalQty = g.list.reduce((s, a) => s + (a.stocks || []).reduce((t, x) => t + x.qty, 0), 0);
       }
@@ -93,20 +127,16 @@
     return { head, rows, count: map.size };
   }
 
-  function view_axis(axis) {
-    // axis: 'employee' | 'worksite'
+  function view_axis(list, axis) {
     const map = new Map();
     const bump = (name, kind, n) => {
       if (!name) return;
       if (!map.has(name)) map.set(name, { name, indiv: 0, qty: 0 });
       map.get(name)[kind] += n;
     };
-    assets.forEach(a => {
-      if (a.type === "individual") {
-        (a.assignments || []).forEach(x => bump(x[axis], "indiv", 1)); // 공동배정: 행별 1건 / 복합: 양축 각각
-      } else {
-        (a.stocks || []).forEach(x => bump(x[axis], "qty", x.qty));
-      }
+    list.forEach(a => {
+      if (a.type === "individual") (a.assignments || []).forEach(x => bump(x[axis], "indiv", 1));
+      else (a.stocks || []).forEach(x => bump(x[axis], "qty", x.qty));
     });
     const label = axis === "employee" ? "구성원" : "근무지";
     const head = `<tr><th>${label}</th><th class="num">배정 자산 수(개별형)</th><th class="num">보유 수량(수량형)</th></tr>`;
@@ -119,15 +149,32 @@
   }
 
   function currentView() {
-    if (state.view === "all") return view_all();
-    if (state.view === "product") return view_product();
-    if (state.view === "employee") return view_axis("employee");
-    if (state.view === "worksite") return view_axis("worksite");
+    const list = getFiltered();
+    if (state.view === "all") return view_all(list);
+    if (state.view === "product") return view_product(list);
+    if (state.view === "employee") return view_axis(list, "employee");
+    if (state.view === "worksite") return view_axis(list, "worksite");
+  }
+
+  /* ---------- render ---------- */
+  function filterChips() {
+    const f = state.filters;
+    const chips = [];
+    const push = (grp, label, clear) => chips.push(
+      `<span class="fchip">${label}<button data-clear='${JSON.stringify(clear)}'>✕</button></span>`);
+    if (f.category.length) push("category", `분류: ${f.category.map(c => c.split("/")[1]).join("·")}`, { k: "category" });
+    if (f.type.length) push("type", `자산 유형: ${f.type.map(t => TYPE_LABEL[t]).join("·")}`, { k: "type" });
+    if (f.status.length) push("status", `상태: ${f.status.map(s => STATUS_LABEL[s][0]).join("·")}`, { k: "status" });
+    if (f.expiry.length) push("expiry", `기한: ${f.expiry.map(e => EXP_LABEL[e]).join("·")}`, { k: "expiry" });
+    if (f.labels.length) push("labels", `라벨(${f.labelMode.toUpperCase()}): ${f.labels.join("·")}`, { k: "labels" });
+    if (!chips.length) return "";
+    return `<div class="filterbar">${chips.join("")}<button class="fclear" id="fclear-all">전체 해제</button></div>`;
   }
 
   function render() {
     const c = document.getElementById("content");
     const v = currentView();
+    const nAct = activeFilterCount();
     c.innerHTML = `
       <div class="tabs">
         <a class="active">현황</a>
@@ -141,10 +188,8 @@
       </div>
 
       <div class="toolbar">
-        <button class="filter-btn" data-stub="분류 필터(트리)">▤ 전체 분류 <span class="chev">▾</span></button>
-        <button class="filter-btn" data-stub="상태 필터">상태 <span class="chev">▾</span></button>
-        <button class="filter-btn" data-stub="기한 필터">기한 <span class="chev">▾</span></button>
-        <button class="filter-btn" data-stub="라벨 필터">라벨 <span class="chev">▾</span></button>
+        <button class="filter-btn ${nAct ? 'set' : ''}" id="btn-filter">▤ 필터${nAct ? ` <b>${nAct}</b>` : ""}</button>
+        <input class="search" placeholder="검색" data-stub="검색">
         <div class="right">
           <button class="btn primary" id="btn-add">＋ 자산 추가 <span class="chev">▾</span></button>
           <button class="btn" id="btn-bulk-add">일괄 자산 추가</button>
@@ -153,17 +198,18 @@
         </div>
       </div>
 
+      ${filterChips()}
+
       <div class="countrow">
         <span class="total">전체 <b>${v.count}</b></span>
         <div class="right">
-          <input class="search" placeholder="검색" data-stub="검색">
           <button class="btn sm" data-stub="보기 설정">▤ 보기 설정</button>
           <button class="btn sm" data-stub="다운로드">⬇ 다운로드</button>
         </div>
       </div>
 
       <div class="table-wrap">
-        <table><thead>${v.head}</thead><tbody>${v.rows}</tbody></table>
+        <table><thead>${v.head}</thead><tbody>${v.rows || `<tr><td colspan="8" style="text-align:center;color:var(--text-mut);padding:32px">조건에 맞는 자산이 없습니다</td></tr>`}</tbody></table>
       </div>
 
       <div class="pager">
@@ -175,21 +221,150 @@
     `;
 
     c.querySelectorAll(".subtabs button").forEach(b =>
-      b.onclick = () => { state.view = b.dataset.view; state.page = 1; render(); });
-
+      b.onclick = () => { state.view = b.dataset.view; render(); });
     c.querySelectorAll("tbody tr.clickable").forEach(tr =>
       tr.onclick = () => location.href = `asset-detail.html?id=${tr.dataset.id}`);
-
     c.querySelectorAll("[data-stub]").forEach(el =>
       el.onclick = () => toast(`"${el.dataset.stub}" — 이후 단계에서 정의`));
+    c.querySelectorAll("[data-clear]").forEach(b =>
+      b.onclick = () => { state.filters[JSON.parse(b.dataset.clear).k] = []; render(); });
+    const clearAll = document.getElementById("fclear-all");
+    if (clearAll) clearAll.onclick = () => {
+      state.filters = { category: [], type: [], status: [], expiry: [], labels: [], labelMode: "or" };
+      render();
+    };
 
+    document.getElementById("btn-filter").onclick = openFilterModal;
     document.getElementById("btn-add").onclick = openAddModal;
     document.getElementById("btn-qr").onclick = openQrModal;
     document.getElementById("btn-bulk-add").onclick = () => location.href = "batch-register.html";
     document.getElementById("btn-bulk-assign").onclick = () => location.href = "batch-assign.html";
   }
 
-  /* ---------- modals ---------- */
+  /* ---------- filter modal ---------- */
+  function openFilterModal() {
+    const draft = JSON.parse(JSON.stringify(state.filters));
+    let group = "category";
+
+    const GROUPS = [
+      { k: "category", name: "분류" },
+      { k: "type", name: "자산 유형" },
+      { k: "status", name: "상태" },
+      { k: "expiry", name: "기한" },
+      { k: "labels", name: "라벨" },
+    ];
+    const summary = k => {
+      if (k === "category") return draft.category.length ? draft.category.map(c => c.split("/")[1]).join(", ") : "전체";
+      if (k === "type") return draft.type.length ? draft.type.map(t => TYPE_LABEL[t]).join(", ") : "전체";
+      if (k === "status") return draft.status.length ? draft.status.map(s => STATUS_LABEL[s][0]).join(", ") : "전체";
+      if (k === "expiry") return draft.expiry.length ? draft.expiry.map(e => EXP_LABEL[e]).join(", ") : "전체";
+      if (k === "labels") return draft.labels.length ? `${draft.labels.join(", ")} · ${draft.labelMode.toUpperCase()}` : "전체";
+    };
+
+    const back = modal(`
+      <div class="modal lg">
+        <h3>필터</h3>
+        <div class="fmodal">
+          <div class="groups" id="f-groups"></div>
+          <div class="opts" id="f-opts"></div>
+        </div>
+        <div class="foot">
+          <span class="sum" id="f-sum"></span>
+          <button class="btn" id="f-reset">초기화</button>
+          <button class="btn" data-close>취소</button>
+          <button class="btn primary" id="f-apply">적용</button>
+        </div>
+      </div>`);
+
+    function drawGroups() {
+      back.querySelector("#f-groups").innerHTML = GROUPS.map(g => {
+        const active = draft[g.k] && draft[g.k].length;
+        return `<button data-g="${g.k}" class="${g.k === group ? "active" : ""}">
+          <span class="g-name">${active ? '<span class="dot"></span>' : ""}${g.name}</span>
+          <span class="g-sum">${summary(g.k)}</span></button>`;
+      }).join("");
+      back.querySelectorAll("#f-groups button").forEach(b =>
+        b.onclick = () => { group = b.dataset.g; drawGroups(); drawOpts(); });
+    }
+
+    function optRow(checked, label, val, cls = "") {
+      return `<label class="opt ${cls}"><input type="checkbox" data-v="${val}" ${checked ? "checked" : ""}>${label}</label>`;
+    }
+
+    function drawOpts() {
+      const box = back.querySelector("#f-opts");
+      if (group === "category") {
+        box.innerHTML = [...CAT_GROUPS.entries()].map(([g, subs]) => {
+          const keys = subs.map(s => `${g}/${s}`);
+          const all = keys.every(k => draft.category.includes(k));
+          const parent = optRow(all, `<b>${g}</b>`, `grp:${g}`);
+          const kids = subs.map(s => optRow(draft.category.includes(`${g}/${s}`), s, `${g}/${s}`, "child")).join("");
+          return parent + kids;
+        }).join("");
+      } else if (group === "type") {
+        box.innerHTML = Object.entries(TYPE_LABEL).map(([v, l]) => optRow(draft.type.includes(v), l, v)).join("");
+      } else if (group === "status") {
+        box.innerHTML = `<p class="hint" style="margin-bottom:6px">개별형 자산에만 적용</p>` +
+          STATUS_ORDER.map(v => optRow(draft.status.includes(v), STATUS_LABEL[v][0], v)).join("");
+      } else if (group === "expiry") {
+        box.innerHTML = Object.entries(EXP_LABEL).map(([v, l]) => optRow(draft.expiry.includes(v), l, v)).join("");
+      } else if (group === "labels") {
+        box.innerHTML = `
+          <div class="field" style="margin-bottom:10px">
+            <label>다중 선택 조건</label>
+            <div class="seg" id="lbl-mode">
+              <button data-m="or" class="${draft.labelMode === "or" ? "active" : ""}">OR (하나라도)</button>
+              <button data-m="and" class="${draft.labelMode === "and" ? "active" : ""}">AND (모두)</button>
+            </div>
+          </div>` +
+          ALL_LABELS.map(l => optRow(draft.labels.includes(l), l, l)).join("");
+        box.querySelector("#lbl-mode").onclick = e => {
+          const b = e.target.closest("button"); if (!b) return;
+          draft.labelMode = b.dataset.m; drawOpts(); drawGroups();
+        };
+      }
+
+      box.querySelectorAll('input[type=checkbox]').forEach(cb => cb.onchange = () => {
+        const v = cb.dataset.v;
+        if (group === "category") {
+          if (v.startsWith("grp:")) {
+            const g = v.slice(4);
+            const keys = CAT_GROUPS.get(g).map(s => `${g}/${s}`);
+            draft.category = cb.checked
+              ? [...new Set([...draft.category, ...keys])]
+              : draft.category.filter(k => !keys.includes(k));
+          } else {
+            draft.category = cb.checked ? [...draft.category, v] : draft.category.filter(k => k !== v);
+          }
+        } else {
+          const arr = draft[group];
+          draft[group] = cb.checked ? [...arr, v] : arr.filter(x => x !== v);
+        }
+        drawOpts(); drawGroups(); drawSum();
+      });
+      drawSum();
+    }
+    function drawSum() {
+      const n = (draft[group] || []).length;
+      back.querySelector("#f-sum").textContent = group === "labels" || group === "category"
+        ? `선택됨 ${n}` : `선택됨 ${n}`;
+    }
+
+    back.querySelector("#f-reset").onclick = () => {
+      Object.assign(draft, { category: [], type: [], status: [], expiry: [], labels: [], labelMode: "or" });
+      drawGroups(); drawOpts();
+    };
+    back.querySelector("#f-apply").onclick = () => {
+      state.filters = draft;
+      back.remove();
+      render();
+    };
+
+    drawGroups();
+    drawOpts();
+  }
+
+  /* ---------- other modals ---------- */
   function modal(html) {
     const back = document.createElement("div");
     back.className = "modal-back";
