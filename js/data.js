@@ -11,8 +11,8 @@ window.DATA = (function () {
     { group: "소모품", sub: "문구류", type: "quantity" },
   ];
 
-  // 개별형 자산: 활성 배정(assignments) 0~N건. worksite/employee 중 최소 1.
-  // 수량형 자산: stocks 행별 수량.
+  // 개별 자산: 활성 배정(assignments) 0~N건. 각 레코드는 worksite/employee 중 정확히 1개.
+  // 수량 자산: stocks 행별 수량. 각 행은 worksite/employee 중 정확히 1개.
   const assets = [
     { id: "A001", type: "individual", assetNo: "IT-2024-0012", product: "그램 16 (2024)", group: "전자기기류", sub: "노트북",
       status: "assigned", serial: "SN-8842-AA", purchaseDate: "2024-03-11", price: 1890000, manufactured: "2024-01-20",
@@ -31,7 +31,8 @@ window.DATA = (function () {
     { id: "A005", type: "individual", assetNo: "FN-2022-0032", product: "시디즈 T50", group: "가구류", sub: "의자",
       status: "assigned", serial: "", purchaseDate: "2022-05-20", price: 320000, expiry: "",
       labels: [], assignments: [
-        { employee: "박지훈", worksite: "강남점", since: "2023-01-04" },
+        { employee: "박지훈", worksite: null, since: "2023-01-04" },
+        { employee: null, worksite: "강남점", since: "2023-06-01" },
         { employee: null, worksite: "판교점", since: "2024-02-11" },
       ] },
     { id: "A006", type: "individual", assetNo: "IT-2021-0005", product: "델 U2720Q", group: "전자기기류", sub: "모니터",
@@ -51,7 +52,7 @@ window.DATA = (function () {
       labels: ["하복"], stocks: [
         { worksite: "강남점", employee: null, qty: 60 },
         { worksite: "판교점", employee: null, qty: 40 },
-        { worksite: "강남점", employee: "김철수", qty: 12 },
+        { worksite: null, employee: "김철수", qty: 12 },
       ] },
     { id: "A102", type: "quantity", assetNo: "", product: "USB-C 케이블 2m", group: "전자기기류", sub: "케이블·액세서리",
       status: null, serial: "", purchaseDate: "2025-09-10", price: 9000, expiry: "",
