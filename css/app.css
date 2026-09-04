@@ -11,6 +11,7 @@
   --primary: #2f6df6;
   --primary-weak: #eef3ff;
   --primary-press: #1f57d6;
+  --topbar-bg: #1b1d1f;
   --danger: #e5484d;
   --warn: #e79a2b;
   --ok: #1f9d55;
@@ -46,15 +47,16 @@ input { font: inherit; }
 /* ============ sidebar ============ */
 .brand {
   height: var(--topbar-h); display: flex; align-items: center; gap: 8px;
-  padding: 0 16px; border-bottom: 1px solid var(--line); flex-shrink: 0;
+  padding: 0 16px; flex-shrink: 0;
+  background: var(--topbar-bg); color: #fff;
 }
 .brand .logo {
-  width: 26px; height: 26px; border-radius: 6px; background: #111;
-  color: #fff; font-weight: 700; font-size: 11px;
+  width: 26px; height: 26px; border-radius: 6px; background: #fff;
+  color: #111; font-weight: 700; font-size: 11px;
   display: flex; align-items: center; justify-content: center; letter-spacing: -.5px;
 }
 .brand .co { font-weight: 600; font-size: 13px; }
-.brand .collapse { margin-left: auto; color: var(--text-mut); }
+.brand .collapse { margin-left: auto; color: rgba(255,255,255,.55); }
 
 .nav { padding: 8px 0 24px; flex: 1; }
 .nav-group { margin-top: 10px; }
@@ -72,15 +74,14 @@ input { font: inherit; }
 
 /* ============ topbar ============ */
 .topbar {
-  height: var(--topbar-h); flex-shrink: 0; background: var(--panel);
-  border-bottom: 1px solid var(--line);
+  height: var(--topbar-h); flex-shrink: 0; background: var(--topbar-bg); color: #fff;
   display: flex; align-items: center; gap: 14px; padding: 0 20px;
   position: sticky; top: 0; z-index: 20;
 }
 .topbar .page-title { font-size: 15px; font-weight: 700; }
 .topbar .spacer { flex: 1; }
-.topbar .t-ic { color: var(--text-mut); font-size: 14px; padding: 6px; }
-.topbar .lang { color: var(--text-sub); font-size: 12px; }
+.topbar .t-ic { color: rgba(255,255,255,.7); font-size: 14px; padding: 6px; }
+.topbar .lang { color: rgba(255,255,255,.8); font-size: 12px; }
 .topbar .avatar {
   width: 28px; height: 28px; border-radius: 50%;
   background: linear-gradient(135deg,#5b8def,#8f6ef0); color: #fff;
