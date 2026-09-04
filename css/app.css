@@ -94,19 +94,19 @@ input { font: inherit; }
   display: flex; gap: 24px; border-bottom: 1px solid var(--line); margin-bottom: 16px;
 }
 .tabs a {
-  padding: 12px 2px; font-size: 15px; font-weight: 600; color: var(--text-mut);
+  padding: 11px 2px; font-size: 13px; font-weight: 600; color: var(--text-mut);
 }
 .tabs a.active { color: var(--text); font-weight: 700; }
 
 .subtabs {
   display: flex; gap: 18px;
   background: #f6f7f8; border-bottom: 1px solid var(--line);
-  margin: -16px -28px 18px; padding: 9px 28px;
+  margin: -16px -28px 18px; padding: 10px 28px;
 }
 .subtabs button {
-  font-size: 12.5px; font-weight: 600; color: var(--text-mut); padding: 2px 0;
+  font-size: 15px; font-weight: 600; color: var(--text-mut); padding: 2px 0;
 }
-.subtabs button.active { color: var(--text); }
+.subtabs button.active { color: var(--text); font-weight: 700; }
 
 /* ============ toolbar ============ */
 .toolbar {
