@@ -21,14 +21,29 @@
     const k = expiryKey(d);
     return `${d} <span class="badge exp-${k}">${EXP_LABEL[k]}</span>`;
   }
+  const IC_EMP = `<svg class="hi" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5.5 20c0-4 3-6.5 6.5-6.5s6.5 2.5 6.5 6.5"/></svg>`;
+  const IC_WS = `<svg class="hi" viewBox="0 0 24 24"><path d="M4 20V9.5L12 4l8 5.5V20"/><path d="M9.5 20v-5h5v5"/></svg>`;
+  function holderOne(x) {
+    const p = [];
+    if (x.employee) p.push(`${IC_EMP}${x.employee}`);
+    if (x.worksite) p.push(`${IC_WS}${x.worksite}`);
+    return p.join(" ");
+  }
   function holderText(a) {
     if (a.type === "individual") {
-      if (!a.assignments || !a.assignments.length) return '<span class="muted">재고</span>';
-      const names = a.assignments.map(x => [x.employee, x.worksite].filter(Boolean).join("·"));
-      return names.length === 1 ? names[0] : `${names[0]} <span class="muted">외 ${names.length - 1}</span>`;
+      const as = a.assignments || [];
+      if (!as.length) return '<span class="muted">미배정</span>';
+      const first = holderOne(as[0]);
+      return as.length > 1 ? `${first} <span class="muted">+${as.length - 1}</span>` : first;
     }
-    const total = (a.stocks || []).reduce((s, x) => s + x.qty, 0);
-    return `${total}개 <span class="muted">/ ${(a.stocks || []).length}곳</span>`;
+    const stocks = a.stocks || [];
+    const total = stocks.reduce((s, x) => s + x.qty, 0);
+    const ws = new Set(stocks.filter(x => x.worksite).map(x => x.worksite)).size;
+    const emp = new Set(stocks.filter(x => x.employee).map(x => x.employee)).size;
+    let out = `${total}개`;
+    if (ws) out += ` <span class="hcnt">${IC_WS}${ws}</span>`;
+    if (emp) out += ` <span class="hcnt">${IC_EMP}${emp}</span>`;
+    return out;
   }
   function labelsCell(labels) {
     if (!labels || !labels.length) return '<span class="muted">—</span>';

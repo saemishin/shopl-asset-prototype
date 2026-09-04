@@ -15,6 +15,15 @@
   }
   const chips = arr => (arr && arr.length) ? arr.map(l => `<span class="tag">${l}</span>`).join("") : '<span class="muted">—</span>';
 
+  const IC_EMP = `<svg class="hi" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5.5 20c0-4 3-6.5 6.5-6.5s6.5 2.5 6.5 6.5"/></svg>`;
+  const IC_WS = `<svg class="hi" viewBox="0 0 24 24"><path d="M4 20V9.5L12 4l8 5.5V20"/><path d="M9.5 20v-5h5v5"/></svg>`;
+  const holderOne = x => {
+    const p = [];
+    if (x.employee) p.push(`${IC_EMP}${x.employee}`);
+    if (x.worksite) p.push(`${IC_WS}${x.worksite}`);
+    return p.join(" ");
+  };
+
   function toast(msg) {
     const t = document.createElement("div");
     t.textContent = msg;
@@ -54,10 +63,10 @@
     if (isIndiv) {
       const rows = (a.assignments && a.assignments.length)
         ? a.assignments.map(x => `<div class="subrow">
-            <span>${[x.employee, x.worksite].filter(Boolean).join(" · ")}</span>
+            <span>${holderOne(x)}</span>
             <span class="muted" style="margin-left:auto">${x.since}~</span>
             <button class="btn sm" data-act="개별 반납">반납</button></div>`).join("")
-        : '<p class="muted">활성 배정 없음 — 재고 상태</p>';
+        : '<p class="muted">배정 없음 (재고)</p>';
       rightCard = `<div class="card"><h4>배정 현황 ${a.assignments && a.assignments.length > 1 ? '<span class="chip">공동 배정 ' + a.assignments.length + '건</span>' : ""}</h4>
         <div class="card-body">${rows}</div></div>
         <div class="card" style="margin-top:16px"><h4>배정 이력</h4>
@@ -65,7 +74,7 @@
     } else {
       const total = (a.stocks || []).reduce((s, x) => s + x.qty, 0);
       const rows = (a.stocks || []).map(x => `<div class="subrow">
-        <span>${[x.worksite, x.employee].filter(Boolean).join(" · ")}</span>
+        <span>${holderOne(x)}</span>
         <span style="margin-left:auto;font-variant-numeric:tabular-nums">${x.qty}개</span>
         <button class="btn sm" data-act="보유 대상 제외">제외</button></div>`).join("");
       rightCard = `<div class="card"><h4>보유 현황 <span class="chip">총 ${total}개</span></h4>
