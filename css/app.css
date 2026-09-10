@@ -365,7 +365,10 @@ th.c, td.c { text-align: center; width: 52px; }
 .drow .qty { margin-left: auto; font-variant-numeric: tabular-nums; font-weight: 600; }
 
 .photos { display: flex; gap: 8px; flex-wrap: wrap; }
-.photos .ph { width: 72px; height: 72px; border-radius: 8px; background: #eef0f2; display: flex; align-items: center; justify-content: center; color: var(--text-mut); font-size: 11px; }
+.photos .ph { width: 60px; height: 60px; border-radius: 8px; background: #eef0f2; display: flex; align-items: center; justify-content: center; color: var(--text-mut); font-size: 11px; }
 .qrbox { display: flex; gap: 14px; align-items: center; }
+.dphotos { display: flex; align-items: center; gap: 12px; padding-bottom: 16px; margin-bottom: 16px; border-bottom: 1px dashed var(--line); }
+.dphotos .k { color: var(--text-mut); font-size: 11px; width: 110px; flex-shrink: 0; }
+.dphotos button { margin-left: auto; }
 
 .notice { background: #fff8e6; border: 1px solid #f2e2b6; color: #8a6d1d; padding: 8px 12px; border-radius: var(--radius); font-size: 12px; margin-bottom: 14px; }

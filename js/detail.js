@@ -146,16 +146,16 @@
 
         <div class="dsection">
           <div class="dsection-head"><h4>기본 정보</h4><button class="btn sm" data-act="자산 수정">수정</button></div>
+          <div class="dphotos">
+            <div class="k">사진 <span class="muted">(최대 4장)</span></div>
+            <div class="photos">${photoSlots}</div>
+            <button class="btn sm" data-act="자산 사진 등록·관리">관리</button>
+          </div>
           <div class="kv2">${kv}</div>
         </div>
       </section>
 
       ${holdCard}
-
-      <section class="dcard">
-        <div class="dsection-head"><h4>사진 <span class="muted">(최대 4장)</span></h4><button class="btn sm" data-act="사진 업로드">＋ 업로드</button></div>
-        <div class="photos">${photoSlots}</div>
-      </section>
 
       <section class="dcard">
         <div class="dsection-head"><h4>QR 라벨</h4></div>
