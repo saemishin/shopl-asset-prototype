@@ -19,10 +19,18 @@
   const IC_WS = `<svg class="hi" viewBox="0 0 24 24"><path d="M4 20V9.5L12 4l8 5.5V20"/><path d="M9.5 20v-5h5v5"/></svg>`;
   const holderOne = x => (x.employee ? `${IC_EMP}${x.employee}` : `${IC_WS}${x.worksite}`);
 
+  function tint(hex, amt) {
+    const n = parseInt(hex.slice(1), 16);
+    const cl = v => Math.max(0, Math.min(255, v));
+    const r = cl((n >> 16) + amt), g = cl(((n >> 8) & 255) + amt), b = cl((n & 255) + amt);
+    return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+  }
+  const photosOf = a => a.photo ? [a.photo, tint(a.photo, 26), tint(a.photo, -24)] : [];
+
   function toast(msg) {
     const t = document.createElement("div");
     t.textContent = msg;
-    t.style.cssText = "position:fixed;left:50%;bottom:32px;transform:translateX(-50%);background:#1b1d1f;color:#fff;padding:10px 16px;border-radius:8px;font-size:12.5px;z-index:200";
+    t.style.cssText = "position:fixed;left:50%;bottom:32px;transform:translateX(-50%);background:#1b1d1f;color:#fff;padding:10px 16px;border-radius:8px;font-size:12.5px;z-index:300";
     document.body.appendChild(t); setTimeout(() => t.remove(), 1800);
   }
   function dropdown(anchor, items) {
@@ -40,6 +48,69 @@
     });
   }
   const btn = (label, cls = "btn sm") => `<button class="${cls}" data-act="${label}">${label}</button>`;
+  const bindActs = scope => scope.querySelectorAll("[data-act]").forEach(b =>
+    b.onclick = () => toast(`"${b.dataset.act}" — 이후 단계에서 정의`));
+
+  /* ---------- 활동 로그 (합성 데이터) ---------- */
+  function activityOf(a) {
+    const ev = [{ d: a.purchaseDate || "2024-01-01", t: "자산 생성", who: "dana" }];
+    (a.assignments || []).forEach(x => ev.push({ d: x.since, t: `${x.employee || x.worksite}에게 배정`, who: "dana" }));
+    (a.stocks || []).forEach(x => ev.push({ d: a.purchaseDate || "2025-01-01", t: `${x.employee || x.worksite} 보유 대상 추가`, who: "dana" }));
+    if (a.status === "repair") ev.push({ d: "2026-08-14", t: "수리 접수 · 배정중 → 수리중", who: "dana" });
+    if (a.status === "lost") ev.push({ d: "2026-07-21", t: "분실 신고 · 배정중 → 분실", who: "정우성" });
+    if (a.status === "disposed") ev.push({ d: "2025-12-30", t: "폐기 처리 · 활성 배정 자동 종료", who: "dana" });
+    if (a.note) ev.push({ d: "2026-06-02", t: "메모 수정", who: "dana" });
+    return ev.sort((x, y) => (x.d < y.d ? 1 : -1));
+  }
+  function timelineHtml(a) {
+    return `<ol class="dtimeline">${activityOf(a).map(e => `
+      <li><span class="tl-dot"></span>
+        <div><div class="tl-t">${e.t}</div><div class="tl-m">${e.d} · ${e.who}</div></div>
+      </li>`).join("")}</ol>`;
+  }
+  function assignCurrentHtml(a) {
+    const asg = a.assignments || [];
+    if (!asg.length) return '<p class="muted" style="padding:6px 0">배정 없음 (재고 상태)</p>';
+    return `<div class="dlist">${asg.map(x => `<div class="drow">
+      <span class="who">${holderOne(x)}</span>
+      <span class="muted since">${x.since} ~</span>
+      <button class="btn sm" data-act="반납">반납</button></div>`).join("")}</div>`;
+  }
+
+  /* ---------- 사진 뷰어 ---------- */
+  function openViewer(photos, start) {
+    let i = start || 0;
+    const back = document.createElement("div");
+    back.className = "modal-back";
+    back.innerHTML = `
+      <div class="viewer">
+        <button class="v-close" data-vclose aria-label="닫기">✕</button>
+        <div class="v-stage">
+          <button class="v-nav" data-vprev aria-label="이전">‹</button>
+          <div class="v-img"></div>
+          <button class="v-nav" data-vnext aria-label="다음">›</button>
+        </div>
+        <div class="v-strip">${photos.map((p, k) => `<span data-k="${k}" style="background:${p}"></span>`).join("")}</div>
+        <div class="v-manage">${btn("사진 추가")}${btn("현재 사진 삭제")}${btn("대표로 지정")}<span class="v-count"></span></div>
+      </div>`;
+    const draw = () => {
+      back.querySelector(".v-img").style.background = photos[i];
+      back.querySelectorAll(".v-strip span").forEach((s, k) => s.classList.toggle("on", k === i));
+      back.querySelector(".v-count").textContent = `${i + 1} / ${photos.length}`;
+    };
+    back.addEventListener("click", e => { if (e.target === back) back.remove(); });
+    back.querySelector("[data-vclose]").onclick = () => back.remove();
+    back.querySelector("[data-vprev]").onclick = () => { i = (i - 1 + photos.length) % photos.length; draw(); };
+    back.querySelector("[data-vnext]").onclick = () => { i = (i + 1) % photos.length; draw(); };
+    back.querySelectorAll(".v-strip span").forEach(s => s.onclick = () => { i = +s.dataset.k; draw(); });
+    const key = e => { if (e.key === "Escape") { back.remove(); document.removeEventListener("keydown", key); }
+      else if (e.key === "ArrowLeft") back.querySelector("[data-vprev]").click();
+      else if (e.key === "ArrowRight") back.querySelector("[data-vnext]").click(); };
+    document.addEventListener("keydown", key);
+    bindActs(back);
+    document.body.appendChild(back);
+    draw();
+  }
 
   function render() {
     const id = new URLSearchParams(location.search).get("id");
@@ -49,9 +120,11 @@
     const isIndiv = a.type === "individual";
     const prevId = assets[(idx - 1 + assets.length) % assets.length].id;
     const nextId = assets[(idx + 1) % assets.length].id;
+    const photos = photosOf(a);
 
-    const thumb = a.photo
-      ? `<span class="dthumb" style="background:${a.photo}"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.5"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10" r="1.6"/><path d="m21 16-5-5-9 8"/></svg></span>`
+    const thumb = photos.length
+      ? `<button class="dthumb" style="background:${photos[0]}" data-viewer aria-label="사진 보기">
+           ${photos.length > 1 ? `<span class="tcount">+${photos.length - 1}</span>` : ""}</button>`
       : `<span class="dthumb empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 15 5-4 4 3 4-4 5 4"/></svg></span>`;
 
     const subMeta = [
@@ -84,22 +157,16 @@
     let holdCard;
     if (isIndiv) {
       const asg = a.assignments || [];
-      const rows = asg.length
-        ? asg.map(x => `<div class="drow"><span class="who">${holderOne(x)}</span>
-            <span class="muted since">${x.since} ~</span>
-            <button class="btn sm" data-act="반납">반납</button></div>`).join("")
-        : '<p class="muted" style="padding:6px 0">배정 없음 (재고 상태)</p>';
       holdCard = `
-        <section class="dcard">
+        <section class="dcard" id="assign-card">
           <div class="dsection-head">
-            <h4>배정 현황 ${asg.length > 1 ? `<span class="chip">공동 배정 ${asg.length}건</span>` : ""}</h4>
+            <div class="dtabs">
+              <button data-atab="current" class="active">현황 ${asg.length > 1 ? `<span class="chip">공동 ${asg.length}건</span>` : ""}</button>
+              <button data-atab="history">이력</button>
+            </div>
             <div class="hactions">${btn("신규 배정")}${btn("공동 배정 추가")}</div>
           </div>
-          <div class="dlist">${rows}</div>
-        </section>
-        <section class="dcard">
-          <div class="dsection-head"><h4>배정 이력</h4></div>
-          <p class="muted" style="padding:4px 0">배정·반납 타임라인 — 이후 단계에서 정의</p>
+          <div id="assign-body">${assignCurrentHtml(a)}</div>
         </section>`;
     } else {
       const stocks = a.stocks || [];
@@ -116,9 +183,6 @@
           <div class="dlist">${rows}</div>
         </section>`;
     }
-
-    const photoSlots = [0, 1, 2, 3].map(i =>
-      i === 0 && a.photo ? `<div class="ph" style="background:${a.photo}"></div>` : `<div class="ph">＋</div>`).join("");
 
     c.innerHTML = `
       <div class="detail-topbar">
@@ -146,11 +210,6 @@
 
         <div class="dsection">
           <div class="dsection-head"><h4>기본 정보</h4><button class="btn sm" data-act="자산 수정">수정</button></div>
-          <div class="dphotos">
-            <div class="k">사진 <span class="muted">(최대 4장)</span></div>
-            <div class="photos">${photoSlots}</div>
-            <button class="btn sm" data-act="자산 사진 등록·관리">관리</button>
-          </div>
           <div class="kv2">${kv}</div>
         </div>
       </section>
@@ -169,8 +228,20 @@
       </section>
     `;
 
-    c.querySelectorAll("[data-act]").forEach(b => b.onclick = () => toast(`"${b.dataset.act}" — 이후 단계에서 정의`));
+    bindActs(c);
     c.querySelector("[data-more]").onclick = e => dropdown(e.currentTarget, moreItems);
+    const tb = c.querySelector("[data-viewer]");
+    if (tb) tb.onclick = () => openViewer(photos, 0);
+
+    const card = c.querySelector("#assign-card");
+    if (card) {
+      const body = card.querySelector("#assign-body");
+      card.querySelectorAll("[data-atab]").forEach(t => t.onclick = () => {
+        card.querySelectorAll("[data-atab]").forEach(x => x.classList.toggle("active", x === t));
+        body.innerHTML = t.dataset.atab === "current" ? assignCurrentHtml(a) : timelineHtml(a);
+        bindActs(body);
+      });
+    }
   }
 
   window.DetailScreen = { render };
