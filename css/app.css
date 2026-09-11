@@ -329,6 +329,9 @@ th.c, td.c { text-align: center; width: 52px; }
   border: 1px solid var(--line); border-radius: 10px; background: var(--panel);
   padding: 18px 20px; margin-bottom: 14px;
 }
+.dgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start; }
+.dgrid .dcard { margin-bottom: 0; }
+@media (max-width: 860px) { .dgrid { grid-template-columns: 1fr; } }
 .dsection-head { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
 .dsection-head h4 { font-size: 13px; font-weight: 700; }
 .dsection-head > div, .dsection-head .hactions { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }

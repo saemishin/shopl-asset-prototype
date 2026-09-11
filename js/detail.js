@@ -346,14 +346,16 @@
           </div>
         </div>
         <div class="dhead-actions">${headActions}</div>
-
-        <div class="dsection">
-          <div class="dsection-head"><h4>기본 정보</h4><button class="btn sm" data-act="자산 수정">수정</button></div>
-          <div class="kv2">${kv}</div>
-        </div>
       </section>
 
-      ${holdCard}
+      <div class="dgrid">
+        <section class="dcard">
+          <div class="dsection-head"><h4>기본 정보</h4><button class="btn sm" data-act="자산 수정">수정</button></div>
+          <div class="kv2">${kv}</div>
+        </section>
+
+        ${holdCard}
+      </div>
     `;
 
     bindActs(c);
