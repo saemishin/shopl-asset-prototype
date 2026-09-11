@@ -20,7 +20,6 @@
 
   const IC_EMP = `<svg class="hi" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5.5 20c0-4 3-6.5 6.5-6.5s6.5 2.5 6.5 6.5"/></svg>`;
   const IC_WS = `<svg class="hi" viewBox="0 0 24 24"><path d="M4 20V9.5L12 4l8 5.5V20"/><path d="M9.5 20v-5h5v5"/></svg>`;
-  const holderOne = x => (x.employee ? `${IC_EMP}${x.employee}` : `${IC_WS}${x.worksite}`);
 
   // 배정 현황 카드 — 구성원/근무지 여부에 따른 아이덴티티 표현.
   // ※ 그룹(부서)·근무지 코드는 구조설계안에 없는 필드 — 구성원/근무지가 "기존 재사용" 엔티티라 여기선 프로토타입 데모용 샘플값만 매핑
@@ -35,10 +34,16 @@
   const AVATAR_WS_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 20V9.5L12 4l8 5.5V20"/><path d="M9.5 20v-5h5v5"/></svg>`;
   function assignIdentity(x) {
     if (x.employee) {
-      return `<span class="acard-avatar" style="background:${avatarColor(x.employee)}">${x.employee[0]}</span>
+      return `<span class="acard-avatar-wrap">
+          <span class="acard-avatar" style="background:${avatarColor(x.employee)}">${x.employee[0]}</span>
+          <span class="acard-type-badge" title="구성원">${IC_EMP}</span>
+        </span>
         <div><div class="acard-name">${x.employee}</div><div class="acard-sub">${EMP_GROUP[x.employee] || '<span class="muted">—</span>'}</div></div>`;
     }
-    return `<span class="acard-avatar ws">${AVATAR_WS_ICON}</span>
+    return `<span class="acard-avatar-wrap">
+        <span class="acard-avatar ws">${AVATAR_WS_ICON}</span>
+        <span class="acard-type-badge" title="근무지">${IC_WS}</span>
+      </span>
       <div><div class="acard-name">${x.worksite}</div><div class="acard-sub">${WS_CODE[x.worksite] || '<span class="muted">—</span>'}</div></div>`;
   }
 
@@ -412,10 +417,10 @@
       ? (statusItems.length
           ? `<button class="badge ${STATUS_LABEL[a.status][1]} clickable" data-statuschange>${STATUS_LABEL[a.status][0]} <span class="bchev">▾</span></button>`
           : `<span class="badge ${STATUS_LABEL[a.status][1]}">${STATUS_LABEL[a.status][0]}</span>`)
-      : `<span class="type-pill">수량 자산</span>`;
-    const subMeta = `
-      <div>${statusBadge}</div>
-      ${isIndiv && a.assetNo ? `<div style="margin-top:5px">고유관리번호 <b>${a.assetNo}</b></div>` : ""}`;
+      : "";   // 수량 자산 뱃지는 분류(kv2)에 이미 노출돼 중복 — 헤더엔 표기하지 않음
+    const subMeta = isIndiv
+      ? `<div>${statusBadge}</div>${a.assetNo ? `<div style="margin-top:5px">고유관리번호 <b>${a.assetNo}</b></div>` : ""}`
+      : "";
 
     const QR_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM19 14h2v2h-2zM14 19h2v2h-2zM19 19h2v2h-2z"/></svg>`;
     const qrBtn = `<button class="btn sm icon-only" data-qr aria-label="QR 라벨" title="QR 라벨">${QR_ICON}</button>`;
