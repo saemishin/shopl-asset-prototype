@@ -16,13 +16,13 @@ window.DATA = (function () {
   const assets = [
     { id: "A001", type: "individual", assetNo: "IT-2024-0012", product: "그램 16 (2024)", group: "전자기기류", sub: "노트북",
       status: "assigned", serial: "SN-8842-AA", purchaseDate: "2024-03-11", price: 1890000, manufactured: "2024-01-20",
-      expiry: "2027-03-10", note: "키보드 자판 일부 마모 — 2025-06 교체 요청 이력", photo: "#4b7bec",
+      expiry: "2027-03-10", note: "키보드 자판 일부 마모 — 2025-06 교체 요청 이력", photo: "#4b7bec", photoCount: 6,
       labels: ["본사", "개발팀"], assignments: [{ employee: "김민수", worksite: null, since: "2024-03-15" }] },
     { id: "A002", type: "individual", assetNo: "IT-2024-0013", product: "그램 16 (2024)", group: "전자기기류", sub: "노트북",
       status: "stock", serial: "SN-8842-AB", purchaseDate: "2024-03-11", price: 1890000, expiry: "2027-03-10",
       labels: ["본사"], assignments: [] },
     { id: "A003", type: "individual", assetNo: "IT-2023-0090", product: "맥북 프로 14", group: "전자기기류", sub: "노트북",
-      status: "repair", serial: "C02XR-99", purchaseDate: "2023-08-02", price: 2690000, expiry: "", photo: "#8854d0",
+      status: "repair", serial: "C02XR-99", purchaseDate: "2023-08-02", price: 2690000, expiry: "", photo: "#8854d0", photoCount: 8,
       note: "2026-08 배터리 스웰링으로 수리 접수, 센터 입고", labels: ["디자인팀"],
       assignments: [{ employee: "이서연", worksite: null, since: "2023-08-10" }] },
     { id: "A004", type: "individual", assetNo: "FN-2022-0031", product: "시디즈 T50", group: "가구류", sub: "의자",
@@ -48,7 +48,7 @@ window.DATA = (function () {
 
     { id: "A101", type: "quantity", assetNo: "", product: "2026 하복 유니폼", group: "소모품", sub: "유니폼",
       status: null, serial: "", purchaseDate: "2026-04-01", price: 18000, manufactured: "2026-03-15",
-      expiry: "2027-04-01", note: "L/XL 사이즈 위주 소진 빠름", photo: "#e67e22",
+      expiry: "2027-04-01", note: "L/XL 사이즈 위주 소진 빠름", photo: "#e67e22", photoCount: 10,
       labels: ["하복"], stocks: [
         { worksite: "강남점", employee: null, qty: 60 },
         { worksite: "판교점", employee: null, qty: 40 },

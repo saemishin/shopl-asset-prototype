@@ -25,7 +25,24 @@
     const r = cl((n >> 16) + amt), g = cl(((n >> 8) & 255) + amt), b = cl((n & 255) + amt);
     return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
   }
-  const photosOf = a => a.photo ? [a.photo, tint(a.photo, 26), tint(a.photo, -24)] : [];
+  const PH_TINTS = [0, 26, -24, 42, -40, 14, -12, 34, -30, 8];
+  const PH_DATES = ["2026-08-28", "2026-08-28", "2026-07-15", "2026-07-15", "2026-06-02", "2026-06-02", "2026-05-20", "2026-05-20", "2026-04-10", "2026-04-10"];
+  const PH_BY = ["dana", "김민수", "dana", "이서연", "dana", "김민수", "dana", "이서연", "dana", "김민수"];
+  function photosOf(a) {
+    if (a._photos) return a._photos;
+    if (!a.photo) return (a._photos = []);
+    const n = a.photoCount || 5;
+    a._primary = 0;
+    return (a._photos = PH_TINTS.slice(0, n).map((t, i) => ({
+      color: t === 0 ? a.photo : tint(a.photo, t),
+      at: PH_DATES[i], by: PH_BY[i],
+    })));
+  }
+  function tsNow() {
+    const d = new Date(), p = n => String(n).padStart(2, "0");
+    return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
+  }
+  const zipName = a => `${(a.assetNo || a.product).replace(/[\\/:*?"<>|\s]+/g, "_")}_Photos_${tsNow()}.zip`;
 
   function toast(msg) {
     const t = document.createElement("div");
@@ -77,39 +94,145 @@
       <button class="btn sm" data-act="반납">반납</button></div>`).join("")}</div>`;
   }
 
-  /* ---------- 사진 뷰어 ---------- */
-  function openViewer(photos, start) {
-    let i = start || 0;
+  /* ---------- 공통 사진 뷰어 ---------- */
+  function openViewer(a, start) {
+    const items = photosOf(a);
+    if (!items.length) return;
+    let cur = start || 0;
+    let zoom = 1;
+    let infoOn = false;
+    let idleTimer;
+
     const back = document.createElement("div");
-    back.className = "modal-back";
+    back.className = "modal-back viewer-back";
     back.innerHTML = `
-      <div class="viewer">
-        <button class="v-close" data-vclose aria-label="닫기">✕</button>
-        <div class="v-stage">
-          <button class="v-nav" data-vprev aria-label="이전">‹</button>
-          <div class="v-img"></div>
-          <button class="v-nav" data-vnext aria-label="다음">›</button>
+      <div class="viewer bar-hidden">
+        <div class="v-bar">
+          <div class="v-bar-l">
+            <span class="v-count"></span>
+            <button data-vprev class="v-ib" aria-label="이전">‹</button>
+            <button data-vnext class="v-ib" aria-label="다음">›</button>
+          </div>
+          <div class="v-bar-c">
+            <button data-vfs class="v-ib" data-tip="전체화면">⛶</button>
+            <button data-vzin class="v-ib" data-tip="확대">＋</button>
+            <button data-vzout class="v-ib" data-tip="축소">－</button>
+            <button data-vinfo class="v-ib" data-tip="정보">ⓘ</button>
+          </div>
+          <div class="v-bar-r">
+            <button data-vmore class="v-ib" aria-label="더보기">⋮</button>
+            <button data-vclose class="v-ib" aria-label="닫기">✕</button>
+          </div>
         </div>
-        <div class="v-strip">${photos.map((p, k) => `<span data-k="${k}" style="background:${p}"></span>`).join("")}</div>
-        <div class="v-manage">${btn("사진 추가")}${btn("현재 사진 삭제")}${btn("대표로 지정")}<span class="v-count"></span></div>
+        <div class="v-info" hidden>
+          <span class="v-info-badge">자산</span>
+          <div class="v-info-t">${a.product}</div>
+          <div class="v-info-sub">${a.assetNo || '<span class="muted">고유관리번호 없음</span>'}</div>
+          <div class="v-info-date"></div>
+          <div class="v-info-by"><span class="avatar-sm"></span><span class="v-info-name"></span></div>
+        </div>
+        <div class="v-stage">
+          <button class="v-edge prev" data-vprev aria-label="이전">‹</button>
+          <div class="v-img-wrap"><div class="v-img"></div></div>
+          <button class="v-edge next" data-vnext aria-label="다음">›</button>
+        </div>
+        <div class="v-strip"></div>
       </div>`;
-    const draw = () => {
-      back.querySelector(".v-img").style.background = photos[i];
-      back.querySelectorAll(".v-strip span").forEach((s, k) => s.classList.toggle("on", k === i));
-      back.querySelector(".v-count").textContent = `${i + 1} / ${photos.length}`;
+    const V = back.querySelector(".viewer");
+
+    function drawStrip() {
+      V.querySelector(".v-strip").innerHTML = items.map((p, k) =>
+        `<span data-k="${k}" class="${k === cur ? "on" : ""} ${k === a._primary ? "primary" : ""}" style="background:${p.color}">
+          ${k === a._primary ? '<i class="pstar">★</i>' : ""}</span>`).join("");
+      V.querySelectorAll(".v-strip span").forEach(s => s.onclick = () => { cur = +s.dataset.k; draw(); });
+    }
+    function draw() {
+      const p = items[cur];
+      const img = V.querySelector(".v-img");
+      img.style.background = p.color;
+      img.style.transform = `scale(${zoom})`;
+      V.querySelector(".v-count").textContent = `${cur + 1} / ${items.length}`;
+      V.querySelector(".v-info-date").textContent = `첨부일 ${p.at}`;
+      V.querySelector(".v-info-name").textContent = p.by;
+      V.querySelector(".avatar-sm").textContent = p.by[0].toUpperCase();
+      drawStrip();
+    }
+    const go = d => { cur = (cur + d + items.length) % items.length; zoom = 1; draw(); };
+
+    function showBar() {
+      V.classList.remove("bar-hidden");
+      clearTimeout(idleTimer);
+      if (!infoOn) idleTimer = setTimeout(() => V.classList.add("bar-hidden"), 2500);
+    }
+    V.addEventListener("mousemove", showBar);
+
+    function toggleInfo() {
+      infoOn = !infoOn;
+      V.querySelector(".v-info").hidden = !infoOn;
+      V.querySelector("[data-vinfo]").classList.toggle("on", infoOn);
+      showBar();
+    }
+    function zoomBy(d) { zoom = Math.min(3, Math.max(1, +(zoom + d).toFixed(2))); draw(); }
+
+    function moreMenu(anchor) {
+      document.querySelectorAll(".dropdown-menu").forEach(m => m.remove());
+      const list = [
+        { t: "현재 사진 다운로드", fn: () => toast("현재 사진 다운로드 — 원본 파일명 그대로 (프로토타입)") },
+        { t: "전체 사진 다운로드 (zip)", fn: () => toast(`${zipName(a)} 다운로드 (프로토타입)`) },
+      ];
+      if (cur !== a._primary) list.push({ t: "대표 사진으로 지정", fn: () => { a._primary = cur; toast("대표 사진으로 지정됨"); draw(); } });
+      list.push({ t: "삭제", fn: delCur, danger: true });
+      const menu = document.createElement("div");
+      menu.className = "dropdown-menu";
+      menu.innerHTML = list.map((x, i) => `<button data-i="${i}" class="${x.danger ? "danger" : ""}">${x.t}</button>`).join("");
+      const r = anchor.getBoundingClientRect();
+      menu.style.cssText = `position:fixed;top:${r.bottom + 6}px;left:${Math.max(8, r.right - 190)}px;min-width:190px;z-index:320`;
+      document.body.appendChild(menu);
+      menu.querySelectorAll("button").forEach(b => b.onclick = () => { menu.remove(); list[+b.dataset.i].fn(); });
+      setTimeout(() => {
+        const close = e => { if (!menu.contains(e.target)) { menu.remove(); document.removeEventListener("click", close); } };
+        document.addEventListener("click", close);
+      });
+    }
+    function delCur() {
+      const wasPrimary = cur === a._primary;
+      items.splice(cur, 1);
+      if (!items.length) { close(); toast("사진이 모두 삭제되었습니다"); DetailScreen.render(); return; }
+      if (wasPrimary) a._primary = 0;
+      else if (a._primary > cur) a._primary -= 1;
+      if (cur >= items.length) cur = items.length - 1;
+      zoom = 1; draw();
+      toast(wasPrimary ? "대표 사진 삭제 — 첫 사진이 대표로 지정됨" : "사진 삭제됨");
+    }
+
+    function close() {
+      back.remove();
+      document.removeEventListener("keydown", key);
+      DetailScreen.render();   // 헤더 썸네일·개수 반영
+    }
+    const key = e => {
+      if (e.key === "Escape") close();
+      else if (e.key === "ArrowLeft") go(-1);
+      else if (e.key === "ArrowRight") go(1);
+      else if (e.key === "+" || e.key === "=") zoomBy(0.25);
+      else if (e.key === "-") zoomBy(-0.25);
+      else if (e.key.toLowerCase() === "i") toggleInfo();
     };
-    back.addEventListener("click", e => { if (e.target === back) back.remove(); });
-    back.querySelector("[data-vclose]").onclick = () => back.remove();
-    back.querySelector("[data-vprev]").onclick = () => { i = (i - 1 + photos.length) % photos.length; draw(); };
-    back.querySelector("[data-vnext]").onclick = () => { i = (i + 1) % photos.length; draw(); };
-    back.querySelectorAll(".v-strip span").forEach(s => s.onclick = () => { i = +s.dataset.k; draw(); });
-    const key = e => { if (e.key === "Escape") { back.remove(); document.removeEventListener("keydown", key); }
-      else if (e.key === "ArrowLeft") back.querySelector("[data-vprev]").click();
-      else if (e.key === "ArrowRight") back.querySelector("[data-vnext]").click(); };
+
+    back.addEventListener("click", e => { if (e.target === back) close(); });
+    V.querySelectorAll("[data-vprev]").forEach(b => b.onclick = () => go(-1));
+    V.querySelectorAll("[data-vnext]").forEach(b => b.onclick = () => go(1));
+    V.querySelector("[data-vclose]").onclick = close;
+    V.querySelector("[data-vinfo]").onclick = toggleInfo;
+    V.querySelector("[data-vzin]").onclick = () => zoomBy(0.25);
+    V.querySelector("[data-vzout]").onclick = () => zoomBy(-0.25);
+    V.querySelector("[data-vfs]").onclick = () => V.classList.toggle("fs");
+    V.querySelector("[data-vmore]").onclick = e => moreMenu(e.currentTarget);
     document.addEventListener("keydown", key);
-    bindActs(back);
+
     document.body.appendChild(back);
     draw();
+    showBar();
   }
 
   function render() {
@@ -122,8 +245,9 @@
     const nextId = assets[(idx + 1) % assets.length].id;
     const photos = photosOf(a);
 
+    const primColor = photos.length ? photos[a._primary || 0].color : null;
     const thumb = photos.length
-      ? `<button class="dthumb" style="background:${photos[0]}" data-viewer aria-label="사진 보기">
+      ? `<button class="dthumb" style="background:${primColor}" data-viewer aria-label="사진 보기">
            ${photos.length > 1 ? `<span class="tcount">+${photos.length - 1}</span>` : ""}</button>`
       : `<span class="dthumb empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 15 5-4 4 3 4-4 5 4"/></svg></span>`;
 
@@ -228,7 +352,7 @@
     bindActs(c);
     c.querySelector("[data-more]").onclick = e => dropdown(e.currentTarget, moreItems);
     const tb = c.querySelector("[data-viewer]");
-    if (tb) tb.onclick = () => openViewer(photos, 0);
+    if (tb) tb.onclick = () => openViewer(a, a._primary || 0);
 
     const card = c.querySelector("#assign-card");
     if (card) {
