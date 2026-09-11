@@ -332,31 +332,32 @@
         </span>
       </div>
 
-      <section class="dcard dhead">
-        <div class="dhead-top">
-          <div class="dhead-id">
-            ${thumb}
-            <div>
-              <h1>${a.product}</h1>
-              <div class="dhead-sub">${subMeta}</div>
-            </div>
-          </div>
-          <div class="dhead-meta">
-            <span class="avatar-sm">D</span> 최종 수정 · dana · ${window.fmtDateTime("2026-08-28 14:10")}
-          </div>
-        </div>
-        <div class="dhead-actions">${headActions}</div>
-      </section>
-
       <div class="dgrid">
         <section class="dcard">
-          <div class="dsection-head"><h4>기본 정보</h4><button class="btn sm" data-act="자산 수정">수정</button></div>
-          <div class="kv2">${kv}</div>
+          <div class="dhead-top">
+            <div class="dhead-id">
+              ${thumb}
+              <div>
+                <h1>${a.product}</h1>
+                <div class="dhead-sub">${subMeta}</div>
+              </div>
+            </div>
+            <div class="dhead-meta">
+              <span class="avatar-sm">D</span> 최종 수정 · dana · ${window.fmtDateTime("2026-08-28 14:10")}
+            </div>
+          </div>
+          <div class="dhead-actions">${headActions}</div>
+
+          <div class="dsection">
+            <div class="dsection-head"><h4>기본 정보</h4><button class="btn sm" data-act="자산 수정">수정</button></div>
+            <div class="kv2">${kv}</div>
+          </div>
         </section>
 
         ${holdCard}
       </div>
     `;
+    c.classList.add("detail-split");
 
     bindActs(c);
     c.querySelector("[data-qr]").onclick = () => openQrModal(a);

@@ -329,9 +329,21 @@ th.c, td.c { text-align: center; width: 52px; }
   border: 1px solid var(--line); border-radius: 10px; background: var(--panel);
   padding: 18px 20px; margin-bottom: 14px;
 }
-.dgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start; }
+.dgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: stretch; }
 .dgrid .dcard { margin-bottom: 0; }
-@media (max-width: 860px) { .dgrid { grid-template-columns: 1fr; } }
+
+/* 상세 페이지: 좌우 컬럼 높이를 맞추고, 넘치면 각자 독립 스크롤 */
+.content.detail-split { flex: none; height: calc(100vh - var(--topbar-h)); display: flex; flex-direction: column; padding-bottom: 0; overflow: hidden; }
+.detail-split .detail-topbar { flex-shrink: 0; }
+.detail-split .dgrid { flex: 1; min-height: 0; }
+.detail-split .dgrid > .dcard { height: 100%; overflow-y: auto; }
+
+@media (max-width: 860px) {
+  .dgrid { grid-template-columns: 1fr; }
+  .content.detail-split { height: auto; overflow: visible; display: block; }
+  .detail-split .dgrid { flex: none; }
+  .detail-split .dgrid > .dcard { height: auto; overflow: visible; }
+}
 .dsection-head { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
 .dsection-head h4 { font-size: 13px; font-weight: 700; }
 .dsection-head > div, .dsection-head .hactions { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
@@ -365,7 +377,7 @@ button.dthumb:hover { filter: brightness(0.94); }
 .dsection { border-top: 1px solid var(--line); margin-top: 14px; padding-top: 16px; }
 
 /* kv grid */
-.kv2 { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 14px 18px; font-size: 12.5px; }
+.kv2 { display: grid; grid-template-columns: 1fr; gap: 12px; font-size: 12.5px; }
 .kv2 .k { color: var(--text-mut); font-size: 11px; margin-bottom: 3px; }
 .kv2 .v { color: var(--text); }
 
