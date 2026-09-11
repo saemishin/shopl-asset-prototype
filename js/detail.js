@@ -349,7 +349,7 @@
           <div class="dhead-actions">${headActions}</div>
 
           <div class="dsection">
-            <div class="dsection-head"><h4>기본 정보</h4><button class="btn sm" data-act="자산 수정">수정</button></div>
+            <div class="dsection-head"><button class="btn sm" data-act="자산 수정">수정</button></div>
             <div class="kv2">${kv}</div>
           </div>
         </section>

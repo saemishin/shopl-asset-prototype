@@ -329,7 +329,7 @@ th.c, td.c { text-align: center; width: 52px; }
   border: 1px solid var(--line); border-radius: 10px; background: var(--panel);
   padding: 18px 20px; margin-bottom: 14px;
 }
-.dgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: stretch; }
+.dgrid { display: grid; grid-template-columns: 1.4fr 1fr; gap: 14px; align-items: stretch; }
 .dgrid .dcard { margin-bottom: 0; }
 
 /* 상세 페이지: 좌우 컬럼 높이를 맞추고, 넘치면 각자 독립 스크롤 */
@@ -377,8 +377,9 @@ button.dthumb:hover { filter: brightness(0.94); }
 .dsection { border-top: 1px solid var(--line); margin-top: 14px; padding-top: 16px; }
 
 /* kv grid */
-.kv2 { display: grid; grid-template-columns: 1fr; gap: 12px; font-size: 12.5px; }
-.kv2 .k { color: var(--text-mut); font-size: 11px; margin-bottom: 3px; }
+.kv2 { display: grid; grid-template-columns: 110px 1fr; row-gap: 10px; column-gap: 14px; font-size: 12.5px; }
+.kv2 > div { display: contents; }
+.kv2 .k { color: var(--text-mut); font-size: 12px; padding-top: 1px; }
 .kv2 .v { color: var(--text); }
 
 /* list rows in cards */
