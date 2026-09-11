@@ -377,9 +377,6 @@ button.dthumb:hover { filter: brightness(0.94); }
 
 /* kv grid */
 .kv2 { display: grid; grid-template-columns: 110px 1fr; row-gap: 18px; column-gap: 32px; font-size: 12.5px; }
-.memo-text.clamped { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.memo-more { display: block; margin-top: 4px; font-size: 11.5px; color: var(--primary); }
-.memo-more:hover { text-decoration: underline; }
 .kv2 > div { display: contents; }
 .kv2 .k { color: var(--text-mut); font-size: 12px; padding-top: 1px; }
 .kv2 .v { color: var(--text); }

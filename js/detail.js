@@ -15,12 +15,8 @@
   }
   const chips = arr => (arr && arr.length) ? arr.map(l => `<span class="tag">${l}</span>`).join("") : '<span class="muted">—</span>';
 
-  const MEMO_CLAMP_AT = 80;   // 이 길이를 넘으면 2줄로 접어 보여주고 "더보기" 제공
-  function memoHtml(note) {
-    if (!note) return '<span class="muted">—</span>';
-    if (note.length <= MEMO_CLAMP_AT) return `<span>${note}</span>`;
-    return `<div class="memo-block"><span class="memo-text clamped">${note}</span><button type="button" class="memo-more" data-memotoggle>더보기</button></div>`;
-  }
+  // 메모: 최대 500자(구조설계안 3.4), 화면엔 길이 제한 없이 전체 노출(말줄임·접기 없음)
+  const memoHtml = note => note ? `<span>${note}</span>` : '<span class="muted">—</span>';
 
   const IC_EMP = `<svg class="hi" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5.5 20c0-4 3-6.5 6.5-6.5s6.5 2.5 6.5 6.5"/></svg>`;
   const IC_WS = `<svg class="hi" viewBox="0 0 24 24"><path d="M4 20V9.5L12 4l8 5.5V20"/><path d="M9.5 20v-5h5v5"/></svg>`;
@@ -376,12 +372,6 @@
     c.querySelector("[data-more]").onclick = e => dropdown(e.currentTarget, moreItems);
     const tb = c.querySelector("[data-viewer]");
     if (tb) tb.onclick = () => openViewer(a, a._primary || 0);
-    const memoBtn = c.querySelector("[data-memotoggle]");
-    if (memoBtn) memoBtn.onclick = () => {
-      const t = memoBtn.previousElementSibling;
-      const collapsed = t.classList.toggle("clamped");
-      memoBtn.textContent = collapsed ? "더보기" : "접기";
-    };
 
     const card = c.querySelector("#assign-card");
     if (card) {
