@@ -433,8 +433,11 @@ button.dthumb:hover { filter: brightness(0.94); }
 
 /* 배정 현황 — 카드형 행 */
 .acard-list { display: flex; flex-direction: column; gap: 10px; }
-.acard { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+.acard { position: relative; border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
 .acard-id { display: flex; align-items: center; gap: 10px; }
+/* 구성원/근무지 구분 — 프로필 이미지+이름+그룹(공통 컴포넌트) 영역은 건드리지 않고 카드 모서리에 별도 표시 */
+.acard-type { position: absolute; top: 12px; right: 14px; }
+.acard-type .hi { margin-right: 0; width: 13px; height: 13px; }
 .acard-avatar {
   width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;

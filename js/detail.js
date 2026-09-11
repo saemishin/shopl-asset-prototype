@@ -32,15 +32,16 @@
     return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length];
   }
   const AVATAR_WS_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 20V9.5L12 4l8 5.5V20"/><path d="M9.5 20v-5h5v5"/></svg>`;
-  // 구성원/근무지 구분은 아바타 위에 겹쳐 올리지 않고, 이름 앞 인라인 아이콘으로 표시(assets.js 목록의 holderText()와 동일 패턴)
+  // 프로필 이미지+이름+그룹은 공통 컴포넌트라 그 영역엔 손대지 않고, 구성원/근무지 구분은 카드 우측 상단에 별도로 표시(자산관리 카드의 corner 아이콘과 동일 패턴)
   function assignIdentity(x) {
     if (x.employee) {
       return `<span class="acard-avatar" style="background:${avatarColor(x.employee)}">${x.employee[0]}</span>
-        <div><div class="acard-name">${IC_EMP}${x.employee}</div><div class="acard-sub">${EMP_GROUP[x.employee] || '<span class="muted">—</span>'}</div></div>`;
+        <div><div class="acard-name">${x.employee}</div><div class="acard-sub">${EMP_GROUP[x.employee] || '<span class="muted">—</span>'}</div></div>`;
     }
     return `<span class="acard-avatar ws">${AVATAR_WS_ICON}</span>
-      <div><div class="acard-name">${IC_WS}${x.worksite}</div><div class="acard-sub">${WS_CODE[x.worksite] || '<span class="muted">—</span>'}</div></div>`;
+      <div><div class="acard-name">${x.worksite}</div><div class="acard-sub">${WS_CODE[x.worksite] || '<span class="muted">—</span>'}</div></div>`;
   }
+  const typeBadge = x => `<span class="acard-type" title="${x.employee ? "구성원" : "근무지"}">${x.employee ? IC_EMP : IC_WS}</span>`;
 
   const photosOf = window.assetPhotos;   // 목록과 공유 (js/data.js)
   function tsNow() {
@@ -162,6 +163,7 @@
     if (!rows.length) return '<p class="muted" style="padding:6px 0">일치하는 보유 대상이 없습니다</p>';
     return `<div class="acard-list">${rows.map(({ x, idx }) => `
       <div class="acard" data-idx="${idx}">
+        ${typeBadge(x)}
         <div class="acard-id">${assignIdentity(x)}</div>
         <div class="acard-foot">
           <span class="acard-date">보유 수량 <b class="qty">${x.qty}개</b></span>
@@ -251,6 +253,7 @@
     if (!asg.length) return '<p class="muted" style="padding:6px 0">배정 없음 (재고 상태)</p>';
     return `<div class="acard-list">${asg.map(x => `
       <div class="acard">
+        ${typeBadge(x)}
         <div class="acard-id">${assignIdentity(x)}</div>
         <div class="acard-foot">
           <span class="acard-date">배정일 <b>${window.fmtDate(x.since)}</b></span>
