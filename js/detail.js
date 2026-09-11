@@ -69,6 +69,23 @@
       document.addEventListener("click", close);
     });
   }
+  function confirmModal(msg, onOk) {
+    const cb = document.createElement("div");
+    cb.className = "modal-back";
+    cb.style.zIndex = 340;
+    cb.innerHTML = `
+      <div class="modal" style="width:380px">
+        <div class="body" style="padding-top:20px;font-size:13px">${msg}</div>
+        <div class="foot">
+          <button class="btn" data-cclose>취소</button>
+          <button class="btn primary" data-cok>확인</button>
+        </div>
+      </div>`;
+    cb.addEventListener("click", e => { if (e.target === cb) cb.remove(); });
+    cb.querySelector("[data-cclose]").onclick = () => cb.remove();
+    cb.querySelector("[data-cok]").onclick = () => { cb.remove(); onOk(); };
+    document.body.appendChild(cb);
+  }
   const btn = (label, cls = "btn sm") => `<button class="${cls}" data-act="${label}">${label}</button>`;
   const bindActs = scope => scope.querySelectorAll("[data-act]").forEach(b =>
     b.onclick = () => toast(`"${b.dataset.act}" — 이후 단계에서 정의`));
@@ -114,16 +131,47 @@
         <div><div class="tl-t">${e.t}</div><div class="tl-m">${window.fmtDate(e.d)} · ${e.who}</div></div>
       </li>`).join("")}</ol>`;
   }
-  function stockRows(a) {
-    return (a.stocks || []).map((x, i) => `<div class="drow" data-idx="${i}">
-      <span class="who">${holderOne(x)}</span>
-      <span class="qty" data-qtyview title="클릭해서 수량 수정">${x.qty}개</span>
-      <button class="btn sm" data-act="보유 대상 제외">제외</button></div>`).join("");
+  // 보유 현황 — 배정 현황과 동일한 카드 UI(assignIdentity 재사용) + 검색(구성원/근무지 카테고리 선택)
+  function stockCards(a, query, cat) {
+    const stocks = a.stocks || [];
+    const q = (query || "").trim().toLowerCase();
+    const rows = stocks
+      .map((x, idx) => ({ x, idx }))
+      .filter(({ x }) => {
+        if (!q) return true;
+        if (cat === "worksite") {
+          if (!x.worksite) return false;
+          const code = (WS_CODE[x.worksite] || "").toLowerCase();
+          return x.worksite.toLowerCase().includes(q) || code.includes(q);
+        }
+        if (!x.employee) return false;
+        return x.employee.toLowerCase().includes(q);
+      });
+    if (!rows.length) return '<p class="muted" style="padding:6px 0">일치하는 보유 대상이 없습니다</p>';
+    return `<div class="acard-list">${rows.map(({ x, idx }) => `
+      <div class="acard" data-idx="${idx}">
+        <div class="acard-id">${assignIdentity(x)}</div>
+        <div class="acard-foot">
+          <span class="acard-date">보유 수량 <b class="qty" data-qtyview title="클릭해서 수량 수정">${x.qty}개</b></span>
+          <div class="acard-actions"><button class="btn sm" data-exclude>제외</button></div>
+        </div>
+      </div>`).join("")}</div>`;
   }
-  function wireStockRows(scope, a) {
+  function wireStockCards(scope, a) {
+    scope.querySelectorAll("[data-exclude]").forEach(b => b.onclick = () => {
+      const row = b.closest(".acard");
+      const idx = +row.dataset.idx;
+      const x = a.stocks[idx];
+      const name = x.employee || x.worksite;
+      confirmModal(`${name}을(를) 보유 대상에서 제외하시겠습니까?<br><span class="muted" style="font-size:12px">보유 기록이 삭제되며, 이후 이 자산의 보유 대상 목록에 나타나지 않습니다. (수량만 바꾸려면 취소 후 수량을 클릭하세요)</span>`, () => {
+        a.stocks.splice(idx, 1);
+        toast("보유 대상에서 제외되었습니다");
+        render();
+      });
+    });
     scope.querySelectorAll("[data-qtyview]").forEach(el => {
       el.onclick = () => {
-        const row = el.closest(".drow");
+        const row = el.closest(".acard");
         const idx = +row.dataset.idx;
         const cur = a.stocks[idx].qty;
         el.outerHTML = `<span class="qty-edit"><input type="number" min="0" value="${cur}" data-qtyinput>
@@ -228,23 +276,6 @@
     }
     function zoomBy(d) { zoom = Math.min(3, Math.max(1, +(zoom + d).toFixed(2))); draw(); }
 
-    function confirmModal(msg, onOk) {
-      const cb = document.createElement("div");
-      cb.className = "modal-back";
-      cb.style.zIndex = 340;
-      cb.innerHTML = `
-        <div class="modal" style="width:380px">
-          <div class="body" style="padding-top:20px;font-size:13px">${msg}</div>
-          <div class="foot">
-            <button class="btn" data-cclose>취소</button>
-            <button class="btn primary" data-cok>확인</button>
-          </div>
-        </div>`;
-      cb.addEventListener("click", e => { if (e.target === cb) cb.remove(); });
-      cb.querySelector("[data-cclose]").onclick = () => cb.remove();
-      cb.querySelector("[data-cok]").onclick = () => { cb.remove(); onOk(); };
-      document.body.appendChild(cb);
-    }
     function moreMenu(anchor) {
       document.querySelectorAll(".dropdown-menu").forEach(m => m.remove());
       const list = [];
@@ -389,10 +420,20 @@
       holdCard = `
         <section class="dcard">
           <div class="dsection-head">
-            <h4>보유 현황 <span class="chip">총 ${total}개 · ${stocks.length}건</span></h4>
+            <h4>보유 현황 <span class="chip">총 ${total}개</span></h4>
             <div class="hactions">${btn("보유 대상 추가")}</div>
           </div>
-          <div class="dlist" id="stock-body">${stockRows(a)}</div>
+          <div class="stock-toolbar">
+            <span class="stock-count">전체 <b>${stocks.length}</b></span>
+            <div class="stock-search">
+              <select id="stock-cat">
+                <option value="employee">구성원</option>
+                <option value="worksite">근무지</option>
+              </select>
+              <input type="text" id="stock-q" placeholder="이름·휴대폰번호·사번으로 검색">
+            </div>
+          </div>
+          <div id="stock-body">${stockCards(a, "", "employee")}</div>
         </section>`;
     }
 
@@ -448,7 +489,19 @@
         bindActs(body);
       });
     }
-    wireStockRows(c, a);
+    wireStockCards(c, a);
+    const stockQ = c.querySelector("#stock-q");
+    if (stockQ) {
+      const stockCat = c.querySelector("#stock-cat");
+      const stockBody = c.querySelector("#stock-body");
+      const CAT_PLACEHOLDER = { employee: "이름·휴대폰번호·사번으로 검색", worksite: "근무지명·코드·주소로 검색" };
+      const refresh = () => {
+        stockBody.innerHTML = stockCards(a, stockQ.value, stockCat.value);
+        wireStockCards(stockBody, a);
+      };
+      stockCat.onchange = () => { stockQ.placeholder = CAT_PLACEHOLDER[stockCat.value]; refresh(); };
+      stockQ.oninput = refresh;
+    }
   }
 
   window.DetailScreen = { render };
