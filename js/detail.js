@@ -207,10 +207,6 @@
       minus.disabled = v === null || v <= 1;
       save.disabled = v === null || v < 1;
     };
-    let cleared = false;
-    input.addEventListener("focus", () => {
-      if (!cleared) { cleared = true; input.value = ""; sync(); }
-    });
     input.addEventListener("input", () => {
       input.value = input.value.replace(/[^0-9]/g, "");
       sync();
