@@ -147,13 +147,32 @@
     }
     function zoomBy(d) { zoom = Math.min(3, Math.max(1, +(zoom + d).toFixed(2))); draw(); }
 
+    function confirmModal(msg, onOk) {
+      const cb = document.createElement("div");
+      cb.className = "modal-back";
+      cb.style.zIndex = 340;
+      cb.innerHTML = `
+        <div class="modal" style="width:380px">
+          <div class="body" style="padding-top:20px;font-size:13px">${msg}</div>
+          <div class="foot">
+            <button class="btn" data-cclose>취소</button>
+            <button class="btn primary" data-cok>확인</button>
+          </div>
+        </div>`;
+      cb.addEventListener("click", e => { if (e.target === cb) cb.remove(); });
+      cb.querySelector("[data-cclose]").onclick = () => cb.remove();
+      cb.querySelector("[data-cok]").onclick = () => { cb.remove(); onOk(); };
+      document.body.appendChild(cb);
+    }
     function moreMenu(anchor) {
       document.querySelectorAll(".dropdown-menu").forEach(m => m.remove());
       const list = [];
-      if (cur !== a._primary) list.push({ t: "대표 사진으로 지정", fn: () => { a._primary = cur; toast("대표 사진으로 지정됨"); draw(); } });
+      if (cur !== a._primary) list.push({ t: "대표 사진으로 지정", fn: () => confirmModal("자산 대표 사진으로 지정하시겠습니까?", () => {
+        a._primary = cur; toast("자산 대표 사진으로 지정되었습니다"); draw();
+      }) });
       list.push({ t: "다운로드", fn: () => toast("다운로드 — 원본 파일명 그대로 (프로토타입)") });
+      list.push({ t: "삭제", fn: () => confirmModal("자산 사진을 삭제하시겠습니까?", delCur), danger: true });
       list.push({ t: "전체 사진 다운로드", fn: () => toast(`${zipName(a)} 다운로드 (프로토타입)`) });
-      list.push({ t: "삭제", fn: delCur, danger: true });
       const menu = document.createElement("div");
       menu.className = "dropdown-menu";
       menu.innerHTML = list.map((x, i) => `<button data-i="${i}" class="${x.danger ? "danger" : ""}">${x.t}</button>`).join("");
@@ -169,12 +188,12 @@
     function delCur() {
       const wasPrimary = cur === a._primary;
       items.splice(cur, 1);
-      if (!items.length) { close(); toast("사진이 모두 삭제되었습니다"); DetailScreen.render(); return; }
+      if (!items.length) { close(); toast("자산 사진이 삭제되었습니다."); DetailScreen.render(); return; }
       if (wasPrimary) a._primary = 0;
       else if (a._primary > cur) a._primary -= 1;
       if (cur >= items.length) cur = items.length - 1;
       zoom = 1; draw();
-      toast(wasPrimary ? "대표 사진 삭제 — 첫 사진이 대표로 지정됨" : "사진 삭제됨");
+      toast("자산 사진이 삭제되었습니다.");
     }
 
     function close() {
