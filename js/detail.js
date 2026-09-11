@@ -32,19 +32,14 @@
     return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length];
   }
   const AVATAR_WS_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 20V9.5L12 4l8 5.5V20"/><path d="M9.5 20v-5h5v5"/></svg>`;
+  // 구성원/근무지 구분은 아바타 위에 겹쳐 올리지 않고, 이름 앞 인라인 아이콘으로 표시(assets.js 목록의 holderText()와 동일 패턴)
   function assignIdentity(x) {
     if (x.employee) {
-      return `<span class="acard-avatar-wrap">
-          <span class="acard-avatar" style="background:${avatarColor(x.employee)}">${x.employee[0]}</span>
-          <span class="acard-type-badge" title="구성원">${IC_EMP}</span>
-        </span>
-        <div><div class="acard-name">${x.employee}</div><div class="acard-sub">${EMP_GROUP[x.employee] || '<span class="muted">—</span>'}</div></div>`;
+      return `<span class="acard-avatar" style="background:${avatarColor(x.employee)}">${x.employee[0]}</span>
+        <div><div class="acard-name">${IC_EMP}${x.employee}</div><div class="acard-sub">${EMP_GROUP[x.employee] || '<span class="muted">—</span>'}</div></div>`;
     }
-    return `<span class="acard-avatar-wrap">
-        <span class="acard-avatar ws">${AVATAR_WS_ICON}</span>
-        <span class="acard-type-badge" title="근무지">${IC_WS}</span>
-      </span>
-      <div><div class="acard-name">${x.worksite}</div><div class="acard-sub">${WS_CODE[x.worksite] || '<span class="muted">—</span>'}</div></div>`;
+    return `<span class="acard-avatar ws">${AVATAR_WS_ICON}</span>
+      <div><div class="acard-name">${IC_WS}${x.worksite}</div><div class="acard-sub">${WS_CODE[x.worksite] || '<span class="muted">—</span>'}</div></div>`;
   }
 
   const photosOf = window.assetPhotos;   // 목록과 공유 (js/data.js)
@@ -485,13 +480,13 @@
         <section class="dcard" id="stock-card">
           <div class="dsection-head">
             <div class="dtabs">
-              <button data-stab="current" class="active">보유 현황</button>
+              <button data-stab="current" class="active">보유 현황 <span class="chip">총 ${total}개</span></button>
               <button data-stab="history">이력</button>
             </div>
             <div class="hactions" id="stock-actions">${btn("보유 대상 추가")}</div>
           </div>
           <div class="stock-toolbar" id="stock-toolbar">
-            <span class="stock-count">총 <b>${total}</b>개 · 전체 <b>${stocks.length}</b></span>
+            <span class="stock-count">전체 <b>${stocks.length}</b></span>
             <div class="stock-search">
               <select id="stock-cat">
                 <option value="employee">구성원</option>
