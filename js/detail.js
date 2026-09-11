@@ -22,6 +22,26 @@
   const IC_WS = `<svg class="hi" viewBox="0 0 24 24"><path d="M4 20V9.5L12 4l8 5.5V20"/><path d="M9.5 20v-5h5v5"/></svg>`;
   const holderOne = x => (x.employee ? `${IC_EMP}${x.employee}` : `${IC_WS}${x.worksite}`);
 
+  // 배정 현황 카드 — 구성원/근무지 여부에 따른 아이덴티티 표현.
+  // ※ 그룹(부서)·근무지 코드는 구조설계안에 없는 필드 — 구성원/근무지가 "기존 재사용" 엔티티라 여기선 프로토타입 데모용 샘플값만 매핑
+  const EMP_GROUP = { "김민수": "개발팀", "이서연": "디자인팀", "박지훈": "영업팀", "정우성": "CS팀", "김철수": "운영팀" };
+  const WS_CODE = { "강남점": "GN-01", "판교점": "PG-01", "본사": "HQ-01" };
+  const AVATAR_COLORS = ["#5b8def", "#8f6ef0", "#eb7f8b", "#3fb37f", "#e0a63c", "#4dabf7"];
+  function avatarColor(name) {
+    let h = 0;
+    for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) % 997;
+    return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length];
+  }
+  const AVATAR_WS_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 20V9.5L12 4l8 5.5V20"/><path d="M9.5 20v-5h5v5"/></svg>`;
+  function assignIdentity(x) {
+    if (x.employee) {
+      return `<span class="acard-avatar" style="background:${avatarColor(x.employee)}">${x.employee[0]}</span>
+        <div><div class="acard-name">${x.employee}</div><div class="acard-sub">${EMP_GROUP[x.employee] || '<span class="muted">—</span>'}</div></div>`;
+    }
+    return `<span class="acard-avatar ws">${AVATAR_WS_ICON}</span>
+      <div><div class="acard-name">${x.worksite}</div><div class="acard-sub">${WS_CODE[x.worksite] || '<span class="muted">—</span>'}</div></div>`;
+  }
+
   const photosOf = window.assetPhotos;   // 목록과 공유 (js/data.js)
   function tsNow() {
     const d = new Date(), p = n => String(n).padStart(2, "0");
@@ -124,11 +144,17 @@
   function assignCurrentHtml(a) {
     const asg = a.assignments || [];
     if (!asg.length) return '<p class="muted" style="padding:6px 0">배정 없음 (재고 상태)</p>';
-    return `<div class="dlist">${asg.map(x => `<div class="drow">
-      <span class="who">${holderOne(x)}</span>
-      <span class="muted since">${window.fmtDate(x.since)} ~</span>
-      <button class="btn sm" data-act="재배정">재배정</button>
-      <button class="btn sm" data-act="반납">반납</button></div>`).join("")}</div>`;
+    return `<div class="acard-list">${asg.map(x => `
+      <div class="acard">
+        <div class="acard-id">${assignIdentity(x)}</div>
+        <div class="acard-foot">
+          <span class="acard-date">배정일 <b>${window.fmtDate(x.since)}</b></span>
+          <div class="acard-actions">
+            <button class="btn sm" data-act="재배정">재배정</button>
+            <button class="btn sm" data-act="반납">반납</button>
+          </div>
+        </div>
+      </div>`).join("")}</div>`;
   }
 
   /* ---------- 공통 사진 뷰어 ---------- */
@@ -323,21 +349,21 @@
     const mgrBtn = `<button class="btn sm icon-only corner" data-more aria-label="자산관리" title="자산관리">${MORE_ICON}</button>`;
     const moreItems = ["소분류 이동", "자산 수정", "자산 삭제"];
 
-    // 필수값(분류) 먼저, 선택값이 뒤따름(제조연월일이 구매일보다 앞 — 제조가 구매보다 먼저 일어나는 시점이라).
-    // 태그는 분류 바로 다음. 선택 필드(field 태그가 있는 행)는 소분류 필드 노출 설정(hiddenFields)에서 off면 행 자체를 숨김.
-    // QR 라벨은 이 정렬·노출 규칙과 무관하게 항상 마지막.
+    // 필수값(분류) 먼저, 선택값이 뒤따름. 태그·유효기한은 분류 바로 다음. 제조연월일이 구매일보다 앞(제조가 구매보다 먼저 일어나는 시점).
+    // 선택 필드(field 태그가 있는 행)는 소분류 필드 노출 설정(hiddenFields)에서 off면 행 자체를 숨김.
+    // QR 라벨은 메모(최대 500자, 길어질 수 있음)보다 위 — 메모가 길어져도 QR을 찾으려 스크롤할 필요 없게.
     const cat = (window.DATA.categories || []).find(x => x.group === a.group && x.sub === a.sub) || {};
     const hidden = cat.hiddenFields || [];
     const kv = [
       { k: "분류", v: `<div><span class="type-pill">${isIndiv ? "개별 자산" : "수량 자산"}</span></div><div style="margin-top:5px">${a.group} › ${a.sub}</div>` },
       { k: "태그", v: chips(a.labels) },
+      { k: "유효기한", field: "expiry", v: expiryBadge(a.expiry) },
       isIndiv ? { k: "S/N", field: "serial", v: a.serial || '<span class="muted">—</span>' } : null,
       { k: "제조연월일", field: "manufactured", v: a.manufactured ? window.fmtDate(a.manufactured) : '<span class="muted">—</span>' },
       { k: "구매일", field: "purchaseDate", v: a.purchaseDate ? window.fmtDate(a.purchaseDate) : "—" },
       { k: isIndiv ? "구매가격" : "구매가격 (품목 단가)", field: "purchasePrice", v: a.price ? a.price.toLocaleString() + "원" : "—" },
-      { k: "유효기한", field: "expiry", v: expiryBadge(a.expiry) },
-      { k: "메모", v: memoHtml(a.note) },
       { k: "QR 라벨", v: qrBtn },
+      { k: "메모", v: memoHtml(a.note) },
     ].filter(Boolean)
      .filter(row => !row.field || !hidden.includes(row.field))
      .map(({ k, v }) => `<div><div class="k">${k}</div><div class="v">${v}</div></div>`).join("");
@@ -350,7 +376,7 @@
         <section class="dcard" id="assign-card">
           <div class="dsection-head">
             <div class="dtabs">
-              <button data-atab="current" class="active">현황 ${asg.length > 1 ? `<span class="chip">공동 ${asg.length}건</span>` : ""}</button>
+              <button data-atab="current" class="active">배정 현황</button>
               <button data-atab="history">이력</button>
             </div>
             <div class="hactions" id="assign-actions">${btn("배정 추가")}</div>
