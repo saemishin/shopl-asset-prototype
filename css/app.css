@@ -124,6 +124,8 @@ input { font: inherit; }
 .btn.primary { background: var(--primary); border-color: var(--primary); color: #fff; }
 .btn.primary:hover { background: var(--primary-press); }
 .btn.sm { height: 28px; padding: 0 9px; font-size: 12px; }
+.btn.icon-only { width: 32px; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
+.btn.icon-only svg { width: 15px; height: 15px; }
 .btn .chev { font-size: 10px; color: var(--text-mut); }
 .btn.primary .chev { color: #dbe6ff; }
 
@@ -175,6 +177,7 @@ input { font: inherit; }
   border-radius: 6px; white-space: nowrap;
 }
 .dropdown-menu button:hover { background: var(--primary-weak); color: var(--primary); }
+.dropdown-sep { height: 1px; background: var(--line); margin: 4px 2px; }
 
 /* ============ stats ============ */
 .statwrap { margin-bottom: 18px; }

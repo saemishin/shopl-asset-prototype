@@ -50,6 +50,30 @@
   const bindActs = scope => scope.querySelectorAll("[data-act]").forEach(b =>
     b.onclick = () => toast(`"${b.dataset.act}" — 이후 단계에서 정의`));
 
+  function openQrModal(a) {
+    const back = document.createElement("div");
+    back.className = "modal-back";
+    back.innerHTML = `
+      <div class="modal">
+        <h3>QR 라벨</h3>
+        <div class="body" style="display:flex;gap:16px;align-items:center">
+          <div class="ph" style="width:96px;height:96px;flex-shrink:0">QR</div>
+          <div>
+            <p style="font-size:13px;font-weight:600">${a.product}${a.assetNo ? ` / ${a.assetNo}` : ""}</p>
+            <p class="muted" style="margin-top:4px">자산 등록 시 자동 생성 · 스캔 시 앱 자산 상세로 연결</p>
+          </div>
+        </div>
+        <div class="foot">
+          <button class="btn" data-close>닫기</button>
+          <button class="btn primary" data-act="QR 라벨 다운로드">다운로드</button>
+        </div>
+      </div>`;
+    back.addEventListener("click", e => { if (e.target === back) back.remove(); });
+    back.querySelector("[data-close]").onclick = () => back.remove();
+    bindActs(back);
+    document.body.appendChild(back);
+  }
+
   /* ---------- 활동 로그 (합성 데이터) ---------- */
   function activityOf(a) {
     const ev = [{ d: a.purchaseDate || "2024-01-01", t: "자산 생성", who: "dana" }];
@@ -172,10 +196,11 @@
       }) });
       list.push({ t: "다운로드", fn: () => toast("다운로드 — 원본 파일명 그대로 (프로토타입)") });
       list.push({ t: "삭제", fn: () => confirmModal("자산 사진을 삭제하시겠습니까?", delCur), danger: true });
-      list.push({ t: "전체 사진 다운로드", fn: () => toast(`${zipName(a)} 다운로드 (프로토타입)`) });
+      list.push({ t: "전체 사진 다운로드", fn: () => toast(`${zipName(a)} 다운로드 (프로토타입)`), sep: true });
       const menu = document.createElement("div");
       menu.className = "dropdown-menu";
-      menu.innerHTML = list.map((x, i) => `<button data-i="${i}" class="${x.danger ? "danger" : ""}">${x.t}</button>`).join("");
+      menu.innerHTML = list.map((x, i) => (x.sep ? '<div class="dropdown-sep"></div>' : "") +
+        `<button data-i="${i}" class="${x.danger ? "danger" : ""}">${x.t}</button>`).join("");
       const r = anchor.getBoundingClientRect();
       menu.style.cssText = `position:fixed;top:${r.bottom + 6}px;left:${Math.max(8, r.right - 190)}px;min-width:190px;z-index:320`;
       document.body.appendChild(menu);
@@ -247,9 +272,11 @@
       isIndiv && a.assetNo ? `고유관리번호 <b>${a.assetNo}</b>` : "",
     ].filter(Boolean).join('<span class="ddot">·</span>');
 
+    const QR_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM19 14h2v2h-2zM14 19h2v2h-2zM19 19h2v2h-2z"/></svg>`;
+    const qrBtn = `<button class="btn sm icon-only" data-qr aria-label="QR 라벨" title="QR 라벨">${QR_ICON}</button>`;
     const headActions = isIndiv
-      ? btn("상태 변경") + `<button class="btn sm" data-more>⋯ 더보기</button>`
-      : `<button class="btn sm" data-more>⋯ 더보기</button>`;
+      ? qrBtn + btn("상태 변경") + `<button class="btn sm" data-more>⋯ 더보기</button>`
+      : qrBtn + `<button class="btn sm" data-more>⋯ 더보기</button>`;
     const moreItems = isIndiv
       ? ["재배정·이동", "소분류 이동", "자산 수정", "자산 삭제"]
       : ["소분류 이동", "자산 수정", "자산 삭제"];
@@ -327,20 +354,10 @@
       </section>
 
       ${holdCard}
-
-      <section class="dcard">
-        <div class="dsection-head"><h4>QR 라벨</h4></div>
-        <div class="qrbox">
-          <div class="ph" style="width:76px;height:76px">QR</div>
-          <div>
-            <p class="muted" style="margin-bottom:6px">자산 등록 시 자동 생성 · 스캔 시 앱 자산 상세로 연결</p>
-            <button class="btn sm" data-act="QR 라벨 다운로드">다운로드</button>
-          </div>
-        </div>
-      </section>
     `;
 
     bindActs(c);
+    c.querySelector("[data-qr]").onclick = () => openQrModal(a);
     c.querySelector("[data-more]").onclick = e => dropdown(e.currentTarget, moreItems);
     const tb = c.querySelector("[data-viewer]");
     if (tb) tb.onclick = () => openViewer(a, a._primary || 0);
