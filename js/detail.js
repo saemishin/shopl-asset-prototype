@@ -94,12 +94,40 @@
         <div><div class="tl-t">${e.t}</div><div class="tl-m">${window.fmtDate(e.d)} · ${e.who}</div></div>
       </li>`).join("")}</ol>`;
   }
+  function stockRows(a) {
+    return (a.stocks || []).map((x, i) => `<div class="drow" data-idx="${i}">
+      <span class="who">${holderOne(x)}</span>
+      <span class="qty" data-qtyview title="클릭해서 수량 수정">${x.qty}개</span>
+      <button class="btn sm" data-act="보유 대상 제외">제외</button></div>`).join("");
+  }
+  function wireStockRows(scope, a) {
+    scope.querySelectorAll("[data-qtyview]").forEach(el => {
+      el.onclick = () => {
+        const row = el.closest(".drow");
+        const idx = +row.dataset.idx;
+        const cur = a.stocks[idx].qty;
+        el.outerHTML = `<span class="qty-edit"><input type="number" min="0" value="${cur}" data-qtyinput>
+          <button class="btn sm" data-qtysave>저장</button></span>`;
+        const input = row.querySelector("[data-qtyinput]");
+        input.focus(); input.select();
+        const save = () => {
+          const v = Math.max(0, parseInt(input.value, 10) || 0);
+          a.stocks[idx].qty = v;
+          toast(`보유 수량이 ${v}개로 변경되었습니다`);
+          render();
+        };
+        row.querySelector("[data-qtysave]").onclick = save;
+        input.onkeydown = e => { if (e.key === "Enter") save(); };
+      };
+    });
+  }
   function assignCurrentHtml(a) {
     const asg = a.assignments || [];
     if (!asg.length) return '<p class="muted" style="padding:6px 0">배정 없음 (재고 상태)</p>';
     return `<div class="dlist">${asg.map(x => `<div class="drow">
       <span class="who">${holderOne(x)}</span>
       <span class="muted since">${window.fmtDate(x.since)} ~</span>
+      <button class="btn sm" data-act="재배정">재배정</button>
       <button class="btn sm" data-act="반납">반납</button></div>`).join("")}</div>`;
   }
 
@@ -270,11 +298,7 @@
            ${photos.length > 1 ? `<span class="tcount">+${photos.length - 1}</span>` : ""}</button>`
       : `<span class="dthumb empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 15 5-4 4 3 4-4 5 4"/></svg></span>`;
 
-    const subMeta = `
-      <div>${isIndiv ? `<span class="badge ${STATUS_LABEL[a.status][1]}">${STATUS_LABEL[a.status][0]}</span>` : `<span class="type-pill">수량 자산</span>`}</div>
-      ${isIndiv && a.assetNo ? `<div style="margin-top:5px">고유관리번호 <b>${a.assetNo}</b></div>` : ""}`;
-
-    // 상태 변경으로 이동 가능한 전이만 노출. 재고⟷배정중은 배정/반납으로 자동 파생되므로 이 메뉴엔 없음. 폐기는 최종 상태라 버튼 자체를 숨김.
+    // 상태 변경으로 이동 가능한 전이만 노출. 재고⟷배정중은 배정/반납으로 자동 파생되므로 이 메뉴엔 없음. 폐기는 최종 상태라 뱃지가 클릭 불가.
     const STATUS_TRANSITIONS = {
       stock: ["수리 접수", "분실 신고", "폐기 처리"],
       assigned: ["수리 접수", "분실 신고", "폐기 처리"],
@@ -283,14 +307,21 @@
       disposed: [],
     };
     const statusItems = isIndiv ? STATUS_TRANSITIONS[a.status] : [];
+    const statusBadge = isIndiv
+      ? (statusItems.length
+          ? `<button class="badge ${STATUS_LABEL[a.status][1]} clickable" data-statuschange>${STATUS_LABEL[a.status][0]} <span class="bchev">▾</span></button>`
+          : `<span class="badge ${STATUS_LABEL[a.status][1]}">${STATUS_LABEL[a.status][0]}</span>`)
+      : `<span class="type-pill">수량 자산</span>`;
+    const subMeta = `
+      <div>${statusBadge}</div>
+      ${isIndiv && a.assetNo ? `<div style="margin-top:5px">고유관리번호 <b>${a.assetNo}</b></div>` : ""}`;
 
     const QR_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM19 14h2v2h-2zM14 19h2v2h-2zM19 19h2v2h-2z"/></svg>`;
     const qrBtn = `<button class="btn sm icon-only" data-qr aria-label="QR 라벨" title="QR 라벨">${QR_ICON}</button>`;
-    const headActions = (isIndiv && statusItems.length ? `<button class="btn sm" data-statuschange>상태 변경</button>` : "")
-      + `<button class="btn sm" data-more>⋯ 더보기</button>`;
-    const moreItems = isIndiv
-      ? ["재배정·이동", "소분류 이동", "자산 수정", "자산 삭제"]
-      : ["소분류 이동", "자산 수정", "자산 삭제"];
+    // 자산관리(소분류 이동·자산 수정·자산 삭제)만 남음. 재배정은 배정 행으로, 상태 변경은 상태 뱃지로 이동.
+    const MORE_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg>`;
+    const mgrBtn = `<button class="btn sm icon-only corner" data-more aria-label="자산관리" title="자산관리">${MORE_ICON}</button>`;
+    const moreItems = ["소분류 이동", "자산 수정", "자산 삭제"];
 
     // 필수값(분류) 먼저, 선택값이 뒤따름(제조연월일이 구매일보다 앞 — 제조가 구매보다 먼저 일어나는 시점이라).
     // 태그는 분류 바로 다음. 선택 필드(field 태그가 있는 행)는 소분류 필드 노출 설정(hiddenFields)에서 off면 행 자체를 숨김.
@@ -311,7 +342,7 @@
      .filter(row => !row.field || !hidden.includes(row.field))
      .map(({ k, v }) => `<div><div class="k">${k}</div><div class="v">${v}</div></div>`).join("");
 
-    // 배정/보유 카드
+    // 배정/보유 카드. 카드 상단 액션은 "추가"만 담당(라벨 하나로 고정) — 재배정/반납은 각 행에 종속.
     let holdCard;
     if (isIndiv) {
       const asg = a.assignments || [];
@@ -322,23 +353,20 @@
               <button data-atab="current" class="active">현황 ${asg.length > 1 ? `<span class="chip">공동 ${asg.length}건</span>` : ""}</button>
               <button data-atab="history">이력</button>
             </div>
-            <div class="hactions">${btn("신규 배정")}${btn("공동 배정 추가")}</div>
+            <div class="hactions" id="assign-actions">${btn("배정 추가")}</div>
           </div>
           <div id="assign-body">${assignCurrentHtml(a)}</div>
         </section>`;
     } else {
       const stocks = a.stocks || [];
       const total = stocks.reduce((s, x) => s + x.qty, 0);
-      const rows = stocks.map(x => `<div class="drow"><span class="who">${holderOne(x)}</span>
-        <span class="qty">${x.qty}개</span>
-        <button class="btn sm" data-act="보유 대상 제외">제외</button></div>`).join("");
       holdCard = `
         <section class="dcard">
           <div class="dsection-head">
             <h4>보유 현황 <span class="chip">총 ${total}개 · ${stocks.length}건</span></h4>
-            <div class="hactions">${btn("보유 변경")}${btn("보유 대상 추가")}</div>
+            <div class="hactions">${btn("보유 대상 추가")}</div>
           </div>
-          <div class="dlist">${rows}</div>
+          <div class="dlist" id="stock-body">${stockRows(a)}</div>
         </section>`;
     }
 
@@ -352,7 +380,8 @@
       </div>
 
       <div class="dgrid">
-        <section class="dcard">
+        <section class="dcard" style="position:relative">
+          ${mgrBtn}
           <div class="dhead-top">
             <div class="dhead-id">
               ${thumb}
@@ -362,10 +391,8 @@
               </div>
             </div>
           </div>
-          <div class="dhead-actions">${headActions}</div>
 
           <div class="dsection">
-            <div class="dsection-head"><button class="btn sm" data-act="자산 수정">수정</button></div>
             <div class="kv2">${kv}</div>
           </div>
         </section>
@@ -386,12 +413,16 @@
     const card = c.querySelector("#assign-card");
     if (card) {
       const body = card.querySelector("#assign-body");
+      const actions = card.querySelector("#assign-actions");
       card.querySelectorAll("[data-atab]").forEach(t => t.onclick = () => {
         card.querySelectorAll("[data-atab]").forEach(x => x.classList.toggle("active", x === t));
-        body.innerHTML = t.dataset.atab === "current" ? assignCurrentHtml(a) : timelineHtml(a);
+        const isCurrent = t.dataset.atab === "current";
+        body.innerHTML = isCurrent ? assignCurrentHtml(a) : timelineHtml(a);
+        actions.hidden = !isCurrent;   // 배정 액션은 현황 탭에서만
         bindActs(body);
       });
     }
+    wireStockRows(c, a);
   }
 
   window.DetailScreen = { render };
