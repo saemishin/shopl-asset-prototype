@@ -439,7 +439,8 @@
 
     // 필수값(분류) 먼저, 선택값이 뒤따름. 태그·유효기한은 분류 바로 다음. 제조연월일이 구매일보다 앞(제조가 구매보다 먼저 일어나는 시점).
     // 선택 필드(field 태그가 있는 행)는 소분류 필드 노출 설정(hiddenFields)에서 off면 행 자체를 숨김.
-    // QR 라벨은 메모(최대 500자, 길어질 수 있음)보다 위 — 메모가 길어져도 QR을 찾으려 스크롤할 필요 없게.
+    // 구매일·구매가격을 붙여서 "취득 정보" 세트로 묶고, 그 뒤로 사용자 입력이 아니라 시스템이 자동 기록하는 필드(등록일·QR 라벨)를 배치.
+    // 메모는 마지막(최대 500자, 길어질 수 있음) — 자유 입력값이지만 길이가 가변적이라 다른 고정형 필드들 뒤에 둠.
     const cat = (window.DATA.categories || []).find(x => x.group === a.group && x.sub === a.sub) || {};
     const hidden = cat.hiddenFields || [];
     const kv = [
@@ -449,8 +450,8 @@
       isIndiv ? { k: "S/N", field: "serial", v: a.serial || '<span class="muted">—</span>' } : null,
       { k: "제조연월일", field: "manufactured", v: a.manufactured ? window.fmtDate(a.manufactured) : '<span class="muted">—</span>' },
       { k: "구매일", field: "purchaseDate", v: a.purchaseDate ? window.fmtDate(a.purchaseDate) : "—" },
-      { k: "등록일", v: window.fmtDate(a.createdAt) },
       { k: isIndiv ? "구매가격" : "구매가격 (품목 단가)", field: "purchasePrice", v: a.price ? a.price.toLocaleString() + "원" : "—" },
+      { k: "등록일", v: window.fmtDate(a.createdAt) },
       { k: "QR 라벨", v: qrBtn },
       { k: "메모", v: memoHtml(a.note) },
     ].filter(Boolean)
