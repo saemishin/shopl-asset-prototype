@@ -354,6 +354,8 @@ th.c, td.c { text-align: center; width: 52px; }
 .dsection-head > div:not(.dtabs), .dsection-head .hactions { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
 .dsection-head button[data-act] { margin-left: auto; }
 .dsection-head .hactions button { margin-left: 0; }
+/* [hidden]은 UA 기본 규칙(낮은 특이성)이라 위 display:flex 규칙에 밀려 무시되기 쉬움 — 명시적으로 이겨줌 */
+.dsection-head .hactions[hidden], .stock-toolbar[hidden] { display: none; }
 
 /* header card */
 .dhead-top { display: flex; align-items: flex-start; gap: 14px; }

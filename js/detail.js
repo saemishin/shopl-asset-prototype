@@ -119,19 +119,31 @@
     document.body.appendChild(back);
   }
 
-  /* ---------- 활동 로그 (합성 데이터) ---------- */
+  /* ---------- 활동 로그 ---------- */
+  // 초기 스냅샷(합성 데이터) — 세션 시작 시 자산의 현재 상태로부터 한 번만 만들어지는 베이스라인
   function activityOf(a) {
-    const ev = [{ d: a.purchaseDate || "2024-01-01", t: "자산 생성", who: "dana" }];
+    const ev = [{ d: a.createdAt || a.purchaseDate || "2024-01-01", t: "자산 생성", who: "dana" }];
     (a.assignments || []).forEach(x => ev.push({ d: x.since, t: `${x.employee || x.worksite}에게 배정`, who: "dana" }));
-    (a.stocks || []).forEach(x => ev.push({ d: a.purchaseDate || "2025-01-01", t: `${x.employee || x.worksite} 보유 대상 추가`, who: "dana" }));
+    (a.stocks || []).forEach(x => ev.push({ d: a.purchaseDate || "2025-01-01", t: `${x.employee || x.worksite} 보유 대상 추가 · ${x.qty}개`, who: "dana" }));
     if (a.status === "repair") ev.push({ d: "2026-08-14", t: "수리 접수 · 배정중 → 수리중", who: "dana" });
     if (a.status === "lost") ev.push({ d: "2026-07-21", t: "분실 신고 · 배정중 → 분실", who: "정우성" });
     if (a.status === "disposed") ev.push({ d: "2025-12-30", t: "폐기 처리 · 활성 배정 자동 종료", who: "dana" });
     if (a.note) ev.push({ d: "2026-06-02", t: "메모 수정", who: "dana" });
     return ev.sort((x, y) => (x.d < y.d ? 1 : -1));
   }
+  // 실제 이력 로그 — activityOf()의 베이스라인을 세션당 한 번만 시드하고, 이후 실사용자 조작(수량 변경·보유 해제 등)은
+  // 여기 append해서 남김. 그래야 대상이 삭제되거나 값이 바뀌어도 "무슨 일이 있었는지"가 이력에서 사라지지 않음.
+  function activityLog(a) {
+    if (!a._activityLog) a._activityLog = activityOf(a);
+    return a._activityLog;
+  }
+  function logActivity(a, t) {
+    const p = n => String(n).padStart(2, "0");
+    const d = `${TODAY.getFullYear()}-${p(TODAY.getMonth() + 1)}-${p(TODAY.getDate())}`;
+    activityLog(a).unshift({ d, t, who: "dana" });
+  }
   function timelineHtml(a) {
-    return `<ol class="dtimeline">${activityOf(a).map(e => `
+    return `<ol class="dtimeline">${activityLog(a).map(e => `
       <li><span class="tl-dot"></span>
         <div><div class="tl-t">${e.t}</div><div class="tl-m">${window.fmtDate(e.d)} · ${e.who}</div></div>
       </li>`).join("")}</ol>`;
@@ -208,7 +220,10 @@
     save.onclick = () => {
       const v = val();
       if (v === null || v < 1) return;
+      const x = a.stocks[idx];
+      const name = x.employee || x.worksite;
       a.stocks[idx].qty = v;
+      logActivity(a, `${name} 보유 수량 변경 · ${cur}개 → ${v}개`);
       pop.remove();
       toast(`보유 수량이 ${v}개로 변경되었습니다`);
       render();
@@ -228,7 +243,9 @@
       const x = a.stocks[idx];
       const name = x.employee || x.worksite;
       confirmModal(`${name}을(를) 보유 대상에서 해제하시겠습니까?<br><span class="muted" style="font-size:12px">보유 기록이 삭제되며, 이후 이 자산의 보유 대상 목록에 나타나지 않습니다. (수량만 바꾸려면 취소 후 수량 변경을 이용하세요)</span>`, () => {
+        const qty = x.qty;
         a.stocks.splice(idx, 1);
+        logActivity(a, `${name} 보유 대상에서 해제 · 기존 수량 ${qty}개`);
         toast("보유 대상에서 해제되었습니다");
         render();
       });
@@ -441,6 +458,7 @@
       isIndiv ? { k: "S/N", field: "serial", v: a.serial || '<span class="muted">—</span>' } : null,
       { k: "제조연월일", field: "manufactured", v: a.manufactured ? window.fmtDate(a.manufactured) : '<span class="muted">—</span>' },
       { k: "구매일", field: "purchaseDate", v: a.purchaseDate ? window.fmtDate(a.purchaseDate) : "—" },
+      { k: "등록일", v: window.fmtDate(a.createdAt) },
       { k: isIndiv ? "구매가격" : "구매가격 (품목 단가)", field: "purchasePrice", v: a.price ? a.price.toLocaleString() + "원" : "—" },
       { k: "QR 라벨", v: qrBtn },
       { k: "메모", v: memoHtml(a.note) },
@@ -464,16 +482,20 @@
           <div id="assign-body">${assignCurrentHtml(a)}</div>
         </section>`;
     } else {
+      activityLog(a);   // 첫 렌더에서 미리 시드 — 조작 전 상태를 정확히 베이스라인으로 남기기 위해
       const stocks = a.stocks || [];
       const total = stocks.reduce((s, x) => s + x.qty, 0);
       holdCard = `
-        <section class="dcard">
+        <section class="dcard" id="stock-card">
           <div class="dsection-head">
-            <h4>보유 현황 <span class="chip">총 ${total}개</span></h4>
-            <div class="hactions">${btn("보유 대상 추가")}</div>
+            <div class="dtabs">
+              <button data-stab="current" class="active">보유 현황</button>
+              <button data-stab="history">이력</button>
+            </div>
+            <div class="hactions" id="stock-actions">${btn("보유 대상 추가")}</div>
           </div>
-          <div class="stock-toolbar">
-            <span class="stock-count">전체 <b>${stocks.length}</b></span>
+          <div class="stock-toolbar" id="stock-toolbar">
+            <span class="stock-count">총 <b>${total}</b>개 · 전체 <b>${stocks.length}</b></span>
             <div class="stock-search">
               <select id="stock-cat">
                 <option value="employee">구성원</option>
@@ -538,18 +560,30 @@
         bindActs(body);
       });
     }
-    wireStockCards(c, a);
-    const stockQ = c.querySelector("#stock-q");
-    if (stockQ) {
-      const stockCat = c.querySelector("#stock-cat");
-      const stockBody = c.querySelector("#stock-body");
+    const scard = c.querySelector("#stock-card");
+    if (scard) {
+      const sbody = scard.querySelector("#stock-body");
+      const sactions = scard.querySelector("#stock-actions");
+      const stoolbar = scard.querySelector("#stock-toolbar");
+      const stockCat = scard.querySelector("#stock-cat");
+      const stockQ = scard.querySelector("#stock-q");
       const CAT_PLACEHOLDER = { employee: "이름·휴대폰번호·사번으로 검색", worksite: "근무지명·코드·주소로 검색" };
-      const refresh = () => {
-        stockBody.innerHTML = stockCards(a, stockQ.value, stockCat.value);
-        wireStockCards(stockBody, a);
+      const refreshStock = () => {
+        sbody.innerHTML = stockCards(a, stockQ.value, stockCat.value);
+        wireStockCards(sbody, a);
       };
-      stockCat.onchange = () => { stockQ.placeholder = CAT_PLACEHOLDER[stockCat.value]; refresh(); };
-      stockQ.oninput = refresh;
+      stockCat.onchange = () => { stockQ.placeholder = CAT_PLACEHOLDER[stockCat.value]; refreshStock(); };
+      stockQ.oninput = refreshStock;
+      wireStockCards(sbody, a);
+
+      scard.querySelectorAll("[data-stab]").forEach(t => t.onclick = () => {
+        scard.querySelectorAll("[data-stab]").forEach(x => x.classList.toggle("active", x === t));
+        const isCurrent = t.dataset.stab === "current";
+        sactions.hidden = !isCurrent;   // 보유 대상 추가·검색은 현황 탭에서만
+        stoolbar.hidden = !isCurrent;
+        if (isCurrent) refreshStock();
+        else sbody.innerHTML = timelineHtml(a);
+      });
     }
   }
 
