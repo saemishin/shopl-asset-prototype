@@ -152,41 +152,85 @@
       <div class="acard" data-idx="${idx}">
         <div class="acard-id">${assignIdentity(x)}</div>
         <div class="acard-foot">
-          <span class="acard-date">보유 수량 <b class="qty" data-qtyview title="클릭해서 수량 수정">${x.qty}개</b></span>
-          <div class="acard-actions"><button class="btn sm" data-exclude>제외</button></div>
+          <span class="acard-date">보유 수량 <b class="qty">${x.qty}개</b></span>
+          <div class="acard-actions">
+            <button class="btn sm" data-qtyedit>수량 변경</button>
+            <button class="btn sm" data-release>보유 해제</button>
+          </div>
         </div>
       </div>`).join("")}</div>`;
   }
+  // 수량 변경 팝오버 — 스테퍼(1 미만 불가) + 직접입력(포커스 시 기존값 지우고 새로 입력, 미입력 시 저장 비활성)
+  function openQtyPopover(anchor, a, idx) {
+    document.querySelectorAll(".qty-popover").forEach(m => m.remove());
+    const cur = a.stocks[idx].qty;
+    const pop = document.createElement("div");
+    pop.className = "qty-popover";
+    pop.innerHTML = `
+      <div class="qty-stepper">
+        <button type="button" class="qty-step" data-qminus aria-label="수량 감소">－</button>
+        <input type="text" inputmode="numeric" data-qinput placeholder="입력" value="${cur}">
+        <button type="button" class="qty-step" data-qplus aria-label="수량 증가">＋</button>
+      </div>
+      <div class="qty-pop-acts">
+        <button class="btn sm" data-qcancel>취소</button>
+        <button class="btn sm primary" data-qsave>저장</button>
+      </div>`;
+    const r = anchor.getBoundingClientRect();
+    pop.style.cssText = `position:fixed;top:${r.bottom + 6}px;left:${Math.max(8, r.right - 200)}px`;
+    document.body.appendChild(pop);
+
+    const input = pop.querySelector("[data-qinput]");
+    const minus = pop.querySelector("[data-qminus]");
+    const plus = pop.querySelector("[data-qplus]");
+    const save = pop.querySelector("[data-qsave]");
+    const val = () => { const n = parseInt(input.value, 10); return Number.isFinite(n) ? n : null; };
+    const sync = () => {
+      const v = val();
+      minus.disabled = v === null || v <= 1;
+      save.disabled = v === null || v < 1;
+    };
+    let cleared = false;
+    input.addEventListener("focus", () => {
+      if (!cleared) { cleared = true; input.value = ""; sync(); }
+    });
+    input.addEventListener("input", () => {
+      input.value = input.value.replace(/[^0-9]/g, "");
+      sync();
+    });
+    minus.onclick = () => { const v = val(); if (v !== null && v > 1) { input.value = v - 1; sync(); } };
+    plus.onclick = () => { const v = val() ?? 0; input.value = v + 1; sync(); };
+    save.onclick = () => {
+      const v = val();
+      if (v === null || v < 1) return;
+      a.stocks[idx].qty = v;
+      pop.remove();
+      toast(`보유 수량이 ${v}개로 변경되었습니다`);
+      render();
+    };
+    pop.querySelector("[data-qcancel]").onclick = () => pop.remove();
+    sync();
+    input.focus(); input.select();
+    setTimeout(() => {
+      const close = e => { if (!pop.contains(e.target) && e.target !== anchor) { pop.remove(); document.removeEventListener("click", close); } };
+      document.addEventListener("click", close);
+    });
+  }
   function wireStockCards(scope, a) {
-    scope.querySelectorAll("[data-exclude]").forEach(b => b.onclick = () => {
+    scope.querySelectorAll("[data-release]").forEach(b => b.onclick = () => {
       const row = b.closest(".acard");
       const idx = +row.dataset.idx;
       const x = a.stocks[idx];
       const name = x.employee || x.worksite;
-      confirmModal(`${name}을(를) 보유 대상에서 제외하시겠습니까?<br><span class="muted" style="font-size:12px">보유 기록이 삭제되며, 이후 이 자산의 보유 대상 목록에 나타나지 않습니다. (수량만 바꾸려면 취소 후 수량을 클릭하세요)</span>`, () => {
+      confirmModal(`${name}을(를) 보유 대상에서 해제하시겠습니까?<br><span class="muted" style="font-size:12px">보유 기록이 삭제되며, 이후 이 자산의 보유 대상 목록에 나타나지 않습니다. (수량만 바꾸려면 취소 후 수량 변경을 이용하세요)</span>`, () => {
         a.stocks.splice(idx, 1);
-        toast("보유 대상에서 제외되었습니다");
+        toast("보유 대상에서 해제되었습니다");
         render();
       });
     });
-    scope.querySelectorAll("[data-qtyview]").forEach(el => {
-      el.onclick = () => {
-        const row = el.closest(".acard");
-        const idx = +row.dataset.idx;
-        const cur = a.stocks[idx].qty;
-        el.outerHTML = `<span class="qty-edit"><input type="number" min="0" value="${cur}" data-qtyinput>
-          <button class="btn sm" data-qtysave>저장</button></span>`;
-        const input = row.querySelector("[data-qtyinput]");
-        input.focus(); input.select();
-        const save = () => {
-          const v = Math.max(0, parseInt(input.value, 10) || 0);
-          a.stocks[idx].qty = v;
-          toast(`보유 수량이 ${v}개로 변경되었습니다`);
-          render();
-        };
-        row.querySelector("[data-qtysave]").onclick = save;
-        input.onkeydown = e => { if (e.key === "Enter") save(); };
-      };
+    scope.querySelectorAll("[data-qtyedit]").forEach(b => b.onclick = () => {
+      const row = b.closest(".acard");
+      openQtyPopover(b, a, +row.dataset.idx);
     });
   }
   function assignCurrentHtml(a) {

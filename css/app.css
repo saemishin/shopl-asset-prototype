@@ -395,8 +395,24 @@ button.dthumb:hover { filter: brightness(0.94); }
 .drow .since { margin-left: auto; }
 .drow .qty { margin-left: auto; font-variant-numeric: tabular-nums; font-weight: 600; cursor: pointer; border-bottom: 1px dashed var(--line-strong); }
 .drow .qty:hover { color: var(--primary); border-color: var(--primary); }
-.qty-edit { margin-left: auto; display: flex; gap: 6px; align-items: center; }
-.qty-edit input { width: 70px; height: 28px; border: 1px solid var(--primary); border-radius: 6px; padding: 0 8px; font-variant-numeric: tabular-nums; }
+/* 수량 변경 팝오버 */
+.qty-popover {
+  position: fixed; background: var(--panel); border: 1px solid var(--line-strong);
+  border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.12); padding: 10px; z-index: 200;
+}
+.qty-stepper { display: flex; align-items: center; gap: 6px; }
+.qty-step {
+  width: 28px; height: 28px; border: 1px solid var(--line-strong); border-radius: 6px;
+  background: var(--panel); font-size: 14px; line-height: 1; flex-shrink: 0;
+}
+.qty-step:hover:not(:disabled) { background: #f7f8f9; }
+.qty-step:disabled { opacity: .4; }
+.qty-stepper input {
+  width: 68px; height: 28px; border: 1px solid var(--line-strong); border-radius: 6px;
+  padding: 0 8px; font-size: 12.5px; text-align: center; font-variant-numeric: tabular-nums;
+}
+.qty-pop-acts { display: flex; justify-content: flex-end; gap: 6px; margin-top: 8px; }
+.btn:disabled { opacity: .45; pointer-events: none; }
 
 /* 보유 현황 — 전체 카운트 + 검색(카테고리 선택) */
 .stock-toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
