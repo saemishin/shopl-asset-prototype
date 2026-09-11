@@ -19,7 +19,7 @@
   function expiryCell(d) {
     if (!d) return '<span class="muted">—</span>';
     const k = expiryKey(d);
-    return `${d} <span class="badge exp-${k}">${EXP_LABEL[k]}</span>`;
+    return `${window.fmtDate(d)} <span class="badge exp-${k}">${EXP_LABEL[k]}</span>`;
   }
   const IC_EMP = `<svg class="hi" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5.5 20c0-4 3-6.5 6.5-6.5s6.5 2.5 6.5 6.5"/></svg>`;
   const IC_WS = `<svg class="hi" viewBox="0 0 24 24"><path d="M4 20V9.5L12 4l8 5.5V20"/><path d="M9.5 20v-5h5v5"/></svg>`;
