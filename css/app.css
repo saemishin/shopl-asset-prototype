@@ -329,7 +329,7 @@ th.c, td.c { text-align: center; width: 52px; }
   border: 1px solid var(--line); border-radius: 10px; background: var(--panel);
   padding: 18px 20px; margin-bottom: 14px;
 }
-.dgrid { display: grid; grid-template-columns: 1fr 1.4fr; gap: 14px; align-items: stretch; }
+.dgrid { display: grid; grid-template-columns: 1fr 1.2fr; gap: 14px; align-items: stretch; }
 .dgrid .dcard { margin-bottom: 0; }
 
 /* 상세 페이지: 좌우 컬럼 높이를 맞추고, 넘치면 각자 독립 스크롤 */
