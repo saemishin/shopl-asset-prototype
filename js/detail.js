@@ -283,13 +283,16 @@
       </div>`).join("")}</div>`;
   }
   // 배정일 수정 팝오버 — 대상(구성원/근무지)은 여기서 못 바꿈(재배정으로만), 날짜만 수정
+  // validation: 배정은 예약 개념 없이 즉시 처리되는 게 원칙(2.3)이라 미래 날짜는 불가
   function openDatePopover(anchor, a, idx) {
     document.querySelectorAll(".qty-popover").forEach(m => m.remove());
     const cur = a.assignments[idx].since;
+    const max = todayStr();
     const pop = document.createElement("div");
     pop.className = "qty-popover";
     pop.innerHTML = `
-      <input type="date" data-dinput value="${cur}">
+      <input type="date" data-dinput value="${cur}" max="${max}">
+      <div class="qty-pop-err" data-derr hidden>배정일은 오늘보다 미래일 수 없습니다</div>
       <div class="qty-pop-acts">
         <button class="btn sm" data-dcancel>취소</button>
         <button class="btn sm primary" data-dsave>저장</button>
@@ -300,10 +303,15 @@
 
     const input = pop.querySelector("[data-dinput]");
     const save = pop.querySelector("[data-dsave]");
-    const sync = () => { save.disabled = !input.value; };
+    const err = pop.querySelector("[data-derr]");
+    const sync = () => {
+      const future = input.value > max;
+      err.hidden = !future;
+      save.disabled = !input.value || future;
+    };
     input.addEventListener("input", sync);
     save.onclick = () => {
-      if (!input.value) return;
+      if (!input.value || input.value > max) return;
       const v = input.value;
       const x = a.assignments[idx];
       const name = x.employee || x.worksite;
