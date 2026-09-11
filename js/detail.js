@@ -133,11 +133,15 @@
     if (!a._activityLog) a._activityLog = activityOf(a);
     return a._activityLog;
   }
-  function logActivity(a, t) {
+  function todayStr() {
     const p = n => String(n).padStart(2, "0");
-    const d = `${TODAY.getFullYear()}-${p(TODAY.getMonth() + 1)}-${p(TODAY.getDate())}`;
-    activityLog(a).unshift({ d, t, who: "dana" });
+    return `${TODAY.getFullYear()}-${p(TODAY.getMonth() + 1)}-${p(TODAY.getDate())}`;
   }
+  function logActivity(a, t) {
+    activityLog(a).unshift({ d: todayStr(), t, who: "dana" });
+  }
+  // 보유 레코드의 "최종 수정일" — 최초 등록(자산 등록일과 동일 취급) 이후 수량이 바뀐 적 있으면 그 시점, 없으면 등록일
+  const stockUpdatedAt = (a, x) => x._updatedAt || a.createdAt;
   function timelineHtml(a) {
     return `<ol class="dtimeline">${activityLog(a).map(e => `
       <li><span class="tl-dot"></span>
@@ -166,7 +170,10 @@
         ${typeBadge(x)}
         <div class="acard-id">${assignIdentity(x)}</div>
         <div class="acard-foot">
-          <span class="acard-date">보유 수량 <b class="qty">${x.qty}개</b></span>
+          <div class="acard-meta">
+            <span class="acard-date">보유 수량 <b class="qty">${x.qty}개</b></span>
+            <span class="acard-date">최종 수정일 <b>${window.fmtDate(stockUpdatedAt(a, x))}</b></span>
+          </div>
           <div class="acard-actions">
             <button class="btn sm" data-qtyedit>수량 변경</button>
             <button class="btn sm" data-release>보유 해제</button>
@@ -216,6 +223,7 @@
       const x = a.stocks[idx];
       const name = x.employee || x.worksite;
       a.stocks[idx].qty = v;
+      a.stocks[idx]._updatedAt = todayStr();
       logActivity(a, `${name} 보유 수량 변경 · ${cur}개 → ${v}개`);
       pop.remove();
       toast(`보유 수량이 ${v}개로 변경되었습니다`);
@@ -251,18 +259,64 @@
   function assignCurrentHtml(a) {
     const asg = a.assignments || [];
     if (!asg.length) return '<p class="muted" style="padding:6px 0">배정 없음 (재고 상태)</p>';
-    return `<div class="acard-list">${asg.map(x => `
-      <div class="acard">
+    return `<div class="acard-list">${asg.map((x, idx) => `
+      <div class="acard" data-idx="${idx}">
         ${typeBadge(x)}
         <div class="acard-id">${assignIdentity(x)}</div>
         <div class="acard-foot">
           <span class="acard-date">배정일 <b>${window.fmtDate(x.since)}</b></span>
           <div class="acard-actions">
+            <button class="btn sm" data-dateedit>배정일 수정</button>
             <button class="btn sm" data-act="재배정">재배정</button>
             <button class="btn sm" data-act="반납">반납</button>
           </div>
         </div>
       </div>`).join("")}</div>`;
+  }
+  // 배정일 수정 팝오버 — 대상(구성원/근무지)은 여기서 못 바꿈(재배정으로만), 날짜만 수정
+  function openDatePopover(anchor, a, idx) {
+    document.querySelectorAll(".qty-popover").forEach(m => m.remove());
+    const cur = a.assignments[idx].since;
+    const pop = document.createElement("div");
+    pop.className = "qty-popover";
+    pop.innerHTML = `
+      <input type="date" data-dinput value="${cur}">
+      <div class="qty-pop-acts">
+        <button class="btn sm" data-dcancel>취소</button>
+        <button class="btn sm primary" data-dsave>저장</button>
+      </div>`;
+    const r = anchor.getBoundingClientRect();
+    pop.style.cssText = `position:fixed;top:${r.bottom + 6}px;left:${Math.max(8, r.right - 200)}px`;
+    document.body.appendChild(pop);
+
+    const input = pop.querySelector("[data-dinput]");
+    const save = pop.querySelector("[data-dsave]");
+    const sync = () => { save.disabled = !input.value; };
+    input.addEventListener("input", sync);
+    save.onclick = () => {
+      if (!input.value) return;
+      const v = input.value;
+      const x = a.assignments[idx];
+      const name = x.employee || x.worksite;
+      x.since = v;
+      logActivity(a, `${name} 배정일 변경 · ${window.fmtDate(cur)} → ${window.fmtDate(v)}`);
+      pop.remove();
+      toast(`배정일이 ${window.fmtDate(v)}로 변경되었습니다`);
+      render();
+    };
+    pop.querySelector("[data-dcancel]").onclick = () => pop.remove();
+    sync();
+    input.focus();
+    setTimeout(() => {
+      const close = e => { if (!pop.contains(e.target) && e.target !== anchor) { pop.remove(); document.removeEventListener("click", close); } };
+      document.addEventListener("click", close);
+    });
+  }
+  function wireAssignCards(scope, a) {
+    scope.querySelectorAll("[data-dateedit]").forEach(b => b.onclick = () => {
+      const row = b.closest(".acard");
+      openDatePopover(b, a, +row.dataset.idx);
+    });
   }
 
   /* ---------- 공통 사진 뷰어 ---------- */
@@ -461,7 +515,8 @@
      .filter(row => !row.field || !hidden.includes(row.field))
      .map(({ k, v }) => `<div><div class="k">${k}</div><div class="v">${v}</div></div>`).join("");
 
-    // 배정/보유 카드. 카드 상단 액션은 "추가"만 담당(라벨 하나로 고정) — 재배정/반납은 각 행에 종속.
+    // 배정/보유 카드. 카드 상단 액션은 "추가"만 담당(라벨 하나로 고정) — 재배정/반납/배정일 수정/수량 변경은 각 행에 종속.
+    activityLog(a);   // 첫 렌더에서 미리 시드 — 조작 전 상태를 정확히 베이스라인으로 남기기 위해(개별형·수량형 공통)
     let holdCard;
     if (isIndiv) {
       const asg = a.assignments || [];
@@ -477,7 +532,6 @@
           <div id="assign-body">${assignCurrentHtml(a)}</div>
         </section>`;
     } else {
-      activityLog(a);   // 첫 렌더에서 미리 시드 — 조작 전 상태를 정확히 베이스라인으로 남기기 위해
       const stocks = a.stocks || [];
       const total = stocks.reduce((s, x) => s + x.qty, 0);
       holdCard = `
@@ -547,12 +601,14 @@
     if (card) {
       const body = card.querySelector("#assign-body");
       const actions = card.querySelector("#assign-actions");
+      wireAssignCards(body, a);
       card.querySelectorAll("[data-atab]").forEach(t => t.onclick = () => {
         card.querySelectorAll("[data-atab]").forEach(x => x.classList.toggle("active", x === t));
         const isCurrent = t.dataset.atab === "current";
         body.innerHTML = isCurrent ? assignCurrentHtml(a) : timelineHtml(a);
         actions.hidden = !isCurrent;   // 배정 액션은 현황 탭에서만
         bindActs(body);
+        if (isCurrent) wireAssignCards(body, a);
       });
     }
     const scard = c.querySelector("#stock-card");
