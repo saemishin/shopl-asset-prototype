@@ -270,16 +270,24 @@
            ${photos.length > 1 ? `<span class="tcount">+${photos.length - 1}</span>` : ""}</button>`
       : `<span class="dthumb empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 15 5-4 4 3 4-4 5 4"/></svg></span>`;
 
-    const subMeta = [
-      isIndiv ? `<span class="badge ${STATUS_LABEL[a.status][1]}">${STATUS_LABEL[a.status][0]}</span>` : `<span class="type-pill">수량 자산</span>`,
-      isIndiv && a.assetNo ? `고유관리번호 <b>${a.assetNo}</b>` : "",
-    ].filter(Boolean).join('<span class="ddot">·</span>');
+    const subMeta = `
+      <div>${isIndiv ? `<span class="badge ${STATUS_LABEL[a.status][1]}">${STATUS_LABEL[a.status][0]}</span>` : `<span class="type-pill">수량 자산</span>`}</div>
+      ${isIndiv && a.assetNo ? `<div style="margin-top:5px">고유관리번호 <b>${a.assetNo}</b></div>` : ""}`;
+
+    // 상태 변경으로 이동 가능한 전이만 노출. 재고⟷배정중은 배정/반납으로 자동 파생되므로 이 메뉴엔 없음. 폐기는 최종 상태라 버튼 자체를 숨김.
+    const STATUS_TRANSITIONS = {
+      stock: ["수리 접수", "분실 신고", "폐기 처리"],
+      assigned: ["수리 접수", "분실 신고", "폐기 처리"],
+      repair: ["수리 완료", "분실 신고", "폐기 처리"],
+      lost: ["분실 회수", "폐기 처리"],
+      disposed: [],
+    };
+    const statusItems = isIndiv ? STATUS_TRANSITIONS[a.status] : [];
 
     const QR_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM19 14h2v2h-2zM14 19h2v2h-2zM19 19h2v2h-2z"/></svg>`;
     const qrBtn = `<button class="btn sm icon-only" data-qr aria-label="QR 라벨" title="QR 라벨">${QR_ICON}</button>`;
-    const headActions = isIndiv
-      ? btn("상태 변경") + `<button class="btn sm" data-more>⋯ 더보기</button>`
-      : `<button class="btn sm" data-more>⋯ 더보기</button>`;
+    const headActions = (isIndiv && statusItems.length ? `<button class="btn sm" data-statuschange>상태 변경</button>` : "")
+      + `<button class="btn sm" data-more>⋯ 더보기</button>`;
     const moreItems = isIndiv
       ? ["재배정·이동", "소분류 이동", "자산 수정", "자산 삭제"]
       : ["소분류 이동", "자산 수정", "자산 삭제"];
@@ -370,6 +378,8 @@
     bindActs(c);
     c.querySelector("[data-qr]").onclick = () => openQrModal(a);
     c.querySelector("[data-more]").onclick = e => dropdown(e.currentTarget, moreItems);
+    const sc = c.querySelector("[data-statuschange]");
+    if (sc) sc.onclick = e => dropdown(e.currentTarget, statusItems);
     const tb = c.querySelector("[data-viewer]");
     if (tb) tb.onclick = () => openViewer(a, a._primary || 0);
 
