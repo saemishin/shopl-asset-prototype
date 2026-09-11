@@ -130,7 +130,6 @@
     const subMeta = [
       isIndiv ? `<span class="badge ${STATUS_LABEL[a.status][1]}">${STATUS_LABEL[a.status][0]}</span>` : `<span class="type-pill">수량 자산</span>`,
       isIndiv && a.assetNo ? `고유관리번호 <b>${a.assetNo}</b>` : "",
-      isIndiv && a.serial ? `S/N ${a.serial}` : "",
     ].filter(Boolean).join('<span class="ddot">·</span>');
 
     const headActions = isIndiv
@@ -142,8 +141,6 @@
 
     const kv = [
       ["분류", `${a.group} › ${a.sub} <span class="type-pill">${isIndiv ? "개별 자산" : "수량 자산"}</span>`],
-      ["제품명", a.product],
-      isIndiv ? ["고유관리번호", a.assetNo || "—"] : null,
       isIndiv ? ["S/N", a.serial || '<span class="muted">—</span>'] : null,
       ["구매일", a.purchaseDate || "—"],
       [isIndiv ? "구매가격" : "구매가격 (품목 단가)", a.price ? a.price.toLocaleString() + "원" : "—"],
