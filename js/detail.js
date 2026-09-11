@@ -132,30 +132,20 @@
           <div class="v-info-by"><span class="avatar-sm"></span><span class="v-info-name"></span></div>
         </div>
         <div class="v-stage">
-          <button class="v-edge prev" data-vprev aria-label="이전">‹</button>
           <div class="v-img-wrap"><div class="v-img"></div></div>
-          <button class="v-edge next" data-vnext aria-label="다음">›</button>
         </div>
-        <div class="v-strip"></div>
       </div>`;
     const V = back.querySelector(".viewer");
 
-    function drawStrip() {
-      V.querySelector(".v-strip").innerHTML = items.map((p, k) =>
-        `<span data-k="${k}" class="${k === cur ? "on" : ""} ${k === a._primary ? "primary" : ""}" style="background:${p.color}">
-          ${k === a._primary ? '<i class="pstar">★</i>' : ""}</span>`).join("");
-      V.querySelectorAll(".v-strip span").forEach(s => s.onclick = () => { cur = +s.dataset.k; draw(); });
-    }
     function draw() {
       const p = items[cur];
       const img = V.querySelector(".v-img");
       img.style.background = p.color;
       img.style.transform = `scale(${zoom})`;
-      V.querySelector(".v-count").textContent = `${cur + 1} / ${items.length}`;
+      V.querySelector(".v-count").textContent = `${cur + 1} / ${items.length}${cur === a._primary ? " · 대표 사진" : ""}`;
       V.querySelector(".v-info-date").textContent = `첨부일 ${p.at}`;
       V.querySelector(".v-info-name").textContent = p.by;
       V.querySelector(".avatar-sm").textContent = p.by[0].toUpperCase();
-      drawStrip();
     }
     const go = d => { cur = (cur + d + items.length) % items.length; zoom = 1; draw(); };
 

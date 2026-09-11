@@ -429,16 +429,9 @@ button.dthumb:hover { filter: brightness(0.94); }
 .v-info-date { font-size: 12px; color: rgba(255,255,255,.7); margin-top: 10px; }
 .v-info-by { display: flex; align-items: center; gap: 6px; font-size: 12px; margin-top: 6px; }
 
-.v-stage { display: flex; align-items: center; gap: 4px; width: 100%; flex: 1; min-height: 0; padding: 60px 8px 12px; }
+.v-stage { display: flex; align-items: center; justify-content: center; width: 100%; flex: 1; min-height: 0; padding: 64px 16px 24px; }
 .v-img-wrap { flex: 1; height: 100%; display: flex; align-items: center; justify-content: center; overflow: hidden; }
-.v-img { width: min(78vw, 900px); height: min(72vh, 680px); border-radius: 6px; background: #ccc; transition: transform .18s; }
-.v-edge { width: 44px; height: 44px; border-radius: 50%; font-size: 22px; color: rgba(255,255,255,.8); flex-shrink: 0; }
-.v-edge:hover { background: rgba(255,255,255,.14); color: #fff; }
-.v-strip { display: flex; gap: 6px; padding: 8px 16px 16px; flex-wrap: wrap; justify-content: center; }
-.v-strip span { width: 46px; height: 46px; border-radius: 6px; cursor: pointer; opacity: .45; position: relative; }
-.v-strip span.on { opacity: 1; box-shadow: 0 0 0 2px #fff; }
-.v-strip span.primary .pstar { position: absolute; top: -6px; right: -4px; font-size: 11px; color: #ffcf3f; text-shadow: 0 1px 2px rgba(0,0,0,.5); }
-.viewer.fs { }
+.v-img { width: min(80vw, 940px); height: min(74vh, 700px); border-radius: 6px; background: #ccc; transition: transform .18s; }
 .dropdown-menu button.danger { color: var(--danger); }
 
 .notice { background: #fff8e6; border: 1px solid #f2e2b6; color: #8a6d1d; padding: 8px 12px; border-radius: var(--radius); font-size: 12px; margin-bottom: 14px; }
