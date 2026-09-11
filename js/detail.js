@@ -20,6 +20,7 @@
 
   const IC_EMP = `<svg class="hi" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5.5 20c0-4 3-6.5 6.5-6.5s6.5 2.5 6.5 6.5"/></svg>`;
   const IC_WS = `<svg class="hi" viewBox="0 0 24 24"><path d="M4 20V9.5L12 4l8 5.5V20"/><path d="M9.5 20v-5h5v5"/></svg>`;
+  const IC_EDIT = `<svg viewBox="0 0 24 24"><path d="M4 20l1-4L16 5l3 3L8 19l-4 1z"/><path d="M13.5 6.5l4 4"/></svg>`;
 
   // 배정 현황 카드 — 구성원/근무지 여부에 따른 아이덴티티 표현.
   // ※ 그룹(부서)·근무지 코드는 구조설계안에 없는 필드 — 구성원/근무지가 "기존 재사용" 엔티티라 여기선 프로토타입 데모용 샘플값만 매핑
@@ -149,6 +150,7 @@
       </li>`).join("")}</ol>`;
   }
   // 보유 현황 — 배정 현황과 동일한 카드 UI(assignIdentity 재사용) + 검색(구성원/근무지 카테고리 선택)
+  // 정렬: 최종 수정일 내림차순(최근 변경 위로) → 동률(일괄 처리 등)이면 이름 가나다순
   function stockCards(a, query, cat) {
     const stocks = a.stocks || [];
     const q = (query || "").trim().toLowerCase();
@@ -163,6 +165,12 @@
         }
         if (!x.employee) return false;
         return x.employee.toLowerCase().includes(q);
+      })
+      .sort((p, q2) => {
+        const dp = stockUpdatedAt(a, p.x), dq = stockUpdatedAt(a, q2.x);
+        if (dp !== dq) return dp < dq ? 1 : -1;
+        const np = p.x.employee || p.x.worksite, nq = q2.x.employee || q2.x.worksite;
+        return np.localeCompare(nq, "ko");
       });
     if (!rows.length) return '<p class="muted" style="padding:6px 0">일치하는 보유 대상이 없습니다</p>';
     return `<div class="acard-list">${rows.map(({ x, idx }) => `
@@ -256,17 +264,18 @@
       openQtyPopover(b, a, +row.dataset.idx);
     });
   }
+  // 정렬: 배정일 내림차순(최신 배정이 위로)
   function assignCurrentHtml(a) {
     const asg = a.assignments || [];
     if (!asg.length) return '<p class="muted" style="padding:6px 0">배정 없음 (재고 상태)</p>';
-    return `<div class="acard-list">${asg.map((x, idx) => `
+    const rows = asg.map((x, idx) => ({ x, idx })).sort((p, q) => (p.x.since < q.x.since ? 1 : -1));
+    return `<div class="acard-list">${rows.map(({ x, idx }) => `
       <div class="acard" data-idx="${idx}">
         ${typeBadge(x)}
         <div class="acard-id">${assignIdentity(x)}</div>
         <div class="acard-foot">
-          <span class="acard-date">배정일 <b>${window.fmtDate(x.since)}</b></span>
+          <span class="acard-date">배정일 <b>${window.fmtDate(x.since)}</b><button class="icon-edit" data-dateedit aria-label="배정일 수정" title="배정일 수정">${IC_EDIT}</button></span>
           <div class="acard-actions">
-            <button class="btn sm" data-dateedit>배정일 수정</button>
             <button class="btn sm" data-act="재배정">재배정</button>
             <button class="btn sm" data-act="반납">반납</button>
           </div>

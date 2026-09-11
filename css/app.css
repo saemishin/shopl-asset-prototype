@@ -457,6 +457,13 @@ button.dthumb:hover { filter: brightness(0.94); }
 }
 .acard-date { font-size: 12px; color: var(--text-sub); }
 .acard-date b { color: var(--text); font-weight: 600; }
+/* 배정일 옆 수정 아이콘 — 재배정/반납과 성격이 다른 가벼운 데이터 정정이라 버튼 대신 인라인 아이콘으로 축소 */
+.icon-edit {
+  display: inline-flex; align-items: center; justify-content: center; vertical-align: -3px;
+  width: 18px; height: 18px; margin-left: 2px; border-radius: 4px; color: var(--text-mut); opacity: .7;
+}
+.icon-edit:hover { background: #f0f1f3; color: var(--text-sub); opacity: 1; }
+.icon-edit svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .acard-meta { display: flex; flex-direction: column; gap: 3px; }
 .acard-actions { display: flex; gap: 6px; }
 
