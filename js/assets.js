@@ -111,7 +111,7 @@
   function view_all(list) {
     const head = `<tr>
       <th>고유관리번호</th><th>제품명</th><th>분류</th><th>자산 유형</th><th>상태</th>
-      <th>배정·보유 현황</th><th>기한</th><th>라벨</th><th class="c">메모</th></tr>`;
+      <th>배정·보유 현황</th><th>유효기한</th><th>태그</th><th class="c">메모</th></tr>`;
     const rows = list.map(a => {
       const st = a.type === "quantity"
         ? '<span class="muted">—</span>'
@@ -199,8 +199,8 @@
     if (f.category.length) push("category", `분류: ${f.category.map(c => c.split("/")[1]).join("·")}`, { k: "category" });
     if (f.type.length) push("type", `자산 유형: ${f.type.map(t => TYPE_LABEL[t]).join("·")}`, { k: "type" });
     if (f.status.length) push("status", `상태: ${f.status.map(s => STATUS_LABEL[s][0]).join("·")}`, { k: "status" });
-    if (f.expiry.length) push("expiry", `기한: ${f.expiry.map(e => EXP_LABEL[e]).join("·")}`, { k: "expiry" });
-    if (f.labels.length) push("labels", `라벨(${f.labelMode.toUpperCase()}): ${f.labels.join("·")}`, { k: "labels" });
+    if (f.expiry.length) push("expiry", `유효기한: ${f.expiry.map(e => EXP_LABEL[e]).join("·")}`, { k: "expiry" });
+    if (f.labels.length) push("labels", `태그(${f.labelMode.toUpperCase()}): ${f.labels.join("·")}`, { k: "labels" });
     if (!chips.length) return "";
     return `<div class="filterbar">${chips.join("")}<button class="fclear" id="fclear-all">전체 해제</button></div>`;
   }
@@ -346,8 +346,8 @@
       statTile({ k: "배정률", v: s.rate + "%" }),
     ].join("");
     const row2 = [
-      statTile({ k: "기한 지남", v: s.expOver, cls: "alert", filter: { k: "expiry", v: ["over"] } }),
-      statTile({ k: "기한 임박", v: s.expSoon, cls: "warn", filter: { k: "expiry", v: ["soon"] } }),
+      statTile({ k: "유효기한 지남", v: s.expOver, cls: "alert", filter: { k: "expiry", v: ["over"] } }),
+      statTile({ k: "유효기한 임박", v: s.expSoon, cls: "warn", filter: { k: "expiry", v: ["soon"] } }),
       statTile({ k: "분실", v: s.lost, cls: "alert", filter: { k: "status", v: ["lost"] } }),
       statTile({ k: "수리중", v: s.repair, cls: "warn", filter: { k: "status", v: ["repair"] } }),
       statTile({ k: "소진 보유처", v: s.zeroStocks, cls: s.zeroStocks ? "warn" : "" }),
@@ -383,8 +383,8 @@
       { k: "category", name: "분류" },
       { k: "type", name: "자산 유형" },
       { k: "status", name: "상태" },
-      { k: "expiry", name: "기한" },
-      { k: "labels", name: "라벨" },
+      { k: "expiry", name: "유효기한" },
+      { k: "labels", name: "태그" },
     ];
     const summary = k => {
       if (k === "category") return draft.category.length ? draft.category.map(c => c.split("/")[1]).join(", ") : "전체";
@@ -526,8 +526,8 @@
             <select><option>전자기기류 › 노트북</option><option>가구류 › 의자</option><option>소모품 › 유니폼</option></select></div>
           <div class="field"><label>제품명 <span class="req">*</span></label><input type="text" placeholder="예: 그램 16 (2024)"></div>
           <div class="field" id="f-assetno"><label>고유관리번호 <span class="req">*</span></label><input type="text" placeholder="예: IT-2026-0001"></div>
-          <div class="field"><label>기한</label><input type="date"><div class="hint">소분류 필드 노출 설정이 on일 때만 표시 (기본 off)</div></div>
-          <div class="field"><label>라벨</label><input type="text" placeholder="입력 후 Enter · 최대 5개 · 20자"></div>
+          <div class="field"><label>유효기한</label><input type="date"><div class="hint">소분류 필드 노출 설정이 on일 때만 표시 (기본 off)</div></div>
+          <div class="field"><label>태그</label><input type="text" placeholder="입력 후 Enter · 최대 5개 · 20자"></div>
         </div>
         <div class="foot">
           <button class="btn" data-close>취소</button>

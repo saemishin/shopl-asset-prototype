@@ -1,9 +1,10 @@
 /* Sample data for the prototype. Not a real schema — mirrors 구조설계안 fields. */
 window.DATA = (function () {
   // 분류: 대분류 > 소분류(개별형/수량형)
+  // hiddenFields: 소분류 필드 노출 설정에서 off된 선택 필드(구조안 3.3). 상세에서 해당 행 자체를 숨김
   const categories = [
-    { group: "가구류", sub: "책상", type: "individual" },
-    { group: "가구류", sub: "의자", type: "individual" },
+    { group: "가구류", sub: "책상", type: "individual", hiddenFields: ["expiry"] },
+    { group: "가구류", sub: "의자", type: "individual", hiddenFields: ["expiry"] },
     { group: "전자기기류", sub: "노트북", type: "individual" },
     { group: "전자기기류", sub: "모니터", type: "individual" },
     { group: "전자기기류", sub: "케이블·액세서리", type: "quantity" },
@@ -16,7 +17,7 @@ window.DATA = (function () {
   const assets = [
     { id: "A001", type: "individual", assetNo: "IT-2024-0012", product: "그램 16 (2024)", group: "전자기기류", sub: "노트북",
       status: "assigned", serial: "SN-8842-AA", purchaseDate: "2024-03-11", price: 1890000, manufactured: "2024-01-20",
-      expiry: "2027-03-10", note: "키보드 자판 일부 마모 — 2025-06 교체 요청 이력", photo: "#4b7bec", photoCount: 6,
+      expiry: "2027-03-10", note: "키보드 자판 일부 마모 확인 — 2025-06 교체 요청 이력 있음. 배정 반납 시 상태 재확인 필요. 트랙패드 클릭감 저하 민원 1건 접수돼 다음 정기 점검 때 같이 확인 요망.", photo: "#4b7bec", photoCount: 6,
       labels: ["본사", "개발팀"], assignments: [{ employee: "김민수", worksite: null, since: "2024-03-15" }] },
     { id: "A002", type: "individual", assetNo: "IT-2024-0013", product: "그램 16 (2024)", group: "전자기기류", sub: "노트북",
       status: "stock", serial: "SN-8842-AB", purchaseDate: "2024-03-11", price: 1890000, expiry: "2027-03-10",

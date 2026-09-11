@@ -15,6 +15,13 @@
   }
   const chips = arr => (arr && arr.length) ? arr.map(l => `<span class="tag">${l}</span>`).join("") : '<span class="muted">—</span>';
 
+  const MEMO_CLAMP_AT = 80;   // 이 길이를 넘으면 2줄로 접어 보여주고 "더보기" 제공
+  function memoHtml(note) {
+    if (!note) return '<span class="muted">—</span>';
+    if (note.length <= MEMO_CLAMP_AT) return `<span>${note}</span>`;
+    return `<div class="memo-block"><span class="memo-text clamped">${note}</span><button type="button" class="memo-more" data-memotoggle>더보기</button></div>`;
+  }
+
   const IC_EMP = `<svg class="hi" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5.5 20c0-4 3-6.5 6.5-6.5s6.5 2.5 6.5 6.5"/></svg>`;
   const IC_WS = `<svg class="hi" viewBox="0 0 24 24"><path d="M4 20V9.5L12 4l8 5.5V20"/><path d="M9.5 20v-5h5v5"/></svg>`;
   const holderOne = x => (x.employee ? `${IC_EMP}${x.employee}` : `${IC_WS}${x.worksite}`);
@@ -281,18 +288,24 @@
       ? ["재배정·이동", "소분류 이동", "자산 수정", "자산 삭제"]
       : ["소분류 이동", "자산 수정", "자산 삭제"];
 
-    // 필수값(분류) 먼저, 선택값이 뒤따름. QR 라벨은 정렬 기준과 무관하게 항상 마지막.
+    // 필수값(분류) 먼저, 선택값이 뒤따름(제조연월일이 구매일보다 앞 — 제조가 구매보다 먼저 일어나는 시점이라).
+    // 태그는 분류 바로 다음. 선택 필드(field 태그가 있는 행)는 소분류 필드 노출 설정(hiddenFields)에서 off면 행 자체를 숨김.
+    // QR 라벨은 이 정렬·노출 규칙과 무관하게 항상 마지막.
+    const cat = (window.DATA.categories || []).find(x => x.group === a.group && x.sub === a.sub) || {};
+    const hidden = cat.hiddenFields || [];
     const kv = [
-      ["분류", `<div>${a.group} › ${a.sub}</div><div style="margin-top:5px"><span class="type-pill">${isIndiv ? "개별 자산" : "수량 자산"}</span></div>`],
-      isIndiv ? ["S/N", a.serial || '<span class="muted">—</span>'] : null,
-      ["구매일", a.purchaseDate ? window.fmtDate(a.purchaseDate) : "—"],
-      [isIndiv ? "구매가격" : "구매가격 (품목 단가)", a.price ? a.price.toLocaleString() + "원" : "—"],
-      ["제조연월일", a.manufactured ? window.fmtDate(a.manufactured) : '<span class="muted">—</span>'],
-      ["기한", expiryBadge(a.expiry)],
-      ["라벨", chips(a.labels)],
-      ["메모", a.note || '<span class="muted">—</span>'],
-      ["QR 라벨", qrBtn],
-    ].filter(Boolean).map(([k, v]) => `<div><div class="k">${k}</div><div class="v">${v}</div></div>`).join("");
+      { k: "분류", v: `<div><span class="type-pill">${isIndiv ? "개별 자산" : "수량 자산"}</span></div><div style="margin-top:5px">${a.group} › ${a.sub}</div>` },
+      { k: "태그", v: chips(a.labels) },
+      isIndiv ? { k: "S/N", field: "serial", v: a.serial || '<span class="muted">—</span>' } : null,
+      { k: "제조연월일", field: "manufactured", v: a.manufactured ? window.fmtDate(a.manufactured) : '<span class="muted">—</span>' },
+      { k: "구매일", field: "purchaseDate", v: a.purchaseDate ? window.fmtDate(a.purchaseDate) : "—" },
+      { k: isIndiv ? "구매가격" : "구매가격 (품목 단가)", field: "purchasePrice", v: a.price ? a.price.toLocaleString() + "원" : "—" },
+      { k: "유효기한", field: "expiry", v: expiryBadge(a.expiry) },
+      { k: "메모", v: memoHtml(a.note) },
+      { k: "QR 라벨", v: qrBtn },
+    ].filter(Boolean)
+     .filter(row => !row.field || !hidden.includes(row.field))
+     .map(({ k, v }) => `<div><div class="k">${k}</div><div class="v">${v}</div></div>`).join("");
 
     // 배정/보유 카드
     let holdCard;
@@ -363,6 +376,12 @@
     c.querySelector("[data-more]").onclick = e => dropdown(e.currentTarget, moreItems);
     const tb = c.querySelector("[data-viewer]");
     if (tb) tb.onclick = () => openViewer(a, a._primary || 0);
+    const memoBtn = c.querySelector("[data-memotoggle]");
+    if (memoBtn) memoBtn.onclick = () => {
+      const t = memoBtn.previousElementSibling;
+      const collapsed = t.classList.toggle("clamped");
+      memoBtn.textContent = collapsed ? "더보기" : "접기";
+    };
 
     const card = c.querySelector("#assign-card");
     if (card) {
