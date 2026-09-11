@@ -75,6 +75,15 @@ window.DATA = (function () {
   return { categories, assets };
 })();
 
+/* 자산 관리 공통 날짜 표기: yyyy.mm.dd(요일) hh:mm / 날짜만: yyyy.mm.dd(요일) */
+(function () {
+  const DAYS = ["일", "월", "화", "수", "목", "금", "토"];
+  const p = n => String(n).padStart(2, "0");
+  const parse = s => new Date(String(s).replace(" ", "T"));
+  window.fmtDate = s => { if (!s) return "—"; const d = parse(s); return `${d.getFullYear()}.${p(d.getMonth() + 1)}.${p(d.getDate())}(${DAYS[d.getDay()]})`; };
+  window.fmtDateTime = s => { if (!s) return "—"; const d = parse(s); return `${window.fmtDate(s)} ${p(d.getHours())}:${p(d.getMinutes())}`; };
+})();
+
 /* 공통 사진 헬퍼 — 목록·상세가 같은 대표 사진을 쓰도록 공유 */
 window.tintHex = function (hex, amt) {
   const n = parseInt(hex.slice(1), 16);
@@ -84,7 +93,7 @@ window.tintHex = function (hex, amt) {
 };
 window.assetPhotos = (function () {
   const TINTS = [0, 26, -24, 42, -40, 14, -12, 34, -30, 8];
-  const DATES = ["2026-08-28", "2026-08-28", "2026-07-15", "2026-07-15", "2026-06-02", "2026-06-02", "2026-05-20", "2026-05-20", "2026-04-10", "2026-04-10"];
+  const DATES = ["2026-08-28 14:10", "2026-08-28 14:12", "2026-07-15 09:33", "2026-07-15 09:34", "2026-06-02 17:20", "2026-06-02 17:22", "2026-05-20 11:05", "2026-05-20 11:06", "2026-04-10 08:48", "2026-04-10 08:49"];
   const BY = ["dana", "김민수", "dana", "이서연", "dana", "김민수", "dana", "이서연", "dana", "김민수"];
   return function (a) {
     if (a._photos) return a._photos;

@@ -11,7 +11,7 @@
     if (!d) return '<span class="muted">—</span>';
     const days = Math.ceil((new Date(d) - TODAY) / 86400000);
     const [t, c] = days < 0 ? ["지남", "exp-over"] : days <= 7 ? ["임박", "exp-soon"] : ["유효", "exp-valid"];
-    return `${d} <span class="badge ${c}">${t}</span>`;
+    return `${window.fmtDate(d)} <span class="badge ${c}">${t}</span>`;
   }
   const chips = arr => (arr && arr.length) ? arr.map(l => `<span class="tag">${l}</span>`).join("") : '<span class="muted">—</span>';
 
@@ -64,7 +64,7 @@
   function timelineHtml(a) {
     return `<ol class="dtimeline">${activityOf(a).map(e => `
       <li><span class="tl-dot"></span>
-        <div><div class="tl-t">${e.t}</div><div class="tl-m">${e.d} · ${e.who}</div></div>
+        <div><div class="tl-t">${e.t}</div><div class="tl-m">${window.fmtDate(e.d)} · ${e.who}</div></div>
       </li>`).join("")}</ol>`;
   }
   function assignCurrentHtml(a) {
@@ -72,7 +72,7 @@
     if (!asg.length) return '<p class="muted" style="padding:6px 0">배정 없음 (재고 상태)</p>';
     return `<div class="dlist">${asg.map(x => `<div class="drow">
       <span class="who">${holderOne(x)}</span>
-      <span class="muted since">${x.since} ~</span>
+      <span class="muted since">${window.fmtDate(x.since)} ~</span>
       <button class="btn sm" data-act="반납">반납</button></div>`).join("")}</div>`;
   }
 
@@ -92,11 +92,11 @@
         <div class="v-bar">
           <div class="v-bar-l">
             <span class="v-count"></span>
-            <button data-vprev class="v-ib" aria-label="이전">‹</button>
-            <button data-vnext class="v-ib" aria-label="다음">›</button>
+            <button data-vprev class="v-ib" data-tip="이전" aria-label="이전">‹</button>
+            <button data-vnext class="v-ib" data-tip="다음" aria-label="다음">›</button>
           </div>
           <div class="v-bar-c">
-            <button data-vfs class="v-ib" data-tip="전체화면">⛶</button>
+            <button data-vfs class="v-ib" data-tip="전체 스크린">⛶</button>
             <button data-vzin class="v-ib" data-tip="확대">＋</button>
             <button data-vzout class="v-ib" data-tip="축소">－</button>
             <button data-vinfo class="v-ib" data-tip="정보">ⓘ</button>
@@ -108,8 +108,7 @@
         </div>
         <div class="v-info" hidden>
           <span class="v-info-badge">자산</span>
-          <div class="v-info-t">${a.product}</div>
-          <div class="v-info-sub">${a.assetNo || '<span class="muted">고유관리번호 없음</span>'}</div>
+          <div class="v-info-t">${a.product}${a.assetNo ? ` / ${a.assetNo}` : ""}</div>
           <div class="v-info-date"></div>
           <div class="v-info-by"><span class="avatar-sm"></span><span class="v-info-name"></span></div>
         </div>
@@ -125,11 +124,13 @@
       img.style.background = p.color;
       img.style.transform = `scale(${zoom})`;
       V.querySelector(".v-count").textContent = `${cur + 1} / ${items.length}`;
-      V.querySelector(".v-info-date").textContent = `첨부일 ${p.at}`;
+      V.querySelector(".v-info-date").textContent = window.fmtDateTime(p.at);
       V.querySelector(".v-info-name").textContent = p.by;
       V.querySelector(".avatar-sm").textContent = p.by[0].toUpperCase();
+      V.querySelector("[data-vprev]").disabled = cur === 0;
+      V.querySelector("[data-vnext]").disabled = cur === items.length - 1;
     }
-    const go = d => { cur = (cur + d + items.length) % items.length; zoom = 1; draw(); };
+    const go = d => { cur = Math.max(0, Math.min(items.length - 1, cur + d)); zoom = 1; draw(); };
 
     function showBar() {
       V.classList.remove("bar-hidden");
@@ -148,11 +149,10 @@
 
     function moreMenu(anchor) {
       document.querySelectorAll(".dropdown-menu").forEach(m => m.remove());
-      const list = [
-        { t: "현재 사진 다운로드", fn: () => toast("현재 사진 다운로드 — 원본 파일명 그대로 (프로토타입)") },
-        { t: "전체 사진 다운로드 (zip)", fn: () => toast(`${zipName(a)} 다운로드 (프로토타입)`) },
-      ];
+      const list = [];
       if (cur !== a._primary) list.push({ t: "대표 사진으로 지정", fn: () => { a._primary = cur; toast("대표 사진으로 지정됨"); draw(); } });
+      list.push({ t: "다운로드", fn: () => toast("다운로드 — 원본 파일명 그대로 (프로토타입)") });
+      list.push({ t: "전체 사진 다운로드", fn: () => toast(`${zipName(a)} 다운로드 (프로토타입)`) });
       list.push({ t: "삭제", fn: delCur, danger: true });
       const menu = document.createElement("div");
       menu.className = "dropdown-menu";
@@ -238,9 +238,9 @@
     const kv = [
       ["분류", `${a.group} › ${a.sub} <span class="type-pill">${isIndiv ? "개별 자산" : "수량 자산"}</span>`],
       isIndiv ? ["S/N", a.serial || '<span class="muted">—</span>'] : null,
-      ["구매일", a.purchaseDate || "—"],
+      ["구매일", a.purchaseDate ? window.fmtDate(a.purchaseDate) : "—"],
       [isIndiv ? "구매가격" : "구매가격 (품목 단가)", a.price ? a.price.toLocaleString() + "원" : "—"],
-      ["제조연월일", a.manufactured || '<span class="muted">—</span>'],
+      ["제조연월일", a.manufactured ? window.fmtDate(a.manufactured) : '<span class="muted">—</span>'],
       ["기한", expiryBadge(a.expiry)],
       ["라벨", chips(a.labels)],
       ["메모", a.note || '<span class="muted">—</span>'],
@@ -296,7 +296,7 @@
             </div>
           </div>
           <div class="dhead-meta">
-            <span class="avatar-sm">D</span> 최종 수정 · dana · 2026.08.28 14:10
+            <span class="avatar-sm">D</span> 최종 수정 · dana · ${window.fmtDateTime("2026-08-28 14:10")}
           </div>
         </div>
         <div class="dhead-actions">${headActions}</div>
