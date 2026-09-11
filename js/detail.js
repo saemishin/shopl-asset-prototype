@@ -275,14 +275,15 @@
     const QR_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM19 14h2v2h-2zM14 19h2v2h-2zM19 19h2v2h-2z"/></svg>`;
     const qrBtn = `<button class="btn sm icon-only" data-qr aria-label="QR 라벨" title="QR 라벨">${QR_ICON}</button>`;
     const headActions = isIndiv
-      ? qrBtn + btn("상태 변경") + `<button class="btn sm" data-more>⋯ 더보기</button>`
-      : qrBtn + `<button class="btn sm" data-more>⋯ 더보기</button>`;
+      ? btn("상태 변경") + `<button class="btn sm" data-more>⋯ 더보기</button>`
+      : `<button class="btn sm" data-more>⋯ 더보기</button>`;
     const moreItems = isIndiv
       ? ["재배정·이동", "소분류 이동", "자산 수정", "자산 삭제"]
       : ["소분류 이동", "자산 수정", "자산 삭제"];
 
+    // 필수값(분류) 먼저, 선택값이 뒤따름. QR 라벨은 정렬 기준과 무관하게 항상 마지막.
     const kv = [
-      ["분류", `${a.group} › ${a.sub} <span class="type-pill">${isIndiv ? "개별 자산" : "수량 자산"}</span>`],
+      ["분류", `<div>${a.group} › ${a.sub}</div><div style="margin-top:5px"><span class="type-pill">${isIndiv ? "개별 자산" : "수량 자산"}</span></div>`],
       isIndiv ? ["S/N", a.serial || '<span class="muted">—</span>'] : null,
       ["구매일", a.purchaseDate ? window.fmtDate(a.purchaseDate) : "—"],
       [isIndiv ? "구매가격" : "구매가격 (품목 단가)", a.price ? a.price.toLocaleString() + "원" : "—"],
@@ -290,6 +291,7 @@
       ["기한", expiryBadge(a.expiry)],
       ["라벨", chips(a.labels)],
       ["메모", a.note || '<span class="muted">—</span>'],
+      ["QR 라벨", qrBtn],
     ].filter(Boolean).map(([k, v]) => `<div><div class="k">${k}</div><div class="v">${v}</div></div>`).join("");
 
     // 배정/보유 카드
@@ -341,9 +343,6 @@
                 <h1>${a.product}</h1>
                 <div class="dhead-sub">${subMeta}</div>
               </div>
-            </div>
-            <div class="dhead-meta">
-              <span class="avatar-sm">D</span> 최종 수정 · dana · ${window.fmtDateTime("2026-08-28 14:10")}
             </div>
           </div>
           <div class="dhead-actions">${headActions}</div>

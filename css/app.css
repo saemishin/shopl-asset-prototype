@@ -371,13 +371,12 @@ button.dthumb:hover { filter: brightness(0.94); }
 .dhead-sub { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 5px; font-size: 12px; color: var(--text-sub); }
 .dhead-sub b { color: var(--text); font-weight: 600; }
 .ddot { color: var(--line-strong); }
-.dhead-meta { margin-left: auto; display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--text-mut); white-space: nowrap; }
 .avatar-sm { width: 18px; height: 18px; border-radius: 50%; background: linear-gradient(135deg,#5b8def,#8f6ef0); color: #fff; font-size: 9px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
 .dhead-actions { display: flex; gap: 6px; flex-wrap: wrap; margin: 14px 0 4px; }
 .dsection { border-top: 1px solid var(--line); margin-top: 14px; padding-top: 16px; }
 
 /* kv grid */
-.kv2 { display: grid; grid-template-columns: 110px 1fr; row-gap: 10px; column-gap: 32px; font-size: 12.5px; }
+.kv2 { display: grid; grid-template-columns: 110px 1fr; row-gap: 18px; column-gap: 32px; font-size: 12.5px; }
 .kv2 > div { display: contents; }
 .kv2 .k { color: var(--text-mut); font-size: 12px; padding-top: 1px; }
 .kv2 .v { color: var(--text); }
