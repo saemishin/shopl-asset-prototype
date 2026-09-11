@@ -560,15 +560,15 @@
     c.innerHTML = `
       <div class="detail-topbar">
         <a href="assets.html" class="backbtn" aria-label="목록으로">←</a>
-        <span class="navbtns">
-          <a href="asset-detail.html?id=${prevId}" aria-label="이전 자산">‹</a>
-          <a href="asset-detail.html?id=${nextId}" aria-label="다음 자산">›</a>
-        </span>
       </div>
 
       <div class="dgrid">
         <section class="dcard" style="position:relative">
           ${mgrBtn}
+          <span class="navbtns">
+            <a href="asset-detail.html?id=${prevId}" aria-label="이전 자산">‹</a>
+            <a href="asset-detail.html?id=${nextId}" aria-label="다음 자산">›</a>
+          </span>
           <div class="dhead-top">
             <div class="dhead-id">
               ${thumb}
