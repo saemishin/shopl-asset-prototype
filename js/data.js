@@ -74,3 +74,25 @@ window.DATA = (function () {
 
   return { categories, assets };
 })();
+
+/* 공통 사진 헬퍼 — 목록·상세가 같은 대표 사진을 쓰도록 공유 */
+window.tintHex = function (hex, amt) {
+  const n = parseInt(hex.slice(1), 16);
+  const cl = v => Math.max(0, Math.min(255, v));
+  const r = cl((n >> 16) + amt), g = cl(((n >> 8) & 255) + amt), b = cl((n & 255) + amt);
+  return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+};
+window.assetPhotos = (function () {
+  const TINTS = [0, 26, -24, 42, -40, 14, -12, 34, -30, 8];
+  const DATES = ["2026-08-28", "2026-08-28", "2026-07-15", "2026-07-15", "2026-06-02", "2026-06-02", "2026-05-20", "2026-05-20", "2026-04-10", "2026-04-10"];
+  const BY = ["dana", "김민수", "dana", "이서연", "dana", "김민수", "dana", "이서연", "dana", "김민수"];
+  return function (a) {
+    if (a._photos) return a._photos;
+    if (!a.photo) return (a._photos = []);
+    a._primary = 0;
+    return (a._photos = TINTS.slice(0, a.photoCount || 5).map((t, i) => ({
+      color: t === 0 ? a.photo : window.tintHex(a.photo, t),
+      at: DATES[i], by: BY[i],
+    })));
+  };
+})();

@@ -19,25 +19,7 @@
   const IC_WS = `<svg class="hi" viewBox="0 0 24 24"><path d="M4 20V9.5L12 4l8 5.5V20"/><path d="M9.5 20v-5h5v5"/></svg>`;
   const holderOne = x => (x.employee ? `${IC_EMP}${x.employee}` : `${IC_WS}${x.worksite}`);
 
-  function tint(hex, amt) {
-    const n = parseInt(hex.slice(1), 16);
-    const cl = v => Math.max(0, Math.min(255, v));
-    const r = cl((n >> 16) + amt), g = cl(((n >> 8) & 255) + amt), b = cl((n & 255) + amt);
-    return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
-  }
-  const PH_TINTS = [0, 26, -24, 42, -40, 14, -12, 34, -30, 8];
-  const PH_DATES = ["2026-08-28", "2026-08-28", "2026-07-15", "2026-07-15", "2026-06-02", "2026-06-02", "2026-05-20", "2026-05-20", "2026-04-10", "2026-04-10"];
-  const PH_BY = ["dana", "김민수", "dana", "이서연", "dana", "김민수", "dana", "이서연", "dana", "김민수"];
-  function photosOf(a) {
-    if (a._photos) return a._photos;
-    if (!a.photo) return (a._photos = []);
-    const n = a.photoCount || 5;
-    a._primary = 0;
-    return (a._photos = PH_TINTS.slice(0, n).map((t, i) => ({
-      color: t === 0 ? a.photo : tint(a.photo, t),
-      at: PH_DATES[i], by: PH_BY[i],
-    })));
-  }
+  const photosOf = window.assetPhotos;   // 목록과 공유 (js/data.js)
   function tsNow() {
     const d = new Date(), p = n => String(n).padStart(2, "0");
     return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
@@ -142,7 +124,7 @@
       const img = V.querySelector(".v-img");
       img.style.background = p.color;
       img.style.transform = `scale(${zoom})`;
-      V.querySelector(".v-count").textContent = `${cur + 1} / ${items.length}${cur === a._primary ? " · 대표 사진" : ""}`;
+      V.querySelector(".v-count").textContent = `${cur + 1} / ${items.length}`;
       V.querySelector(".v-info-date").textContent = `첨부일 ${p.at}`;
       V.querySelector(".v-info-name").textContent = p.by;
       V.querySelector(".avatar-sm").textContent = p.by[0].toUpperCase();
