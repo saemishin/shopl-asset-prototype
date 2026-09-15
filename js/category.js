@@ -32,6 +32,8 @@
   const HANDLE_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>`;
   const BACK_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>`;
   const CLOSE_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg>`;
+  const RESET_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 1 2.64 6.36"/><path d="M3 20v-6h6"/></svg>`;
+  const INFO_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 8v.01"/></svg>`;
 
   // 자산 조회·배정/보유 변경 권한 옵션 — 구조설계안 4.3. assign은 항상 view 범위의 부분집합(표에 정의된 선택 가능 범위/기본값 그대로 반영)
   const VIEW_OPTIONS = ["회사의 모든 구성원", "모든 관리자 및 리더", "특정 그룹 및 직무/직급", "특정 관리자/리더", "관리자만"];
@@ -43,6 +45,30 @@
     "관리자만": { options: ["관리자만", "특정 관리자/리더"], default: "관리자만" },
   };
   const TARGET_NEEDED = new Set(["특정 그룹 및 직무/직급", "특정 관리자/리더"]);
+
+  // 권한 대상 선택(그룹/직무/직급·구성원 선택 모달)용 샘플 데이터 — 실제 조직도 연동 전, 프로토타입 데모용
+  const GROUP_TREE = [
+    { name: "샤플앤컴퍼니", children: [
+      { name: "개발팀" },
+      { name: "디자인팀" },
+      { name: "영업팀", children: [{ name: "국내영업" }, { name: "해외영업" }] },
+      { name: "운영팀" },
+      { name: "CS팀" },
+    ] },
+  ];
+  const JOB_TITLES = ["직무/직급 없음", "팀장", "매니저", "주임", "사원"];
+  const MEMBERS = [
+    { name: "김민수", team: "개발팀" }, { name: "이서연", team: "디자인팀" }, { name: "박지훈", team: "영업팀" },
+    { name: "정우성", team: "CS팀" }, { name: "김철수", team: "운영팀" }, { name: "최유진", team: "개발팀" },
+    { name: "한소희", team: "디자인팀" }, { name: "장민호", team: "국내영업" }, { name: "오세훈", team: "운영팀" },
+    { name: "배수지", team: "CS팀" }, { name: "윤재현", team: "해외영업" }, { name: "임하늘", team: "개발팀" },
+  ];
+  const AVATAR_COLORS = ["#5b8def", "#8f6ef0", "#eb7f8b", "#3fb37f", "#e0a63c", "#4dabf7"];
+  function avatarColor(name) {
+    let h = 0;
+    for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) % 997;
+    return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length];
+  }
   // 배정중/재고 외 상태(수리중·분실·폐기)는 "기타"로 묶어서 보여줌 — 구조설계안 3.4 status 정의 기준
   const STATUS_LABEL = { stock: "재고", assigned: "배정중", repair: "수리중", lost: "분실", disposed: "폐기" };
   // 구조설계안 3.3: 필드 노출 설정 대상은 S/N·IMEI·구매일·구매가격·제조연월일·유효기한 6개(IMEI·S/N은 개별형 전용) — 기본값: IMEI·유효기한 off, 나머지 on
@@ -442,11 +468,14 @@
       createState = {
         name: "", type: "individual",
         view: VIEW_OPTIONS[0], assign: ASSIGN_BY_VIEW[VIEW_OPTIONS[0]].default,
+        viewTarget: { groups: [], jobTitles: [], members: [] },
+        assignTarget: { groups: [], jobTitles: [], members: [] },
         hiddenFields: [...DEFAULT_HIDDEN_FIELDS.individual],
       };
       renderCreateForm();
       setMode("create");
     }
+
 
     function createFormHtml() {
       const s = createState;
@@ -468,13 +497,13 @@
         </div>
         <div class="field">
           <label>자산 조회 권한<span class="req">*</span></label>
+          <p class="hint" style="margin-top:0;margin-bottom:8px">이 소분류의 자산을 조회할 수 있는 대상을 설정합니다.</p>
           <button type="button" class="cat-manage-select-btn" data-f-view-btn><span>${s.view}</span><span class="chev">▾</span></button>
-          ${TARGET_NEEDED.has(s.view) ? `<button type="button" class="btn sm" style="margin-top:8px" data-f-target="view">대상 선택</button> <span class="hint">선택된 대상 없음</span>` : ""}
         </div>
         <div class="field">
           <label>배정/보유 변경 권한<span class="req">*</span></label>
+          <p class="hint" style="margin-top:0;margin-bottom:8px">이 소분류의 자산에 대해 배정·보유 변경을 할 수 있는 대상을 설정합니다.</p>
           <button type="button" class="cat-manage-select-btn" data-f-assign-btn><span>${s.assign}</span><span class="chev">▾</span></button>
-          ${TARGET_NEEDED.has(s.assign) ? `<button type="button" class="btn sm" style="margin-top:8px" data-f-target="assign">대상 선택</button> <span class="hint">선택된 대상 없음</span>` : ""}
         </div>
         <div class="field">
           <label>관리 정보</label>
@@ -507,7 +536,6 @@
       createEl.querySelector("[data-f-type-help]").onclick = openTypeHelp;
       createEl.querySelector("[data-f-view-btn]").onclick = () => openPermPicker("view");
       createEl.querySelector("[data-f-assign-btn]").onclick = () => openPermPicker("assign");
-      createEl.querySelectorAll("[data-f-target]").forEach(b => b.onclick = () => toast(`"대상 선택" — 이후 단계에서 정의`));
       createEl.querySelector("[data-f-fields]").addEventListener("click", e => {
         const b = e.target.closest("[data-field]");
         if (!b) return;
@@ -539,22 +567,167 @@
       p.querySelector("[data-close]").onclick = () => p.remove();
     }
 
-    // 조회/배정 권한 선택 — 드롭다운이 아니라 라디오 목록의 모달 선택창으로
+    // 조회/배정 권한 선택 — 드롭다운이 아니라 라디오 목록의 모달 선택창으로. "특정 그룹 및 직무/직급"·"특정 관리자/리더"는
+    // 대상을 별도로 지정해야 하는 옵션이라, 선택 시 그 아래 요약 UI가 추가되고 눌러서 하위 선택 모달을 연다.
+    // 라디오를 이리저리 바꿔도 이 모달이 열려 있는 동안은(적용/취소로 닫기 전까지) 각 옵션별 세부 선택 내용을 draftTarget에 그대로 들고 있음
     function openPermPicker(kind) {
       const isView = kind === "view";
-      const options = isView ? VIEW_OPTIONS : ASSIGN_BY_VIEW[createState.view].options;
       const current = createState[kind];
+      const draftTarget = {
+        groups: [...createState[kind + "Target"].groups],
+        jobTitles: [...createState[kind + "Target"].jobTitles],
+        members: [...createState[kind + "Target"].members],
+      };
+      let picked = current;
+
       const p = document.createElement("div");
       p.className = "modal-back";
       p.innerHTML = `
         <div class="modal">
           <h3>${isView ? "자산 조회 권한" : "배정/보유 변경 권한"}</h3>
-          <div class="body">
-            ${options.map(v => `
-              <label class="radio-row">
-                <input type="radio" name="perm-pick" value="${v}"${v === current ? " checked" : ""}>
-                <span>${v}</span>
-              </label>`).join("")}
+          <div class="body" data-picker-body></div>
+          <div class="foot">
+            <button class="btn" data-close>취소</button>
+            <button class="btn primary" data-ok>적용</button>
+          </div>
+        </div>`;
+      document.body.appendChild(p);
+      const body = p.querySelector("[data-picker-body]");
+      const okBtn = p.querySelector("[data-ok]");
+
+      // "특정 그룹 및 직무/직급"과 "특정 관리자/리더"는 서로 다른 대상 종류라 draftTarget 안에서도 완전히 독립적으로 관리 —
+      // 라디오를 이리저리 바꿔도 각자 골라둔 내용이 안 섞이고 그대로 남아있어야 함
+      function isTargetSetFor(v) {
+        if (v === "특정 그룹 및 직무/직급") return draftTarget.groups.length > 0 || draftTarget.jobTitles.length > 0;
+        if (v === "특정 관리자/리더") return draftTarget.members.length > 0;
+        return false;
+      }
+      function targetSummaryHtml(v) {
+        if (!isTargetSetFor(v)) return `<button type="button" class="perm-target-btn" data-target-open><span class="muted">선택</span><span class="chev">›</span></button>`;
+        let chips, avatar = "";
+        if (v === "특정 그룹 및 직무/직급") {
+          chips = [];
+          if (draftTarget.groups.length) chips.push(`그룹 : ${draftTarget.groups[0]}${draftTarget.groups.length > 1 ? `<span class="chip-more">+${draftTarget.groups.length - 1}</span>` : ""}`);
+          if (draftTarget.jobTitles.length) chips.push(`직무/직급 : ${draftTarget.jobTitles[0]}${draftTarget.jobTitles.length > 1 ? `<span class="chip-more">+${draftTarget.jobTitles.length - 1}</span>` : ""}`);
+        } else {
+          avatar = `<span class="picker-avatar sm" style="background:${avatarColor(draftTarget.members[0])}">${draftTarget.members[0][0]}</span>`;
+          chips = [`${draftTarget.members[0]}${draftTarget.members.length > 1 ? `<span class="chip-more">+${draftTarget.members.length - 1}</span>` : ""}`];
+        }
+        return `
+          <div class="perm-target-row">
+            <button type="button" class="perm-target-chips" data-target-open>${avatar}${chips.map(c => `<span class="perm-chip">${c}</span>`).join("")}</button>
+            <button type="button" class="perm-target-clear" data-target-clear aria-label="선택 해제">${CLOSE_ICON}</button>
+          </div>`;
+      }
+      function render() {
+        const options = isView ? VIEW_OPTIONS : ASSIGN_BY_VIEW[createState.view].options;
+        body.innerHTML = options.map(v => `
+          <label class="radio-row">
+            <input type="radio" name="perm-pick" value="${v}"${v === picked ? " checked" : ""}>
+            <span>${v}</span>
+          </label>
+          ${picked === v && TARGET_NEEDED.has(v) ? `<div class="perm-target-wrap">${targetSummaryHtml(v)}</div>` : ""}`).join("")
+          + (isView ? `<div class="perm-info-note">${INFO_ICON}<span>관리자라도 조회 권한을 부여받아야 이 정보를 볼 수 있습니다.</span></div>` : "");
+
+        body.querySelectorAll('input[name="perm-pick"]').forEach(r => r.onchange = () => { picked = r.value; render(); });
+        const openBtn = body.querySelector("[data-target-open]");
+        if (openBtn) openBtn.onclick = () => {
+          if (picked === "특정 그룹 및 직무/직급") {
+            openGroupJobPicker({ groups: draftTarget.groups, jobTitles: draftTarget.jobTitles }, res => {
+              draftTarget.groups = res.groups; draftTarget.jobTitles = res.jobTitles;
+              render();
+            });
+          } else if (picked === "특정 관리자/리더") {
+            openMemberPicker(draftTarget.members, res => { draftTarget.members = res; render(); });
+          }
+        };
+        const clearBtn = body.querySelector("[data-target-clear]");
+        if (clearBtn) clearBtn.onclick = () => {
+          if (picked === "특정 그룹 및 직무/직급") { draftTarget.groups = []; draftTarget.jobTitles = []; }
+          else { draftTarget.members = []; }
+          render();
+        };
+        okBtn.disabled = TARGET_NEEDED.has(picked) && !isTargetSetFor(picked);
+      }
+      render();
+
+      p.addEventListener("click", e => { if (e.target === p) p.remove(); });
+      p.querySelector("[data-close]").onclick = () => p.remove();
+      okBtn.onclick = () => {
+        if (okBtn.disabled) return;
+        // 실제로 선택된 종류(picked)에 해당하는 대상만 커밋 — draftTarget엔 다른 옵션 볼 때 골라둔 값이 같이 남아있을 수 있어 그건 버림
+        const appliedTarget = picked === "특정 그룹 및 직무/직급"
+          ? { groups: [...draftTarget.groups], jobTitles: [...draftTarget.jobTitles], members: [] }
+          : picked === "특정 관리자/리더"
+            ? { groups: [], jobTitles: [], members: [...draftTarget.members] }
+            : { groups: [], jobTitles: [], members: [] };
+        if (isView) {
+          createState.view = picked;
+          createState.assign = ASSIGN_BY_VIEW[picked].default;
+          createState.viewTarget = appliedTarget;
+          createState.assignTarget = { groups: [], jobTitles: [], members: [] };
+        } else {
+          createState.assign = picked;
+          createState.assignTarget = appliedTarget;
+        }
+        p.remove();
+        renderCreateForm();
+      };
+    }
+
+    // 그룹 및 직무/직급 선택 — 대시보드 공용 컴포넌트 참조(좌측 그룹/직무·직급 탭 + 우측 체크리스트)
+    function openGroupJobPicker(initial, onApply) {
+      const selGroups = new Set(initial.groups);
+      const selJobTitles = new Set(initial.jobTitles);
+      let activeTab = "groups";
+      let cascade = true;
+      const collapsed = new Set();
+      let query = "";
+
+      const flatten = nodes => nodes.reduce((out, n) => out.concat(n.name, n.children ? flatten(n.children) : []), []);
+      const ALL_GROUP_NAMES = flatten(GROUP_TREE);
+      function findNode(nodes, name) {
+        for (const n of nodes) {
+          if (n.name === name) return n;
+          if (n.children) { const f = findNode(n.children, name); if (f) return f; }
+        }
+        return null;
+      }
+      function setChecked(node, checked, withCascade) {
+        checked ? selGroups.add(node.name) : selGroups.delete(node.name);
+        if (withCascade && node.children) node.children.forEach(c => setChecked(c, checked, true));
+      }
+      function matches(node) {
+        if (!query) return true;
+        if (node.name.includes(query)) return true;
+        return !!(node.children && node.children.some(matches));
+      }
+      function groupRowHtml(node, depth) {
+        if (!matches(node)) return "";
+        const hasChildren = node.children && node.children.length;
+        const isCollapsed = collapsed.has(node.name);
+        return `
+          <div class="picker-tree-row" style="padding-left:${depth * 20}px">
+            ${hasChildren ? `<button type="button" class="picker-tree-toggle" data-toggle-group="${node.name}">${isCollapsed ? "▸" : "▾"}</button>` : `<span class="picker-tree-toggle"></span>`}
+            <label class="picker-check"><input type="checkbox" data-group="${node.name}"${selGroups.has(node.name) ? " checked" : ""}><span>${node.name}</span></label>
+          </div>
+          ${hasChildren && !isCollapsed ? node.children.map(c => groupRowHtml(c, depth + 1)).join("") : ""}`;
+      }
+
+      const p = document.createElement("div");
+      p.className = "modal-back";
+      p.innerHTML = `
+        <div class="modal picker-modal">
+          <div class="picker-head">
+            <h3>그룹 및 직무/직급 선택</h3>
+            <button type="button" class="picker-reset" data-reset>${RESET_ICON}초기화</button>
+          </div>
+          <div class="picker-layout">
+            <div class="picker-tabs">
+              <button type="button" class="picker-tab" data-tab="groups">그룹</button>
+              <button type="button" class="picker-tab" data-tab="jobTitles">직무/직급</button>
+            </div>
+            <div class="picker-content" data-content></div>
           </div>
           <div class="foot">
             <button class="btn" data-close>취소</button>
@@ -562,30 +735,109 @@
           </div>
         </div>`;
       document.body.appendChild(p);
+      const content = p.querySelector("[data-content]");
+      const jobTab = p.querySelector('[data-tab="jobTitles"]');
+
+      function renderContent() {
+        if (activeTab === "groups") {
+          const allChecked = ALL_GROUP_NAMES.every(n => selGroups.has(n));
+          content.innerHTML = `
+            <input type="text" class="picker-search" placeholder="검색어를 입력하세요" value="${query}">
+            <div class="picker-toolbar">
+              <label class="picker-check"><input type="checkbox" data-select-all${allChecked ? " checked" : ""}><span>전체 선택</span></label>
+              <label class="picker-check right"><input type="checkbox" data-cascade${cascade ? " checked" : ""}><span>하위그룹도 한번에 체크</span></label>
+            </div>
+            <div class="picker-tree">${GROUP_TREE.map(n => groupRowHtml(n, 0)).join("")}</div>`;
+          content.querySelector(".picker-search").addEventListener("input", e => { query = e.target.value; renderContent(); });
+          content.querySelector("[data-select-all]").onchange = e => { ALL_GROUP_NAMES.forEach(n => e.target.checked ? selGroups.add(n) : selGroups.delete(n)); renderContent(); };
+          content.querySelector("[data-cascade]").onchange = e => { cascade = e.target.checked; };
+          content.querySelectorAll("[data-toggle-group]").forEach(b => b.onclick = () => {
+            collapsed.has(b.dataset.toggleGroup) ? collapsed.delete(b.dataset.toggleGroup) : collapsed.add(b.dataset.toggleGroup);
+            renderContent();
+          });
+          content.querySelectorAll("[data-group]").forEach(cb => cb.onchange = e => {
+            setChecked(findNode(GROUP_TREE, e.target.dataset.group), e.target.checked, cascade);
+            renderContent();
+          });
+        } else {
+          const filtered = JOB_TITLES.filter(t => !query || t.includes(query));
+          content.innerHTML = `
+            <input type="text" class="picker-search" placeholder="검색어를 입력하세요" value="${query}">
+            <div class="picker-flatlist">
+              ${filtered.map(t => `<label class="picker-check row"><input type="checkbox" data-jobtitle="${t}"${selJobTitles.has(t) ? " checked" : ""}><span>${t}</span></label>`).join("")}
+            </div>`;
+          content.querySelector(".picker-search").addEventListener("input", e => { query = e.target.value; renderContent(); });
+          content.querySelectorAll("[data-jobtitle]").forEach(cb => cb.onchange = e => {
+            e.target.checked ? selJobTitles.add(e.target.dataset.jobtitle) : selJobTitles.delete(e.target.dataset.jobtitle);
+          });
+        }
+      }
+      function renderAll() {
+        p.querySelectorAll("[data-tab]").forEach(b => b.classList.toggle("active", b.dataset.tab === activeTab));
+        jobTab.innerHTML = `직무/직급${selJobTitles.size ? '<span class="picker-tab-dot"></span>' : ""}`;
+        renderContent();
+      }
+      p.querySelectorAll("[data-tab]").forEach(b => b.onclick = () => { activeTab = b.dataset.tab; query = ""; renderAll(); });
+      p.querySelector("[data-reset]").onclick = () => { selGroups.clear(); selJobTitles.clear(); renderAll(); };
+      renderAll();
+
       p.addEventListener("click", e => { if (e.target === p) p.remove(); });
       p.querySelector("[data-close]").onclick = () => p.remove();
-      p.querySelector("[data-ok]").onclick = () => {
-        const picked = p.querySelector('input[name="perm-pick"]:checked')?.value;
-        if (!picked) return;
-        if (isView) {
-          createState.view = picked;
-          createState.assign = ASSIGN_BY_VIEW[picked].default;
-        } else {
-          createState.assign = picked;
-        }
-        p.remove();
-        renderCreateForm();
-      };
+      p.querySelector("[data-ok]").onclick = () => { p.remove(); onApply({ groups: [...selGroups], jobTitles: [...selJobTitles] }); };
+    }
+
+    // 구성원(직원) 선택 — 대시보드 공용 컴포넌트 참조
+    function openMemberPicker(initial, onApply) {
+      const sel = new Set(initial);
+      let query = "";
+      const p = document.createElement("div");
+      p.className = "modal-back";
+      p.innerHTML = `
+        <div class="modal picker-modal">
+          <h3>직원 선택</h3>
+          <div class="body">
+            <input type="text" class="picker-search" placeholder="검색어를 입력하세요">
+            <div class="picker-memberlist" data-list></div>
+          </div>
+          <div class="foot">
+            <button class="btn" data-close>취소</button>
+            <button class="btn primary" data-ok>적용</button>
+          </div>
+        </div>`;
+      document.body.appendChild(p);
+      const list = p.querySelector("[data-list]");
+      function renderList() {
+        const filtered = MEMBERS.filter(m => !query || m.name.includes(query));
+        list.innerHTML = filtered.length ? filtered.map(m => `
+          <label class="picker-member-row">
+            <input type="checkbox" data-member="${m.name}"${sel.has(m.name) ? " checked" : ""}>
+            <span class="picker-avatar" style="background:${avatarColor(m.name)}">${m.name[0]}</span>
+            <span class="picker-member-info"><b>${m.name}</b><span>${m.team}</span></span>
+          </label>`).join("") : `<p class="muted" style="padding:16px 0">검색 결과가 없습니다</p>`;
+        list.querySelectorAll("[data-member]").forEach(cb => cb.onchange = e => {
+          e.target.checked ? sel.add(e.target.dataset.member) : sel.delete(e.target.dataset.member);
+        });
+      }
+      p.querySelector(".picker-search").addEventListener("input", e => { query = e.target.value; renderList(); });
+      renderList();
+      p.addEventListener("click", e => { if (e.target === p) p.remove(); });
+      p.querySelector("[data-close]").onclick = () => p.remove();
+      p.querySelector("[data-ok]").onclick = () => { p.remove(); onApply([...sel]); };
     }
 
     function commitCreate() {
       const name = createState.name.trim();
       if (!name) return;
       const group = draft[createGi].origName || draft[createGi].name;
-      const newCat = { group, sub: name, type: createState.type, hiddenFields: [...createState.hiddenFields], view: createState.view, assign: createState.assign };
+      const newCat = {
+        group, sub: name, type: createState.type, hiddenFields: [...createState.hiddenFields],
+        view: createState.view, assign: createState.assign,
+        viewTarget: TARGET_NEEDED.has(createState.view) ? { ...createState.viewTarget } : null,
+        assignTarget: TARGET_NEEDED.has(createState.assign) ? { ...createState.assignTarget } : null,
+      };
       categories.push(newCat);
       draft[createGi].subs.push({ name, data: newCat });
-      toast(`"${name}" 소분류가 생성되었습니다`);
+      toast("소분류가 추가되었습니다.");
       setMode("list");
       renderBody();
     }

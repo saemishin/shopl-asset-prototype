@@ -341,6 +341,7 @@ th.c, td.c { text-align: center; width: 52px; }
 .cat-manage-modal .cat-manage-head h3 { padding: 0; border: 0; }
 .cat-manage-modal .body { flex: 1; overflow-y: auto; min-height: 0; }
 .cat-manage-modal .cat-manage-create { flex: 1; overflow-y: auto; min-height: 0; padding: 18px 20px; }
+.cat-manage-create .field { margin-bottom: 22px; }
 .cat-manage-create-group {
   height: 34px; display: flex; align-items: center; padding: 0 10px;
   background: #f6f7f8; border-radius: var(--radius); font-size: 12.5px; color: var(--text-mut);
@@ -373,6 +374,69 @@ button.usebullet { background: var(--panel); font: inherit; cursor: pointer; }
 .toggle-switch.on .toggle-knob { left: 18px; }
 .cat-manage-add-group { display: flex; gap: 8px; padding: 14px 20px 0; flex-shrink: 0; }
 .cat-manage-add-group input { flex: 1; }
+
+/* 권한 선택 모달 — "특정 그룹 및 직무/직급"·"특정 관리자/리더" 대상 요약(선택 전엔 버튼, 선택 후엔 칩 + 해제) */
+.perm-target-wrap { margin: 2px 0 10px 26px; }
+.perm-target-btn {
+  width: 100%; height: 32px; display: flex; align-items: center; justify-content: space-between;
+  padding: 0 10px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--panel); font-size: 12.5px; color: var(--text-mut);
+}
+.perm-target-btn:hover { background: #f7f8f9; }
+.perm-target-btn .chev { font-size: 13px; color: var(--text-mut); }
+.perm-target-row { display: flex; align-items: center; gap: 6px; }
+.perm-target-chips {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  min-height: 32px; padding: 5px 10px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--panel);
+}
+.perm-chip { font-size: 12px; color: var(--text); white-space: nowrap; }
+.chip-more { color: var(--text-mut); margin-left: 2px; }
+.perm-target-clear {
+  width: 32px; height: 32px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+  border-radius: 6px; color: var(--text-mut);
+}
+.perm-target-clear svg { width: 13px; height: 13px; }
+.perm-target-clear:hover { background: #eef0f2; color: var(--text); }
+.perm-info-note {
+  display: flex; align-items: flex-start; gap: 8px; margin-top: 14px; padding: 12px 14px;
+  background: #f6f7f8; border-radius: var(--radius); font-size: 12px; color: var(--text-sub); line-height: 1.5;
+}
+.perm-info-note svg { width: 15px; height: 15px; flex-shrink: 0; margin-top: 1px; color: var(--text-mut); }
+
+/* 그룹/직무·직급 선택, 구성원 선택 모달 */
+.picker-modal { width: 560px; display: flex; flex-direction: column; max-height: 88vh; }
+.picker-modal .body { flex: 1; overflow-y: auto; min-height: 0; }
+.picker-head { display: flex; align-items: center; justify-content: space-between; padding: 18px 20px; border-bottom: 1px solid var(--line); flex-shrink: 0; }
+.picker-head h3 { padding: 0; border: 0; font-size: 15px; }
+.picker-reset { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--primary); }
+.picker-reset svg { width: 13px; height: 13px; }
+.picker-layout { display: flex; flex: 1; min-height: 0; overflow: hidden; }
+.picker-tabs { width: 140px; flex-shrink: 0; padding: 12px 0; border-right: 1px solid var(--line); }
+.picker-tab { display: flex; align-items: center; gap: 6px; width: 100%; padding: 10px 20px; font-size: 13px; color: var(--text-sub); text-align: left; }
+.picker-tab.active { color: var(--primary); font-weight: 600; background: var(--primary-weak); }
+.picker-tab-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--primary); }
+.picker-content { flex: 1; min-width: 0; padding: 16px 20px; overflow-y: auto; }
+.picker-search {
+  width: 100%; height: 36px; border: 1px solid var(--line-strong); background: var(--panel);
+  border-radius: var(--radius); padding: 0 12px; font-size: 12.5px; margin-bottom: 12px;
+}
+.picker-toolbar { display: flex; align-items: center; padding-bottom: 8px; margin-bottom: 6px; border-bottom: 1px solid var(--line); }
+.picker-toolbar .right { margin-left: auto; }
+.picker-check { display: flex; align-items: center; gap: 7px; font-size: 12.5px; cursor: pointer; }
+.picker-check input { width: 15px; height: 15px; accent-color: var(--primary); flex-shrink: 0; }
+.picker-check.row { padding: 8px 0; }
+.picker-tree-row { display: flex; align-items: center; gap: 4px; padding: 6px 0; }
+.picker-tree-toggle { width: 16px; flex-shrink: 0; font-size: 10px; color: var(--text-mut); text-align: center; }
+.picker-flatlist { display: flex; flex-direction: column; }
+.picker-memberlist { display: flex; flex-direction: column; }
+.picker-member-row { display: flex; align-items: center; gap: 10px; padding: 8px 4px; border-radius: 8px; cursor: pointer; }
+.picker-member-row:hover { background: #f7f8f9; }
+.picker-member-info { display: flex; flex-direction: column; gap: 2px; font-size: 12.5px; }
+.picker-member-info span { font-size: 11.5px; color: var(--text-mut); }
+.picker-avatar {
+  width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+  color: #fff; font-size: 12px; font-weight: 700;
+}
+.picker-avatar.sm { width: 20px; height: 20px; font-size: 10px; }
 .cat-manage-input {
   height: 32px; border: 1px solid var(--line-strong); border-radius: var(--radius);
   padding: 0 10px; background: var(--panel); font-size: 12.5px;
