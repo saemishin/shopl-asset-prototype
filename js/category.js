@@ -341,6 +341,7 @@
                 </div>
               </div>`;
             }).join("")}
+            ${g.subs.length ? "" : '<p class="cat-tree-empty" style="padding-left:8px">소분류 없음</p>'}
             <button class="btn sm cat-manage-add-sub" data-add-sub="${gi}">+ 소분류 추가</button>
           </div>
         </div>`;
