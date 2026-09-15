@@ -335,7 +335,20 @@ th.c, td.c { text-align: center; width: 52px; }
 
 /* 분류 관리 모달 — 구조 편집 전용(추가·이름변경·순서·삭제·대분류이동만. 유형/권한/필드노출은 별도 폼) */
 .cat-manage-modal { display: flex; flex-direction: column; max-height: 88vh; }
+/* 위 body/add-group는 display:flex를 직접 지정해서 [hidden]의 기본 display:none을 덮어써버림 — 모드 전환 시 확실히 숨겨지도록 재지정 */
+.cat-manage-modal [hidden] { display: none !important; }
+.cat-manage-modal .cat-manage-head { display: flex; align-items: center; gap: 4px; padding: 12px 12px 12px 20px; border-bottom: 1px solid var(--line); flex-shrink: 0; }
+.cat-manage-modal .cat-manage-head h3 { padding: 0; border: 0; }
 .cat-manage-modal .body { flex: 1; overflow-y: auto; min-height: 0; }
+.cat-manage-modal .cat-manage-create { flex: 1; overflow-y: auto; min-height: 0; padding: 18px 20px; }
+.cat-manage-create-group {
+  height: 34px; display: flex; align-items: center; padding: 0 10px;
+  background: #f6f7f8; border-radius: var(--radius); font-size: 12.5px; color: var(--text-mut);
+}
+.cat-manage-create select {
+  width: 100%; height: 34px; border: 1px solid var(--line-strong); border-radius: var(--radius); padding: 0 10px; background: var(--panel); font-size: 12.5px;
+}
+button.usebullet { background: var(--panel); font: inherit; cursor: pointer; }
 .cat-manage-add-group { display: flex; gap: 8px; padding: 14px 20px 0; flex-shrink: 0; }
 .cat-manage-add-group input { flex: 1; }
 .cat-manage-input {

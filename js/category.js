@@ -10,6 +10,18 @@
   }
   const TRASH_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M9.5 7l.7 13a1 1 0 0 0 1 1h5.6a1 1 0 0 0 1-1l.7-13"/></svg>`;
   const HANDLE_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>`;
+  const BACK_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>`;
+
+  // 자산 조회·배정/보유 변경 권한 옵션 — 구조설계안 4.3. assign은 항상 view 범위의 부분집합(표에 정의된 선택 가능 범위/기본값 그대로 반영)
+  const VIEW_OPTIONS = ["회사의 모든 구성원", "모든 관리자 및 리더", "특정 그룹 및 직무/직급", "특정 관리자/리더", "관리자만"];
+  const ASSIGN_BY_VIEW = {
+    "회사의 모든 구성원": { options: VIEW_OPTIONS, default: "모든 관리자 및 리더" },
+    "모든 관리자 및 리더": { options: ["모든 관리자 및 리더", "특정 그룹 및 직무/직급", "특정 관리자/리더", "관리자만"], default: "모든 관리자 및 리더" },
+    "특정 그룹 및 직무/직급": { options: ["특정 그룹 및 직무/직급"], default: "특정 그룹 및 직무/직급" },
+    "특정 관리자/리더": { options: ["특정 관리자/리더"], default: "특정 관리자/리더" },
+    "관리자만": { options: ["관리자만", "특정 관리자/리더"], default: "관리자만" },
+  };
+  const TARGET_NEEDED = new Set(["특정 그룹 및 직무/직급", "특정 관리자/리더"]);
   // 배정중/재고 외 상태(수리중·분실·폐기)는 "기타"로 묶어서 보여줌 — 구조설계안 3.4 status 정의 기준
   const STATUS_LABEL = { stock: "재고", assigned: "배정중", repair: "수리중", lost: "분실", disposed: "폐기" };
   const FIELD_LABEL = { expiry: "유효기한", serial: "S/N", manufactured: "제조연월일", purchaseDate: "구매일", purchasePrice: "구매가격" };
@@ -115,11 +127,13 @@
   }
 
   // 관리 정보 — 소분류 필드 노출 설정(구조안 3.3)을 전체 필드 대비 on/off 라벨로 표시. S/N은 개별형에만 해당하는 필드라 수량형엔 안 보여줌
+  const fieldsForType = type => type === "individual"
+    ? ["expiry", "serial", "manufactured", "purchaseDate", "purchasePrice"]
+    : ["expiry", "manufactured", "purchaseDate", "purchasePrice"];
+
   function usageInfoHtml(cat) {
     const hidden = cat.hiddenFields || [];
-    const fields = cat.type === "individual"
-      ? ["expiry", "serial", "manufactured", "purchaseDate", "purchasePrice"]
-      : ["expiry", "manufactured", "purchaseDate", "purchasePrice"];
+    const fields = fieldsForType(cat.type);
     return fields.map(f => {
       const on = !hidden.includes(f);
       return `<span class="usebullet ${on ? "on" : "off"}">${FIELD_LABEL[f]}</span>`;
@@ -177,35 +191,69 @@
   // 대분류/소분류 추가·이름변경·삭제·순서변경(핸들 드래그)을 한 곳에서 처리하는 구조 편집 전용 모달.
   // 열려 있는 동안은 draft(로컬 사본)만 수정하고, [저장]을 눌러야 실제 데이터(window.DATA)에 반영됨 — [취소]/배경 클릭 시 draft는 버려짐.
   // 유형·권한·필드노출 같은 "내용"은 여기서 안 다룸 — 소분류 생성/수정은 별도 폼(소분류 상세의 "소분류 수정" 버튼)이 담당
-  function openManageModal() {
+  function openManageModal(sel) {
     // draft: [{ name, subs: [{ name, data(원본 category 객체 참조 — 삭제 가능 여부는 항상 이 원본 소속 기준으로 판단) }] }]
-    let draft = groupsOf().map(({ group, subs }) => ({ name: group, subs: subs.map(s => ({ name: s.sub, data: s })) }));
+    // 이름변경/삭제/순서변경/대분류 추가는 전부 이 draft에만 반영되고 [저장]을 눌러야 실제 데이터로 감. 단, 소분류 생성만은 예외
+    // — 유형·권한까지 다 채우는 무거운 액션이라(분류 관리 화면 안에서 벌크로 여러 개 만드는 상황 고려) 폼에서 확정하는 즉시 실제 데이터에 반영됨(draft 취소와 무관)
+    // origName: 실제 데이터상의 원래 대분류명(대분류 이름변경은 draft라 취소될 수 있음 — 그 사이 소분류 생성이 즉시 커밋될 때는
+    // 항상 이 origName을 써서, 나중에 이름변경이 취소돼도 방금 만든 소분류가 엉뚱한 이름의 그룹으로 붕 뜨지 않게 함)
+    let draft = groupsOf().map(({ group, subs }) => ({ name: group, origName: group, subs: subs.map(s => ({ name: s.sub, data: s })) }));
     let dragging = null;
     let dirty = false;
+    let createGi = null; // 소분류 생성 모드일 때, 생성 대상 대분류의 draft 인덱스
+    let createState = null;
 
     const back = document.createElement("div");
     back.className = "modal-back";
     back.innerHTML = `
       <div class="modal lg cat-manage-modal">
-        <h3>분류 관리</h3>
+        <div class="cat-manage-head">
+          <button class="btn icon-only sm" data-back hidden aria-label="뒤로">${BACK_ICON}</button>
+          <h3 data-modal-title>분류 관리</h3>
+        </div>
         <div class="cat-manage-add-group">
           <input type="text" class="cat-manage-input" placeholder="입력" maxlength="30">
           <button class="btn primary" data-add-group>+ 대분류 추가</button>
         </div>
         <div class="body cat-manage-body"></div>
+        <div class="cat-manage-create" hidden></div>
         <div class="foot">
-          <button class="btn" data-close>취소</button>
-          <button class="btn primary" data-save disabled>저장</button>
+          <button class="btn" data-cancel>취소</button>
+          <button class="btn primary" data-confirm disabled>저장</button>
         </div>
       </div>`;
     document.body.appendChild(back);
 
     const body = back.querySelector(".cat-manage-body");
-    const saveBtn = back.querySelector("[data-save]");
+    const createEl = back.querySelector(".cat-manage-create");
+    const addGroupRow = back.querySelector(".cat-manage-add-group");
+    const titleEl = back.querySelector("[data-modal-title]");
+    const backBtn = back.querySelector("[data-back]");
+    const cancelBtn = back.querySelector("[data-cancel]");
+    const confirmBtn = back.querySelector("[data-confirm]");
     const addInput = back.querySelector(".cat-manage-add-group input");
-    const markDirty = () => { dirty = true; saveBtn.disabled = false; };
+    let currentMode = "list";
+    const markDirty = () => { dirty = true; if (currentMode === "list") confirmBtn.disabled = false; };
     const clearDragMarks = () => body.querySelectorAll(".drag-over-top,.drag-over-bottom")
       .forEach(el => el.classList.remove("drag-over-top", "drag-over-bottom"));
+
+    function setMode(mode) {
+      currentMode = mode;
+      const isList = mode === "list";
+      titleEl.textContent = isList ? "분류 관리" : "소분류 추가";
+      backBtn.hidden = isList;
+      addGroupRow.hidden = !isList;
+      body.hidden = !isList;
+      createEl.hidden = isList;
+      cancelBtn.textContent = "취소";
+      confirmBtn.textContent = isList ? "저장" : "추가";
+      confirmBtn.disabled = isList ? !dirty : true;
+      // 취소 자체는 draft(이름변경/삭제/순서변경/대분류추가)만 버림 — 소분류 생성은 이미 실제 반영됐으므로, 닫을 때 배경 트리를 다시 그려서 그대로 보여줌
+      cancelBtn.onclick = isList ? (() => { back.remove(); render(sel); }) : (() => setMode("list"));
+      confirmBtn.onclick = isList ? saveAll : commitCreate;
+    }
+    backBtn.onclick = () => setMode("list");
+    back.addEventListener("click", e => { if (e.target === back) cancelBtn.click(); });
 
     function renderBody() {
       body.innerHTML = draft.map((g, gi) => {
@@ -233,7 +281,7 @@
                 </div>
               </div>`;
             }).join("")}
-            <button class="btn sm cat-manage-add-sub" data-act="소분류 추가">+ 소분류 추가</button>
+            <button class="btn sm cat-manage-add-sub" data-add-sub="${gi}">+ 소분류 추가</button>
           </div>
         </div>`;
       }).join("");
@@ -243,7 +291,7 @@
     function addGroup() {
       const name = addInput.value.trim();
       if (!name) { addInput.focus(); return; }
-      draft.unshift({ name, subs: [] });
+      draft.unshift({ name, origName: null, subs: [] });
       addInput.value = "";
       markDirty(); renderBody();
     }
@@ -262,7 +310,7 @@
     body.addEventListener("click", e => {
       const delGroup = e.target.closest("[data-del-group]");
       const delSub = e.target.closest("[data-del-sub]");
-      const addSub = e.target.closest('[data-act="소분류 추가"]');
+      const addSub = e.target.closest("[data-add-sub]");
       if (delGroup && !delGroup.classList.contains("is-disabled")) {
         draft.splice(+delGroup.dataset.delGroup, 1);
         markDirty(); renderBody();
@@ -271,7 +319,7 @@
         draft[gi].subs.splice(si, 1);
         markDirty(); renderBody();
       } else if (addSub) {
-        toast(`"소분류 추가" — 이후 단계에서 정의`);
+        enterCreate(+addSub.dataset.addSub);
       }
     });
 
@@ -339,7 +387,7 @@
       clearDragMarks();
     });
 
-    saveBtn.onclick = () => {
+    function saveAll() {
       if (!dirty) return;
       const newCategories = [];
       const newEmptyGroups = [];
@@ -353,9 +401,107 @@
       back.remove();
       toast("분류 구조가 저장되었습니다");
       render(null);
-    };
-    back.querySelector("[data-close]").onclick = () => back.remove();
-    back.addEventListener("click", e => { if (e.target === back) back.remove(); });
+    }
+
+    // 소분류 생성 — 유형·권한까지 다 채우는 무거운 액션이라 여기서만 예외적으로 "추가"를 누르는 즉시 실제 데이터(categories)에 반영됨.
+    // 이 draft(구조 편집)의 [취소]와는 무관 — 다만 목록에 바로 보이도록 draft에도 같이 끼워 넣음
+    function enterCreate(gi) {
+      createGi = gi;
+      createState = {
+        name: "", type: "individual",
+        view: VIEW_OPTIONS[0], assign: ASSIGN_BY_VIEW[VIEW_OPTIONS[0]].default,
+        hiddenFields: [],
+      };
+      renderCreateForm();
+      setMode("create");
+    }
+
+    function createFormHtml() {
+      const s = createState;
+      const assignCfg = ASSIGN_BY_VIEW[s.view];
+      return `
+        <div class="field">
+          <label>대분류</label>
+          <div class="cat-manage-create-group">${draft[createGi].name}</div>
+        </div>
+        <div class="field">
+          <label>소분류명<span class="req">*</span></label>
+          <input type="text" class="cat-manage-input" data-f-name value="${s.name}" placeholder="입력" maxlength="30" style="width:100%">
+        </div>
+        <div class="field">
+          <label>자산 유형<span class="req">*</span></label>
+          <div class="seg" data-f-type>
+            <button type="button" data-val="individual" class="${s.type === "individual" ? "active" : ""}">개별 자산</button>
+            <button type="button" data-val="quantity" class="${s.type === "quantity" ? "active" : ""}">수량 자산</button>
+          </div>
+        </div>
+        <div class="field">
+          <label>자산 조회 권한<span class="req">*</span></label>
+          <select data-f-view>${VIEW_OPTIONS.map(v => `<option value="${v}"${v === s.view ? " selected" : ""}>${v}</option>`).join("")}</select>
+          ${TARGET_NEEDED.has(s.view) ? `<button type="button" class="btn sm" style="margin-top:8px" data-f-target="view">대상 선택</button> <span class="hint">선택된 대상 없음</span>` : ""}
+        </div>
+        <div class="field">
+          <label>배정/보유 변경 권한<span class="req">*</span></label>
+          <select data-f-assign>${assignCfg.options.map(v => `<option value="${v}"${v === s.assign ? " selected" : ""}>${v}</option>`).join("")}</select>
+          ${TARGET_NEEDED.has(s.assign) ? `<button type="button" class="btn sm" style="margin-top:8px" data-f-target="assign">대상 선택</button> <span class="hint">선택된 대상 없음</span>` : ""}
+        </div>
+        <div class="field">
+          <label>관리 정보</label>
+          <div class="cat-usage-bullets" data-f-fields>
+            ${fieldsForType(s.type).map(f => `<button type="button" class="usebullet ${s.hiddenFields.includes(f) ? "off" : "on"}" data-field="${f}">${FIELD_LABEL[f]}</button>`).join("")}
+          </div>
+          <p class="hint">클릭해서 노출 여부를 바꿀 수 있어요</p>
+        </div>`;
+    }
+
+    function renderCreateForm() {
+      createEl.innerHTML = createFormHtml();
+      confirmBtn.disabled = !createState.name.trim();
+
+      createEl.querySelector("[data-f-name]").addEventListener("input", e => {
+        createState.name = e.target.value;
+        confirmBtn.disabled = !createState.name.trim();
+      });
+      createEl.querySelector("[data-f-type]").addEventListener("click", e => {
+        const b = e.target.closest("[data-val]");
+        if (!b) return;
+        createState.type = b.dataset.val;
+        createState.hiddenFields = createState.hiddenFields.filter(f => fieldsForType(createState.type).includes(f));
+        renderCreateForm();
+      });
+      createEl.querySelector("[data-f-view]").addEventListener("change", e => {
+        createState.view = e.target.value;
+        createState.assign = ASSIGN_BY_VIEW[createState.view].default;
+        renderCreateForm();
+      });
+      createEl.querySelector("[data-f-assign]").addEventListener("change", e => {
+        createState.assign = e.target.value;
+        renderCreateForm();
+      });
+      createEl.querySelectorAll("[data-f-target]").forEach(b => b.onclick = () => toast(`"대상 선택" — 이후 단계에서 정의`));
+      createEl.querySelector("[data-f-fields]").addEventListener("click", e => {
+        const b = e.target.closest("[data-field]");
+        if (!b) return;
+        const f = b.dataset.field;
+        const i = createState.hiddenFields.indexOf(f);
+        if (i === -1) createState.hiddenFields.push(f); else createState.hiddenFields.splice(i, 1);
+        b.classList.toggle("on"); b.classList.toggle("off");
+      });
+    }
+
+    function commitCreate() {
+      const name = createState.name.trim();
+      if (!name) return;
+      const group = draft[createGi].origName || draft[createGi].name;
+      const newCat = { group, sub: name, type: createState.type, hiddenFields: [...createState.hiddenFields], view: createState.view, assign: createState.assign };
+      categories.push(newCat);
+      draft[createGi].subs.push({ name, data: newCat });
+      toast(`"${name}" 소분류가 생성되었습니다`);
+      setMode("list");
+      renderBody();
+    }
+
+    setMode("list");
   }
 
   function wireAssetSection(c, a) {
@@ -400,7 +546,7 @@
       if (collapsedGroups.has(g)) collapsedGroups.delete(g); else collapsedGroups.add(g);
       render(sel);
     });
-    c.querySelector("[data-manage]").onclick = () => openManageModal();
+    c.querySelector("[data-manage]").onclick = () => openManageModal(sel);
     wireAssetSection(c);
   }
 
