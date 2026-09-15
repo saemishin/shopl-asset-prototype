@@ -8,11 +8,9 @@
     t.style.cssText = "position:fixed;left:50%;bottom:32px;transform:translateX(-50%);background:#1b1d1f;color:#fff;padding:10px 16px;border-radius:8px;font-size:12.5px;z-index:300";
     document.body.appendChild(t); setTimeout(() => t.remove(), 1800);
   }
-  const PENCIL_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l1-4L16 5l3 3L8 19l-4 1z"/><path d="M13.5 6.5l4 4"/></svg>`;
-  const MOVE_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 13h6m0 0-2-2m2 2-2 2"/></svg>`;
   const TRASH_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M9.5 7l.7 13a1 1 0 0 0 1 1h5.6a1 1 0 0 0 1-1l.7-13"/></svg>`;
-  const UP_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg>`;
-  const DOWN_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>`;
+  const HANDLE_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>`;
+  const PLUS_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>`;
   // 배정중/재고 외 상태(수리중·분실·폐기)는 "기타"로 묶어서 보여줌 — 구조설계안 3.4 status 정의 기준
   const STATUS_LABEL = { stock: "재고", assigned: "배정중", repair: "수리중", lost: "분실", disposed: "폐기" };
   const FIELD_LABEL = { expiry: "유효기한", serial: "S/N", manufactured: "제조연월일", purchaseDate: "구매일", purchasePrice: "구매가격" };
@@ -177,57 +175,188 @@
     `;
   }
 
-  // 대분류/소분류 추가·이름변경·삭제·순서변경을 한 곳에서 처리하는 구조 편집 전용 모달(전부 placeholder)
+  // 대분류/소분류 추가·이름변경·삭제·순서변경(핸들 드래그)을 한 곳에서 처리하는 구조 편집 전용 모달.
+  // 열려 있는 동안은 draft(로컬 사본)만 수정하고, [저장]을 눌러야 실제 데이터(window.DATA)에 반영됨 — [취소]/배경 클릭 시 draft는 버려짐.
   // 유형·권한·필드노출 같은 "내용"은 여기서 안 다룸 — 소분류 생성/수정은 별도 폼(소분류 상세의 "소분류 수정" 버튼)이 담당
-  function manageOrderBtns(upAct, downAct, i, len) {
-    return `
-      <div class="cat-manage-order">
-        <button class="cat-manage-icon" data-act="${upAct}" aria-label="위로" title="위로"${i === 0 ? " disabled" : ""}>${UP_ICON}</button>
-        <button class="cat-manage-icon" data-act="${downAct}" aria-label="아래로" title="아래로"${i === len - 1 ? " disabled" : ""}>${DOWN_ICON}</button>
-      </div>`;
-  }
   function openManageModal() {
-    const groups = groupsOf();
+    // draft: [{ name, subs: [{ name, data(원본 category 객체 참조 — 삭제 가능 여부는 항상 이 원본 소속 기준으로 판단) }] }]
+    let draft = groupsOf().map(({ group, subs }) => ({ name: group, subs: subs.map(s => ({ name: s.sub, data: s })) }));
+    let dragging = null;
+    let dirty = false;
+
     const back = document.createElement("div");
     back.className = "modal-back";
     back.innerHTML = `
-      <div class="modal lg">
+      <div class="modal lg cat-manage-modal">
         <h3>분류 관리</h3>
-        <div class="body cat-manage-body">
-          ${groups.map(({ group, subs }, gi) => `
-            <div class="cat-manage-group">
-              <div class="cat-manage-row cat-manage-group-row">
-                ${manageOrderBtns("대분류 위로 이동", "대분류 아래로 이동", gi, groups.length)}
-                <span class="cat-manage-name">${group}</span>
-                <div class="cat-manage-row-acts">
-                  <button class="cat-manage-icon" data-act="대분류 이름 변경" aria-label="이름 변경" title="이름 변경">${PENCIL_ICON}</button>
-                  <button class="cat-manage-icon" data-act="대분류 삭제" aria-label="삭제" title="삭제"${subs.length ? " disabled" : ""}>${TRASH_ICON}</button>
-                </div>
-              </div>
-              <div class="cat-manage-subs">
-                ${subs.map((s, si) => `
-                  <div class="cat-manage-row cat-manage-sub-row">
-                    ${manageOrderBtns("소분류 위로 이동", "소분류 아래로 이동", si, subs.length)}
-                    <span class="cat-manage-name">${s.sub}</span>
-                    <div class="cat-manage-row-acts">
-                      <button class="cat-manage-icon" data-act="소분류 이름 변경" aria-label="이름 변경" title="이름 변경">${PENCIL_ICON}</button>
-                      <button class="cat-manage-icon" data-act="소분류 대분류 이동" aria-label="대분류 이동" title="대분류 이동">${MOVE_ICON}</button>
-                      <button class="cat-manage-icon" data-act="소분류 삭제" aria-label="삭제" title="삭제"${assetsOf(group, s.sub).length ? " disabled" : ""}>${TRASH_ICON}</button>
-                    </div>
-                  </div>`).join("")}
-                <button class="btn sm cat-manage-add-sub" data-act="소분류 추가">+ 소분류 추가</button>
-              </div>
-            </div>`).join("")}
+        <div class="cat-manage-add-group">
+          <input type="text" class="cat-manage-input" placeholder="대분류 명칭 입력" maxlength="30">
+          <button class="btn icon-only primary" data-add-group aria-label="대분류 추가">${PLUS_ICON}</button>
         </div>
+        <div class="body cat-manage-body"></div>
         <div class="foot">
-          <button class="btn primary" data-act="대분류 추가">+ 대분류 추가</button>
-          <button class="btn" data-close>닫기</button>
+          <button class="btn" data-close>취소</button>
+          <button class="btn primary" data-save disabled>저장</button>
         </div>
       </div>`;
-    back.addEventListener("click", e => { if (e.target === back) back.remove(); });
-    back.querySelector("[data-close]").onclick = () => back.remove();
-    bindActs(back);
     document.body.appendChild(back);
+
+    const body = back.querySelector(".cat-manage-body");
+    const saveBtn = back.querySelector("[data-save]");
+    const addInput = back.querySelector(".cat-manage-add-group input");
+    const markDirty = () => { dirty = true; saveBtn.disabled = false; };
+    const clearDragMarks = () => body.querySelectorAll(".drag-over-top,.drag-over-bottom")
+      .forEach(el => el.classList.remove("drag-over-top", "drag-over-bottom"));
+
+    function renderBody() {
+      body.innerHTML = draft.map((g, gi) => {
+        const blocked = g.subs.length > 0;
+        return `
+        <div class="cat-manage-group">
+          <div class="cat-manage-row cat-manage-group-row" draggable="true" data-drag="group" data-gi="${gi}">
+            <span class="cat-manage-handle" title="드래그해서 순서 변경">${HANDLE_ICON}</span>
+            <input type="text" class="cat-manage-name-input" data-rename-group="${gi}" value="${g.name}" maxlength="30">
+            <div class="cat-manage-row-acts">
+              <button class="cat-manage-icon${blocked ? " is-disabled" : ""}" data-del-group="${gi}" aria-label="삭제"
+                title="${blocked ? `하위 소분류가 ${g.subs.length}개 있어 삭제할 수 없어요` : "삭제"}">${TRASH_ICON}</button>
+            </div>
+          </div>
+          <div class="cat-manage-subs">
+            ${g.subs.map((s, si) => {
+              const hasAssets = assetsOf(s.data.group, s.data.sub).length > 0;
+              return `
+              <div class="cat-manage-row cat-manage-sub-row" draggable="true" data-drag="sub" data-gi="${gi}" data-si="${si}">
+                <span class="cat-manage-handle" title="드래그해서 순서·대분류 변경">${HANDLE_ICON}</span>
+                <input type="text" class="cat-manage-name-input" data-rename-sub="${gi}|${si}" value="${s.name}" maxlength="30">
+                <div class="cat-manage-row-acts">
+                  <button class="cat-manage-icon${hasAssets ? " is-disabled" : ""}" data-del-sub="${gi}|${si}" aria-label="삭제"
+                    title="${hasAssets ? "등록된 자산이 있어 삭제할 수 없어요" : "삭제"}">${TRASH_ICON}</button>
+                </div>
+              </div>`;
+            }).join("")}
+            <button class="btn sm cat-manage-add-sub" data-act="소분류 추가">+ 소분류 추가</button>
+          </div>
+        </div>`;
+      }).join("");
+    }
+    renderBody();
+
+    function addGroup() {
+      const name = addInput.value.trim();
+      if (!name) { addInput.focus(); return; }
+      draft.unshift({ name, subs: [] });
+      addInput.value = "";
+      markDirty(); renderBody();
+    }
+    back.querySelector("[data-add-group]").onclick = addGroup;
+    addInput.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); addGroup(); } });
+
+    body.addEventListener("input", e => {
+      const rg = e.target.closest("[data-rename-group]");
+      const rs = e.target.closest("[data-rename-sub]");
+      if (rg) { draft[+rg.dataset.renameGroup].name = e.target.value; markDirty(); }
+      else if (rs) {
+        const [gi, si] = rs.dataset.renameSub.split("|").map(Number);
+        draft[gi].subs[si].name = e.target.value; markDirty();
+      }
+    });
+    body.addEventListener("click", e => {
+      const delGroup = e.target.closest("[data-del-group]");
+      const delSub = e.target.closest("[data-del-sub]");
+      const addSub = e.target.closest('[data-act="소분류 추가"]');
+      if (delGroup && !delGroup.classList.contains("is-disabled")) {
+        draft.splice(+delGroup.dataset.delGroup, 1);
+        markDirty(); renderBody();
+      } else if (delSub && !delSub.classList.contains("is-disabled")) {
+        const [gi, si] = delSub.dataset.delSub.split("|").map(Number);
+        draft[gi].subs.splice(si, 1);
+        markDirty(); renderBody();
+      } else if (addSub) {
+        toast(`"소분류 추가" — 이후 단계에서 정의`);
+      }
+    });
+
+    // 드래그 정렬 — 핸들을 잡고 시작(입력창/버튼에서는 브라우저 기본 동작이 드래그를 가로채 자연히 막힘)
+    body.addEventListener("dragstart", e => {
+      const row = e.target.closest("[data-drag]");
+      if (!row) return;
+      dragging = row.dataset.drag === "group"
+        ? { type: "group", gi: +row.dataset.gi }
+        : { type: "sub", gi: +row.dataset.gi, si: +row.dataset.si };
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", "");
+      row.classList.add("dragging");
+    });
+    body.addEventListener("dragend", e => {
+      dragging = null;
+      e.target.closest("[data-drag]")?.classList.remove("dragging");
+      clearDragMarks();
+    });
+    body.addEventListener("dragover", e => {
+      if (!dragging) return;
+      const subRow = e.target.closest('[data-drag="sub"]');
+      const groupRow = e.target.closest('[data-drag="group"]');
+      if (dragging.type === "sub" && subRow) {
+        e.preventDefault(); clearDragMarks();
+        const rect = subRow.getBoundingClientRect();
+        subRow.classList.add(e.clientY < rect.top + rect.height / 2 ? "drag-over-top" : "drag-over-bottom");
+      } else if (dragging.type === "sub" && groupRow) {
+        e.preventDefault(); clearDragMarks();
+        groupRow.classList.add("drag-over-bottom");
+      } else if (dragging.type === "group" && groupRow) {
+        e.preventDefault(); clearDragMarks();
+        const rect = groupRow.getBoundingClientRect();
+        groupRow.classList.add(e.clientY < rect.top + rect.height / 2 ? "drag-over-top" : "drag-over-bottom");
+      }
+    });
+    body.addEventListener("drop", e => {
+      if (!dragging) return;
+      e.preventDefault();
+      const subRow = e.target.closest('[data-drag="sub"]');
+      const groupRow = e.target.closest('[data-drag="group"]');
+      if (dragging.type === "sub") {
+        let targetGi, targetIndex;
+        if (subRow) {
+          targetGi = +subRow.dataset.gi;
+          targetIndex = +subRow.dataset.si + (subRow.classList.contains("drag-over-top") ? 0 : 1);
+        } else if (groupRow) {
+          targetGi = +groupRow.dataset.gi;
+          targetIndex = 0;
+        } else { dragging = null; clearDragMarks(); return; }
+        const [moved] = draft[dragging.gi].subs.splice(dragging.si, 1);
+        let insertAt = targetIndex;
+        if (dragging.gi === targetGi && dragging.si < targetIndex) insertAt -= 1;
+        draft[targetGi].subs.splice(insertAt, 0, moved);
+        markDirty(); renderBody();
+      } else if (dragging.type === "group" && groupRow) {
+        const targetIndex = +groupRow.dataset.gi + (groupRow.classList.contains("drag-over-top") ? 0 : 1);
+        const [moved] = draft.splice(dragging.gi, 1);
+        let insertAt = targetIndex;
+        if (dragging.gi < targetIndex) insertAt -= 1;
+        draft.splice(insertAt, 0, moved);
+        markDirty(); renderBody();
+      }
+      dragging = null;
+      clearDragMarks();
+    });
+
+    saveBtn.onclick = () => {
+      if (!dirty) return;
+      const newCategories = [];
+      const newEmptyGroups = [];
+      draft.forEach(g => {
+        if (!g.subs.length) { newEmptyGroups.push(g.name); return; }
+        g.subs.forEach(s => newCategories.push({ ...s.data, group: g.name, sub: s.name }));
+      });
+      categories.length = 0;
+      categories.push(...newCategories);
+      window.DATA.emptyGroups = newEmptyGroups;
+      back.remove();
+      toast("분류 구조가 저장되었습니다");
+      render(null);
+    };
+    back.querySelector("[data-close]").onclick = () => back.remove();
+    back.addEventListener("click", e => { if (e.target === back) back.remove(); });
   }
 
   function wireAssetSection(c, a) {

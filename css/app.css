@@ -123,6 +123,7 @@ input { font: inherit; }
 .btn:hover { background: #f7f8f9; }
 .btn.primary { background: var(--primary); border-color: var(--primary); color: #fff; }
 .btn.primary:hover { background: var(--primary-press); }
+.btn.primary:disabled { background: #c7d3ea; border-color: #c7d3ea; color: #fff; cursor: not-allowed; }
 .btn.sm { height: 28px; padding: 0 9px; font-size: 12px; }
 .btn.icon-only { width: 32px; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
 .btn.icon-only svg { width: 15px; height: 15px; }
@@ -312,7 +313,7 @@ th.c, td.c { text-align: center; width: 52px; }
 .cat-detail-acts { display: flex; gap: 6px; flex-shrink: 0; }
 /* .kv2와 특이성을 똑같이(단일 클래스) 두면 소스 순서상 .kv2에 밀리므로 두 클래스를 묶어 특이성을 더 높여둠 */
 .kv2.cat-detail-kv { grid-template-columns: 110px 1fr 110px 1fr; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
-.cat-usage { display: flex; align-items: center; margin-top: 14px; }
+.cat-usage { display: flex; align-items: center; gap: 32px; margin-top: 14px; }
 .cat-usage .k { width: 110px; flex-shrink: 0; color: var(--text-mut); font-size: 12px; }
 .cat-usage-bullets { display: flex; flex-wrap: nowrap; gap: 6px; overflow-x: auto; }
 .usebullet {
@@ -333,23 +334,46 @@ th.c, td.c { text-align: center; width: 52px; }
 .cat-unit-no { color: var(--text-sub); font-variant-numeric: tabular-nums; }
 
 /* 분류 관리 모달 — 구조 편집 전용(추가·이름변경·순서·삭제·대분류이동만. 유형/권한/필드노출은 별도 폼) */
+.cat-manage-modal { display: flex; flex-direction: column; max-height: 88vh; }
+.cat-manage-modal .body { flex: 1; overflow-y: auto; min-height: 0; }
+.cat-manage-add-group { display: flex; gap: 8px; padding: 14px 20px 0; flex-shrink: 0; }
+.cat-manage-add-group input { flex: 1; }
+.cat-manage-input {
+  height: 32px; border: 1px solid var(--line-strong); border-radius: var(--radius);
+  padding: 0 10px; background: var(--panel); font-size: 12.5px;
+}
+.cat-manage-add-group .btn.icon-only { width: 32px; height: 32px; flex-shrink: 0; }
+.cat-manage-add-group .btn.icon-only svg { width: 15px; height: 15px; }
 .cat-manage-body { display: flex; flex-direction: column; }
 .cat-manage-group { margin-bottom: 16px; }
-.cat-manage-row { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 6px; }
+.cat-manage-row { display: flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 6px; }
+.cat-manage-row.dragging { opacity: .35; }
+.cat-manage-row.drag-over-top { box-shadow: inset 0 2px 0 var(--primary); }
+.cat-manage-row.drag-over-bottom { box-shadow: inset 0 -2px 0 var(--primary); }
 .cat-manage-group-row { background: #f6f7f8; margin-bottom: 3px; }
 .cat-manage-sub-row { padding-left: 30px; }
 .cat-manage-sub-row:hover { background: #f7f8f9; }
-.cat-manage-order { display: flex; gap: 1px; }
-.cat-manage-name { flex: 1; min-width: 0; font-size: 12.5px; }
-.cat-manage-group-row .cat-manage-name { font-weight: 700; }
-.cat-manage-row-acts { display: flex; gap: 1px; }
+.cat-manage-handle {
+  display: flex; align-items: center; justify-content: center; width: 20px; height: 26px;
+  flex-shrink: 0; color: var(--text-mut); cursor: grab;
+}
+.cat-manage-handle svg { width: 14px; height: 14px; }
+.cat-manage-handle:active { cursor: grabbing; }
+.cat-manage-name-input {
+  flex: 1; min-width: 0; height: 28px; font-size: 12.5px; color: var(--text);
+  border: 1px solid transparent; border-radius: 6px; padding: 0 6px; background: transparent;
+}
+.cat-manage-name-input:hover { border-color: var(--line-strong); }
+.cat-manage-name-input:focus { border-color: var(--primary); background: var(--panel); }
+.cat-manage-group-row .cat-manage-name-input { font-weight: 700; }
+.cat-manage-row-acts { display: flex; gap: 1px; flex-shrink: 0; }
 .cat-manage-icon {
   width: 26px; height: 26px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
   border-radius: 6px; color: var(--text-mut);
 }
 .cat-manage-icon svg { width: 14px; height: 14px; }
-.cat-manage-icon:hover:not(:disabled) { background: #eef0f2; color: var(--text); }
-.cat-manage-icon:disabled { opacity: .3; }
+.cat-manage-icon:hover:not(.is-disabled) { background: #eef0f2; color: var(--text); }
+.cat-manage-icon.is-disabled { opacity: .3; cursor: not-allowed; }
 .cat-manage-subs { display: flex; flex-direction: column; gap: 1px; }
 .cat-manage-add-sub { margin: 6px 0 0 30px; align-self: flex-start; }
 
