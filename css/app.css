@@ -280,6 +280,12 @@ th.c, td.c { text-align: center; width: 52px; }
 .badge.exp-over { background: #fdecec; color: #d23b40; }
 .type-pill { font-size: 11px; color: var(--text-sub); border: 1px solid var(--line-strong); border-radius: 4px; padding: 1px 5px; }
 
+/* ============ 분류 관리 ============ */
+.cat-groups { display: flex; flex-direction: column; gap: 20px; }
+.cat-group-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.cat-group-head h4 { font-size: 14px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+.cat-group-acts { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+
 /* ============ pagination ============ */
 .pager { display: flex; align-items: center; justify-content: center; gap: 4px; padding: 16px 0 4px; position: relative; }
 .pager button { width: 28px; height: 28px; border-radius: 6px; color: var(--text-sub); }

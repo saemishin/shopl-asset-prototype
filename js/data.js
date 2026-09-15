@@ -2,14 +2,15 @@
 window.DATA = (function () {
   // 분류: 대분류 > 소분류(개별형/수량형)
   // hiddenFields: 소분류 필드 노출 설정에서 off된 선택 필드(구조안 3.3). 상세에서 해당 행 자체를 숨김
+  // view/assign: 자산 조회 권한 / 배정·보유 변경 권한(구조안 4.3) — assign은 항상 view의 부분집합
   const categories = [
-    { group: "가구류", sub: "책상", type: "individual", hiddenFields: ["expiry"] },
-    { group: "가구류", sub: "의자", type: "individual", hiddenFields: ["expiry"] },
-    { group: "전자기기류", sub: "노트북", type: "individual" },
-    { group: "전자기기류", sub: "모니터", type: "individual" },
-    { group: "전자기기류", sub: "케이블·액세서리", type: "quantity" },
-    { group: "소모품", sub: "유니폼", type: "quantity" },
-    { group: "소모품", sub: "문구류", type: "quantity" },
+    { group: "가구류", sub: "책상", type: "individual", hiddenFields: ["expiry"], view: "회사의 모든 구성원", assign: "모든 관리자 및 리더" },
+    { group: "가구류", sub: "의자", type: "individual", hiddenFields: ["expiry"], view: "회사의 모든 구성원", assign: "모든 관리자 및 리더" },
+    { group: "전자기기류", sub: "노트북", type: "individual", view: "모든 관리자 및 리더", assign: "모든 관리자 및 리더" },
+    { group: "전자기기류", sub: "모니터", type: "individual", view: "모든 관리자 및 리더", assign: "특정 관리자/리더" },
+    { group: "전자기기류", sub: "케이블·액세서리", type: "quantity", view: "회사의 모든 구성원", assign: "모든 관리자 및 리더" },
+    { group: "소모품", sub: "유니폼", type: "quantity", view: "회사의 모든 구성원", assign: "특정 관리자/리더" },
+    { group: "소모품", sub: "문구류", type: "quantity", view: "회사의 모든 구성원", assign: "회사의 모든 구성원" },
   ];
 
   // 개별 자산: 활성 배정(assignments) 0~N건. 각 레코드는 worksite/employee 중 정확히 1개.
