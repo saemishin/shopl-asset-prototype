@@ -11,6 +11,7 @@
   const TRASH_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M9.5 7l.7 13a1 1 0 0 0 1 1h5.6a1 1 0 0 0 1-1l.7-13"/></svg>`;
   const HANDLE_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>`;
   const BACK_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>`;
+  const CLOSE_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg>`;
 
   // 자산 조회·배정/보유 변경 권한 옵션 — 구조설계안 4.3. assign은 항상 view 범위의 부분집합(표에 정의된 선택 가능 범위/기본값 그대로 반영)
   const VIEW_OPTIONS = ["회사의 모든 구성원", "모든 관리자 및 리더", "특정 그룹 및 직무/직급", "특정 관리자/리더", "관리자만"];
@@ -24,7 +25,9 @@
   const TARGET_NEEDED = new Set(["특정 그룹 및 직무/직급", "특정 관리자/리더"]);
   // 배정중/재고 외 상태(수리중·분실·폐기)는 "기타"로 묶어서 보여줌 — 구조설계안 3.4 status 정의 기준
   const STATUS_LABEL = { stock: "재고", assigned: "배정중", repair: "수리중", lost: "분실", disposed: "폐기" };
-  const FIELD_LABEL = { expiry: "유효기한", serial: "S/N", manufactured: "제조연월일", purchaseDate: "구매일", purchasePrice: "구매가격" };
+  // 구조설계안 3.3: 필드 노출 설정 대상은 S/N·IMEI·구매일·구매가격·제조연월일·유효기한 6개(IMEI·S/N은 개별형 전용) — 기본값: IMEI·유효기한 off, 나머지 on
+  const FIELD_LABEL = { serial: "S/N", imei: "IMEI", purchaseDate: "구매일", purchasePrice: "구매가격", manufactured: "제조연월일", expiry: "유효기한" };
+  const DEFAULT_HIDDEN_FIELDS = { individual: ["imei", "expiry"], quantity: ["expiry"] };
   const btn = (label, cls = "btn sm") => `<button class="${cls}" data-act="${label}">${label}</button>`;
   const bindActs = scope => scope.querySelectorAll("[data-act]").forEach(b =>
     b.onclick = () => toast(`"${b.dataset.act}" — 이후 단계에서 정의`));
@@ -55,7 +58,6 @@
   function treeHtml(groups, sel) {
     const head = `
       <div class="cat-tree-head">
-        <span class="cat-tree-head-label">대분류</span>
         <button class="btn sm" data-manage>분류 관리</button>
       </div>`;
     const body = groups.map(({ group, subs }) => {
@@ -69,7 +71,7 @@
           <button class="cat-tree-item${sel && sel.group === group && sel.sub === s.sub ? " active" : ""}"
                   data-tree="${group}|${s.sub}">
             ${s.sub}<span class="cat-tree-count">${assetsOf(group, s.sub).length}</span>
-          </button>`).join("") : '<p class="cat-tree-empty">없음</p>')}
+          </button>`).join("") : '<p class="cat-tree-empty">소분류 없음</p>')}
       </div>`;
     }).join("");
     return head + body;
@@ -126,10 +128,10 @@
       </tr>`;
   }
 
-  // 관리 정보 — 소분류 필드 노출 설정(구조안 3.3)을 전체 필드 대비 on/off 라벨로 표시. S/N은 개별형에만 해당하는 필드라 수량형엔 안 보여줌
+  // 관리 정보 — 소분류 필드 노출 설정(구조안 3.3)을 전체 필드 대비 on/off 라벨로 표시. S/N·IMEI는 개별형에만 해당하는 필드라 수량형엔 안 보여줌
   const fieldsForType = type => type === "individual"
-    ? ["expiry", "serial", "manufactured", "purchaseDate", "purchasePrice"]
-    : ["expiry", "manufactured", "purchaseDate", "purchasePrice"];
+    ? ["serial", "imei", "purchaseDate", "purchasePrice", "manufactured", "expiry"]
+    : ["purchaseDate", "purchasePrice", "manufactured", "expiry"];
 
   function usageInfoHtml(cat) {
     const hidden = cat.hiddenFields || [];
@@ -410,7 +412,7 @@
       createState = {
         name: "", type: "individual",
         view: VIEW_OPTIONS[0], assign: ASSIGN_BY_VIEW[VIEW_OPTIONS[0]].default,
-        hiddenFields: [],
+        hiddenFields: [...DEFAULT_HIDDEN_FIELDS.individual],
       };
       renderCreateForm();
       setMode("create");
@@ -418,7 +420,6 @@
 
     function createFormHtml() {
       const s = createState;
-      const assignCfg = ASSIGN_BY_VIEW[s.view];
       return `
         <div class="field">
           <label>대분류</label>
@@ -429,7 +430,7 @@
           <input type="text" class="cat-manage-input" data-f-name value="${s.name}" placeholder="입력" maxlength="30" style="width:100%">
         </div>
         <div class="field">
-          <label>자산 유형<span class="req">*</span></label>
+          <label>자산 유형<span class="req">*</span> <button type="button" class="help-icon" data-f-type-help aria-label="자산 유형 도움말">?</button></label>
           <div class="seg" data-f-type>
             <button type="button" data-val="individual" class="${s.type === "individual" ? "active" : ""}">개별 자산</button>
             <button type="button" data-val="quantity" class="${s.type === "quantity" ? "active" : ""}">수량 자산</button>
@@ -437,20 +438,24 @@
         </div>
         <div class="field">
           <label>자산 조회 권한<span class="req">*</span></label>
-          <select data-f-view>${VIEW_OPTIONS.map(v => `<option value="${v}"${v === s.view ? " selected" : ""}>${v}</option>`).join("")}</select>
+          <button type="button" class="cat-manage-select-btn" data-f-view-btn><span>${s.view}</span><span class="chev">▾</span></button>
           ${TARGET_NEEDED.has(s.view) ? `<button type="button" class="btn sm" style="margin-top:8px" data-f-target="view">대상 선택</button> <span class="hint">선택된 대상 없음</span>` : ""}
         </div>
         <div class="field">
           <label>배정/보유 변경 권한<span class="req">*</span></label>
-          <select data-f-assign>${assignCfg.options.map(v => `<option value="${v}"${v === s.assign ? " selected" : ""}>${v}</option>`).join("")}</select>
+          <button type="button" class="cat-manage-select-btn" data-f-assign-btn><span>${s.assign}</span><span class="chev">▾</span></button>
           ${TARGET_NEEDED.has(s.assign) ? `<button type="button" class="btn sm" style="margin-top:8px" data-f-target="assign">대상 선택</button> <span class="hint">선택된 대상 없음</span>` : ""}
         </div>
         <div class="field">
           <label>관리 정보</label>
-          <div class="cat-usage-bullets" data-f-fields>
-            ${fieldsForType(s.type).map(f => `<button type="button" class="usebullet ${s.hiddenFields.includes(f) ? "off" : "on"}" data-field="${f}">${FIELD_LABEL[f]}</button>`).join("")}
+          <p class="hint" style="margin-top:0;margin-bottom:10px">이 유형의 자산 관리에 필요한 정보만 사용하도록 설정할 수 있습니다.</p>
+          <div class="cat-manage-fieldlist" data-f-fields>
+            ${fieldsForType(s.type).map(f => `
+              <div class="cat-manage-fieldrow">
+                <span>${FIELD_LABEL[f]}</span>
+                <button type="button" class="toggle-switch${s.hiddenFields.includes(f) ? "" : " on"}" data-field="${f}" role="switch" aria-checked="${!s.hiddenFields.includes(f)}" aria-label="${FIELD_LABEL[f]} 노출"><span class="toggle-knob"></span></button>
+              </div>`).join("")}
           </div>
-          <p class="hint">클릭해서 노출 여부를 바꿀 수 있어요</p>
         </div>`;
     }
 
@@ -466,18 +471,12 @@
         const b = e.target.closest("[data-val]");
         if (!b) return;
         createState.type = b.dataset.val;
-        createState.hiddenFields = createState.hiddenFields.filter(f => fieldsForType(createState.type).includes(f));
+        createState.hiddenFields = [...DEFAULT_HIDDEN_FIELDS[createState.type]];
         renderCreateForm();
       });
-      createEl.querySelector("[data-f-view]").addEventListener("change", e => {
-        createState.view = e.target.value;
-        createState.assign = ASSIGN_BY_VIEW[createState.view].default;
-        renderCreateForm();
-      });
-      createEl.querySelector("[data-f-assign]").addEventListener("change", e => {
-        createState.assign = e.target.value;
-        renderCreateForm();
-      });
+      createEl.querySelector("[data-f-type-help]").onclick = openTypeHelp;
+      createEl.querySelector("[data-f-view-btn]").onclick = () => openPermPicker("view");
+      createEl.querySelector("[data-f-assign-btn]").onclick = () => openPermPicker("assign");
       createEl.querySelectorAll("[data-f-target]").forEach(b => b.onclick = () => toast(`"대상 선택" — 이후 단계에서 정의`));
       createEl.querySelector("[data-f-fields]").addEventListener("click", e => {
         const b = e.target.closest("[data-field]");
@@ -485,8 +484,68 @@
         const f = b.dataset.field;
         const i = createState.hiddenFields.indexOf(f);
         if (i === -1) createState.hiddenFields.push(f); else createState.hiddenFields.splice(i, 1);
-        b.classList.toggle("on"); b.classList.toggle("off");
+        b.classList.toggle("on");
+        b.setAttribute("aria-checked", String(!createState.hiddenFields.includes(f)));
       });
+    }
+
+    // 자산 유형 도움말 — 대시보드 공용 도움말 모달 패턴(다이얼로그 위에 dim 오버레이) 참조
+    function openTypeHelp() {
+      const p = document.createElement("div");
+      p.className = "modal-back";
+      p.innerHTML = `
+        <div class="modal help-modal">
+          <div class="help-modal-head">
+            <h3>도움말</h3>
+            <button type="button" class="btn icon-only sm" data-close aria-label="닫기">${CLOSE_ICON}</button>
+          </div>
+          <div class="body">
+            <p><b>개별 자산</b><br>노트북, 책상처럼 실물 하나하나를 구분해서 관리하는 자산입니다. 자산마다 별도의 배정 정보와 상태(배정중·재고·수리중·분실·폐기)를 가지며, 필요한 경우 S/N·IMEI 같은 개체 식별 정보도 함께 관리할 수 있습니다.</p>
+            <p><b>수량 자산</b><br>유니폼, 사무용품처럼 개별 식별 없이 수량으로만 관리하는 자산입니다. 근무지·구성원별 보유 수량을 기록하고, 재고가 얼마나 남았는지 확인할 수 있습니다.</p>
+          </div>
+        </div>`;
+      document.body.appendChild(p);
+      p.addEventListener("click", e => { if (e.target === p) p.remove(); });
+      p.querySelector("[data-close]").onclick = () => p.remove();
+    }
+
+    // 조회/배정 권한 선택 — 드롭다운이 아니라 라디오 목록의 모달 선택창으로
+    function openPermPicker(kind) {
+      const isView = kind === "view";
+      const options = isView ? VIEW_OPTIONS : ASSIGN_BY_VIEW[createState.view].options;
+      const current = createState[kind];
+      const p = document.createElement("div");
+      p.className = "modal-back";
+      p.innerHTML = `
+        <div class="modal">
+          <h3>${isView ? "자산 조회 권한 선택" : "배정/보유 변경 권한 선택"}</h3>
+          <div class="body">
+            ${options.map(v => `
+              <label class="radio-row">
+                <input type="radio" name="perm-pick" value="${v}"${v === current ? " checked" : ""}>
+                <span>${v}</span>
+              </label>`).join("")}
+          </div>
+          <div class="foot">
+            <button class="btn" data-close>취소</button>
+            <button class="btn primary" data-ok>확인</button>
+          </div>
+        </div>`;
+      document.body.appendChild(p);
+      p.addEventListener("click", e => { if (e.target === p) p.remove(); });
+      p.querySelector("[data-close]").onclick = () => p.remove();
+      p.querySelector("[data-ok]").onclick = () => {
+        const picked = p.querySelector('input[name="perm-pick"]:checked')?.value;
+        if (!picked) return;
+        if (isView) {
+          createState.view = picked;
+          createState.assign = ASSIGN_BY_VIEW[picked].default;
+        } else {
+          createState.assign = picked;
+        }
+        p.remove();
+        renderCreateForm();
+      };
     }
 
     function commitCreate() {

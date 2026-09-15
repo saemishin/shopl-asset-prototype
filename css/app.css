@@ -288,7 +288,6 @@ th.c, td.c { text-align: center; width: 52px; }
   border: 1px solid var(--line); border-radius: 10px; background: var(--panel); padding: 16px;
 }
 .cat-tree-head { display: flex; align-items: center; gap: 6px; padding: 0 2px; }
-.cat-tree-head-label { font-size: 12.5px; font-weight: 700; }
 .cat-tree-head [data-manage] { margin-left: auto; }
 .cat-tree-group { display: flex; flex-direction: column; gap: 1px; }
 .cat-tree-label {
@@ -334,7 +333,8 @@ th.c, td.c { text-align: center; width: 52px; }
 .cat-unit-no { color: var(--text-sub); font-variant-numeric: tabular-nums; }
 
 /* 분류 관리 모달 — 구조 편집 전용(추가·이름변경·순서·삭제·대분류이동만. 유형/권한/필드노출은 별도 폼) */
-.cat-manage-modal { display: flex; flex-direction: column; max-height: 88vh; }
+/* 리스트/소분류 생성 화면 전환 시 모달이 내용 크기에 따라 출렁이지 않도록 높이 고정(각 화면 내부만 스크롤) */
+.cat-manage-modal { display: flex; flex-direction: column; height: 88vh; max-height: 720px; }
 /* 위 body/add-group는 display:flex를 직접 지정해서 [hidden]의 기본 display:none을 덮어써버림 — 모드 전환 시 확실히 숨겨지도록 재지정 */
 .cat-manage-modal [hidden] { display: none !important; }
 .cat-manage-modal .cat-manage-head { display: flex; align-items: center; gap: 4px; padding: 12px 12px 12px 20px; border-bottom: 1px solid var(--line); flex-shrink: 0; }
@@ -345,10 +345,32 @@ th.c, td.c { text-align: center; width: 52px; }
   height: 34px; display: flex; align-items: center; padding: 0 10px;
   background: #f6f7f8; border-radius: var(--radius); font-size: 12.5px; color: var(--text-mut);
 }
-.cat-manage-create select {
-  width: 100%; height: 34px; border: 1px solid var(--line-strong); border-radius: var(--radius); padding: 0 10px; background: var(--panel); font-size: 12.5px;
+.cat-manage-select-btn {
+  width: 100%; height: 34px; display: flex; align-items: center; justify-content: space-between;
+  padding: 0 10px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--panel); font-size: 12.5px; color: var(--text);
 }
+.cat-manage-select-btn:hover { background: #f7f8f9; }
+.cat-manage-select-btn .chev { font-size: 10px; color: var(--text-mut); }
 button.usebullet { background: var(--panel); font: inherit; cursor: pointer; }
+.help-icon {
+  display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px;
+  border-radius: 50%; border: 1px solid var(--text-mut); color: var(--text-mut); font-size: 10px; font-weight: 700; vertical-align: middle;
+}
+.help-icon:hover { border-color: var(--primary); color: var(--primary); }
+.help-modal { width: 420px; }
+.help-modal-head { display: flex; align-items: center; justify-content: space-between; padding: 18px 20px; border-bottom: 1px solid var(--line); }
+.help-modal .help-modal-head h3 { padding: 0; border: 0; font-size: 17px; font-weight: 700; }
+.help-modal .body { display: flex; flex-direction: column; gap: 16px; font-size: 13px; line-height: 1.6; color: var(--text); }
+.help-modal .body b { display: block; margin-bottom: 4px; }
+.radio-row { display: flex; align-items: center; gap: 8px; padding: 9px 4px; font-size: 13px; cursor: pointer; }
+.radio-row input { width: 16px; height: 16px; accent-color: var(--primary); flex-shrink: 0; }
+.cat-manage-fieldlist { display: flex; flex-direction: column; }
+.cat-manage-fieldrow { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 12.5px; }
+.cat-manage-fieldrow:last-child { border-bottom: 0; }
+.toggle-switch { width: 36px; height: 20px; border-radius: 10px; background: var(--line-strong); position: relative; flex-shrink: 0; transition: background .15s; }
+.toggle-switch.on { background: var(--primary); }
+.toggle-knob { position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: left .15s; box-shadow: 0 1px 2px rgba(0,0,0,.2); }
+.toggle-switch.on .toggle-knob { left: 18px; }
 .cat-manage-add-group { display: flex; gap: 8px; padding: 14px 20px 0; flex-shrink: 0; }
 .cat-manage-add-group input { flex: 1; }
 .cat-manage-input {
