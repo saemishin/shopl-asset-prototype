@@ -230,12 +230,14 @@
       if (v === null || v < 1) return;
       const x = a.stocks[idx];
       const name = x.employee || x.worksite;
-      a.stocks[idx].qty = v;
-      a.stocks[idx]._updatedAt = todayStr();
-      logActivity(a, `${name} 보유 수량 변경 · ${cur}개 → ${v}개`);
       pop.remove();
-      toast(`보유 수량이 ${v}개로 변경되었습니다`);
-      render();
+      confirmModal("수량을 변경하시겠습니까?", () => {
+        a.stocks[idx].qty = v;
+        a.stocks[idx]._updatedAt = todayStr();
+        logActivity(a, `${name} 보유 수량 변경 · ${cur}개 → ${v}개`);
+        toast("수량이 변경되었습니다.");
+        render();
+      });
     };
     pop.querySelector("[data-qcancel]").onclick = () => pop.remove();
     sync();
@@ -344,11 +346,13 @@
       if (!v) return;
       const x = a.assignments[idx];
       const name = x.employee || x.worksite;
-      x.since = v;
-      logActivity(a, `${name} 배정일 변경 · ${window.fmtDate(cur)} → ${window.fmtDate(v)}`);
       pop.remove();
-      toast("배정일이 수정되었습니다.");
-      render();
+      confirmModal("배정일을 수정하시겠습니까?", () => {
+        x.since = v;
+        logActivity(a, `${name} 배정일 변경 · ${window.fmtDate(cur)} → ${window.fmtDate(v)}`);
+        toast("배정일이 수정되었습니다.");
+        render();
+      });
     };
     pop.querySelector("[data-dcancel]").onclick = () => pop.remove();
     save.disabled = !getValue();
