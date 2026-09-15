@@ -117,9 +117,7 @@
           <button class="cat-tree-item${sel && sel.group === group && sel.sub === s.sub ? " active" : ""}"
                   data-tree="${group}|${s.sub}">
             ${s.sub}<span class="cat-tree-count">${assetsOf(group, s.sub).length}</span>
-          </button>`).join("") : `
-          <p class="cat-tree-empty">소분류 없음</p>
-          <button class="btn sm cat-tree-add-sub" data-add-sub-tree="${group}">+ 소분류 추가</button>`)}
+          </button>`).join("") : '<p class="cat-tree-empty">소분류 없음</p>')}
       </div>`;
     }).join("");
     return head + body;
@@ -241,7 +239,7 @@
   // 대분류/소분류 추가·이름변경·삭제·순서변경(핸들 드래그)을 한 곳에서 처리하는 구조 편집 전용 모달.
   // 열려 있는 동안은 draft(로컬 사본)만 수정하고, [저장]을 눌러야 실제 데이터(window.DATA)에 반영됨 — [취소]/배경 클릭 시 draft는 버려짐.
   // 유형·권한·필드노출 같은 "내용"은 여기서 안 다룸 — 소분류 생성/수정은 별도 폼(소분류 상세의 "소분류 수정" 버튼)이 담당
-  function openManageModal(sel, autoCreateGroup) {
+  function openManageModal(sel) {
     // draft: [{ name, subs: [{ name, data(원본 category 객체 참조 — 삭제 가능 여부는 항상 이 원본 소속 기준으로 판단) }] }]
     // 이름변경/삭제/순서변경/대분류 추가는 전부 이 draft에만 반영되고 [저장]을 눌러야 실제 데이터로 감. 단, 소분류 생성만은 예외
     // — 유형·권한까지 다 채우는 무거운 액션이라(분류 관리 화면 안에서 벌크로 여러 개 만드는 상황 고려) 폼에서 확정하는 즉시 실제 데이터에 반영됨(draft 취소와 무관)
@@ -846,11 +844,6 @@
     }
 
     setMode("list");
-    // 트리에서 "소분류 없음" 대분류의 [+ 소분류 추가]를 눌러 들어온 경우, 목록 화면을 거치지 않고 바로 생성 화면으로
-    if (autoCreateGroup) {
-      const gi = draft.findIndex(g => (g.origName || g.name) === autoCreateGroup);
-      if (gi !== -1) enterCreate(gi);
-    }
   }
 
   function wireAssetSection(c, a) {
@@ -896,7 +889,6 @@
       render(sel);
     });
     c.querySelector("[data-manage]").onclick = () => openManageModal(sel);
-    c.querySelectorAll("[data-add-sub-tree]").forEach(b => b.onclick = () => openManageModal(sel, b.dataset.addSubTree));
     wireAssetSection(c);
   }
 
