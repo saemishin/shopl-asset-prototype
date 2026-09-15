@@ -320,13 +320,12 @@ th.c, td.c { text-align: center; width: 52px; }
 }
 .usebullet.on { border-color: var(--primary); color: var(--primary); }
 .cat-asset-head { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); margin-bottom: 10px; }
-.cat-asset-head h4 { font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
-.cat-prod-row td:first-child { display: flex; align-items: center; gap: 6px; }
-.cat-prod-chevron { display: inline-block; width: 10px; color: var(--text-mut); font-size: 10px; }
-.cat-prod-sub td { padding: 10px 12px 14px 36px; background: #fafbfc; }
+.cat-asset-head h4 { font-size: 13px; font-weight: 700; }
+.cat-asset-count { font-size: 12px; color: var(--text-mut); margin-top: 4px; }
+.cat-unit-list { display: flex; flex-direction: column; gap: 2px; max-height: 50vh; overflow-y: auto; }
 .cat-unit-row {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
-  padding: 6px 8px; border-radius: 6px; font-size: 12px; cursor: pointer; max-width: 320px;
+  padding: 10px 8px; border-radius: 6px; font-size: 12.5px; color: var(--text); text-decoration: none;
 }
 .cat-unit-row:hover { background: #eef0f2; }
 .cat-unit-no { color: var(--text-sub); font-variant-numeric: tabular-nums; }

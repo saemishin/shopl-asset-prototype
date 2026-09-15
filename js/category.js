@@ -74,9 +74,6 @@
   // 구조설계안 3.3: 필드 노출 설정 대상은 S/N·IMEI·구매일·구매가격·제조연월일·유효기한 6개(IMEI·S/N은 개별형 전용) — 기본값: IMEI·유효기한 off, 나머지 on
   const FIELD_LABEL = { serial: "S/N", imei: "IMEI", purchaseDate: "구매일", purchasePrice: "구매가격", manufactured: "제조연월일", expiry: "유효기한" };
   const DEFAULT_HIDDEN_FIELDS = { individual: ["imei", "expiry"], quantity: ["expiry"] };
-  const btn = (label, cls = "btn sm") => `<button class="${cls}" data-act="${label}">${label}</button>`;
-  const bindActs = scope => scope.querySelectorAll("[data-act]").forEach(b =>
-    b.onclick = () => toast(`"${b.dataset.act}" — 이후 단계에서 정의`));
 
   const assetsOf = (group, sub) => assets.filter(a => a.group === group && a.sub === sub);
 
@@ -146,22 +143,39 @@
   function productRowHtml(p) {
     const otherTitle = p.other ? ` title="수리중 ${p.repair} · 분실 ${p.lost} · 폐기 ${p.disposed}"` : "";
     return `
-      <tr class="clickable cat-prod-row">
-        <td><span class="cat-prod-chevron">▸</span>${p.product}</td>
+      <tr class="clickable cat-prod-row" data-product="${p.product}">
+        <td>${p.product}</td>
         <td class="num">${p.total}</td>
         <td class="num">${p.assigned}</td>
         <td class="num">${p.stock}</td>
         <td class="num"${otherTitle}>${p.other}</td>
-      </tr>
-      <tr class="cat-prod-sub" hidden>
-        <td colspan="5">
-          ${p.items.map(a => `
-            <div class="cat-unit-row" data-asset="${a.id}">
-              <span class="cat-unit-no">${a.assetNo || "—"}</span>
-              <span class="badge ${a.status}">${STATUS_LABEL[a.status]}</span>
-            </div>`).join("")}
-        </td>
       </tr>`;
+  }
+
+  // 개별 자산 제품 행 클릭 시 S/N 단위 목록을 모달로 — 대시보드 테이블엔 행 확장 구조가 없어서 모달로 전환.
+  // 모달 내 한 줄을 누르면 그 자산의 상세 페이지를 새 탭으로 엶(target=_blank)
+  function openProductUnitsModal(p) {
+    const m = document.createElement("div");
+    m.className = "modal-back";
+    m.innerHTML = `
+      <div class="modal">
+        <h3>${p.product}</h3>
+        <div class="body">
+          <div class="cat-unit-list">
+            ${p.items.map(a => `
+              <a class="cat-unit-row" href="asset-detail.html?id=${a.id}" target="_blank" rel="noopener">
+                <span class="cat-unit-no">${a.assetNo || "—"}</span>
+                <span class="badge ${a.status}">${STATUS_LABEL[a.status]}</span>
+              </a>`).join("")}
+          </div>
+        </div>
+        <div class="foot">
+          <button class="btn" data-close>닫기</button>
+        </div>
+      </div>`;
+    document.body.appendChild(m);
+    m.addEventListener("click", e => { if (e.target === m) m.remove(); });
+    m.querySelector("[data-close]").onclick = () => m.remove();
   }
 
   function stockRowHtml(a) {
@@ -194,7 +208,8 @@
       const total = products.reduce((s, p) => s + p.total, 0);
       return `
         <div class="cat-asset-head">
-          <h4>자산 목록 <span class="chip">전체 ${total}</span></h4>
+          <h4>자산 목록</h4>
+          <p class="cat-asset-count">전체 ${total}</p>
         </div>
         ${products.length ? `
           <div class="table-wrap">
@@ -207,7 +222,8 @@
     const list = assetsOf(cat.group, cat.sub);
     return `
       <div class="cat-asset-head">
-        <h4>자산 목록 <span class="chip">전체 ${list.length}</span></h4>
+        <h4>자산 목록</h4>
+        <p class="cat-asset-count">전체 ${list.length}</p>
       </div>
       ${list.length ? `
         <div class="table-wrap">
@@ -222,7 +238,7 @@
     return `
       <div class="cat-detail-head">
         <h3>${cat.sub} <span class="type-pill">${cat.type === "individual" ? "개별 자산" : "수량 자산"}</span></h3>
-        <div class="cat-detail-acts">${btn("소분류 수정")}</div>
+        <div class="cat-detail-acts"><button class="btn sm" data-edit-sub>수정</button></div>
       </div>
       <div class="kv2 cat-detail-kv">
         <div><div class="k">자산 조회 권한</div><div class="v">${cat.view}</div></div>
@@ -234,6 +250,405 @@
       </div>
       ${assetSectionHtml(cat)}
     `;
+  }
+
+  // 소분류 생성/수정 폼 — 둘 다 이 함수 하나로 렌더링(소분류 생성 화면 vs [수정] 모달이 필드 구성은 완전히 동일하고
+  // 뒤로가기 유무·모달 타이틀만 다름). state: { name, type, view, assign, viewTarget, assignTarget, hiddenFields }
+  // opts: { groupLabel, typeLocked, onNameChange(valid) }
+  function renderSubForm(container, state, opts) {
+    const typeLocked = !!opts.typeLocked;
+    container.innerHTML = `
+      <div class="field">
+        <label>대분류</label>
+        <div class="cat-manage-create-group">${opts.groupLabel}</div>
+      </div>
+      <div class="field">
+        <label>소분류명<span class="req">*</span></label>
+        <input type="text" class="cat-manage-input" data-f-name value="${state.name}" placeholder="입력" maxlength="30" style="width:100%">
+      </div>
+      <div class="field">
+        <label>자산 유형<span class="req">*</span> <button type="button" class="help-icon" data-f-type-help aria-label="자산 유형 도움말">?</button></label>
+        <div class="seg" data-f-type>
+          <button type="button" data-val="individual" class="${state.type === "individual" ? "active" : ""}"${typeLocked ? " disabled" : ""}>개별 자산</button>
+          <button type="button" data-val="quantity" class="${state.type === "quantity" ? "active" : ""}"${typeLocked ? " disabled" : ""}>수량 자산</button>
+        </div>
+        ${typeLocked ? '<p class="hint" style="margin-top:6px">등록된 자산이 있어 자산 유형을 변경할 수 없습니다.</p>' : ""}
+      </div>
+      <div class="field">
+        <label>자산 조회 권한<span class="req">*</span></label>
+        <p class="hint" style="margin-top:0;margin-bottom:8px">이 소분류의 자산을 조회할 수 있는 대상을 설정합니다.</p>
+        <button type="button" class="cat-manage-select-btn" data-f-view-btn><span>${state.view}</span><span class="chev">▾</span></button>
+      </div>
+      <div class="field">
+        <label>배정/보유 변경 권한<span class="req">*</span></label>
+        <p class="hint" style="margin-top:0;margin-bottom:8px">이 소분류의 자산에 대해 배정·보유 변경을 할 수 있는 대상을 설정합니다.</p>
+        <button type="button" class="cat-manage-select-btn" data-f-assign-btn><span>${state.assign}</span><span class="chev">▾</span></button>
+      </div>
+      <div class="field">
+        <label>관리 정보</label>
+        <p class="hint" style="margin-top:0;margin-bottom:10px">이 소분류의 자산 관리에 필요한 정보만 사용하도록 설정합니다.</p>
+        <div class="cat-manage-fieldlist" data-f-fields>
+          ${fieldsForType(state.type).map(f => `
+            <div class="cat-manage-fieldrow">
+              <span>${FIELD_LABEL[f]}</span>
+              <button type="button" class="toggle-switch${state.hiddenFields.includes(f) ? "" : " on"}" data-field="${f}" role="switch" aria-checked="${!state.hiddenFields.includes(f)}" aria-label="${FIELD_LABEL[f]} 노출"><span class="toggle-knob"></span></button>
+            </div>`).join("")}
+        </div>
+      </div>`;
+
+    container.querySelector("[data-f-name]").addEventListener("input", e => {
+      state.name = e.target.value;
+      opts.onNameChange(state.name.trim().length > 0);
+    });
+    opts.onNameChange(state.name.trim().length > 0);
+
+    if (!typeLocked) {
+      container.querySelector("[data-f-type]").addEventListener("click", e => {
+        const b = e.target.closest("[data-val]");
+        if (!b) return;
+        state.type = b.dataset.val;
+        state.hiddenFields = [...DEFAULT_HIDDEN_FIELDS[state.type]];
+        renderSubForm(container, state, opts);
+      });
+    }
+    container.querySelector("[data-f-type-help]").onclick = openTypeHelp;
+    container.querySelector("[data-f-view-btn]").onclick = () => openPermPicker("view", state, () => renderSubForm(container, state, opts));
+    container.querySelector("[data-f-assign-btn]").onclick = () => openPermPicker("assign", state, () => renderSubForm(container, state, opts));
+    container.querySelector("[data-f-fields]").addEventListener("click", e => {
+      const b = e.target.closest("[data-field]");
+      if (!b) return;
+      const f = b.dataset.field;
+      const i = state.hiddenFields.indexOf(f);
+      if (i === -1) state.hiddenFields.push(f); else state.hiddenFields.splice(i, 1);
+      b.classList.toggle("on");
+      b.setAttribute("aria-checked", String(!state.hiddenFields.includes(f)));
+    });
+  }
+
+  // 자산 유형 도움말 — 대시보드 공용 도움말 모달 패턴(다이얼로그 위에 dim 오버레이) 참조
+  function openTypeHelp() {
+    const p = document.createElement("div");
+    p.className = "modal-back";
+    p.innerHTML = `
+      <div class="modal help-modal">
+        <div class="help-modal-head">
+          <h3>도움말</h3>
+          <button type="button" class="btn icon-only sm" data-close aria-label="닫기">${CLOSE_ICON}</button>
+        </div>
+        <div class="body">
+          <p><b>개별 자산</b><br>노트북, 책상처럼 실물 하나하나를 구분해서 관리하는 자산입니다. 자산마다 별도의 배정 정보와 상태(배정중·재고·수리중·분실·폐기)를 가지며, 필요한 경우 S/N·IMEI 같은 개체 식별 정보도 함께 관리할 수 있습니다.</p>
+          <p><b>수량 자산</b><br>유니폼, 사무용품처럼 개별 식별 없이 수량으로만 관리하는 자산입니다. 근무지·구성원별 보유 수량을 기록하고, 재고가 얼마나 남았는지 확인할 수 있습니다.</p>
+        </div>
+      </div>`;
+    document.body.appendChild(p);
+    p.addEventListener("click", e => { if (e.target === p) p.remove(); });
+    p.querySelector("[data-close]").onclick = () => p.remove();
+  }
+
+  // 조회/배정 권한 선택 — 드롭다운이 아니라 라디오 목록의 모달 선택창으로. "특정 그룹 및 직무/직급"·"특정 관리자/리더"는
+  // 대상을 별도로 지정해야 하는 옵션이라, 선택 시 그 아래 요약 UI가 추가되고 눌러서 하위 선택 모달을 연다.
+  // 라디오를 이리저리 바꿔도 이 모달이 열려 있는 동안은(적용/취소로 닫기 전까지) 각 옵션별 세부 선택 내용을 draftTarget에 그대로 들고 있음
+  // state: { view, assign, viewTarget, assignTarget } 형태의 아무 객체나(소분류 생성 폼·수정 폼 공용) — 적용되면 onApply() 호출
+  function openPermPicker(kind, state, onApply) {
+    const isView = kind === "view";
+    const current = state[kind];
+    const draftTarget = {
+      groups: [...state[kind + "Target"].groups],
+      jobTitles: [...state[kind + "Target"].jobTitles],
+      members: [...state[kind + "Target"].members],
+    };
+    let picked = current;
+
+    const p = document.createElement("div");
+    p.className = "modal-back";
+    p.innerHTML = `
+      <div class="modal">
+        <h3>${isView ? "자산 조회 권한" : "배정/보유 변경 권한"}</h3>
+        <div class="body" data-picker-body></div>
+        <div class="foot">
+          <button class="btn" data-close>취소</button>
+          <button class="btn primary" data-ok>적용</button>
+        </div>
+      </div>`;
+    document.body.appendChild(p);
+    const body = p.querySelector("[data-picker-body]");
+    const okBtn = p.querySelector("[data-ok]");
+
+    // "특정 그룹 및 직무/직급"과 "특정 관리자/리더"는 서로 다른 대상 종류라 draftTarget 안에서도 완전히 독립적으로 관리 —
+    // 라디오를 이리저리 바꿔도 각자 골라둔 내용이 안 섞이고 그대로 남아있어야 함
+    function isTargetSetFor(v) {
+      if (v === "특정 그룹 및 직무/직급") return draftTarget.groups.length > 0 || draftTarget.jobTitles.length > 0;
+      if (v === "특정 관리자/리더") return draftTarget.members.length > 0;
+      return false;
+    }
+    function targetSummaryHtml(v) {
+      if (!isTargetSetFor(v)) return `<button type="button" class="perm-target-btn" data-target-open><span class="muted">선택</span><span class="chev">›</span></button>`;
+      let chips, avatar = "";
+      if (v === "특정 그룹 및 직무/직급") {
+        chips = [];
+        if (draftTarget.groups.length) chips.push(`그룹 : ${draftTarget.groups[0]}${draftTarget.groups.length > 1 ? `<span class="chip-more">+${draftTarget.groups.length - 1}</span>` : ""}`);
+        if (draftTarget.jobTitles.length) chips.push(`직무/직급 : ${draftTarget.jobTitles[0]}${draftTarget.jobTitles.length > 1 ? `<span class="chip-more">+${draftTarget.jobTitles.length - 1}</span>` : ""}`);
+      } else {
+        avatar = `<span class="picker-avatar sm" style="background:${avatarColor(draftTarget.members[0])}">${draftTarget.members[0][0]}</span>`;
+        chips = [`${draftTarget.members[0]}${draftTarget.members.length > 1 ? `<span class="chip-more">+${draftTarget.members.length - 1}</span>` : ""}`];
+      }
+      return `
+        <div class="perm-target-row">
+          <button type="button" class="perm-target-chips" data-target-open>${avatar}${chips.map(c => `<span class="perm-chip">${c}</span>`).join("")}</button>
+          <button type="button" class="perm-target-clear" data-target-clear aria-label="선택 해제">${CLOSE_ICON}</button>
+        </div>`;
+    }
+    function render() {
+      const options = isView ? VIEW_OPTIONS : ASSIGN_BY_VIEW[state.view].options;
+      body.innerHTML = options.map(v => `
+        <label class="radio-row">
+          <input type="radio" name="perm-pick" value="${v}"${v === picked ? " checked" : ""}>
+          <span>${v}</span>
+        </label>
+        ${picked === v && TARGET_NEEDED.has(v) ? `<div class="perm-target-wrap">${targetSummaryHtml(v)}</div>` : ""}`).join("")
+        + (isView ? `<div class="perm-info-note">${INFO_ICON}<span>관리자라도 조회 권한을 부여받아야 이 정보를 볼 수 있습니다.</span></div>` : "");
+
+      body.querySelectorAll('input[name="perm-pick"]').forEach(r => r.onchange = () => { picked = r.value; render(); });
+      const openBtn = body.querySelector("[data-target-open]");
+      if (openBtn) openBtn.onclick = () => {
+        if (picked === "특정 그룹 및 직무/직급") {
+          openGroupJobPicker({ groups: draftTarget.groups, jobTitles: draftTarget.jobTitles }, res => {
+            draftTarget.groups = res.groups; draftTarget.jobTitles = res.jobTitles;
+            render();
+          });
+        } else if (picked === "특정 관리자/리더") {
+          openMemberPicker(draftTarget.members, res => { draftTarget.members = res; render(); });
+        }
+      };
+      const clearBtn = body.querySelector("[data-target-clear]");
+      if (clearBtn) clearBtn.onclick = () => {
+        if (picked === "특정 그룹 및 직무/직급") { draftTarget.groups = []; draftTarget.jobTitles = []; }
+        else { draftTarget.members = []; }
+        render();
+      };
+      okBtn.disabled = TARGET_NEEDED.has(picked) && !isTargetSetFor(picked);
+    }
+    render();
+
+    p.addEventListener("click", e => { if (e.target === p) p.remove(); });
+    p.querySelector("[data-close]").onclick = () => p.remove();
+    okBtn.onclick = () => {
+      if (okBtn.disabled) return;
+      // 실제로 선택된 종류(picked)에 해당하는 대상만 커밋 — draftTarget엔 다른 옵션 볼 때 골라둔 값이 같이 남아있을 수 있어 그건 버림
+      const appliedTarget = picked === "특정 그룹 및 직무/직급"
+        ? { groups: [...draftTarget.groups], jobTitles: [...draftTarget.jobTitles], members: [] }
+        : picked === "특정 관리자/리더"
+          ? { groups: [], jobTitles: [], members: [...draftTarget.members] }
+          : { groups: [], jobTitles: [], members: [] };
+      if (isView) {
+        state.view = picked;
+        state.assign = ASSIGN_BY_VIEW[picked].default;
+        state.viewTarget = appliedTarget;
+        state.assignTarget = { groups: [], jobTitles: [], members: [] };
+      } else {
+        state.assign = picked;
+        state.assignTarget = appliedTarget;
+      }
+      p.remove();
+      onApply();
+    };
+  }
+
+  // 그룹 및 직무/직급 선택 — 대시보드 공용 컴포넌트 참조(좌측 그룹/직무·직급 탭 + 우측 체크리스트)
+  function openGroupJobPicker(initial, onApply) {
+    const selGroups = new Set(initial.groups);
+    const selJobTitles = new Set(initial.jobTitles);
+    let activeTab = "groups";
+    let cascade = true;
+    const collapsed = new Set();
+    let query = "";
+
+    const flatten = nodes => nodes.reduce((out, n) => out.concat(n.name, n.children ? flatten(n.children) : []), []);
+    const ALL_GROUP_NAMES = flatten(GROUP_TREE);
+    function findNode(nodes, name) {
+      for (const n of nodes) {
+        if (n.name === name) return n;
+        if (n.children) { const f = findNode(n.children, name); if (f) return f; }
+      }
+      return null;
+    }
+    function setChecked(node, checked, withCascade) {
+      checked ? selGroups.add(node.name) : selGroups.delete(node.name);
+      if (withCascade && node.children) node.children.forEach(c => setChecked(c, checked, true));
+    }
+    function matches(node) {
+      if (!query) return true;
+      if (node.name.includes(query)) return true;
+      return !!(node.children && node.children.some(matches));
+    }
+    function groupRowHtml(node, depth) {
+      if (!matches(node)) return "";
+      const hasChildren = node.children && node.children.length;
+      const isCollapsed = collapsed.has(node.name);
+      return `
+        <div class="picker-tree-row" style="padding-left:${depth * 20}px">
+          ${hasChildren ? `<button type="button" class="picker-tree-toggle" data-toggle-group="${node.name}">${isCollapsed ? "▸" : "▾"}</button>` : `<span class="picker-tree-toggle"></span>`}
+          <label class="picker-check"><input type="checkbox" data-group="${node.name}"${selGroups.has(node.name) ? " checked" : ""}><span>${node.name}</span></label>
+        </div>
+        ${hasChildren && !isCollapsed ? node.children.map(c => groupRowHtml(c, depth + 1)).join("") : ""}`;
+    }
+
+    const p = document.createElement("div");
+    p.className = "modal-back";
+    p.innerHTML = `
+      <div class="modal picker-modal">
+        <div class="picker-head">
+          <h3>그룹 및 직무/직급 선택</h3>
+          <button type="button" class="picker-reset" data-reset>${RESET_ICON}초기화</button>
+        </div>
+        <div class="picker-layout">
+          <div class="picker-tabs">
+            <button type="button" class="picker-tab" data-tab="groups">그룹</button>
+            <button type="button" class="picker-tab" data-tab="jobTitles">직무/직급</button>
+          </div>
+          <div class="picker-content" data-content></div>
+        </div>
+        <div class="foot">
+          <button class="btn" data-close>취소</button>
+          <button class="btn primary" data-ok>적용</button>
+        </div>
+      </div>`;
+    document.body.appendChild(p);
+    const content = p.querySelector("[data-content]");
+    const jobTab = p.querySelector('[data-tab="jobTitles"]');
+
+    function renderContent() {
+      if (activeTab === "groups") {
+        const allChecked = ALL_GROUP_NAMES.every(n => selGroups.has(n));
+        content.innerHTML = `
+          <input type="text" class="picker-search" placeholder="검색어를 입력하세요" value="${query}">
+          <div class="picker-toolbar">
+            <label class="picker-check"><input type="checkbox" data-select-all${allChecked ? " checked" : ""}><span>전체 선택</span></label>
+            <label class="picker-check right"><input type="checkbox" data-cascade${cascade ? " checked" : ""}><span>하위그룹도 한번에 체크</span></label>
+          </div>
+          <div class="picker-tree">${GROUP_TREE.map(n => groupRowHtml(n, 0)).join("")}</div>`;
+        content.querySelector(".picker-search").addEventListener("input", e => { query = e.target.value; renderContent(); });
+        content.querySelector("[data-select-all]").onchange = e => { ALL_GROUP_NAMES.forEach(n => e.target.checked ? selGroups.add(n) : selGroups.delete(n)); renderContent(); };
+        content.querySelector("[data-cascade]").onchange = e => { cascade = e.target.checked; };
+        content.querySelectorAll("[data-toggle-group]").forEach(b => b.onclick = () => {
+          collapsed.has(b.dataset.toggleGroup) ? collapsed.delete(b.dataset.toggleGroup) : collapsed.add(b.dataset.toggleGroup);
+          renderContent();
+        });
+        content.querySelectorAll("[data-group]").forEach(cb => cb.onchange = e => {
+          setChecked(findNode(GROUP_TREE, e.target.dataset.group), e.target.checked, cascade);
+          renderContent();
+        });
+      } else {
+        const filtered = JOB_TITLES.filter(t => !query || t.includes(query));
+        content.innerHTML = `
+          <input type="text" class="picker-search" placeholder="검색어를 입력하세요" value="${query}">
+          <div class="picker-flatlist">
+            ${filtered.map(t => `<label class="picker-check row"><input type="checkbox" data-jobtitle="${t}"${selJobTitles.has(t) ? " checked" : ""}><span>${t}</span></label>`).join("")}
+          </div>`;
+        content.querySelector(".picker-search").addEventListener("input", e => { query = e.target.value; renderContent(); });
+        content.querySelectorAll("[data-jobtitle]").forEach(cb => cb.onchange = e => {
+          e.target.checked ? selJobTitles.add(e.target.dataset.jobtitle) : selJobTitles.delete(e.target.dataset.jobtitle);
+        });
+      }
+    }
+    function renderAll() {
+      p.querySelectorAll("[data-tab]").forEach(b => b.classList.toggle("active", b.dataset.tab === activeTab));
+      jobTab.innerHTML = `직무/직급${selJobTitles.size ? '<span class="picker-tab-dot"></span>' : ""}`;
+      renderContent();
+    }
+    p.querySelectorAll("[data-tab]").forEach(b => b.onclick = () => { activeTab = b.dataset.tab; query = ""; renderAll(); });
+    p.querySelector("[data-reset]").onclick = () => { selGroups.clear(); selJobTitles.clear(); renderAll(); };
+    renderAll();
+
+    p.addEventListener("click", e => { if (e.target === p) p.remove(); });
+    p.querySelector("[data-close]").onclick = () => p.remove();
+    p.querySelector("[data-ok]").onclick = () => { p.remove(); onApply({ groups: [...selGroups], jobTitles: [...selJobTitles] }); };
+  }
+
+  // 구성원(직원) 선택 — 대시보드 공용 컴포넌트 참조
+  function openMemberPicker(initial, onApply) {
+    const sel = new Set(initial);
+    let query = "";
+    const p = document.createElement("div");
+    p.className = "modal-back";
+    p.innerHTML = `
+      <div class="modal picker-modal">
+        <h3>직원 선택</h3>
+        <div class="body">
+          <input type="text" class="picker-search" placeholder="검색어를 입력하세요">
+          <div class="picker-memberlist" data-list></div>
+        </div>
+        <div class="foot">
+          <button class="btn" data-close>취소</button>
+          <button class="btn primary" data-ok>적용</button>
+        </div>
+      </div>`;
+    document.body.appendChild(p);
+    const list = p.querySelector("[data-list]");
+    function renderList() {
+      const filtered = MEMBERS.filter(m => !query || m.name.includes(query));
+      list.innerHTML = filtered.length ? filtered.map(m => `
+        <label class="picker-member-row">
+          <input type="checkbox" data-member="${m.name}"${sel.has(m.name) ? " checked" : ""}>
+          <span class="picker-avatar" style="background:${avatarColor(m.name)}">${m.name[0]}</span>
+          <span class="picker-member-info"><b>${m.name}</b><span>${m.team}</span></span>
+        </label>`).join("") : `<p class="muted" style="padding:16px 0">검색 결과가 없습니다</p>`;
+      list.querySelectorAll("[data-member]").forEach(cb => cb.onchange = e => {
+        e.target.checked ? sel.add(e.target.dataset.member) : sel.delete(e.target.dataset.member);
+      });
+    }
+    p.querySelector(".picker-search").addEventListener("input", e => { query = e.target.value; renderList(); });
+    renderList();
+    p.addEventListener("click", e => { if (e.target === p) p.remove(); });
+    p.querySelector("[data-close]").onclick = () => p.remove();
+    p.querySelector("[data-ok]").onclick = () => { p.remove(); onApply([...sel]); };
+  }
+
+  // 소분류 수정 — 자산 상세 우측 패널의 [수정] 버튼에서 진입. 필드 구성은 소분류 생성 화면과 동일(renderSubForm 공용) —
+  // 뒤로가기 없이 바로 모달로 뜨고 타이틀만 다름. 이미 등록된 자산이 있으면 자산 유형은 변경 제한(구조설계안 3.3)
+  function openSubEditModal(cat) {
+    const hasAssets = assetsOf(cat.group, cat.sub).length > 0;
+    const state = {
+      name: cat.sub, type: cat.type, view: cat.view, assign: cat.assign,
+      viewTarget: cat.viewTarget ? { ...cat.viewTarget } : { groups: [], jobTitles: [], members: [] },
+      assignTarget: cat.assignTarget ? { ...cat.assignTarget } : { groups: [], jobTitles: [], members: [] },
+      hiddenFields: [...(cat.hiddenFields || [])],
+    };
+    const back = document.createElement("div");
+    back.className = "modal-back";
+    back.innerHTML = `
+      <div class="modal lg cat-manage-modal">
+        <div class="cat-manage-head"><h3>소분류 수정</h3></div>
+        <div class="cat-manage-create" data-form></div>
+        <div class="foot">
+          <button class="btn" data-cancel>취소</button>
+          <button class="btn primary" data-save>저장</button>
+        </div>
+      </div>`;
+    document.body.appendChild(back);
+    const form = back.querySelector("[data-form]");
+    const saveBtn = back.querySelector("[data-save]");
+    renderSubForm(form, state, {
+      groupLabel: cat.group,
+      typeLocked: hasAssets,
+      onNameChange: valid => { saveBtn.disabled = !valid; },
+    });
+    back.addEventListener("click", e => { if (e.target === back) back.remove(); });
+    back.querySelector("[data-cancel]").onclick = () => back.remove();
+    saveBtn.onclick = () => {
+      const name = state.name.trim();
+      if (!name) return;
+      cat.sub = name;
+      cat.type = state.type;
+      cat.hiddenFields = [...state.hiddenFields];
+      cat.view = state.view;
+      cat.assign = state.assign;
+      cat.viewTarget = TARGET_NEEDED.has(state.view) ? { ...state.viewTarget } : null;
+      cat.assignTarget = TARGET_NEEDED.has(state.assign) ? { ...state.assignTarget } : null;
+      back.remove();
+      toast("저장되었습니다");
+      render({ group: cat.group, sub: cat.sub });
+    };
   }
 
   // 대분류/소분류 추가·이름변경·삭제·순서변경(핸들 드래그)을 한 곳에서 처리하는 구조 편집 전용 모달.
@@ -478,352 +893,12 @@
     }
 
 
-    function createFormHtml() {
-      const s = createState;
-      return `
-        <div class="field">
-          <label>대분류</label>
-          <div class="cat-manage-create-group">${draft[createGi].name}</div>
-        </div>
-        <div class="field">
-          <label>소분류명<span class="req">*</span></label>
-          <input type="text" class="cat-manage-input" data-f-name value="${s.name}" placeholder="입력" maxlength="30" style="width:100%">
-        </div>
-        <div class="field">
-          <label>자산 유형<span class="req">*</span> <button type="button" class="help-icon" data-f-type-help aria-label="자산 유형 도움말">?</button></label>
-          <div class="seg" data-f-type>
-            <button type="button" data-val="individual" class="${s.type === "individual" ? "active" : ""}">개별 자산</button>
-            <button type="button" data-val="quantity" class="${s.type === "quantity" ? "active" : ""}">수량 자산</button>
-          </div>
-        </div>
-        <div class="field">
-          <label>자산 조회 권한<span class="req">*</span></label>
-          <p class="hint" style="margin-top:0;margin-bottom:8px">이 소분류의 자산을 조회할 수 있는 대상을 설정합니다.</p>
-          <button type="button" class="cat-manage-select-btn" data-f-view-btn><span>${s.view}</span><span class="chev">▾</span></button>
-        </div>
-        <div class="field">
-          <label>배정/보유 변경 권한<span class="req">*</span></label>
-          <p class="hint" style="margin-top:0;margin-bottom:8px">이 소분류의 자산에 대해 배정·보유 변경을 할 수 있는 대상을 설정합니다.</p>
-          <button type="button" class="cat-manage-select-btn" data-f-assign-btn><span>${s.assign}</span><span class="chev">▾</span></button>
-        </div>
-        <div class="field">
-          <label>관리 정보</label>
-          <p class="hint" style="margin-top:0;margin-bottom:10px">이 소분류의 자산 관리에 필요한 정보만 사용하도록 설정합니다.</p>
-          <div class="cat-manage-fieldlist" data-f-fields>
-            ${fieldsForType(s.type).map(f => `
-              <div class="cat-manage-fieldrow">
-                <span>${FIELD_LABEL[f]}</span>
-                <button type="button" class="toggle-switch${s.hiddenFields.includes(f) ? "" : " on"}" data-field="${f}" role="switch" aria-checked="${!s.hiddenFields.includes(f)}" aria-label="${FIELD_LABEL[f]} 노출"><span class="toggle-knob"></span></button>
-              </div>`).join("")}
-          </div>
-        </div>`;
-    }
-
     function renderCreateForm() {
-      createEl.innerHTML = createFormHtml();
-      confirmBtn.disabled = !createState.name.trim();
-
-      createEl.querySelector("[data-f-name]").addEventListener("input", e => {
-        createState.name = e.target.value;
-        confirmBtn.disabled = !createState.name.trim();
+      renderSubForm(createEl, createState, {
+        groupLabel: draft[createGi].name,
+        typeLocked: false,
+        onNameChange: valid => { confirmBtn.disabled = !valid; },
       });
-      createEl.querySelector("[data-f-type]").addEventListener("click", e => {
-        const b = e.target.closest("[data-val]");
-        if (!b) return;
-        createState.type = b.dataset.val;
-        createState.hiddenFields = [...DEFAULT_HIDDEN_FIELDS[createState.type]];
-        renderCreateForm();
-      });
-      createEl.querySelector("[data-f-type-help]").onclick = openTypeHelp;
-      createEl.querySelector("[data-f-view-btn]").onclick = () => openPermPicker("view");
-      createEl.querySelector("[data-f-assign-btn]").onclick = () => openPermPicker("assign");
-      createEl.querySelector("[data-f-fields]").addEventListener("click", e => {
-        const b = e.target.closest("[data-field]");
-        if (!b) return;
-        const f = b.dataset.field;
-        const i = createState.hiddenFields.indexOf(f);
-        if (i === -1) createState.hiddenFields.push(f); else createState.hiddenFields.splice(i, 1);
-        b.classList.toggle("on");
-        b.setAttribute("aria-checked", String(!createState.hiddenFields.includes(f)));
-      });
-    }
-
-    // 자산 유형 도움말 — 대시보드 공용 도움말 모달 패턴(다이얼로그 위에 dim 오버레이) 참조
-    function openTypeHelp() {
-      const p = document.createElement("div");
-      p.className = "modal-back";
-      p.innerHTML = `
-        <div class="modal help-modal">
-          <div class="help-modal-head">
-            <h3>도움말</h3>
-            <button type="button" class="btn icon-only sm" data-close aria-label="닫기">${CLOSE_ICON}</button>
-          </div>
-          <div class="body">
-            <p><b>개별 자산</b><br>노트북, 책상처럼 실물 하나하나를 구분해서 관리하는 자산입니다. 자산마다 별도의 배정 정보와 상태(배정중·재고·수리중·분실·폐기)를 가지며, 필요한 경우 S/N·IMEI 같은 개체 식별 정보도 함께 관리할 수 있습니다.</p>
-            <p><b>수량 자산</b><br>유니폼, 사무용품처럼 개별 식별 없이 수량으로만 관리하는 자산입니다. 근무지·구성원별 보유 수량을 기록하고, 재고가 얼마나 남았는지 확인할 수 있습니다.</p>
-          </div>
-        </div>`;
-      document.body.appendChild(p);
-      p.addEventListener("click", e => { if (e.target === p) p.remove(); });
-      p.querySelector("[data-close]").onclick = () => p.remove();
-    }
-
-    // 조회/배정 권한 선택 — 드롭다운이 아니라 라디오 목록의 모달 선택창으로. "특정 그룹 및 직무/직급"·"특정 관리자/리더"는
-    // 대상을 별도로 지정해야 하는 옵션이라, 선택 시 그 아래 요약 UI가 추가되고 눌러서 하위 선택 모달을 연다.
-    // 라디오를 이리저리 바꿔도 이 모달이 열려 있는 동안은(적용/취소로 닫기 전까지) 각 옵션별 세부 선택 내용을 draftTarget에 그대로 들고 있음
-    function openPermPicker(kind) {
-      const isView = kind === "view";
-      const current = createState[kind];
-      const draftTarget = {
-        groups: [...createState[kind + "Target"].groups],
-        jobTitles: [...createState[kind + "Target"].jobTitles],
-        members: [...createState[kind + "Target"].members],
-      };
-      let picked = current;
-
-      const p = document.createElement("div");
-      p.className = "modal-back";
-      p.innerHTML = `
-        <div class="modal">
-          <h3>${isView ? "자산 조회 권한" : "배정/보유 변경 권한"}</h3>
-          <div class="body" data-picker-body></div>
-          <div class="foot">
-            <button class="btn" data-close>취소</button>
-            <button class="btn primary" data-ok>적용</button>
-          </div>
-        </div>`;
-      document.body.appendChild(p);
-      const body = p.querySelector("[data-picker-body]");
-      const okBtn = p.querySelector("[data-ok]");
-
-      // "특정 그룹 및 직무/직급"과 "특정 관리자/리더"는 서로 다른 대상 종류라 draftTarget 안에서도 완전히 독립적으로 관리 —
-      // 라디오를 이리저리 바꿔도 각자 골라둔 내용이 안 섞이고 그대로 남아있어야 함
-      function isTargetSetFor(v) {
-        if (v === "특정 그룹 및 직무/직급") return draftTarget.groups.length > 0 || draftTarget.jobTitles.length > 0;
-        if (v === "특정 관리자/리더") return draftTarget.members.length > 0;
-        return false;
-      }
-      function targetSummaryHtml(v) {
-        if (!isTargetSetFor(v)) return `<button type="button" class="perm-target-btn" data-target-open><span class="muted">선택</span><span class="chev">›</span></button>`;
-        let chips, avatar = "";
-        if (v === "특정 그룹 및 직무/직급") {
-          chips = [];
-          if (draftTarget.groups.length) chips.push(`그룹 : ${draftTarget.groups[0]}${draftTarget.groups.length > 1 ? `<span class="chip-more">+${draftTarget.groups.length - 1}</span>` : ""}`);
-          if (draftTarget.jobTitles.length) chips.push(`직무/직급 : ${draftTarget.jobTitles[0]}${draftTarget.jobTitles.length > 1 ? `<span class="chip-more">+${draftTarget.jobTitles.length - 1}</span>` : ""}`);
-        } else {
-          avatar = `<span class="picker-avatar sm" style="background:${avatarColor(draftTarget.members[0])}">${draftTarget.members[0][0]}</span>`;
-          chips = [`${draftTarget.members[0]}${draftTarget.members.length > 1 ? `<span class="chip-more">+${draftTarget.members.length - 1}</span>` : ""}`];
-        }
-        return `
-          <div class="perm-target-row">
-            <button type="button" class="perm-target-chips" data-target-open>${avatar}${chips.map(c => `<span class="perm-chip">${c}</span>`).join("")}</button>
-            <button type="button" class="perm-target-clear" data-target-clear aria-label="선택 해제">${CLOSE_ICON}</button>
-          </div>`;
-      }
-      function render() {
-        const options = isView ? VIEW_OPTIONS : ASSIGN_BY_VIEW[createState.view].options;
-        body.innerHTML = options.map(v => `
-          <label class="radio-row">
-            <input type="radio" name="perm-pick" value="${v}"${v === picked ? " checked" : ""}>
-            <span>${v}</span>
-          </label>
-          ${picked === v && TARGET_NEEDED.has(v) ? `<div class="perm-target-wrap">${targetSummaryHtml(v)}</div>` : ""}`).join("")
-          + (isView ? `<div class="perm-info-note">${INFO_ICON}<span>관리자라도 조회 권한을 부여받아야 이 정보를 볼 수 있습니다.</span></div>` : "");
-
-        body.querySelectorAll('input[name="perm-pick"]').forEach(r => r.onchange = () => { picked = r.value; render(); });
-        const openBtn = body.querySelector("[data-target-open]");
-        if (openBtn) openBtn.onclick = () => {
-          if (picked === "특정 그룹 및 직무/직급") {
-            openGroupJobPicker({ groups: draftTarget.groups, jobTitles: draftTarget.jobTitles }, res => {
-              draftTarget.groups = res.groups; draftTarget.jobTitles = res.jobTitles;
-              render();
-            });
-          } else if (picked === "특정 관리자/리더") {
-            openMemberPicker(draftTarget.members, res => { draftTarget.members = res; render(); });
-          }
-        };
-        const clearBtn = body.querySelector("[data-target-clear]");
-        if (clearBtn) clearBtn.onclick = () => {
-          if (picked === "특정 그룹 및 직무/직급") { draftTarget.groups = []; draftTarget.jobTitles = []; }
-          else { draftTarget.members = []; }
-          render();
-        };
-        okBtn.disabled = TARGET_NEEDED.has(picked) && !isTargetSetFor(picked);
-      }
-      render();
-
-      p.addEventListener("click", e => { if (e.target === p) p.remove(); });
-      p.querySelector("[data-close]").onclick = () => p.remove();
-      okBtn.onclick = () => {
-        if (okBtn.disabled) return;
-        // 실제로 선택된 종류(picked)에 해당하는 대상만 커밋 — draftTarget엔 다른 옵션 볼 때 골라둔 값이 같이 남아있을 수 있어 그건 버림
-        const appliedTarget = picked === "특정 그룹 및 직무/직급"
-          ? { groups: [...draftTarget.groups], jobTitles: [...draftTarget.jobTitles], members: [] }
-          : picked === "특정 관리자/리더"
-            ? { groups: [], jobTitles: [], members: [...draftTarget.members] }
-            : { groups: [], jobTitles: [], members: [] };
-        if (isView) {
-          createState.view = picked;
-          createState.assign = ASSIGN_BY_VIEW[picked].default;
-          createState.viewTarget = appliedTarget;
-          createState.assignTarget = { groups: [], jobTitles: [], members: [] };
-        } else {
-          createState.assign = picked;
-          createState.assignTarget = appliedTarget;
-        }
-        p.remove();
-        renderCreateForm();
-      };
-    }
-
-    // 그룹 및 직무/직급 선택 — 대시보드 공용 컴포넌트 참조(좌측 그룹/직무·직급 탭 + 우측 체크리스트)
-    function openGroupJobPicker(initial, onApply) {
-      const selGroups = new Set(initial.groups);
-      const selJobTitles = new Set(initial.jobTitles);
-      let activeTab = "groups";
-      let cascade = true;
-      const collapsed = new Set();
-      let query = "";
-
-      const flatten = nodes => nodes.reduce((out, n) => out.concat(n.name, n.children ? flatten(n.children) : []), []);
-      const ALL_GROUP_NAMES = flatten(GROUP_TREE);
-      function findNode(nodes, name) {
-        for (const n of nodes) {
-          if (n.name === name) return n;
-          if (n.children) { const f = findNode(n.children, name); if (f) return f; }
-        }
-        return null;
-      }
-      function setChecked(node, checked, withCascade) {
-        checked ? selGroups.add(node.name) : selGroups.delete(node.name);
-        if (withCascade && node.children) node.children.forEach(c => setChecked(c, checked, true));
-      }
-      function matches(node) {
-        if (!query) return true;
-        if (node.name.includes(query)) return true;
-        return !!(node.children && node.children.some(matches));
-      }
-      function groupRowHtml(node, depth) {
-        if (!matches(node)) return "";
-        const hasChildren = node.children && node.children.length;
-        const isCollapsed = collapsed.has(node.name);
-        return `
-          <div class="picker-tree-row" style="padding-left:${depth * 20}px">
-            ${hasChildren ? `<button type="button" class="picker-tree-toggle" data-toggle-group="${node.name}">${isCollapsed ? "▸" : "▾"}</button>` : `<span class="picker-tree-toggle"></span>`}
-            <label class="picker-check"><input type="checkbox" data-group="${node.name}"${selGroups.has(node.name) ? " checked" : ""}><span>${node.name}</span></label>
-          </div>
-          ${hasChildren && !isCollapsed ? node.children.map(c => groupRowHtml(c, depth + 1)).join("") : ""}`;
-      }
-
-      const p = document.createElement("div");
-      p.className = "modal-back";
-      p.innerHTML = `
-        <div class="modal picker-modal">
-          <div class="picker-head">
-            <h3>그룹 및 직무/직급 선택</h3>
-            <button type="button" class="picker-reset" data-reset>${RESET_ICON}초기화</button>
-          </div>
-          <div class="picker-layout">
-            <div class="picker-tabs">
-              <button type="button" class="picker-tab" data-tab="groups">그룹</button>
-              <button type="button" class="picker-tab" data-tab="jobTitles">직무/직급</button>
-            </div>
-            <div class="picker-content" data-content></div>
-          </div>
-          <div class="foot">
-            <button class="btn" data-close>취소</button>
-            <button class="btn primary" data-ok>적용</button>
-          </div>
-        </div>`;
-      document.body.appendChild(p);
-      const content = p.querySelector("[data-content]");
-      const jobTab = p.querySelector('[data-tab="jobTitles"]');
-
-      function renderContent() {
-        if (activeTab === "groups") {
-          const allChecked = ALL_GROUP_NAMES.every(n => selGroups.has(n));
-          content.innerHTML = `
-            <input type="text" class="picker-search" placeholder="검색어를 입력하세요" value="${query}">
-            <div class="picker-toolbar">
-              <label class="picker-check"><input type="checkbox" data-select-all${allChecked ? " checked" : ""}><span>전체 선택</span></label>
-              <label class="picker-check right"><input type="checkbox" data-cascade${cascade ? " checked" : ""}><span>하위그룹도 한번에 체크</span></label>
-            </div>
-            <div class="picker-tree">${GROUP_TREE.map(n => groupRowHtml(n, 0)).join("")}</div>`;
-          content.querySelector(".picker-search").addEventListener("input", e => { query = e.target.value; renderContent(); });
-          content.querySelector("[data-select-all]").onchange = e => { ALL_GROUP_NAMES.forEach(n => e.target.checked ? selGroups.add(n) : selGroups.delete(n)); renderContent(); };
-          content.querySelector("[data-cascade]").onchange = e => { cascade = e.target.checked; };
-          content.querySelectorAll("[data-toggle-group]").forEach(b => b.onclick = () => {
-            collapsed.has(b.dataset.toggleGroup) ? collapsed.delete(b.dataset.toggleGroup) : collapsed.add(b.dataset.toggleGroup);
-            renderContent();
-          });
-          content.querySelectorAll("[data-group]").forEach(cb => cb.onchange = e => {
-            setChecked(findNode(GROUP_TREE, e.target.dataset.group), e.target.checked, cascade);
-            renderContent();
-          });
-        } else {
-          const filtered = JOB_TITLES.filter(t => !query || t.includes(query));
-          content.innerHTML = `
-            <input type="text" class="picker-search" placeholder="검색어를 입력하세요" value="${query}">
-            <div class="picker-flatlist">
-              ${filtered.map(t => `<label class="picker-check row"><input type="checkbox" data-jobtitle="${t}"${selJobTitles.has(t) ? " checked" : ""}><span>${t}</span></label>`).join("")}
-            </div>`;
-          content.querySelector(".picker-search").addEventListener("input", e => { query = e.target.value; renderContent(); });
-          content.querySelectorAll("[data-jobtitle]").forEach(cb => cb.onchange = e => {
-            e.target.checked ? selJobTitles.add(e.target.dataset.jobtitle) : selJobTitles.delete(e.target.dataset.jobtitle);
-          });
-        }
-      }
-      function renderAll() {
-        p.querySelectorAll("[data-tab]").forEach(b => b.classList.toggle("active", b.dataset.tab === activeTab));
-        jobTab.innerHTML = `직무/직급${selJobTitles.size ? '<span class="picker-tab-dot"></span>' : ""}`;
-        renderContent();
-      }
-      p.querySelectorAll("[data-tab]").forEach(b => b.onclick = () => { activeTab = b.dataset.tab; query = ""; renderAll(); });
-      p.querySelector("[data-reset]").onclick = () => { selGroups.clear(); selJobTitles.clear(); renderAll(); };
-      renderAll();
-
-      p.addEventListener("click", e => { if (e.target === p) p.remove(); });
-      p.querySelector("[data-close]").onclick = () => p.remove();
-      p.querySelector("[data-ok]").onclick = () => { p.remove(); onApply({ groups: [...selGroups], jobTitles: [...selJobTitles] }); };
-    }
-
-    // 구성원(직원) 선택 — 대시보드 공용 컴포넌트 참조
-    function openMemberPicker(initial, onApply) {
-      const sel = new Set(initial);
-      let query = "";
-      const p = document.createElement("div");
-      p.className = "modal-back";
-      p.innerHTML = `
-        <div class="modal picker-modal">
-          <h3>직원 선택</h3>
-          <div class="body">
-            <input type="text" class="picker-search" placeholder="검색어를 입력하세요">
-            <div class="picker-memberlist" data-list></div>
-          </div>
-          <div class="foot">
-            <button class="btn" data-close>취소</button>
-            <button class="btn primary" data-ok>적용</button>
-          </div>
-        </div>`;
-      document.body.appendChild(p);
-      const list = p.querySelector("[data-list]");
-      function renderList() {
-        const filtered = MEMBERS.filter(m => !query || m.name.includes(query));
-        list.innerHTML = filtered.length ? filtered.map(m => `
-          <label class="picker-member-row">
-            <input type="checkbox" data-member="${m.name}"${sel.has(m.name) ? " checked" : ""}>
-            <span class="picker-avatar" style="background:${avatarColor(m.name)}">${m.name[0]}</span>
-            <span class="picker-member-info"><b>${m.name}</b><span>${m.team}</span></span>
-          </label>`).join("") : `<p class="muted" style="padding:16px 0">검색 결과가 없습니다</p>`;
-        list.querySelectorAll("[data-member]").forEach(cb => cb.onchange = e => {
-          e.target.checked ? sel.add(e.target.dataset.member) : sel.delete(e.target.dataset.member);
-        });
-      }
-      p.querySelector(".picker-search").addEventListener("input", e => { query = e.target.value; renderList(); });
-      renderList();
-      p.addEventListener("click", e => { if (e.target === p) p.remove(); });
-      p.querySelector("[data-close]").onclick = () => p.remove();
-      p.querySelector("[data-ok]").onclick = () => { p.remove(); onApply([...sel]); };
     }
 
     function commitCreate() {
@@ -846,13 +921,10 @@
     setMode("list");
   }
 
-  function wireAssetSection(c, a) {
+  function wireAssetSection(c, cat) {
     c.querySelectorAll(".cat-prod-row").forEach(row => row.onclick = () => {
-      const sub = row.nextElementSibling;
-      const chevron = row.querySelector(".cat-prod-chevron");
-      const willShow = sub.hidden;
-      sub.hidden = !willShow;
-      chevron.textContent = willShow ? "▾" : "▸";
+      const p = productsOf(cat.group, cat.sub).find(x => x.product === row.dataset.product);
+      if (p) openProductUnitsModal(p);
     });
     c.querySelectorAll("[data-asset]").forEach(row => row.onclick = e => {
       e.stopPropagation();
@@ -878,7 +950,6 @@
       </div>
     `;
     c.classList.add("cat-split");
-    bindActs(c);
     c.querySelectorAll("[data-tree]").forEach(b => b.onclick = () => {
       const [group, sub] = b.dataset.tree.split("|");
       render({ group, sub });
@@ -889,7 +960,9 @@
       render(sel);
     });
     c.querySelector("[data-manage]").onclick = () => openManageModal(sel);
-    wireAssetSection(c);
+    const editBtn = c.querySelector("[data-edit-sub]");
+    if (editBtn) editBtn.onclick = () => openSubEditModal(cat);
+    wireAssetSection(c, cat);
   }
 
   window.CategoryScreen = { render: () => render(null) };
