@@ -8,13 +8,16 @@
     t.style.cssText = "position:fixed;left:50%;bottom:32px;transform:translateX(-50%);background:#1b1d1f;color:#fff;padding:10px 16px;border-radius:8px;font-size:12.5px;z-index:300";
     document.body.appendChild(t); setTimeout(() => t.remove(), 1800);
   }
-  function confirmModal(msg, onOk) {
+  function confirmModal(title, body, onOk) {
     const cb = document.createElement("div");
     cb.className = "modal-back";
     cb.style.zIndex = 340;
     cb.innerHTML = `
       <div class="modal" style="width:380px">
-        <div class="body" style="padding-top:20px;font-size:13px">${msg}</div>
+        <div class="body" style="padding-top:20px">
+          <p style="font-size:14px;font-weight:700;margin-bottom:6px">${title}</p>
+          <p class="hint" style="margin-top:0">${body}</p>
+        </div>
         <div class="foot">
           <button class="btn" data-cclose>취소</button>
           <button class="btn primary" data-cok>확인</button>
@@ -259,7 +262,7 @@
     // 뒤로가기 — 소분류명을 입력한 상태(= [저장]이 활성화될 만큼 진행된 상태)에서 나가려 하면 한 번 확인. 이름을 아직 안 썼으면 잃을 내용이 없다고 보고 바로 이동
     function guardedBack() {
       if (createState && createState.name.trim()) {
-        confirmModal("작성 중인 내용이 저장되지 않습니다. 나가시겠습니까?", () => setMode("list"));
+        confirmModal("페이지를 벗어나시겠습니까?", "페이지를 벗어날 경우 편집한 내용이 저장되지 않습니다.", () => setMode("list"));
       } else {
         setMode("list");
       }
