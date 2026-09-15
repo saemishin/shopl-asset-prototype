@@ -116,16 +116,23 @@
     document.body.appendChild(back);
   }
 
-  /* ---------- 활동 로그 ---------- */
+  /* ---------- 활동 로그 ----------
+   * 엔트리 스키마: { d(수정한 일시), script(스크립트), target?(수정 대상 — 구성원/근무지 객체, 없으면 자산 자체),
+   *                 before?/after?(기존값/변경값 — 두 키가 아예 없으면 값 블록 자체를 생략, "" 이면 "없음"으로 표시), who(수정한 사람) }
+   * 유형별 스크립트 정의는 구조설계안 5.5 참조. 아직 트리거할 UI가 없는 유형(소분류 이동·자산정보 수정·사진)은 그 기능을 만들 때 추가. */
   // 초기 스냅샷(합성 데이터) — 세션 시작 시 자산의 현재 상태로부터 한 번만 만들어지는 베이스라인
   function activityOf(a) {
-    const ev = [{ d: a.createdAt || a.purchaseDate || "2024-01-01", t: "자산 생성", who: "dana" }];
-    (a.assignments || []).forEach(x => ev.push({ d: x.since, t: `${x.employee || x.worksite}에게 배정`, who: "dana" }));
-    (a.stocks || []).forEach(x => ev.push({ d: a.purchaseDate || "2025-01-01", t: `${x.employee || x.worksite} 보유 대상 추가 · ${x.qty}개`, who: "dana" }));
-    if (a.status === "repair") ev.push({ d: "2026-08-14", t: "수리 접수 · 배정중 → 수리중", who: "dana" });
-    if (a.status === "lost") ev.push({ d: "2026-07-21", t: "분실 신고 · 배정중 → 분실", who: "정우성" });
-    if (a.status === "disposed") ev.push({ d: "2025-12-30", t: "폐기 처리 · 활성 배정 자동 종료", who: "dana" });
-    if (a.note) ev.push({ d: "2026-06-02", t: "메모 수정", who: "dana" });
+    const ev = [{ d: `${a.createdAt || a.purchaseDate || "2024-01-01"} 09:00`, script: "자산 생성", who: "dana" }];
+    (a.assignments || []).forEach(x => ev.push({
+      d: `${x.since} 09:00`, script: "배정 추가", target: x, before: "", after: window.fmtDate(x.since), who: "dana",
+    }));
+    (a.stocks || []).forEach(x => ev.push({
+      d: `${a.purchaseDate || "2025-01-01"} 09:00`, script: "보유 대상 추가", target: x, before: "", after: `${x.qty}개`, who: "dana",
+    }));
+    if (a.status === "repair") ev.push({ d: "2026-08-14 09:00", script: "수리 접수", before: "배정중", after: "수리중", who: "dana" });
+    if (a.status === "lost") ev.push({ d: "2026-07-21 09:00", script: "분실 신고", before: "배정중", after: "분실", who: "정우성" });
+    if (a.status === "disposed") ev.push({ d: "2025-12-30 09:00", script: "폐기 처리", before: "배정중", after: "폐기", who: "dana" });
+    if (a.note) ev.push({ d: "2026-06-02 09:00", script: "메모 수정", who: "dana" });
     return ev.sort((x, y) => (x.d < y.d ? 1 : -1));
   }
   // 실제 이력 로그 — activityOf()의 베이스라인을 세션당 한 번만 시드하고, 이후 실사용자 조작(수량 변경·보유 해제 등)은
@@ -138,19 +145,44 @@
     const p = n => String(n).padStart(2, "0");
     return `${TODAY.getFullYear()}-${p(TODAY.getMonth() + 1)}-${p(TODAY.getDate())}`;
   }
-  function logActivity(a, t) {
-    activityLog(a).unshift({ d: todayStr(), t, who: "dana" });
+  // 실제 조작 시각 — 자산 등록일 등에 쓰는 고정 데모 날짜(TODAY)는 그대로 두고, 시:분만 실제 클릭 시각을 사용
+  function nowStr() {
+    const p = n => String(n).padStart(2, "0");
+    const real = new Date();
+    return `${todayStr()} ${p(real.getHours())}:${p(real.getMinutes())}`;
   }
-  // 보유 레코드의 "최종 수정일" — 최초 등록(자산 등록일과 동일 취급) 이후 수량이 바뀐 적 있으면 그 시점, 없으면 등록일
-  const stockUpdatedAt = (a, x) => x._updatedAt || a.createdAt;
-  function timelineHtml(a) {
-    return `<ol class="dtimeline">${activityLog(a).map(e => `
-      <li><span class="tl-dot"></span>
-        <div><div class="tl-t">${e.t}</div><div class="tl-m">${window.fmtDate(e.d)} · ${e.who}</div></div>
-      </li>`).join("")}</ol>`;
+  function logActivity(a, entry) {
+    activityLog(a).unshift({ d: nowStr(), who: "dana", ...entry });
+  }
+  // 이력 카드 1건 렌더링 — target 있으면 assignIdentity() 재사용, before/after 키가 아예 없으면 값 블록 생략
+  function historyCardHtml(e) {
+    const val = v => v || "없음";
+    return `
+      <div class="hcard">
+        <div class="hcard-time">${window.fmtDateTime(e.d)}</div>
+        ${e.target ? `<div class="acard-id hcard-target">${assignIdentity(e.target)}</div>` : ""}
+        <div class="hcard-script">${e.script}</div>
+        ${"before" in e ? `
+          <div class="hcard-diff">
+            <div class="hcard-row"><span class="hcard-tag old">기존</span><span class="hcard-val">${val(e.before)}</span></div>
+            <div class="hcard-row"><span class="hcard-tag new">변경</span><span class="hcard-val">${val(e.after)}</span></div>
+          </div>` : ""}
+        <div class="hcard-who">${e.who}</div>
+      </div>`;
+  }
+  // query가 있으면 수정 대상(구성원/근무지) 이름으로 필터 — 수량형 이력 탭 전용(개별형은 검색 없음)
+  function timelineHtml(a, query) {
+    const q = (query || "").trim().toLowerCase();
+    const entries = activityLog(a).filter(e => {
+      if (!q) return true;
+      const name = e.target ? (e.target.employee || e.target.worksite || "") : "";
+      return name.toLowerCase().includes(q);
+    });
+    if (!entries.length) return '<p class="muted" style="padding:6px 0">일치하는 이력이 없습니다</p>';
+    return `<div class="dtimeline">${entries.map(historyCardHtml).join("")}</div>`;
   }
   // 보유 현황 — 배정 현황과 동일한 카드 UI(assignIdentity 재사용) + 검색(구성원/근무지 카테고리 선택)
-  // 정렬: 최종 수정일 내림차순(최근 변경 위로) → 동률(일괄 처리 등)이면 이름 가나다순
+  // 정렬: 이름 가나다순(배정일처럼 시간 기준으로 정렬할 값이 없어서 — 최근 변경은 이력 탭 검색으로 확인)
   function stockCards(a, query, cat) {
     const stocks = a.stocks || [];
     const q = (query || "").trim().toLowerCase();
@@ -167,8 +199,6 @@
         return x.employee.toLowerCase().includes(q);
       })
       .sort((p, q2) => {
-        const dp = stockUpdatedAt(a, p.x), dq = stockUpdatedAt(a, q2.x);
-        if (dp !== dq) return dp < dq ? 1 : -1;
         const np = p.x.employee || p.x.worksite, nq = q2.x.employee || q2.x.worksite;
         return np.localeCompare(nq, "ko");
       });
@@ -178,10 +208,7 @@
         ${typeBadge(x)}
         <div class="acard-id">${assignIdentity(x)}</div>
         <div class="acard-foot">
-          <div class="acard-meta">
-            <span class="acard-date">보유 수량 <b class="qty">${x.qty}개</b></span>
-            <span class="acard-date">최종 수정일 <b>${window.fmtDate(stockUpdatedAt(a, x))}</b></span>
-          </div>
+          <span class="acard-date">보유 수량 <b class="qty">${x.qty}개</b></span>
           <div class="acard-actions">
             <button class="btn sm" data-qtyedit>수량 변경</button>
             <button class="btn sm" data-release>보유 해제</button>
@@ -229,12 +256,10 @@
       const v = val();
       if (v === null || v < 1) return;
       const x = a.stocks[idx];
-      const name = x.employee || x.worksite;
       pop.remove();
       confirmModal("수량을 변경하시겠습니까?", () => {
         a.stocks[idx].qty = v;
-        a.stocks[idx]._updatedAt = todayStr();
-        logActivity(a, `${name} 보유 수량 변경 · ${cur}개 → ${v}개`);
+        logActivity(a, { script: "보유 수량 변경", target: x, before: `${cur}개`, after: `${v}개` });
         toast("수량이 변경되었습니다.");
         render();
       });
@@ -256,7 +281,7 @@
       confirmModal(`${name}을(를) 보유 대상에서 해제하시겠습니까?<br><span class="muted" style="font-size:12px">보유 기록이 삭제되며, 이후 이 자산의 보유 대상 목록에 나타나지 않습니다. (수량만 바꾸려면 취소 후 수량 변경을 이용하세요)</span>`, () => {
         const qty = x.qty;
         a.stocks.splice(idx, 1);
-        logActivity(a, `${name} 보유 대상에서 해제 · 기존 수량 ${qty}개`);
+        logActivity(a, { script: "보유 대상 해제", target: x, before: `${qty}개`, after: "" });
         toast("보유 대상에서 해제되었습니다");
         render();
       });
@@ -345,11 +370,10 @@
       const v = getValue();
       if (!v) return;
       const x = a.assignments[idx];
-      const name = x.employee || x.worksite;
       pop.remove();
       confirmModal("배정일을 수정하시겠습니까?", () => {
         x.since = v;
-        logActivity(a, `${name} 배정일 변경 · ${window.fmtDate(cur)} → ${window.fmtDate(v)}`);
+        logActivity(a, { script: "배정일 변경", target: x, before: window.fmtDate(cur), after: window.fmtDate(v) });
         toast("배정일이 수정되었습니다.");
         render();
       });
@@ -603,6 +627,11 @@
               <input type="text" id="stock-q" placeholder="이름·휴대폰번호·사번으로 검색">
             </div>
           </div>
+          <div class="stock-toolbar" id="history-toolbar" hidden>
+            <div class="stock-search solo">
+              <input type="text" id="history-q" placeholder="구성원·근무지 이름으로 검색">
+            </div>
+          </div>
           <div id="stock-body">${stockCards(a, "", "employee")}</div>
         </section>`;
     }
@@ -666,6 +695,8 @@
       const sbody = scard.querySelector("#stock-body");
       const sactions = scard.querySelector("#stock-actions");
       const stoolbar = scard.querySelector("#stock-toolbar");
+      const htoolbar = scard.querySelector("#history-toolbar");
+      const historyQ = scard.querySelector("#history-q");
       const stockCat = scard.querySelector("#stock-cat");
       const stockQ = scard.querySelector("#stock-q");
       const CAT_PLACEHOLDER = { employee: "이름·휴대폰번호·사번으로 검색", worksite: "근무지명·코드·주소로 검색" };
@@ -675,6 +706,7 @@
       };
       stockCat.onchange = () => { stockQ.placeholder = CAT_PLACEHOLDER[stockCat.value]; refreshStock(); };
       stockQ.oninput = refreshStock;
+      historyQ.oninput = () => { sbody.innerHTML = timelineHtml(a, historyQ.value); };
       wireStockCards(sbody, a);
 
       scard.querySelectorAll("[data-stab]").forEach(t => t.onclick = () => {
@@ -682,8 +714,9 @@
         const isCurrent = t.dataset.stab === "current";
         sactions.hidden = !isCurrent;   // 보유 대상 추가·검색은 현황 탭에서만
         stoolbar.hidden = !isCurrent;
+        htoolbar.hidden = isCurrent;    // 이력 검색은 이력 탭에서만
         if (isCurrent) refreshStock();
-        else sbody.innerHTML = timelineHtml(a);
+        else { historyQ.value = ""; sbody.innerHTML = timelineHtml(a, ""); }
       });
     }
   }
