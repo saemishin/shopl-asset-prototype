@@ -137,32 +137,36 @@
     back.querySelector("[data-close]").onclick = () => back.remove();
     document.body.appendChild(back);
   }
-  function openQrModal(a) {
-    const back = document.createElement("div");
-    back.className = "modal-back";
-    back.innerHTML = `
-      <div class="modal">
-        <h3>QR 라벨</h3>
-        <div class="body" style="display:flex;gap:16px;align-items:center">
-          <button class="qr-thumb" data-preview aria-label="라벨 미리보기">
-            ${qrSampleSvg()}
-            <span class="qr-thumb-hover">라벨 미리보기</span>
-          </button>
-          <div>
-            <p style="font-size:13px;font-weight:600">${a.product}${a.assetNo ? ` / ${a.assetNo}` : ""}</p>
-            <p class="muted" style="margin-top:4px">QR 라벨을 스캔하여 앱에서 자산의 배정 현황 및 이력을 조회할 수 있습니다.</p>
-          </div>
+  // 기존 공용 컴포넌트(근무지 출퇴근용 QR)와 동일하게 dim 없는 앵커형 팝오버로
+  function openQrPopover(a, anchor) {
+    document.querySelectorAll(".qty-popover, .qr-popover").forEach(m => m.remove());
+    const pop = document.createElement("div");
+    pop.className = "qr-popover";
+    pop.innerHTML = `
+      <div class="qr-popover-body">
+        <button class="qr-thumb" data-preview aria-label="라벨 미리보기">
+          ${qrSampleSvg()}
+          <span class="qr-thumb-hover">라벨 미리보기</span>
+        </button>
+        <div>
+          <p style="font-size:13px;font-weight:600">${a.product}${a.assetNo ? ` / ${a.assetNo}` : ""}</p>
+          <p class="muted" style="margin-top:4px">QR 라벨을 스캔하여 앱에서 자산의 배정 현황 및 이력을 조회할 수 있습니다.</p>
         </div>
-        <div class="foot">
-          <button class="btn primary" data-act="라벨 다운로드">라벨 다운로드</button>
-          <button class="btn" data-close>닫기</button>
-        </div>
+      </div>
+      <div class="qr-popover-acts">
+        <button class="btn primary" data-act="라벨 다운로드">라벨 다운로드</button>
+        <button class="btn" data-close>닫기</button>
       </div>`;
-    back.addEventListener("click", e => { if (e.target === back) back.remove(); });
-    back.querySelector("[data-close]").onclick = () => back.remove();
-    back.querySelector("[data-preview]").onclick = () => openLabelPreview(a);
-    bindActs(back);
-    document.body.appendChild(back);
+    const r = anchor.getBoundingClientRect();
+    pop.style.cssText = `position:fixed;top:${r.bottom + 8}px;left:${Math.max(8, r.right - 320)}px`;
+    document.body.appendChild(pop);
+    pop.querySelector("[data-close]").onclick = () => pop.remove();
+    pop.querySelector("[data-preview]").onclick = () => openLabelPreview(a);
+    bindActs(pop);
+    setTimeout(() => {
+      const close = e => { if (!pop.contains(e.target) && e.target !== anchor) { pop.remove(); document.removeEventListener("click", close); } };
+      document.addEventListener("click", close);
+    });
   }
 
   /* ---------- 활동 로그 ----------
@@ -728,7 +732,7 @@
     c.classList.add("detail-split");
 
     bindActs(c);
-    c.querySelector("[data-qr]").onclick = () => openQrModal(a);
+    c.querySelector("[data-qr]").onclick = e => openQrPopover(a, e.currentTarget);
     c.querySelector("[data-more]").onclick = e => dropdown(e.currentTarget, moreItems);
     const sc = c.querySelector("[data-statuschange]");
     if (sc) sc.onclick = e => dropdown(e.currentTarget, statusItems);

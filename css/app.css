@@ -301,7 +301,14 @@ th.c, td.c { text-align: center; width: 52px; }
 .modal h3 { padding: 18px 20px; font-size: 15px; border-bottom: 1px solid var(--line); }
 .modal .body { padding: 18px 20px; }
 .modal .foot { padding: 14px 20px; border-top: 1px solid var(--line); display: flex; justify-content: flex-end; gap: 8px; }
-/* QR 썸네일 — 호버 시 "미리보기" 오버레이, 클릭하면 실제 라벨 구성 확대(openLabelPreview) */
+/* QR 라벨 — 공용 QR 팝오버 컴포넌트와 동일하게 dim 없는 앵커형 팝오버(openQrPopover) */
+.qr-popover {
+  position: fixed; width: 320px; background: var(--panel); border: 1px solid var(--line-strong);
+  border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.12); padding: 16px; z-index: 200;
+}
+.qr-popover-body { display: flex; gap: 16px; align-items: center; }
+.qr-popover-acts { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+/* QR 썸네일 — 호버 시 "라벨 미리보기" 오버레이, 클릭하면 실제 라벨 구성 확대(openLabelPreview) */
 .qr-thumb {
   position: relative; width: 96px; height: 96px; flex-shrink: 0; padding: 0;
   border: 1px solid var(--line); border-radius: 8px; overflow: hidden; cursor: pointer;
