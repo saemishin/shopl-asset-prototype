@@ -10,7 +10,6 @@
   }
   const TRASH_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M9.5 7l.7 13a1 1 0 0 0 1 1h5.6a1 1 0 0 0 1-1l.7-13"/></svg>`;
   const HANDLE_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>`;
-  const PLUS_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>`;
   // 배정중/재고 외 상태(수리중·분실·폐기)는 "기타"로 묶어서 보여줌 — 구조설계안 3.4 status 정의 기준
   const STATUS_LABEL = { stock: "재고", assigned: "배정중", repair: "수리중", lost: "분실", disposed: "폐기" };
   const FIELD_LABEL = { expiry: "유효기한", serial: "S/N", manufactured: "제조연월일", purchaseDate: "구매일", purchasePrice: "구매가격" };
@@ -190,8 +189,8 @@
       <div class="modal lg cat-manage-modal">
         <h3>분류 관리</h3>
         <div class="cat-manage-add-group">
-          <input type="text" class="cat-manage-input" placeholder="대분류 명칭 입력" maxlength="30">
-          <button class="btn icon-only primary" data-add-group aria-label="대분류 추가">${PLUS_ICON}</button>
+          <input type="text" class="cat-manage-input" placeholder="입력" maxlength="30">
+          <button class="btn primary" data-add-group>+ 대분류 추가</button>
         </div>
         <div class="body cat-manage-body"></div>
         <div class="foot">
@@ -218,7 +217,7 @@
             <input type="text" class="cat-manage-name-input" data-rename-group="${gi}" value="${g.name}" maxlength="30">
             <div class="cat-manage-row-acts">
               <button class="cat-manage-icon${blocked ? " is-disabled" : ""}" data-del-group="${gi}" aria-label="삭제"
-                title="${blocked ? `하위 소분류가 ${g.subs.length}개 있어 삭제할 수 없어요` : "삭제"}">${TRASH_ICON}</button>
+                data-tip="${blocked ? "등록된 하위 소분류가 있어 삭제할 수 없습니다" : "삭제"}">${TRASH_ICON}</button>
             </div>
           </div>
           <div class="cat-manage-subs">
@@ -230,7 +229,7 @@
                 <input type="text" class="cat-manage-name-input" data-rename-sub="${gi}|${si}" value="${s.name}" maxlength="30">
                 <div class="cat-manage-row-acts">
                   <button class="cat-manage-icon${hasAssets ? " is-disabled" : ""}" data-del-sub="${gi}|${si}" aria-label="삭제"
-                    title="${hasAssets ? "등록된 자산이 있어 삭제할 수 없어요" : "삭제"}">${TRASH_ICON}</button>
+                    data-tip="${hasAssets ? "등록된 자산이 있어 삭제할 수 없습니다" : "삭제"}">${TRASH_ICON}</button>
                 </div>
               </div>`;
             }).join("")}

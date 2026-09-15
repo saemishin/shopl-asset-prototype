@@ -342,8 +342,7 @@ th.c, td.c { text-align: center; width: 52px; }
   height: 32px; border: 1px solid var(--line-strong); border-radius: var(--radius);
   padding: 0 10px; background: var(--panel); font-size: 12.5px;
 }
-.cat-manage-add-group .btn.icon-only { width: 32px; height: 32px; flex-shrink: 0; }
-.cat-manage-add-group .btn.icon-only svg { width: 15px; height: 15px; }
+.cat-manage-add-group .btn { flex-shrink: 0; }
 .cat-manage-body { display: flex; flex-direction: column; }
 .cat-manage-group { margin-bottom: 16px; }
 .cat-manage-row { display: flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 6px; }
@@ -374,6 +373,14 @@ th.c, td.c { text-align: center; width: 52px; }
 .cat-manage-icon svg { width: 14px; height: 14px; }
 .cat-manage-icon:hover:not(.is-disabled) { background: #eef0f2; color: var(--text); }
 .cat-manage-icon.is-disabled { opacity: .3; cursor: not-allowed; }
+/* 네이티브 title 툴팁이 안 뜨는 환경이 있어 자산 상세 이전/다음 버튼과 동일한 방식(data-tip + ::after)으로 직접 그림 */
+.cat-manage-icon[data-tip] { position: relative; }
+.cat-manage-icon[data-tip]:hover::after {
+  content: attr(data-tip);
+  position: absolute; top: 100%; right: 0; margin-top: 6px;
+  background: #1b1d1f; color: #fff; font-size: 11px; padding: 4px 8px;
+  border-radius: 6px; white-space: nowrap; z-index: 20;
+}
 .cat-manage-subs { display: flex; flex-direction: column; gap: 1px; }
 .cat-manage-add-sub { margin: 6px 0 0 30px; align-self: flex-start; }
 
