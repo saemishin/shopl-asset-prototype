@@ -179,11 +179,13 @@
   }
 
   function stockRowHtml(a) {
-    const right = `${(a.stocks || []).reduce((s, x) => s + x.qty, 0)}개 · 보유 ${(a.stocks || []).length}곳`;
+    const qty = (a.stocks || []).reduce((s, x) => s + x.qty, 0);
+    const targets = (a.stocks || []).length;
     return `
       <tr class="clickable" data-asset="${a.id}">
         <td>${a.product}</td>
-        <td>${right}</td>
+        <td class="num">${qty}</td>
+        <td class="num">${targets}</td>
         <td>${a.expiry ? window.fmtDate(a.expiry) : '<span class="muted">—</span>'}</td>
       </tr>`;
   }
@@ -213,7 +215,7 @@
         </div>
         ${products.length ? `
           <div class="table-wrap">
-            <table>
+            <table class="cat-asset-table">
               <thead><tr><th>제품명</th><th class="num">전체</th><th class="num">배정중</th><th class="num">재고</th><th class="num">기타</th></tr></thead>
               <tbody>${products.map(productRowHtml).join("")}</tbody>
             </table>
@@ -227,8 +229,8 @@
       </div>
       ${list.length ? `
         <div class="table-wrap">
-          <table>
-            <thead><tr><th>제품명</th><th>보유 현황</th><th>유효기한</th></tr></thead>
+          <table class="cat-asset-table">
+            <thead><tr><th>제품명</th><th class="num">보유 수량</th><th class="num">보유 대상</th><th>유효기한</th></tr></thead>
             <tbody>${list.map(stockRowHtml).join("")}</tbody>
           </table>
         </div>` : '<p class="muted" style="padding:12px 0">등록된 자산이 없습니다</p>'}`;
@@ -269,8 +271,8 @@
       <div class="field">
         <label>자산 유형<span class="req">*</span> <button type="button" class="help-icon" data-f-type-help aria-label="자산 유형 도움말">?</button></label>
         ${typeLocked ? `
-          <p class="hint" style="margin:4px 0 8px">등록된 자산이 있어 자산 유형을 변경할 수 없습니다.</p>
           <p class="field-static">${state.type === "individual" ? "개별 자산" : "수량 자산"}</p>
+          <p class="hint" style="margin:4px 0 0">등록된 자산이 있어 자산 유형을 변경할 수 없습니다.</p>
         ` : `
           <div class="seg" data-f-type>
             <button type="button" data-val="individual" class="${state.type === "individual" ? "active" : ""}">개별 자산</button>

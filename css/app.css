@@ -322,6 +322,9 @@ th.c, td.c { text-align: center; width: 52px; }
 .cat-asset-head { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); margin-bottom: 10px; }
 .cat-asset-head h4 { font-size: 13px; font-weight: 700; }
 .cat-asset-count { font-size: 12px; color: var(--text-mut); margin-top: 4px; }
+/* 이 패널 폭에 비해 기본 table의 min-width(880px)가 과해서 제품명 컬럼만 늘어나고 숫자 컬럼들이 끝으로 몰림 — 좁게 재정의 */
+.cat-asset-table { min-width: 0; }
+.cat-asset-table th:not(:first-child), .cat-asset-table td:not(:first-child) { width: 90px; }
 .cat-unit-list { display: flex; flex-direction: column; gap: 2px; max-height: 50vh; overflow-y: auto; }
 .cat-unit-row {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
