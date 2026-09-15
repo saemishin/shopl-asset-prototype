@@ -92,6 +92,25 @@
   const bindActs = scope => scope.querySelectorAll("[data-act]").forEach(b =>
     b.onclick = () => toast(`"${b.dataset.act}" — 이후 단계에서 정의`));
 
+  // QR 라벨 샘플 이미지 — 실제 디코딩되는 값은 아니고 목업용 정적 패턴(파인더 패턴 3개 + 결정적 데이터 영역)
+  function qrSampleSvg() {
+    const n = 21, cell = 4, size = n * cell;
+    const mods = [];
+    const finder = (ox, oy) => {
+      for (let y = 0; y < 7; y++) for (let x = 0; x < 7; x++) {
+        if (x === 0 || x === 6 || y === 0 || y === 6 || (x >= 2 && x <= 4 && y >= 2 && y <= 4)) mods.push([ox + x, oy + y]);
+      }
+    };
+    finder(0, 0); finder(n - 7, 0); finder(0, n - 7);
+    let seed = 42;
+    const rand = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+      const inFinder = (x < 8 && y < 8) || (x >= n - 8 && y < 8) || (x < 8 && y >= n - 8);
+      if (!inFinder && rand() > 0.55) mods.push([x, y]);
+    }
+    const rects = mods.map(([x, y]) => `<rect x="${x * cell}" y="${y * cell}" width="${cell}" height="${cell}"/>`).join("");
+    return `<svg viewBox="0 0 ${size} ${size}" fill="#1b1d1f"><rect width="${size}" height="${size}" fill="#fff"/>${rects}</svg>`;
+  }
   function openQrModal(a) {
     const back = document.createElement("div");
     back.className = "modal-back";
@@ -99,15 +118,15 @@
       <div class="modal">
         <h3>QR 라벨</h3>
         <div class="body" style="display:flex;gap:16px;align-items:center">
-          <div class="ph" style="width:96px;height:96px;flex-shrink:0">QR</div>
+          <div style="width:96px;height:96px;flex-shrink:0;border:1px solid var(--line);border-radius:8px;overflow:hidden">${qrSampleSvg()}</div>
           <div>
             <p style="font-size:13px;font-weight:600">${a.product}${a.assetNo ? ` / ${a.assetNo}` : ""}</p>
-            <p class="muted" style="margin-top:4px">자산 등록 시 자동 생성 · 스캔 시 앱 자산 상세로 연결</p>
+            <p class="muted" style="margin-top:4px">QR 라벨을 스캔하여 앱에서 자산의 배정 현황 및 이력을 조회할 수 있습니다.</p>
           </div>
         </div>
         <div class="foot">
-          <button class="btn" data-close>닫기</button>
           <button class="btn primary" data-act="QR 라벨 다운로드">다운로드</button>
+          <button class="btn" data-close>닫기</button>
         </div>
       </div>`;
     back.addEventListener("click", e => { if (e.target === back) back.remove(); });
