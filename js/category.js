@@ -83,14 +83,13 @@
     const hiddenLabel = hidden.length ? hidden.map(f => FIELD_LABEL[f] || f).join(", ") : "숨김 필드 없음";
     return `
       <div class="cat-detail-head">
-        <h3>${cat.sub}</h3>
+        <h3>${cat.sub} <span class="type-pill">${cat.type === "individual" ? "개별 자산" : "수량 자산"}</span></h3>
         <div class="cat-detail-acts">
           ${btn("소분류 수정")}
           <button class="btn sm icon-only" data-submore aria-label="소분류 관리">${MORE_ICON}</button>
         </div>
       </div>
       <div class="kv2 cat-detail-kv">
-        <div><div class="k">자산 유형</div><div class="v"><span class="type-pill">${cat.type === "individual" ? "개별 자산" : "수량 자산"}</span></div></div>
         <div><div class="k">자산 조회 권한</div><div class="v">${cat.view}</div></div>
         <div><div class="k">배정/보유 변경 권한</div><div class="v">${cat.assign}</div></div>
         <div><div class="k">필드 노출 설정</div><div class="v">${hiddenLabel}</div></div>
@@ -125,6 +124,7 @@
         <div class="cat-detail">${detailHtml(cat)}</div>
       </div>
     `;
+    c.classList.add("cat-split");
     bindActs(c);
     c.querySelectorAll("[data-tree]").forEach(b => b.onclick = () => {
       const [group, sub] = b.dataset.tree.split("|");

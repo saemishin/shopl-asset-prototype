@@ -418,6 +418,19 @@ th.c, td.c { text-align: center; width: 52px; }
   .detail-split .dgrid { flex: none; }
   .detail-split .dgrid > .dcard { height: auto; overflow: visible; }
 }
+
+/* 분류 관리: 좌우 컬럼 높이를 맞추고, 넘치면 각자 독립 스크롤 */
+.content.cat-split { flex: none; height: calc(100vh - var(--topbar-h)); display: flex; flex-direction: column; padding-bottom: 0; overflow: hidden; }
+.cat-split .tabs { flex-shrink: 0; }
+.cat-split .cat-layout { flex: 1; min-height: 0; }
+.cat-split .cat-layout > .cat-tree, .cat-split .cat-layout > .cat-detail { height: 100%; overflow-y: auto; }
+
+@media (max-width: 860px) {
+  .cat-layout { flex-direction: column; }
+  .content.cat-split { height: auto; overflow: visible; display: block; }
+  .cat-split .cat-layout { flex: none; }
+  .cat-split .cat-layout > .cat-tree, .cat-split .cat-layout > .cat-detail { height: auto; overflow: visible; }
+}
 /* min-height: 이력 탭에서 우측 액션 버튼(hactions)이 hidden 처리될 때 행 높이가 줄어 탭 전환마다 덜컹거리는 것 방지 — 버튼 높이(.btn.sm = 28px)로 고정 */
 .dsection-head { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; min-height: 28px; }
 .dsection-head h4 { font-size: 13px; font-weight: 700; }
