@@ -47,6 +47,9 @@ window.DATA = (function () {
     { id: "A008", type: "individual", assetNo: "FN-2025-0101", product: "데스커 1400", group: "가구류", sub: "책상",
       status: "assigned", serial: "", createdAt: "2025-01-21", purchaseDate: "2025-01-20", price: 210000, expiry: "", photo: "#8395a7",
       labels: ["판교점"], assignments: [{ employee: null, worksite: "판교점", since: "2025-02-01" }] },
+    { id: "A009", type: "individual", assetNo: "FN-2025-0102", product: "데스커 1400", group: "가구류", sub: "책상",
+      status: "stock", serial: "", createdAt: "2025-03-11", purchaseDate: "2025-03-10", price: 210000, expiry: "",
+      labels: [], assignments: [] },
 
     { id: "A101", type: "quantity", assetNo: "", product: "2026 하복 유니폼", group: "소모품", sub: "유니폼",
       status: null, serial: "", createdAt: "2026-04-02", purchaseDate: "2026-04-01", price: 18000, manufactured: "2026-03-15",
