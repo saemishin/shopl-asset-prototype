@@ -347,7 +347,7 @@
       x.since = v;
       logActivity(a, `${name} 배정일 변경 · ${window.fmtDate(cur)} → ${window.fmtDate(v)}`);
       pop.remove();
-      toast(`배정일이 ${window.fmtDate(v)}로 변경되었습니다`);
+      toast("배정일이 수정되었습니다.");
       render();
     };
     pop.querySelector("[data-dcancel]").onclick = () => pop.remove();
