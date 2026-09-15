@@ -157,17 +157,23 @@
   // 이력 카드 1건 렌더링 — target 있으면 assignIdentity() 재사용, before/after 키가 아예 없으면 값 블록 생략
   function historyCardHtml(e) {
     const val = v => v || "없음";
+    const targetName = e.target ? (e.target.employee || e.target.worksite) : null;
+    // 기존/변경 값에도 대상 이름을 붙여서, 위 아바타 행을 안 보고도 그 줄만으로 뜻이 통하게
+    const withTarget = v => targetName ? `${targetName} · ${val(v)}` : val(v);
     return `
       <div class="hcard">
-        <div class="hcard-time">${window.fmtDateTime(e.d)}</div>
+        <div class="hcard-head">
+          <span class="hcard-avatar" style="background:${avatarColor(e.who)}">${e.who[0]}</span>
+          <span class="hcard-who">${e.who}</span>
+          <span class="hcard-time">${window.fmtDateTime(e.d)}</span>
+        </div>
         ${e.target ? `<div class="acard-id hcard-target">${assignIdentity(e.target)}</div>` : ""}
         <div class="hcard-script">${e.script}</div>
         ${"before" in e ? `
           <div class="hcard-diff">
-            <div class="hcard-row"><span class="hcard-tag old">기존</span><span class="hcard-val">${val(e.before)}</span></div>
-            <div class="hcard-row"><span class="hcard-tag new">변경</span><span class="hcard-val">${val(e.after)}</span></div>
+            <div class="hcard-row"><span class="hcard-tag old">기존</span><span class="hcard-val">${withTarget(e.before)}</span></div>
+            <div class="hcard-row"><span class="hcard-tag new">변경</span><span class="hcard-val">${withTarget(e.after)}</span></div>
           </div>` : ""}
-        <div class="hcard-who">${e.who}</div>
       </div>`;
   }
   // query가 있으면 수정 대상(구성원/근무지) 이름으로 필터 — 수량형 이력 탭 전용(개별형은 검색 없음)
