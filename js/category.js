@@ -17,6 +17,9 @@
 
   const assetsOf = (group, sub) => assets.filter(a => a.group === group && a.sub === sub);
 
+  // 대분류별 접기/펼치기 상태 — 기본은 전부 펼쳐진 상태(Set이 비어있으면 전부 펼침), render() 사이에도 유지됨
+  const collapsedGroups = new Set();
+
   // 대분류 등장 순서대로 그룹핑(소분류는 categories 배열 순서 그대로). 소분류가 아직 없는 대분류(emptyGroups)도 포함
   function groupsOf() {
     const order = [];
@@ -41,15 +44,20 @@
         <span class="cat-tree-head-label">대분류</span>
         <button class="btn sm" data-manage>분류 관리</button>
       </div>`;
-    const body = groups.map(({ group, subs }) => `
+    const body = groups.map(({ group, subs }) => {
+      const collapsed = collapsedGroups.has(group);
+      return `
       <div class="cat-tree-group">
-        <div class="cat-tree-label">${group}</div>
-        ${subs.length ? subs.map(s => `
+        <button class="cat-tree-label" data-toggle="${group}">
+          <span class="cat-tree-chevron">${collapsed ? "▸" : "▾"}</span>${group}
+        </button>
+        ${collapsed ? "" : (subs.length ? subs.map(s => `
           <button class="cat-tree-item${sel && sel.group === group && sel.sub === s.sub ? " active" : ""}"
                   data-tree="${group}|${s.sub}">
             ${s.sub}<span class="cat-tree-count">${assetsOf(group, s.sub).length}</span>
-          </button>`).join("") : '<p class="cat-tree-empty">소분류 없음</p>'}
-      </div>`).join("");
+          </button>`).join("") : '<p class="cat-tree-empty">없음</p>')}
+      </div>`;
+    }).join("");
     return head + body;
   }
 
@@ -245,6 +253,11 @@
     c.querySelectorAll("[data-tree]").forEach(b => b.onclick = () => {
       const [group, sub] = b.dataset.tree.split("|");
       render({ group, sub });
+    });
+    c.querySelectorAll("[data-toggle]").forEach(b => b.onclick = () => {
+      const g = b.dataset.toggle;
+      if (collapsedGroups.has(g)) collapsedGroups.delete(g); else collapsedGroups.add(g);
+      render(sel);
     });
     c.querySelector("[data-manage]").onclick = () => openManageModal();
     wireAssetSection(c);
