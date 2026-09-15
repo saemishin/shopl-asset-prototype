@@ -8,6 +8,23 @@
     t.style.cssText = "position:fixed;left:50%;bottom:32px;transform:translateX(-50%);background:#1b1d1f;color:#fff;padding:10px 16px;border-radius:8px;font-size:12.5px;z-index:300";
     document.body.appendChild(t); setTimeout(() => t.remove(), 1800);
   }
+  function confirmModal(msg, onOk) {
+    const cb = document.createElement("div");
+    cb.className = "modal-back";
+    cb.style.zIndex = 340;
+    cb.innerHTML = `
+      <div class="modal" style="width:380px">
+        <div class="body" style="padding-top:20px;font-size:13px">${msg}</div>
+        <div class="foot">
+          <button class="btn" data-cclose>취소</button>
+          <button class="btn primary" data-cok>확인</button>
+        </div>
+      </div>`;
+    cb.addEventListener("click", e => { if (e.target === cb) cb.remove(); });
+    cb.querySelector("[data-cclose]").onclick = () => cb.remove();
+    cb.querySelector("[data-cok]").onclick = () => { cb.remove(); onOk(); };
+    document.body.appendChild(cb);
+  }
   const TRASH_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M9.5 7l.7 13a1 1 0 0 0 1 1h5.6a1 1 0 0 0 1-1l.7-13"/></svg>`;
   const HANDLE_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>`;
   const BACK_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>`;
@@ -239,6 +256,14 @@
     const clearDragMarks = () => body.querySelectorAll(".drag-over-top,.drag-over-bottom")
       .forEach(el => el.classList.remove("drag-over-top", "drag-over-bottom"));
 
+    // 뒤로가기 — 소분류명을 입력한 상태(= [저장]이 활성화될 만큼 진행된 상태)에서 나가려 하면 한 번 확인. 이름을 아직 안 썼으면 잃을 내용이 없다고 보고 바로 이동
+    function guardedBack() {
+      if (createState && createState.name.trim()) {
+        confirmModal("작성 중인 내용이 저장되지 않습니다. 나가시겠습니까?", () => setMode("list"));
+      } else {
+        setMode("list");
+      }
+    }
     function setMode(mode) {
       currentMode = mode;
       const isList = mode === "list";
@@ -247,15 +272,17 @@
       addGroupRow.hidden = !isList;
       body.hidden = !isList;
       createEl.hidden = isList;
-      cancelBtn.textContent = "취소";
+      cancelBtn.hidden = !isList; // 소분류 생성 화면에선 헤더의 뒤로가기(←)가 같은 역할을 하므로 푸터 취소는 없앰
       confirmBtn.textContent = "저장";
       confirmBtn.disabled = isList ? !dirty : true;
-      // 취소 자체는 draft(이름변경/삭제/순서변경/대분류추가)만 버림 — 소분류 생성은 이미 실제 반영됐으므로, 닫을 때 배경 트리를 다시 그려서 그대로 보여줌
-      cancelBtn.onclick = isList ? (() => { back.remove(); render(sel); }) : (() => setMode("list"));
+      cancelBtn.onclick = () => { back.remove(); render(sel); };
       confirmBtn.onclick = isList ? saveAll : commitCreate;
     }
-    backBtn.onclick = () => setMode("list");
-    back.addEventListener("click", e => { if (e.target === back) cancelBtn.click(); });
+    backBtn.onclick = guardedBack;
+    back.addEventListener("click", e => {
+      if (e.target !== back) return;
+      if (currentMode === "list") cancelBtn.click(); else guardedBack();
+    });
 
     function renderBody() {
       body.innerHTML = draft.map((g, gi) => {
