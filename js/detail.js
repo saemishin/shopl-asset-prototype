@@ -158,7 +158,13 @@
   function historyCardHtml(e) {
     const val = v => v || "없음";
     const targetName = e.target ? (e.target.employee || e.target.worksite) : null;
-    const withTarget = v => targetName ? `${targetName} · ${val(v)}` : val(v);
+    // 구성원은 프로필 이미지(대시보드 공통 규칙), 근무지는 인라인 아이콘(assets.js 목록과 동일 패턴)
+    const targetMark = e.target
+      ? (e.target.employee
+          ? `<span class="hval-avatar" style="background:${avatarColor(e.target.employee)}">${e.target.employee[0]}</span>`
+          : IC_WS)
+      : "";
+    const withTarget = v => targetName ? `${targetMark}${targetName} · ${val(v)}` : val(v);
     return `
       <div class="hcard">
         <div class="hcard-head">
