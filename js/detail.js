@@ -111,6 +111,34 @@
     const rects = mods.map(([x, y]) => `<rect x="${x * cell}" y="${y * cell}" width="${cell}" height="${cell}"/>`).join("");
     return `<svg viewBox="0 0 ${size} ${size}" fill="#1b1d1f"><rect width="${size}" height="${size}" fill="#fff"/>${rects}</svg>`;
   }
+  // 실제 라벨(다운로드 파일) 구성 — QR + 제품명 + 고유번호(개별형만) + 대분류 › 소분류
+  function labelSheetHtml(a) {
+    return `
+      <div class="label-sheet">
+        <div class="label-qr">${qrSampleSvg()}</div>
+        <div class="label-text">
+          <div class="label-product">${a.product}</div>
+          ${a.assetNo ? `<div class="label-no">${a.assetNo}</div>` : ""}
+          <div class="label-cat">${a.group} › ${a.sub}</div>
+        </div>
+      </div>`;
+  }
+  function openLabelPreview(a) {
+    const back = document.createElement("div");
+    back.className = "modal-back";
+    back.style.zIndex = 350;
+    back.innerHTML = `
+      <div class="modal" style="width:300px">
+        <h3>라벨 미리보기</h3>
+        <div class="body" style="display:flex;justify-content:center;padding-top:20px">${labelSheetHtml(a)}</div>
+        <div class="foot">
+          <button class="btn" data-close>닫기</button>
+        </div>
+      </div>`;
+    back.addEventListener("click", e => { if (e.target === back) back.remove(); });
+    back.querySelector("[data-close]").onclick = () => back.remove();
+    document.body.appendChild(back);
+  }
   function openQrModal(a) {
     const back = document.createElement("div");
     back.className = "modal-back";
@@ -118,7 +146,10 @@
       <div class="modal">
         <h3>QR 라벨</h3>
         <div class="body" style="display:flex;gap:16px;align-items:center">
-          <div style="width:96px;height:96px;flex-shrink:0;border:1px solid var(--line);border-radius:8px;overflow:hidden">${qrSampleSvg()}</div>
+          <button class="qr-thumb" data-preview aria-label="라벨 미리보기">
+            ${qrSampleSvg()}
+            <span class="qr-thumb-hover">미리보기</span>
+          </button>
           <div>
             <p style="font-size:13px;font-weight:600">${a.product}${a.assetNo ? ` / ${a.assetNo}` : ""}</p>
             <p class="muted" style="margin-top:4px">QR 라벨을 스캔하여 앱에서 자산의 배정 현황 및 이력을 조회할 수 있습니다.</p>
@@ -131,6 +162,7 @@
       </div>`;
     back.addEventListener("click", e => { if (e.target === back) back.remove(); });
     back.querySelector("[data-close]").onclick = () => back.remove();
+    back.querySelector("[data-preview]").onclick = () => openLabelPreview(a);
     bindActs(back);
     document.body.appendChild(back);
   }
