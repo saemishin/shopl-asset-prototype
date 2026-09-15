@@ -248,7 +248,7 @@
       body.hidden = !isList;
       createEl.hidden = isList;
       cancelBtn.textContent = "취소";
-      confirmBtn.textContent = isList ? "저장" : "추가";
+      confirmBtn.textContent = "저장";
       confirmBtn.disabled = isList ? !dirty : true;
       // 취소 자체는 draft(이름변경/삭제/순서변경/대분류추가)만 버림 — 소분류 생성은 이미 실제 반영됐으므로, 닫을 때 배경 트리를 다시 그려서 그대로 보여줌
       cancelBtn.onclick = isList ? (() => { back.remove(); render(sel); }) : (() => setMode("list"));
@@ -518,7 +518,7 @@
       p.className = "modal-back";
       p.innerHTML = `
         <div class="modal">
-          <h3>${isView ? "자산 조회 권한 선택" : "배정/보유 변경 권한 선택"}</h3>
+          <h3>${isView ? "자산 조회 권한" : "배정/보유 변경 권한"}</h3>
           <div class="body">
             ${options.map(v => `
               <label class="radio-row">
@@ -528,7 +528,7 @@
           </div>
           <div class="foot">
             <button class="btn" data-close>취소</button>
-            <button class="btn primary" data-ok>확인</button>
+            <button class="btn primary" data-ok>적용</button>
           </div>
         </div>`;
       document.body.appendChild(p);
