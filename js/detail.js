@@ -596,8 +596,9 @@
     const a = assets[idx];
     const c = document.getElementById("content");
     const isIndiv = a.type === "individual";
-    const prevId = assets[(idx - 1 + assets.length) % assets.length].id;
-    const nextId = assets[(idx + 1) % assets.length].id;
+    const prevA = assets[(idx - 1 + assets.length) % assets.length];
+    const nextA = assets[(idx + 1) % assets.length];
+    const prevId = prevA.id, nextId = nextA.id;
     const photos = photosOf(a);
 
     const primColor = photos.length ? photos[a._primary || 0].color : null;
@@ -707,8 +708,8 @@
       <div class="dgrid">
         <section class="dcard">
           <span class="navbtns">
-            <a href="asset-detail.html?id=${prevId}" aria-label="이전 자산">‹</a>
-            <a href="asset-detail.html?id=${nextId}" aria-label="다음 자산">›</a>
+            <a href="asset-detail.html?id=${prevId}" aria-label="이전 자산" data-tip="${prevA.product}">‹</a>
+            <a href="asset-detail.html?id=${nextId}" aria-label="다음 자산" data-tip="${nextA.product}">›</a>
           </span>
           <div class="dhead-top" style="position:relative">
             ${mgrBtn}
