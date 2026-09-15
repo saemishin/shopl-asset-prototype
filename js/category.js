@@ -507,7 +507,7 @@
         </div>
         <div class="field">
           <label>관리 정보</label>
-          <p class="hint" style="margin-top:0;margin-bottom:10px">이 유형의 자산 관리에 필요한 정보만 사용하도록 설정할 수 있습니다.</p>
+          <p class="hint" style="margin-top:0;margin-bottom:10px">이 소분류의 자산 관리에 필요한 정보만 사용하도록 설정합니다.</p>
           <div class="cat-manage-fieldlist" data-f-fields>
             ${fieldsForType(s.type).map(f => `
               <div class="cat-manage-fieldrow">
