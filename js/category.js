@@ -8,6 +8,11 @@
     t.style.cssText = "position:fixed;left:50%;bottom:32px;transform:translateX(-50%);background:#1b1d1f;color:#fff;padding:10px 16px;border-radius:8px;font-size:12.5px;z-index:300";
     document.body.appendChild(t); setTimeout(() => t.remove(), 1800);
   }
+  const PENCIL_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l1-4L16 5l3 3L8 19l-4 1z"/><path d="M13.5 6.5l4 4"/></svg>`;
+  const MOVE_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 13h6m0 0-2-2m2 2-2 2"/></svg>`;
+  const TRASH_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M9.5 7l.7 13a1 1 0 0 0 1 1h5.6a1 1 0 0 0 1-1l.7-13"/></svg>`;
+  const UP_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg>`;
+  const DOWN_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>`;
   // 배정중/재고 외 상태(수리중·분실·폐기)는 "기타"로 묶어서 보여줌 — 구조설계안 3.4 status 정의 기준
   const STATUS_LABEL = { stock: "재고", assigned: "배정중", repair: "수리중", lost: "분실", disposed: "폐기" };
   const FIELD_LABEL = { expiry: "유효기한", serial: "S/N", manufactured: "제조연월일", purchaseDate: "구매일", purchasePrice: "구매가격" };
@@ -172,7 +177,15 @@
     `;
   }
 
-  // 대분류/소분류 추가·이름변경·삭제·순서변경을 한 곳에서 처리하는 통합 모달(전부 placeholder)
+  // 대분류/소분류 추가·이름변경·삭제·순서변경을 한 곳에서 처리하는 구조 편집 전용 모달(전부 placeholder)
+  // 유형·권한·필드노출 같은 "내용"은 여기서 안 다룸 — 소분류 생성/수정은 별도 폼(소분류 상세의 "소분류 수정" 버튼)이 담당
+  function manageOrderBtns(upAct, downAct, i, len) {
+    return `
+      <div class="cat-manage-order">
+        <button class="cat-manage-icon" data-act="${upAct}" aria-label="위로" title="위로"${i === 0 ? " disabled" : ""}>${UP_ICON}</button>
+        <button class="cat-manage-icon" data-act="${downAct}" aria-label="아래로" title="아래로"${i === len - 1 ? " disabled" : ""}>${DOWN_ICON}</button>
+      </div>`;
+  }
   function openManageModal() {
     const groups = groupsOf();
     const back = document.createElement("div");
@@ -183,26 +196,26 @@
         <div class="body cat-manage-body">
           ${groups.map(({ group, subs }, gi) => `
             <div class="cat-manage-group">
-              <div class="cat-manage-group-head">
-                <span class="cat-manage-group-name">${group}</span>
-                <div class="cat-manage-group-acts">
-                  <button class="btn sm icon-only" data-act="대분류 위로 이동" aria-label="위로" title="위로"${gi === 0 ? " disabled" : ""}>↑</button>
-                  <button class="btn sm icon-only" data-act="대분류 아래로 이동" aria-label="아래로" title="아래로"${gi === groups.length - 1 ? " disabled" : ""}>↓</button>
-                  <button class="btn sm" data-act="대분류 이름 변경">이름 변경</button>
-                  <button class="btn sm" data-act="대분류 삭제">삭제</button>
+              <div class="cat-manage-row cat-manage-group-row">
+                ${manageOrderBtns("대분류 위로 이동", "대분류 아래로 이동", gi, groups.length)}
+                <span class="cat-manage-name">${group}</span>
+                <div class="cat-manage-row-acts">
+                  <button class="cat-manage-icon" data-act="대분류 이름 변경" aria-label="이름 변경" title="이름 변경">${PENCIL_ICON}</button>
+                  <button class="cat-manage-icon" data-act="대분류 삭제" aria-label="삭제" title="삭제"${subs.length ? " disabled" : ""}>${TRASH_ICON}</button>
                 </div>
               </div>
               <div class="cat-manage-subs">
-                ${subs.map(s => `
-                  <div class="cat-manage-sub">
-                    <span>${s.sub}</span>
-                    <div class="cat-manage-sub-acts">
-                      <button class="btn sm" data-act="소분류 이름 변경">이름 변경</button>
-                      <button class="btn sm" data-act="소분류 대분류 이동">대분류 이동</button>
-                      <button class="btn sm" data-act="소분류 삭제">삭제</button>
+                ${subs.map((s, si) => `
+                  <div class="cat-manage-row cat-manage-sub-row">
+                    ${manageOrderBtns("소분류 위로 이동", "소분류 아래로 이동", si, subs.length)}
+                    <span class="cat-manage-name">${s.sub}</span>
+                    <div class="cat-manage-row-acts">
+                      <button class="cat-manage-icon" data-act="소분류 이름 변경" aria-label="이름 변경" title="이름 변경">${PENCIL_ICON}</button>
+                      <button class="cat-manage-icon" data-act="소분류 대분류 이동" aria-label="대분류 이동" title="대분류 이동">${MOVE_ICON}</button>
+                      <button class="cat-manage-icon" data-act="소분류 삭제" aria-label="삭제" title="삭제"${assetsOf(group, s.sub).length ? " disabled" : ""}>${TRASH_ICON}</button>
                     </div>
                   </div>`).join("")}
-                <button class="btn sm" data-act="소분류 추가">+ 소분류 추가</button>
+                <button class="btn sm cat-manage-add-sub" data-act="소분류 추가">+ 소분류 추가</button>
               </div>
             </div>`).join("")}
         </div>

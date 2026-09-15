@@ -332,17 +332,26 @@ th.c, td.c { text-align: center; width: 52px; }
 .cat-unit-row:hover { background: #eef0f2; }
 .cat-unit-no { color: var(--text-sub); font-variant-numeric: tabular-nums; }
 
-/* 분류 관리 통합 모달 */
-.cat-manage-body { display: flex; flex-direction: column; gap: 18px; }
-.cat-manage-group-head { display: flex; align-items: center; gap: 8px; }
-.cat-manage-group-name { font-size: 13px; font-weight: 700; }
-.cat-manage-group-acts { margin-left: auto; display: flex; gap: 6px; }
-.cat-manage-subs { margin-top: 10px; padding-left: 14px; display: flex; flex-direction: column; gap: 4px; }
-.cat-manage-sub {
-  display: flex; align-items: center; gap: 8px; font-size: 12.5px; padding: 6px 8px; border-radius: 6px;
+/* 분류 관리 모달 — 구조 편집 전용(추가·이름변경·순서·삭제·대분류이동만. 유형/권한/필드노출은 별도 폼) */
+.cat-manage-body { display: flex; flex-direction: column; }
+.cat-manage-group { margin-bottom: 16px; }
+.cat-manage-row { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 6px; }
+.cat-manage-group-row { background: #f6f7f8; margin-bottom: 3px; }
+.cat-manage-sub-row { padding-left: 30px; }
+.cat-manage-sub-row:hover { background: #f7f8f9; }
+.cat-manage-order { display: flex; gap: 1px; }
+.cat-manage-name { flex: 1; min-width: 0; font-size: 12.5px; }
+.cat-manage-group-row .cat-manage-name { font-weight: 700; }
+.cat-manage-row-acts { display: flex; gap: 1px; }
+.cat-manage-icon {
+  width: 26px; height: 26px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+  border-radius: 6px; color: var(--text-mut);
 }
-.cat-manage-sub:hover { background: #f7f8f9; }
-.cat-manage-sub-acts { margin-left: auto; display: flex; gap: 6px; }
+.cat-manage-icon svg { width: 14px; height: 14px; }
+.cat-manage-icon:hover:not(:disabled) { background: #eef0f2; color: var(--text); }
+.cat-manage-icon:disabled { opacity: .3; }
+.cat-manage-subs { display: flex; flex-direction: column; gap: 1px; }
+.cat-manage-add-sub { margin: 6px 0 0 30px; align-self: flex-start; }
 
 /* ============ pagination ============ */
 .pager { display: flex; align-items: center; justify-content: center; gap: 4px; padding: 16px 0 4px; position: relative; }
