@@ -8,21 +8,6 @@
     t.style.cssText = "position:fixed;left:50%;bottom:32px;transform:translateX(-50%);background:#1b1d1f;color:#fff;padding:10px 16px;border-radius:8px;font-size:12.5px;z-index:300";
     document.body.appendChild(t); setTimeout(() => t.remove(), 1800);
   }
-  function dropdown(anchor, items) {
-    document.querySelectorAll(".dropdown-menu").forEach(m => m.remove());
-    const menu = document.createElement("div");
-    menu.className = "dropdown-menu";
-    menu.innerHTML = items.map((x, i) => `<button data-i="${i}">${x}</button>`).join("");
-    const r = anchor.getBoundingClientRect();
-    menu.style.cssText = `position:fixed;top:${r.bottom + 4}px;left:${Math.max(8, r.right - 180)}px;min-width:180px`;
-    document.body.appendChild(menu);
-    menu.querySelectorAll("button").forEach(b => b.onclick = () => { menu.remove(); toast(`"${items[+b.dataset.i]}" — 이후 단계에서 정의`); });
-    setTimeout(() => {
-      const close = e => { if (!menu.contains(e.target)) { menu.remove(); document.removeEventListener("click", close); } };
-      document.addEventListener("click", close);
-    });
-  }
-  const MORE_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg>`;
   // 배정중/재고 외 상태(수리중·분실·폐기)는 "기타"로 묶어서 보여줌 — 구조설계안 3.4 status 정의 기준
   const STATUS_LABEL = { stock: "재고", assigned: "배정중", repair: "수리중", lost: "분실", disposed: "폐기" };
   const FIELD_LABEL = { expiry: "유효기한", serial: "S/N", manufactured: "제조연월일", purchaseDate: "구매일", purchasePrice: "구매가격" };
@@ -32,7 +17,7 @@
 
   const assetsOf = (group, sub) => assets.filter(a => a.group === group && a.sub === sub);
 
-  // 대분류 등장 순서대로 그룹핑(소분류는 categories 배열 순서 그대로)
+  // 대분류 등장 순서대로 그룹핑(소분류는 categories 배열 순서 그대로). 소분류가 아직 없는 대분류(emptyGroups)도 포함
   function groupsOf() {
     const order = [];
     const map = {};
@@ -40,7 +25,14 @@
       if (!map[c.group]) { map[c.group] = []; order.push(c.group); }
       map[c.group].push(c);
     });
+    (window.DATA.emptyGroups || []).forEach(g => {
+      if (!map[g]) { map[g] = []; order.push(g); }
+    });
     return order.map(group => ({ group, subs: map[group] }));
+  }
+  function firstSelectable(groups) {
+    for (const g of groups) if (g.subs.length) return { group: g.group, sub: g.subs[0].sub };
+    return null;
   }
 
   function treeHtml(groups, sel) {
@@ -52,11 +44,11 @@
     const body = groups.map(({ group, subs }) => `
       <div class="cat-tree-group">
         <div class="cat-tree-label">${group}</div>
-        ${subs.map(s => `
-          <button class="cat-tree-item${sel.group === group && sel.sub === s.sub ? " active" : ""}"
+        ${subs.length ? subs.map(s => `
+          <button class="cat-tree-item${sel && sel.group === group && sel.sub === s.sub ? " active" : ""}"
                   data-tree="${group}|${s.sub}">
             ${s.sub}<span class="cat-tree-count">${assetsOf(group, s.sub).length}</span>
-          </button>`).join("")}
+          </button>`).join("") : '<p class="cat-tree-empty">소분류 없음</p>'}
       </div>`).join("");
     return head + body;
   }
@@ -112,7 +104,7 @@
       </tr>`;
   }
 
-  // 사용 정보 — 소분류 필드 노출 설정(구조안 3.3)을 전체 필드 대비 on/off bullet로 표시. S/N은 개별형에만 해당하는 필드라 수량형엔 안 보여줌
+  // 관리 정보 — 소분류 필드 노출 설정(구조안 3.3)을 전체 필드 대비 on/off 라벨로 표시. S/N은 개별형에만 해당하는 필드라 수량형엔 안 보여줌
   function usageInfoHtml(cat) {
     const hidden = cat.hiddenFields || [];
     const fields = cat.type === "individual"
@@ -120,7 +112,7 @@
       : ["expiry", "manufactured", "purchaseDate", "purchasePrice"];
     return fields.map(f => {
       const on = !hidden.includes(f);
-      return `<span class="usebullet ${on ? "on" : "off"}"><span class="dot"></span>${FIELD_LABEL[f]}</span>`;
+      return `<span class="usebullet ${on ? "on" : "off"}">${FIELD_LABEL[f]}</span>`;
     }).join("");
   }
 
@@ -158,17 +150,14 @@
     return `
       <div class="cat-detail-head">
         <h3>${cat.sub} <span class="type-pill">${cat.type === "individual" ? "개별 자산" : "수량 자산"}</span></h3>
-        <div class="cat-detail-acts">
-          ${btn("소분류 수정")}
-          <button class="btn sm icon-only" data-submore aria-label="소분류 관리">${MORE_ICON}</button>
-        </div>
+        <div class="cat-detail-acts">${btn("소분류 수정")}</div>
       </div>
       <div class="kv2 cat-detail-kv">
         <div><div class="k">자산 조회 권한</div><div class="v">${cat.view}</div></div>
         <div><div class="k">배정/보유 변경 권한</div><div class="v">${cat.assign}</div></div>
       </div>
       <div class="cat-usage">
-        <div class="k">사용 정보</div>
+        <div class="k">관리 정보</div>
         <div class="cat-usage-bullets">${usageInfoHtml(cat)}</div>
       </div>
       ${assetSectionHtml(cat)}
@@ -201,6 +190,7 @@
                     <span>${s.sub}</span>
                     <div class="cat-manage-sub-acts">
                       <button class="btn sm" data-act="소분류 이름 변경">이름 변경</button>
+                      <button class="btn sm" data-act="소분류 대분류 이동">대분류 이동</button>
                       <button class="btn sm" data-act="소분류 삭제">삭제</button>
                     </div>
                   </div>`).join("")}
@@ -236,8 +226,8 @@
   function render(sel) {
     const c = document.getElementById("content");
     const groups = groupsOf();
-    if (!sel) sel = { group: groups[0].group, sub: groups[0].subs[0].sub };
-    const cat = categories.find(x => x.group === sel.group && x.sub === sel.sub);
+    if (!sel) sel = firstSelectable(groups);
+    const cat = sel ? categories.find(x => x.group === sel.group && x.sub === sel.sub) : null;
 
     c.innerHTML = `
       <div class="tabs">
@@ -247,7 +237,7 @@
       </div>
       <div class="cat-layout">
         <nav class="cat-tree">${treeHtml(groups, sel)}</nav>
-        <div class="cat-detail">${detailHtml(cat)}</div>
+        <div class="cat-detail">${cat ? detailHtml(cat) : '<p class="muted" style="padding:20px 0">소분류를 선택하세요</p>'}</div>
       </div>
     `;
     c.classList.add("cat-split");
@@ -258,8 +248,6 @@
     });
     c.querySelector("[data-manage]").onclick = () => openManageModal();
     wireAssetSection(c);
-    const submore = c.querySelector("[data-submore]");
-    if (submore) submore.onclick = () => dropdown(submore, ["소분류 수정", "소분류 대분류 이동", "소분류 삭제"]);
   }
 
   window.CategoryScreen = { render: () => render(null) };

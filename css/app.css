@@ -299,19 +299,22 @@ th.c, td.c { text-align: center; width: 52px; }
 .cat-tree-item.active { background: var(--primary-weak); color: var(--primary); font-weight: 600; }
 .cat-tree-count { color: var(--text-mut); font-size: 11px; font-variant-numeric: tabular-nums; }
 .cat-tree-item.active .cat-tree-count { color: var(--primary); }
+.cat-tree-empty { padding: 4px 8px; font-size: 12px; color: var(--text-mut); }
 
 .cat-detail { flex: 1; min-width: 0; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); padding: 20px; }
 .cat-detail-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .cat-detail-head h3 { font-size: 17px; font-weight: 700; }
 .cat-detail-acts { display: flex; gap: 6px; flex-shrink: 0; }
-.cat-detail-kv { grid-template-columns: 110px 1fr 110px 1fr; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
+/* .kv2와 특이성을 똑같이(단일 클래스) 두면 소스 순서상 .kv2에 밀리므로 두 클래스를 묶어 특이성을 더 높여둠 */
+.kv2.cat-detail-kv { grid-template-columns: 110px 1fr 110px 1fr; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
 .cat-usage { margin-top: 14px; }
 .cat-usage .k { color: var(--text-mut); font-size: 12px; margin-bottom: 6px; }
-.cat-usage-bullets { display: flex; flex-wrap: wrap; gap: 4px 16px; }
-.usebullet { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--text-mut); }
-.usebullet.on { color: var(--text); }
-.usebullet .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--line-strong); flex-shrink: 0; }
-.usebullet.on .dot { background: var(--primary); }
+.cat-usage-bullets { display: flex; flex-wrap: nowrap; gap: 6px; overflow-x: auto; }
+.usebullet {
+  display: inline-flex; align-items: center; height: 22px; padding: 0 9px; flex-shrink: 0;
+  border: 1px solid var(--line-strong); border-radius: 6px; font-size: 11px; color: var(--text-mut); white-space: nowrap;
+}
+.usebullet.on { border-color: var(--primary); color: var(--primary); }
 .cat-asset-head { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); margin-bottom: 10px; }
 .cat-asset-head h4 { font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
 .cat-prod-row td:first-child { display: flex; align-items: center; gap: 6px; }

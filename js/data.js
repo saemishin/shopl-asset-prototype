@@ -13,6 +13,9 @@ window.DATA = (function () {
     { group: "소모품", sub: "문구류", type: "quantity", view: "회사의 모든 구성원", assign: "회사의 모든 구성원" },
   ];
 
+  // 대분류만 생성되고 아직 소분류가 없는 상태(생성 직후 등)도 가능 — 샘플로 하나 둠
+  const emptyGroups = ["비품"];
+
   // 개별 자산: 활성 배정(assignments) 0~N건. 각 레코드는 worksite/employee 중 정확히 1개.
   // 수량 자산: stocks 행별 수량. 각 행은 worksite/employee 중 정확히 1개.
   const assets = [
@@ -77,7 +80,7 @@ window.DATA = (function () {
       ] },
   ];
 
-  return { categories, assets };
+  return { categories, assets, emptyGroups };
 })();
 
 /* 자산 관리 공통 날짜 표기: yyyy.mm.dd(요일) hh:mm / 날짜만: yyyy.mm.dd(요일) */
