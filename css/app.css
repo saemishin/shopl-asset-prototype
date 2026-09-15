@@ -349,7 +349,8 @@ th.c, td.c { text-align: center; width: 52px; }
   .detail-split .dgrid { flex: none; }
   .detail-split .dgrid > .dcard { height: auto; overflow: visible; }
 }
-.dsection-head { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+/* min-height: 이력 탭에서 우측 액션 버튼(hactions)이 hidden 처리될 때 행 높이가 줄어 탭 전환마다 덜컹거리는 것 방지 — 버튼 높이(.btn.sm = 28px)로 고정 */
+.dsection-head { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; min-height: 28px; }
 .dsection-head h4 { font-size: 13px; font-weight: 700; }
 .dsection-head > div:not(.dtabs), .dsection-head .hactions { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
 .dsection-head button[data-act] { margin-left: auto; }
@@ -413,11 +414,18 @@ button.dthumb:hover { filter: brightness(0.94); }
   width: 68px; height: 28px; border: 1px solid var(--line-strong); border-radius: 6px;
   padding: 0 8px; font-size: 12.5px; text-align: center; font-variant-numeric: tabular-nums;
 }
-.qty-popover input[type="date"] {
-  width: 152px; height: 28px; border: 1px solid var(--line-strong); border-radius: 6px;
-  padding: 0 8px; font-size: 12.5px;
+/* 날짜 입력 공통 컴포넌트 — YYYY.MM.DD 텍스트 마스킹 + 달력 아이콘(네이티브 피커 오버레이) */
+.dfield { position: relative; display: inline-block; }
+.dfield input[type="text"] {
+  width: 150px; height: 28px; border: 1px solid var(--line-strong); border-radius: 6px;
+  padding: 0 26px 0 8px; font-size: 12.5px; font-variant-numeric: tabular-nums;
 }
-.qty-pop-err { font-size: 11.5px; color: var(--danger); margin-top: 6px; }
+.dfield-pick {
+  position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+  width: 16px; height: 16px; color: var(--text-mut); pointer-events: none;
+}
+.dfield-pick svg { width: 100%; height: 100%; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.dfield-pick input[type="date"] { position: absolute; inset: -6px; opacity: 0; cursor: pointer; pointer-events: auto; }
 .qty-pop-acts { display: flex; justify-content: flex-end; gap: 6px; margin-top: 8px; }
 .btn:disabled { opacity: .45; pointer-events: none; }
 

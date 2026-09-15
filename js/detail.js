@@ -268,7 +268,8 @@
   function assignCurrentHtml(a) {
     const asg = a.assignments || [];
     if (!asg.length) return '<p class="muted" style="padding:6px 0">배정 없음 (재고 상태)</p>';
-    const rows = asg.map((x, idx) => ({ x, idx })).sort((p, q) => (p.x.since < q.x.since ? 1 : -1));
+    const rows = asg.map((x, idx) => ({ x, idx }))
+      .sort((p, q) => p.x.since === q.x.since ? 0 : (p.x.since < q.x.since ? 1 : -1));
     return `<div class="acard-list">${rows.map(({ x, idx }) => `
       <div class="acard" data-idx="${idx}">
         ${typeBadge(x)}
@@ -282,8 +283,44 @@
         </div>
       </div>`).join("")}</div>`;
   }
+  // 공통 날짜 입력 컴포넌트 — YYYY.MM.DD 텍스트 마스킹(8자리 숫자만) + 달력 아이콘(네이티브 피커, 미래 날짜 선택 제한).
+  // 5번째·7번째 숫자 입력 시 자동 마침표. 범위를 벗어나면(자릿수·연도·월·일·미래 날짜) 에러 문구 없이 저장 버튼만 비활성.
+  const IC_CAL = `<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>`;
+  function dateFieldHtml(initialIso) {
+    const disp = initialIso ? initialIso.replace(/-/g, ".") : "";
+    return `
+      <div class="dfield">
+        <input type="text" inputmode="numeric" data-dtext placeholder="YYYY.MM.DD" maxlength="10" value="${disp}">
+        <span class="dfield-pick">${IC_CAL}<input type="date" data-dnative tabindex="-1"></span>
+      </div>`;
+  }
+  // scope 안의 .dfield를 마스킹·검증 로직과 연결하고, 유효한 값을 읽어오는 getter를 반환
+  function wireDateField(scope, maxIso, onChange) {
+    const text = scope.querySelector("[data-dtext]");
+    const native = scope.querySelector("[data-dnative]");
+    native.max = maxIso;
+    const digitsOf = v => v.replace(/\D/g, "").slice(0, 8);
+    const format = d => d.length > 6 ? `${d.slice(0, 4)}.${d.slice(4, 6)}.${d.slice(6)}`
+                       : d.length > 4 ? `${d.slice(0, 4)}.${d.slice(4)}` : d;
+    const getValue = () => {
+      const d = digitsOf(text.value);
+      if (d.length !== 8) return null;                          // 8자리 미만
+      const y = d.slice(0, 4), m = d.slice(4, 6), dd = d.slice(6, 8);
+      const curYear = TODAY.getFullYear();
+      if (+y < curYear - 100 || +y > curYear) return null;       // 연도 범위
+      if (+m < 1 || +m > 12) return null;                        // 월 범위
+      if (+dd < 1 || +dd > 31) return null;                      // 일 범위
+      const iso = `${y}-${m}-${dd}`;
+      return iso > maxIso ? null : iso;                          // 미래 날짜
+    };
+    text.addEventListener("input", () => { text.value = format(digitsOf(text.value)); onChange(); });
+    native.addEventListener("change", () => {
+      if (native.value) text.value = native.value.replace(/-/g, ".");
+      onChange();
+    });
+    return getValue;
+  }
   // 배정일 수정 팝오버 — 대상(구성원/근무지)은 여기서 못 바꿈(재배정으로만), 날짜만 수정
-  // validation: 배정은 예약 개념 없이 즉시 처리되는 게 원칙(2.3)이라 미래 날짜는 불가
   function openDatePopover(anchor, a, idx) {
     document.querySelectorAll(".qty-popover").forEach(m => m.remove());
     const cur = a.assignments[idx].since;
@@ -291,28 +328,20 @@
     const pop = document.createElement("div");
     pop.className = "qty-popover";
     pop.innerHTML = `
-      <input type="date" data-dinput value="${cur}" max="${max}">
-      <div class="qty-pop-err" data-derr hidden>배정일은 오늘보다 미래일 수 없습니다</div>
+      ${dateFieldHtml(cur)}
       <div class="qty-pop-acts">
         <button class="btn sm" data-dcancel>취소</button>
         <button class="btn sm primary" data-dsave>저장</button>
       </div>`;
     const r = anchor.getBoundingClientRect();
-    pop.style.cssText = `position:fixed;top:${r.bottom + 6}px;left:${Math.max(8, r.right - 200)}px`;
+    pop.style.cssText = `position:fixed;top:${r.bottom + 6}px;left:${Math.max(8, r.right - 220)}px`;
     document.body.appendChild(pop);
 
-    const input = pop.querySelector("[data-dinput]");
     const save = pop.querySelector("[data-dsave]");
-    const err = pop.querySelector("[data-derr]");
-    const sync = () => {
-      const future = input.value > max;
-      err.hidden = !future;
-      save.disabled = !input.value || future;
-    };
-    input.addEventListener("input", sync);
+    const getValue = wireDateField(pop, max, () => { save.disabled = !getValue(); });
     save.onclick = () => {
-      if (!input.value || input.value > max) return;
-      const v = input.value;
+      const v = getValue();
+      if (!v) return;
       const x = a.assignments[idx];
       const name = x.employee || x.worksite;
       x.since = v;
@@ -322,8 +351,8 @@
       render();
     };
     pop.querySelector("[data-dcancel]").onclick = () => pop.remove();
-    sync();
-    input.focus();
+    save.disabled = !getValue();
+    pop.querySelector("[data-dtext]").focus();
     setTimeout(() => {
       const close = e => { if (!pop.contains(e.target) && e.target !== anchor) { pop.remove(); document.removeEventListener("click", close); } };
       document.addEventListener("click", close);
@@ -525,7 +554,7 @@
       { k: "제조연월일", field: "manufactured", v: a.manufactured ? window.fmtDate(a.manufactured) : '<span class="muted">—</span>' },
       { k: "구매일", field: "purchaseDate", v: a.purchaseDate ? window.fmtDate(a.purchaseDate) : "—" },
       { k: isIndiv ? "구매가격" : "구매가격 (품목 단가)", field: "purchasePrice", v: a.price ? a.price.toLocaleString() + "원" : "—" },
-      { k: "등록일", v: window.fmtDate(a.createdAt) },
+      { k: "자산 등록일", v: window.fmtDate(a.createdAt) },
       { k: "QR 라벨", v: qrBtn },
       { k: "메모", v: memoHtml(a.note) },
     ].filter(Boolean)
