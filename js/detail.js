@@ -122,9 +122,9 @@
    * 유형별 스크립트 정의는 구조설계안 5.5 참조. 아직 트리거할 UI가 없는 유형(소분류 이동·자산정보 수정·사진)은 그 기능을 만들 때 추가. */
   // 초기 스냅샷(합성 데이터) — 세션 시작 시 자산의 현재 상태로부터 한 번만 만들어지는 베이스라인
   function activityOf(a) {
-    const ev = [{ d: `${a.createdAt || a.purchaseDate || "2024-01-01"} 09:00`, script: "자산 생성", who: "dana" }];
+    const ev = [{ d: `${a.createdAt || a.purchaseDate || "2024-01-01"} 09:00`, script: "자산 등록", who: "dana" }];
     (a.assignments || []).forEach(x => ev.push({
-      d: `${x.since} 09:00`, script: "배정 추가", target: x, before: "", after: window.fmtDate(x.since), who: "dana",
+      d: `${x.since} 09:00`, script: "신규 배정", target: x, before: "", after: window.fmtDate(x.since), who: "dana",
     }));
     (a.stocks || []).forEach(x => ev.push({
       d: `${a.purchaseDate || "2025-01-01"} 09:00`, script: "보유 대상 추가", target: x, before: "", after: `${x.qty}개`, who: "dana",
