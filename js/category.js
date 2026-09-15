@@ -213,7 +213,7 @@
         return `
         <div class="cat-manage-group">
           <div class="cat-manage-row cat-manage-group-row" draggable="true" data-drag="group" data-gi="${gi}">
-            <span class="cat-manage-handle" title="드래그해서 순서 변경">${HANDLE_ICON}</span>
+            <span class="cat-manage-handle" data-tip="순서 변경">${HANDLE_ICON}</span>
             <input type="text" class="cat-manage-name-input" data-rename-group="${gi}" value="${g.name}" maxlength="30">
             <div class="cat-manage-row-acts">
               <button class="cat-manage-icon${blocked ? " is-disabled" : ""}" data-del-group="${gi}" aria-label="삭제"
@@ -225,7 +225,7 @@
               const hasAssets = assetsOf(s.data.group, s.data.sub).length > 0;
               return `
               <div class="cat-manage-row cat-manage-sub-row" draggable="true" data-drag="sub" data-gi="${gi}" data-si="${si}">
-                <span class="cat-manage-handle" title="드래그해서 순서·대분류 변경">${HANDLE_ICON}</span>
+                <span class="cat-manage-handle" data-tip="순서 변경 및 대분류 이동">${HANDLE_ICON}</span>
                 <input type="text" class="cat-manage-name-input" data-rename-sub="${gi}|${si}" value="${s.name}" maxlength="30">
                 <div class="cat-manage-row-acts">
                   <button class="cat-manage-icon${hasAssets ? " is-disabled" : ""}" data-del-sub="${gi}|${si}" aria-label="삭제"
