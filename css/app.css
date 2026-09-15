@@ -494,8 +494,7 @@ button.dthumb:hover { filter: brightness(0.94); }
 }
 .hcard-who { font-size: 11.5px; font-weight: 600; color: var(--text-sub); }
 .hcard-time { font-size: 11px; color: var(--text-mut); }
-.hcard-time::before { content: "· "; }
-.hcard-target { margin-top: 8px; }
+.hcard-time::after { content: " ·"; }
 .hcard-script { margin-top: 8px; font-size: 13px; font-weight: 600; }
 .hcard-diff {
   margin-top: 8px; border: 1px solid var(--line); border-radius: 8px;
