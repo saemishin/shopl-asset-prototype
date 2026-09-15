@@ -23,6 +23,8 @@
     });
   }
   const MORE_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg>`;
+  const PLUS_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>`;
+  const SORT_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 15l5 5 5-5M7 9l5-5 5 5"/></svg>`;
   const STATUS_LABEL = { stock: "재고", assigned: "배정중", repair: "수리중", lost: "분실", disposed: "폐기" };
   const FIELD_LABEL = { expiry: "유효기한", serial: "S/N", manufactured: "제조연월일", purchaseDate: "구매일", purchasePrice: "구매가격" };
   const btn = (label, cls = "btn sm") => `<button class="${cls}" data-act="${label}">${label}</button>`;
@@ -43,7 +45,15 @@
   }
 
   function treeHtml(groups, sel) {
-    return groups.map(({ group, subs }) => `
+    const head = `
+      <div class="cat-tree-head">
+        <span class="cat-tree-head-label">대분류</span>
+        <div class="cat-tree-head-acts">
+          <button class="btn sm icon-only" data-act="대분류 순서 편집" aria-label="대분류 순서 편집" title="순서 편집">${SORT_ICON}</button>
+          <button class="btn sm icon-only" data-act="대분류 추가" aria-label="대분류 추가" title="대분류 추가">${PLUS_ICON}</button>
+        </div>
+      </div>`;
+    const body = groups.map(({ group, subs }) => `
       <div class="cat-tree-group">
         <div class="cat-tree-label">${group}</div>
         ${subs.map(s => `
@@ -52,6 +62,7 @@
             ${s.sub}<span class="cat-tree-count">${assetsOf(group, s.sub).length}</span>
           </button>`).join("")}
       </div>`).join("");
+    return head + body;
   }
 
   function assetRowHtml(a) {
@@ -72,10 +83,7 @@
     const hiddenLabel = hidden.length ? hidden.map(f => FIELD_LABEL[f] || f).join(", ") : "숨김 필드 없음";
     return `
       <div class="cat-detail-head">
-        <div>
-          <div class="cat-detail-crumb">${cat.group} › ${cat.sub}</div>
-          <h3>${cat.sub}</h3>
-        </div>
+        <h3>${cat.sub}</h3>
         <div class="cat-detail-acts">
           ${btn("소분류 수정")}
           <button class="btn sm icon-only" data-submore aria-label="소분류 관리">${MORE_ICON}</button>
@@ -111,9 +119,6 @@
         <a href="assets.html">현황</a>
         <a class="active">분류</a>
         <a href="settings.html">설정</a>
-      </div>
-      <div class="toolbar">
-        <div class="right">${btn("대분류 추가", "btn sm primary")}</div>
       </div>
       <div class="cat-layout">
         <nav class="cat-tree">${treeHtml(groups, sel)}</nav>

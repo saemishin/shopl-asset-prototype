@@ -282,7 +282,14 @@ th.c, td.c { text-align: center; width: 52px; }
 
 /* ============ 분류 관리 ============ */
 .cat-layout { display: flex; gap: 24px; align-items: flex-start; }
-.cat-tree { width: 200px; flex-shrink: 0; display: flex; flex-direction: column; gap: 16px; }
+.cat-tree {
+  width: 220px; flex-shrink: 0; display: flex; flex-direction: column; gap: 16px;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--panel); padding: 16px;
+}
+.cat-tree-head { display: flex; align-items: center; gap: 6px; padding: 0 2px; }
+.cat-tree-head-label { font-size: 12.5px; font-weight: 700; }
+.cat-tree-head-acts { margin-left: auto; display: flex; gap: 4px; }
+.cat-tree-head-acts .btn svg { width: 14px; height: 14px; }
 .cat-tree-group { display: flex; flex-direction: column; gap: 1px; }
 .cat-tree-label { font-size: 11px; font-weight: 700; color: var(--text-mut); letter-spacing: .02em; padding: 0 8px; margin-bottom: 5px; }
 .cat-tree-item {
@@ -295,11 +302,10 @@ th.c, td.c { text-align: center; width: 52px; }
 .cat-tree-item.active .cat-tree-count { color: var(--primary); }
 
 .cat-detail { flex: 1; min-width: 0; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); padding: 20px; }
-.cat-detail-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-.cat-detail-crumb { font-size: 11.5px; color: var(--text-mut); }
-.cat-detail-head h3 { font-size: 17px; font-weight: 700; margin-top: 3px; }
+.cat-detail-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.cat-detail-head h3 { font-size: 17px; font-weight: 700; }
 .cat-detail-acts { display: flex; gap: 6px; flex-shrink: 0; }
-.cat-detail-kv { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
+.cat-detail-kv { grid-template-columns: 110px 1fr 110px 1fr; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
 .cat-asset-head { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); margin-bottom: 10px; }
 .cat-asset-head h4 { font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
 
