@@ -158,8 +158,11 @@
     const m = document.createElement("div");
     m.className = "modal-back";
     m.innerHTML = `
-      <div class="modal">
-        <h3>${p.product}</h3>
+      <div class="modal help-modal">
+        <div class="help-modal-head">
+          <h3>${p.product}</h3>
+          <button type="button" class="btn icon-only sm" data-close aria-label="닫기">${CLOSE_ICON}</button>
+        </div>
         <div class="body">
           <div class="cat-unit-list">
             ${p.items.map(a => `
@@ -168,9 +171,6 @@
                 <span class="badge ${a.status}">${STATUS_LABEL[a.status]}</span>
               </a>`).join("")}
           </div>
-        </div>
-        <div class="foot">
-          <button class="btn" data-close>닫기</button>
         </div>
       </div>`;
     document.body.appendChild(m);
@@ -260,7 +260,7 @@
     container.innerHTML = `
       <div class="field">
         <label>대분류</label>
-        <div class="cat-manage-create-group">${opts.groupLabel}</div>
+        <p class="field-static">${opts.groupLabel}</p>
       </div>
       <div class="field">
         <label>소분류명<span class="req">*</span></label>
@@ -268,11 +268,15 @@
       </div>
       <div class="field">
         <label>자산 유형<span class="req">*</span> <button type="button" class="help-icon" data-f-type-help aria-label="자산 유형 도움말">?</button></label>
-        <div class="seg" data-f-type>
-          <button type="button" data-val="individual" class="${state.type === "individual" ? "active" : ""}"${typeLocked ? " disabled" : ""}>개별 자산</button>
-          <button type="button" data-val="quantity" class="${state.type === "quantity" ? "active" : ""}"${typeLocked ? " disabled" : ""}>수량 자산</button>
-        </div>
-        ${typeLocked ? '<p class="hint" style="margin-top:6px">등록된 자산이 있어 자산 유형을 변경할 수 없습니다.</p>' : ""}
+        ${typeLocked ? `
+          <p class="hint" style="margin:4px 0 8px">등록된 자산이 있어 자산 유형을 변경할 수 없습니다.</p>
+          <p class="field-static">${state.type === "individual" ? "개별 자산" : "수량 자산"}</p>
+        ` : `
+          <div class="seg" data-f-type>
+            <button type="button" data-val="individual" class="${state.type === "individual" ? "active" : ""}">개별 자산</button>
+            <button type="button" data-val="quantity" class="${state.type === "quantity" ? "active" : ""}">수량 자산</button>
+          </div>
+        `}
       </div>
       <div class="field">
         <label>자산 조회 권한<span class="req">*</span></label>
@@ -928,7 +932,7 @@
     });
     c.querySelectorAll("[data-asset]").forEach(row => row.onclick = e => {
       e.stopPropagation();
-      location.href = `asset-detail.html?id=${row.dataset.asset}`;
+      window.open(`asset-detail.html?id=${row.dataset.asset}`, "_blank", "noopener");
     });
   }
 
