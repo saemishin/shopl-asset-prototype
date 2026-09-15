@@ -123,17 +123,15 @@
         </div>
       </div>`;
   }
+  // 이미지만 보여주는 가벼운 라이트박스 — 타이틀/푸터 없이 우상단 x로만 닫음
   function openLabelPreview(a) {
     const back = document.createElement("div");
     back.className = "modal-back";
     back.style.zIndex = 350;
     back.innerHTML = `
-      <div class="modal" style="width:300px">
-        <h3>라벨 미리보기</h3>
-        <div class="body" style="display:flex;justify-content:center;padding-top:20px">${labelSheetHtml(a)}</div>
-        <div class="foot">
-          <button class="btn" data-close>닫기</button>
-        </div>
+      <div class="label-pop">
+        <button class="label-pop-close" data-close aria-label="닫기">✕</button>
+        ${labelSheetHtml(a)}
       </div>`;
     back.addEventListener("click", e => { if (e.target === back) back.remove(); });
     back.querySelector("[data-close]").onclick = () => back.remove();
@@ -148,7 +146,7 @@
         <div class="body" style="display:flex;gap:16px;align-items:center">
           <button class="qr-thumb" data-preview aria-label="라벨 미리보기">
             ${qrSampleSvg()}
-            <span class="qr-thumb-hover">미리보기</span>
+            <span class="qr-thumb-hover">라벨 미리보기</span>
           </button>
           <div>
             <p style="font-size:13px;font-weight:600">${a.product}${a.assetNo ? ` / ${a.assetNo}` : ""}</p>
@@ -156,7 +154,7 @@
           </div>
         </div>
         <div class="foot">
-          <button class="btn primary" data-act="QR 라벨 다운로드">다운로드</button>
+          <button class="btn primary" data-act="라벨 다운로드">라벨 다운로드</button>
           <button class="btn" data-close>닫기</button>
         </div>
       </div>`;

@@ -312,7 +312,14 @@ th.c, td.c { text-align: center; width: 52px; }
   opacity: 0; transition: opacity .15s;
 }
 .qr-thumb:hover .qr-thumb-hover { opacity: 1; }
-/* 실제 라벨(다운로드 이미지) 구성 미리보기 */
+/* 실제 라벨(다운로드 이미지) 구성 미리보기 — 타이틀/푸터 없는 가벼운 라이트박스(openLabelPreview) */
+.label-pop { position: relative; background: var(--panel); border-radius: 12px; box-shadow: 0 20px 60px rgba(0,0,0,.25); }
+.label-pop-close {
+  position: absolute; top: -12px; right: -12px; width: 28px; height: 28px; border-radius: 50%;
+  background: var(--panel); border: 1px solid var(--line); box-shadow: 0 2px 8px rgba(0,0,0,.15);
+  display: flex; align-items: center; justify-content: center; color: var(--text-sub); font-size: 12px;
+}
+.label-pop-close:hover { background: #f0f1f3; color: var(--text); }
 .label-sheet {
   width: 200px; display: flex; flex-direction: column; align-items: center; gap: 12px;
   border: 1px dashed var(--line-strong); border-radius: 10px; padding: 24px 16px;
