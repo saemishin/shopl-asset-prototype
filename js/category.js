@@ -1,4 +1,4 @@
-/* 분류 관리 — 분류-1 메인 화면(대분류 섹션 + 소분류 요약 테이블) */
+/* 분류 관리 — 분류-1 메인 화면. 좌측 트리(대분류는 그룹 헤더, 소분류만 선택 가능) + 우측(선택된 소분류 정보 + 자산 목록) */
 (function () {
   const { categories, assets } = window.DATA;
 
@@ -23,14 +23,15 @@
     });
   }
   const MORE_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg>`;
+  const STATUS_LABEL = { stock: "재고", assigned: "배정중", repair: "수리중", lost: "분실", disposed: "폐기" };
+  const FIELD_LABEL = { expiry: "유효기한", serial: "S/N", manufactured: "제조연월일", purchaseDate: "구매일", purchasePrice: "구매가격" };
   const btn = (label, cls = "btn sm") => `<button class="${cls}" data-act="${label}">${label}</button>`;
   const bindActs = scope => scope.querySelectorAll("[data-act]").forEach(b =>
     b.onclick = () => toast(`"${b.dataset.act}" — 이후 단계에서 정의`));
 
-  const countOf = (group, sub) => assets.filter(a => a.group === group && a.sub === sub).length;
+  const assetsOf = (group, sub) => assets.filter(a => a.group === group && a.sub === sub);
 
-  // 대분류 노출 순서는 categories 배열 등장 순서 그대로(4.2: 실제로는 조회 권한 통과하는 소분류가 있는 대분류만 노출되지만,
-  // 이 화면은 자산관리 권한 보유자 기준이라 전부 노출)
+  // 대분류 등장 순서대로 그룹핑(소분류는 categories 배열 순서 그대로)
   function groupsOf() {
     const order = [];
     const map = {};
@@ -41,44 +42,70 @@
     return order.map(group => ({ group, subs: map[group] }));
   }
 
-  function subRowHtml(group, s) {
-    return `
-      <tr>
-        <td>${s.sub}</td>
-        <td><span class="type-pill">${s.type === "individual" ? "개별 자산" : "수량 자산"}</span></td>
-        <td>${s.view}</td>
-        <td>${s.assign}</td>
-        <td class="num">${countOf(group, s.sub)}</td>
-        <td class="c"><button class="btn sm icon-only" data-submore="${group}|${s.sub}" aria-label="소분류 관리">${MORE_ICON}</button></td>
-      </tr>`;
-  }
-  function groupSectionHtml({ group, subs }) {
-    return `
-      <section class="cat-group">
-        <div class="cat-group-head">
-          <h4>${group} <span class="chip">소분류 ${subs.length}개</span></h4>
-          <div class="cat-group-acts">
-            ${btn("소분류 추가")}
-            <button class="btn sm icon-only" data-groupmore="${group}" aria-label="대분류 관리">${MORE_ICON}</button>
-          </div>
-        </div>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>소분류</th><th>자산 유형</th><th>자산 조회 권한</th><th>배정/보유 변경 권한</th>
-                <th class="num">자산 수</th><th class="c"></th>
-              </tr>
-            </thead>
-            <tbody>${subs.map(s => subRowHtml(group, s)).join("")}</tbody>
-          </table>
-        </div>
-      </section>`;
+  function treeHtml(groups, sel) {
+    return groups.map(({ group, subs }) => `
+      <div class="cat-tree-group">
+        <div class="cat-tree-label">${group}</div>
+        ${subs.map(s => `
+          <button class="cat-tree-item${sel.group === group && sel.sub === s.sub ? " active" : ""}"
+                  data-tree="${group}|${s.sub}">
+            ${s.sub}<span class="cat-tree-count">${assetsOf(group, s.sub).length}</span>
+          </button>`).join("")}
+      </div>`).join("");
   }
 
-  function render() {
+  function assetRowHtml(a) {
+    const right = a.type === "individual"
+      ? `<span class="badge ${a.status}">${STATUS_LABEL[a.status]}</span>`
+      : `${(a.stocks || []).reduce((s, x) => s + x.qty, 0)}개 · 보유 ${(a.stocks || []).length}곳`;
+    return `
+      <tr class="clickable" data-asset="${a.id}">
+        <td>${a.product}</td>
+        <td>${right}</td>
+        <td>${a.expiry ? window.fmtDate(a.expiry) : '<span class="muted">—</span>'}</td>
+      </tr>`;
+  }
+
+  function detailHtml(cat) {
+    const list = assetsOf(cat.group, cat.sub);
+    const hidden = cat.hiddenFields || [];
+    const hiddenLabel = hidden.length ? hidden.map(f => FIELD_LABEL[f] || f).join(", ") : "숨김 필드 없음";
+    return `
+      <div class="cat-detail-head">
+        <div>
+          <div class="cat-detail-crumb">${cat.group} › ${cat.sub}</div>
+          <h3>${cat.sub}</h3>
+        </div>
+        <div class="cat-detail-acts">
+          ${btn("소분류 수정")}
+          <button class="btn sm icon-only" data-submore aria-label="소분류 관리">${MORE_ICON}</button>
+        </div>
+      </div>
+      <div class="kv2 cat-detail-kv">
+        <div><div class="k">자산 유형</div><div class="v"><span class="type-pill">${cat.type === "individual" ? "개별 자산" : "수량 자산"}</span></div></div>
+        <div><div class="k">자산 조회 권한</div><div class="v">${cat.view}</div></div>
+        <div><div class="k">배정/보유 변경 권한</div><div class="v">${cat.assign}</div></div>
+        <div><div class="k">필드 노출 설정</div><div class="v">${hiddenLabel}</div></div>
+      </div>
+      <div class="cat-asset-head">
+        <h4>자산 목록 <span class="chip">전체 ${list.length}</span></h4>
+      </div>
+      ${list.length ? `
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>제품명</th><th>${cat.type === "individual" ? "상태" : "보유 현황"}</th><th>유효기한</th></tr></thead>
+            <tbody>${list.map(assetRowHtml).join("")}</tbody>
+          </table>
+        </div>` : '<p class="muted" style="padding:12px 0">등록된 자산이 없습니다</p>'}
+    `;
+  }
+
+  function render(sel) {
     const c = document.getElementById("content");
     const groups = groupsOf();
+    if (!sel) sel = { group: groups[0].group, sub: groups[0].subs[0].sub };
+    const cat = categories.find(x => x.group === sel.group && x.sub === sel.sub);
+
     c.innerHTML = `
       <div class="tabs">
         <a href="assets.html">현황</a>
@@ -88,14 +115,22 @@
       <div class="toolbar">
         <div class="right">${btn("대분류 추가", "btn sm primary")}</div>
       </div>
-      <div class="cat-groups">${groups.map(groupSectionHtml).join("")}</div>
+      <div class="cat-layout">
+        <nav class="cat-tree">${treeHtml(groups, sel)}</nav>
+        <div class="cat-detail">${detailHtml(cat)}</div>
+      </div>
     `;
     bindActs(c);
-    c.querySelectorAll("[data-groupmore]").forEach(b => b.onclick = () =>
-      dropdown(b, ["대분류 수정", "대분류 삭제"]));
-    c.querySelectorAll("[data-submore]").forEach(b => b.onclick = () =>
-      dropdown(b, ["소분류 수정", "소분류 대분류 이동", "소분류 삭제"]));
+    c.querySelectorAll("[data-tree]").forEach(b => b.onclick = () => {
+      const [group, sub] = b.dataset.tree.split("|");
+      render({ group, sub });
+    });
+    c.querySelectorAll("[data-asset]").forEach(row => row.onclick = () => {
+      location.href = `asset-detail.html?id=${row.dataset.asset}`;
+    });
+    const submore = c.querySelector("[data-submore]");
+    if (submore) submore.onclick = () => dropdown(submore, ["소분류 수정", "소분류 대분류 이동", "소분류 삭제"]);
   }
 
-  window.CategoryScreen = { render };
+  window.CategoryScreen = { render: () => render(null) };
 })();
