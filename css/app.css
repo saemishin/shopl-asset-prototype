@@ -328,7 +328,8 @@ th.c, td.c { text-align: center; width: 52px; }
 /* 컬럼 폭이 넓어지니 숫자를 오른쪽 정렬하면 옆 컬럼과 붙어 보임 — 이 표는 컬럼 폭 안에서 왼쪽 정렬이 더 보기 편함 */
 .cat-asset-table .num { text-align: left; }
 .cat-asset-search { margin-bottom: 10px; }
-.cat-asset-search input { width: 100%; height: 32px; border: 1px solid var(--line-strong); border-radius: var(--radius); padding: 0 10px; font-size: 12.5px; background: var(--panel); }
+.cat-asset-empty { display: flex; align-items: center; gap: 12px; padding: 12px 0; }
+.cat-asset-empty p { margin: 0; }
 .cat-unit-list { display: flex; flex-direction: column; gap: 2px; max-height: 50vh; overflow-y: auto; }
 .cat-unit-row {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
@@ -366,6 +367,7 @@ button.usebullet { background: var(--panel); font: inherit; cursor: pointer; }
 .help-modal .body { display: flex; flex-direction: column; gap: 16px; font-size: 13px; line-height: 1.6; color: var(--text); }
 .help-modal .body b { display: block; margin-bottom: 4px; }
 .radio-row { display: flex; align-items: center; gap: 8px; padding: 9px 4px; font-size: 13px; cursor: pointer; }
+.radio-row.is-disabled { opacity: .4; cursor: not-allowed; }
 .radio-row input { width: 16px; height: 16px; accent-color: var(--primary); flex-shrink: 0; }
 .cat-manage-fieldlist { display: flex; flex-direction: column; }
 .cat-manage-fieldrow { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 12.5px; }

@@ -209,6 +209,20 @@
     }).join("");
   }
 
+  // 현황 페이지 검색창(searchbox/search/search-clear)과 동일한 패턴 — 평소엔 좁고 "검색", 포커스하면 넓어지며 "제품명"
+  const ASSET_SEARCH_HTML = `
+    <div class="cat-asset-search">
+      <div class="searchbox">
+        <input class="search" type="text" data-product-search placeholder="검색">
+        <button class="search-clear" type="button" data-product-search-clear aria-label="검색어 지우기">✕</button>
+      </div>
+    </div>`;
+  const assetEmptyHtml = () => `
+    <div class="cat-asset-empty">
+      <p class="muted">등록된 자산이 없습니다.</p>
+      <button class="btn sm" data-add-asset>자산 추가</button>
+    </div>`;
+
   function assetSectionHtml(cat) {
     if (cat.type === "individual") {
       const products = productsOf(cat.group, cat.sub);
@@ -219,14 +233,14 @@
           <p class="cat-asset-count">전체 ${total}</p>
         </div>
         ${products.length ? `
-          <div class="cat-asset-search"><input type="text" data-product-search placeholder="제품명 검색"></div>
+          ${ASSET_SEARCH_HTML}
           <div class="table-wrap">
             <table class="cat-asset-table">
               <thead><tr><th>제품명</th><th class="num">전체</th><th class="num">배정중</th><th class="num">재고</th><th class="num">기타</th></tr></thead>
               <tbody>${products.map(productRowHtml).join("")}</tbody>
             </table>
           </div>
-          <p class="muted" data-search-empty hidden style="padding:12px 0">검색 결과가 없습니다</p>` : '<p class="muted" style="padding:12px 0">등록된 자산이 없습니다</p>'}`;
+          <p class="muted" data-search-empty hidden style="padding:12px 0">검색 결과가 없습니다.</p>` : assetEmptyHtml()}`;
     }
     const list = assetsOf(cat.group, cat.sub);
     return `
@@ -235,14 +249,14 @@
         <p class="cat-asset-count">전체 ${list.length}</p>
       </div>
       ${list.length ? `
-        <div class="cat-asset-search"><input type="text" data-product-search placeholder="제품명 검색"></div>
+        ${ASSET_SEARCH_HTML}
         <div class="table-wrap">
           <table class="cat-asset-table">
             <thead><tr><th>제품명</th><th class="num">보유 수량</th><th class="num">보유 대상</th><th>유효기한</th></tr></thead>
             <tbody>${list.map(stockRowHtml).join("")}</tbody>
           </table>
         </div>
-        <p class="muted" data-search-empty hidden style="padding:12px 0">검색 결과가 없습니다</p>` : '<p class="muted" style="padding:12px 0">등록된 자산이 없습니다</p>'}`;
+        <p class="muted" data-search-empty hidden style="padding:12px 0">검색 결과가 없습니다.</p>` : assetEmptyHtml()}`;
   }
 
   function detailHtml(cat) {
@@ -414,13 +428,18 @@
         </div>`;
     }
     function render() {
-      const options = isView ? VIEW_OPTIONS : ASSIGN_BY_VIEW[state.view].options;
-      body.innerHTML = options.map(v => `
-        <label class="radio-row">
-          <input type="radio" name="perm-pick" value="${v}"${v === picked ? " checked" : ""}>
+      // 배정/보유 변경 권한은 조회 권한값에 따라 고를 수 있는 옵션이 제한되지만(구조설계안 4.3), 옵션 자체를 숨기지 않고
+      // 5개 다 보여준 채로 선택 불가한 것만 비활성 처리 — 뭐가 왜 안 되는지는 목록만 봐도 자연스럽게 드러나서 별도 툴팁은 안 둠
+      const allowedSet = isView ? null : new Set(ASSIGN_BY_VIEW[state.view].options);
+      body.innerHTML = VIEW_OPTIONS.map(v => {
+        const isDisabled = allowedSet && !allowedSet.has(v);
+        return `
+        <label class="radio-row${isDisabled ? " is-disabled" : ""}">
+          <input type="radio" name="perm-pick" value="${v}"${v === picked ? " checked" : ""}${isDisabled ? " disabled" : ""}>
           <span>${v}</span>
         </label>
-        ${picked === v && TARGET_NEEDED.has(v) ? `<div class="perm-target-wrap">${targetSummaryHtml(v)}</div>` : ""}`).join("")
+        ${picked === v && TARGET_NEEDED.has(v) ? `<div class="perm-target-wrap">${targetSummaryHtml(v)}</div>` : ""}`;
+      }).join("")
         + (isView ? `<div class="perm-info-note">${INFO_ICON}<span>관리자라도 조회 권한을 부여받아야 이 정보를 볼 수 있습니다.</span></div>` : "");
 
       body.querySelectorAll('input[name="perm-pick"]').forEach(r => r.onchange = () => { picked = r.value; render(); });
@@ -976,10 +995,12 @@
     });
     const searchInput = c.querySelector("[data-product-search]");
     if (searchInput) {
+      const sbox = searchInput.closest(".searchbox");
+      const clearBtn = c.querySelector("[data-product-search-clear]");
       const rows = [...c.querySelectorAll(".cat-asset-table tbody tr")];
       const emptyMsg = c.querySelector("[data-search-empty]");
-      searchInput.addEventListener("input", e => {
-        const q = e.target.value.trim().toLowerCase();
+      const applyFilter = () => {
+        const q = searchInput.value.trim().toLowerCase();
         let anyVisible = false;
         rows.forEach(tr => {
           const match = !q || tr.querySelector("td").textContent.toLowerCase().includes(q);
@@ -987,8 +1008,15 @@
           if (match) anyVisible = true;
         });
         if (emptyMsg) emptyMsg.hidden = anyVisible;
-      });
+        sbox.classList.toggle("has-term", !!searchInput.value);
+      };
+      searchInput.addEventListener("input", applyFilter);
+      searchInput.onfocus = () => { searchInput.classList.add("expanded"); searchInput.placeholder = "제품명"; };
+      searchInput.onblur = () => { if (!searchInput.value) { searchInput.classList.remove("expanded"); searchInput.placeholder = "검색"; } };
+      clearBtn.onclick = () => { searchInput.value = ""; applyFilter(); searchInput.focus(); };
     }
+    const addAssetBtn = c.querySelector("[data-add-asset]");
+    if (addAssetBtn) addAssetBtn.onclick = () => window.openAssetAddModal({ type: cat.type });
   }
 
   function render(sel) {
