@@ -35,7 +35,7 @@
     const back = document.createElement("div");
     back.className = "modal-back";
     back.innerHTML = `
-      <div class="modal">
+      <div class="modal sm">
         <h3>태그 관리</h3>
         <div class="body">
           <div class="tag-manage-add">
@@ -125,7 +125,7 @@
     const back = document.createElement("div");
     back.className = "modal-back";
     back.innerHTML = `
-      <div class="modal">
+      <div class="modal sm">
         <h3>소분류</h3>
         <div class="body">
           <input type="text" class="picker-search" data-cp-search placeholder="검색" autocomplete="off">
