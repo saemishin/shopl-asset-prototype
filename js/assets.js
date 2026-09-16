@@ -624,12 +624,14 @@
       let listHtml = "";
       if (group === "category") {
         listHtml = [...CAT_GROUPS.entries()].map(([g, subs]) => {
-          const filtered = subs.filter(s => !q || g.toLowerCase().includes(q) || s.toLowerCase().includes(q));
+          // 검색어가 대분류명 자체에 걸리면 대분류 통째로, 소분류명에만 걸리면 대분류 헤더 없이 소분류만 나열
+          const groupMatches = !q || g.toLowerCase().includes(q);
+          const filtered = subs.filter(s => groupMatches || s.toLowerCase().includes(q));
           if (!filtered.length) return "";
           const keys = filtered.map(s => `${g}/${s}`);
           const all = keys.every(k => draft.category.includes(k));
-          const parent = optRow(all, `<b>${g}</b>`, `grp:${g}`);
-          const kids = filtered.map(s => optRow(draft.category.includes(`${g}/${s}`), s, `${g}/${s}`, "child")).join("");
+          const parent = groupMatches ? optRow(all, `<b>${g}</b>`, `grp:${g}`) : "";
+          const kids = filtered.map(s => optRow(draft.category.includes(`${g}/${s}`), s, `${g}/${s}`, groupMatches ? "child" : "")).join("");
           return parent + kids;
         }).join("");
         if (!listHtml) listHtml = `<p class="muted" style="padding:12px 2px">결과가 없습니다.</p>`;
@@ -736,68 +738,72 @@
     const m = modal(`
       <div class="modal lg">
         <h3>QR 다운로드</h3>
-        <div class="body">
+        <div class="body" style="display:flex;flex-direction:column;max-height:56vh">
           <input type="text" class="picker-search" id="qr-search" placeholder="고유관리번호/제품명">
-          <div id="qr-dynamic"></div>
+          <div class="picker-toolbar">
+            <label class="picker-check"><input type="checkbox" id="qr-page-all"><span>현재 페이지 전체 선택</span></label>
+          </div>
+          <div id="qr-rows" style="flex:1;min-height:0;overflow-y:auto"></div>
+          <div class="pager" id="qr-pager" style="padding-top:10px"></div>
         </div>
-        <div class="foot">
+        <div class="foot" style="flex-direction:column;align-items:stretch;gap:8px">
           <span class="sum" id="qr-sum">선택됨 0</span>
-          <button class="btn" data-close>취소</button>
-          <button class="btn primary" id="qr-go" disabled>다운로드</button>
+          <div style="display:flex;justify-content:flex-end;gap:8px">
+            <button class="btn" data-close>취소</button>
+            <button class="btn primary" id="qr-go" disabled>다운로드</button>
+          </div>
         </div>
       </div>`);
     m.querySelector("#qr-search").oninput = e => { query = e.target.value; page = 1; renderList(); };
 
     function renderList() {
-      const dyn = m.querySelector("#qr-dynamic");
       const fl = filteredList();
       const totalPages = Math.max(1, Math.ceil(fl.length / PAGE_SIZE));
       if (page > totalPages) page = totalPages;
       const pageItems = fl.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-      const rows = pageItems.map(a => `<label class="picker-member-row">
+      const rowsEl = m.querySelector("#qr-rows");
+      rowsEl.innerHTML = pageItems.map(a => `<label class="picker-member-row">
         <input type="checkbox" data-id="${a.id}" ${sel.has(a.id) ? "checked" : ""}>
         <span class="picker-member-info" style="flex:1">
-          <b>${a.product}</b><span>${a.group} › ${a.sub}</span>
+          <b>${a.product}</b><span>${a.assetNo || "—"}</span>
         </span>
-        <span class="muted">${a.assetNo || "—"}</span>
-      </label>`).join("");
+        <span class="muted">${a.group} › ${a.sub}</span>
+      </label>`).join("") || '<p class="muted" style="padding:16px 0">대상 자산이 없습니다.</p>';
       const pageAllChecked = pageItems.length > 0 && pageItems.every(a => sel.has(a.id));
-      dyn.innerHTML = `
-        <div class="picker-toolbar">
-          <label class="picker-check"><input type="checkbox" id="qr-page-all" ${pageAllChecked ? "checked" : ""}><span>현재 페이지 전체 선택</span></label>
-        </div>
-        ${rows || '<p class="muted" style="padding:16px 0">대상 자산이 없습니다.</p>'}
-        ${fl.length > PAGE_SIZE ? `
-          <div class="pager" style="padding:12px 0 0">
-            <button data-qp="prev" ${page === 1 ? "disabled" : ""}>‹</button>
-            <span style="padding:0 6px;font-size:12.5px;color:var(--text-sub)">${page} / ${totalPages}</span>
-            <button data-qp="next" ${page === totalPages ? "disabled" : ""}>›</button>
-          </div>` : ""}
-      `;
-      dyn.querySelector("#qr-page-all").onchange = e => {
+      m.querySelector("#qr-page-all").checked = pageAllChecked;
+      m.querySelector("#qr-page-all").onchange = e => {
         pageItems.forEach(a => e.target.checked ? sel.add(a.id) : sel.delete(a.id));
         renderList();
       };
-      dyn.querySelectorAll("input[data-id]").forEach(cb => cb.onchange = () => {
+      rowsEl.querySelectorAll("input[data-id]").forEach(cb => cb.onchange = () => {
         cb.checked ? sel.add(cb.dataset.id) : sel.delete(cb.dataset.id);
         renderList();
       });
-      dyn.querySelectorAll("[data-qp]").forEach(b => b.onclick = () => {
+
+      m.querySelector("#qr-pager").innerHTML = `
+        <button data-qp="prev" ${page === 1 ? "disabled" : ""}>‹</button>
+        <span style="padding:0 6px;font-size:12.5px;color:var(--text-sub)">${page} / ${totalPages}</span>
+        <button data-qp="next" ${page === totalPages ? "disabled" : ""}>›</button>
+      `;
+      m.querySelectorAll("[data-qp]").forEach(b => b.onclick = () => {
         page += b.dataset.qp === "prev" ? -1 : 1;
         renderList();
       });
+
       m.querySelector("#qr-sum").textContent = `선택됨 ${sel.size}`;
       m.querySelector("#qr-go").disabled = sel.size === 0;
     }
 
     m.querySelector("#qr-go").onclick = () => {
       const items = list.filter(a => sel.has(a.id));
+      const d = new Date(), p2 = n => String(n).padStart(2, "0");
+      const ts = `${d.getFullYear()}${p2(d.getMonth() + 1)}${p2(d.getDate())}${p2(d.getHours())}${p2(d.getMinutes())}${p2(d.getSeconds())}`;
       if (items.length === 1) {
         const a = items[0];
-        toast(`"${a.assetNo || a.id}_${a.product}.png" 다운로드 (프로토타입 — 반영 없음)`);
+        // 구조설계안 5.4 사진 다운로드와 동일한 식별 라벨 규칙(개별=고유관리번호, 수량=제품명) + QR 접두어
+        const label = a.type === "individual" ? (a.assetNo || a.id) : a.product;
+        toast(`"QR_${label}_${ts}.png" 다운로드 (프로토타입 — 반영 없음)`);
       } else {
-        const d = new Date(), p2 = n => String(n).padStart(2, "0");
-        const ts = `${d.getFullYear()}${p2(d.getMonth() + 1)}${p2(d.getDate())}${p2(d.getHours())}${p2(d.getMinutes())}${p2(d.getSeconds())}`;
         toast(`"Asset_QR_${ts}.zip" (${items.length}건) 다운로드 (프로토타입 — 반영 없음)`);
       }
       m.remove();

@@ -154,7 +154,7 @@
         </div>
       </div>
       <div class="qr-popover-acts">
-        <button class="btn primary" data-act="라벨 다운로드">라벨 다운로드</button>
+        <button class="btn primary" data-dl>라벨 다운로드</button>
         <button class="btn" data-close>닫기</button>
       </div>`;
     const r = anchor.getBoundingClientRect();
@@ -162,7 +162,14 @@
     document.body.appendChild(pop);
     pop.querySelector("[data-close]").onclick = () => pop.remove();
     pop.querySelector("[data-preview]").onclick = () => openLabelPreview(a);
-    bindActs(pop);
+    // 구조설계안 5.4 사진 다운로드와 동일한 식별 라벨 규칙(개별=고유관리번호, 수량=제품명) + QR 접두어
+    pop.querySelector("[data-dl]").onclick = () => {
+      const d = new Date(), p2 = n => String(n).padStart(2, "0");
+      const ts = `${d.getFullYear()}${p2(d.getMonth() + 1)}${p2(d.getDate())}${p2(d.getHours())}${p2(d.getMinutes())}${p2(d.getSeconds())}`;
+      const label = a.type === "individual" ? (a.assetNo || a.id) : a.product;
+      toast(`"QR_${label}_${ts}.png" 다운로드 (프로토타입 — 반영 없음)`);
+      pop.remove();
+    };
     setTimeout(() => {
       const close = e => { if (!pop.contains(e.target) && e.target !== anchor) { pop.remove(); document.removeEventListener("click", close); } };
       document.addEventListener("click", close);
