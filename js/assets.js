@@ -10,6 +10,7 @@
   const STATUS_ORDER = ["stock", "assigned", "repair", "lost", "disposed"];
   const TYPE_LABEL = { individual: "개별 자산", quantity: "수량 자산" };
   const EXP_LABEL = { valid: "유효", soon: "임박", over: "만료", none: "미설정" };
+  const RESET_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 1 2.64 6.36"/><path d="M3 20v-6h6"/></svg>`;
 
   function expiryKey(d) {
     if (!d) return "none";
@@ -202,7 +203,7 @@
     if (f.expiry.length) push("expiry", f.expiry.map(e => EXP_LABEL[e]).join("·"), { k: "expiry" });
     if (f.labels.length) push("labels", `태그(${f.labelMode.toUpperCase()}): ${f.labels.join("·")}`, { k: "labels" });
     if (!chips.length) return "";
-    return `<div class="filterbar">${chips.join("")}</div>`;
+    return `<div class="filterbar"><button class="filter-reset" id="filter-reset" aria-label="필터 전체 해제">${RESET_ICON}</button>${chips.join("")}</div>`;
   }
 
   function tableInner(v) {
@@ -238,16 +239,13 @@
 
       <div class="countrow">
         <span class="total">전체 <b>${v.count}</b></span>
-      </div>
-
-      <div class="searchrow">
-        <div class="searchbox${state.search ? ' has-term' : ''}">
-          <input class="search${state.search ? ' expanded' : ''}" id="search-input"
-            placeholder="${state.search ? '고유관리번호 / 제품명' : '검색'}" value="${state.search.replace(/"/g, '&quot;')}">
-          <button class="search-clear" id="search-clear" type="button" aria-label="검색어 지우기">✕</button>
-        </div>
-        <button class="filter-btn ${nAct ? 'set' : ''}" id="btn-filter">▤ 필터${nAct ? ` <b>${nAct}</b>` : ""}</button>
         <div class="right">
+          <div class="searchbox${state.search ? ' has-term' : ''}">
+            <input class="search${state.search ? ' expanded' : ''}" id="search-input"
+              placeholder="${state.search ? '고유관리번호 / 제품명' : '검색'}" value="${state.search.replace(/"/g, '&quot;')}">
+            <button class="search-clear" id="search-clear" type="button" aria-label="검색어 지우기">✕</button>
+          </div>
+          <button class="filter-btn ${nAct ? 'set' : ''}" id="btn-filter">▤ 필터${nAct ? ` <b>${nAct}</b>` : ""}</button>
           <button class="btn sm" id="btn-qr-dl">▦ QR 다운로드</button>
           <button class="btn sm" data-stub="자산 목록 엑셀 다운로드">⬇ 다운로드</button>
         </div>
@@ -284,10 +282,15 @@
 
     c.querySelectorAll(".statcol.click").forEach(el => el.onclick = () => {
       const p = JSON.parse(el.dataset.filter);
-      const base = { category: state.filters.category, type: [], status: [], expiry: [], labels: [], labelMode: state.filters.labelMode };
-      state.filters = cardActive(p) ? base : { ...base, [p.k]: p.v };
+      state.filters[p.k] = arrEq(state.filters[p.k], p.v) ? [] : p.v;
       render();
     });
+
+    const resetBtn = document.getElementById("filter-reset");
+    if (resetBtn) resetBtn.onclick = () => {
+      state.filters = { category: [], type: [], status: [], expiry: [], labels: [], labelMode: "or" };
+      render();
+    };
 
     document.getElementById("btn-filter").onclick = openFilterModal;
     document.getElementById("btn-add").onclick = () => window.openAssetAddModal();
@@ -320,10 +323,6 @@
     };
   }
   function arrEq(a, b) { a = a || []; b = b || []; return a.length === b.length && a.every(x => b.includes(x)); }
-  function cardActive(f) {
-    const s = state.filters;
-    return ["type", "status", "expiry", "labels"].every(d => d === f.k ? arrEq(s[d], f.v) : !(s[d] || []).length);
-  }
   function statCol({ k, v, sub, cls = "", filter, extra = "" }) {
     const attr = filter ? ` class="statcol click ${cls}" data-filter='${JSON.stringify(filter)}'` : ` class="statcol ${cls}"`;
     return `<div${attr}>${extra}<div><div class="statcol-k">${k}</div><div class="statcol-v">${v}${sub ? ` <small>${sub}</small>` : ""}</div></div></div>`;

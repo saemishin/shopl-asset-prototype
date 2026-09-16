@@ -145,6 +145,12 @@ input { font: inherit; }
 
 /* ============ applied filter chips ============ */
 .filterbar { display: flex; gap: 6px; flex-wrap: wrap; margin: 0 0 14px; align-items: center; }
+.filter-reset {
+  display: flex; align-items: center; justify-content: center; width: 24px; height: 24px;
+  border-radius: 6px; color: var(--text-sub); flex-shrink: 0;
+}
+.filter-reset svg { width: 14px; height: 14px; }
+.filter-reset:hover { background: #eef0f2; color: var(--text); }
 .filterbar .fchip {
   display: inline-flex; align-items: center; gap: 4px; height: 26px; padding: 0 4px 0 10px;
   background: var(--primary-weak); color: var(--primary); border-radius: 6px; font-size: 11.5px;
@@ -217,11 +223,10 @@ input { font: inherit; }
 .donut-hole { position: absolute; inset: 7px; background: var(--panel); border-radius: 50%; }
 
 /* ============ count / search rows ============ */
-.countrow { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.countrow { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
 .countrow .total { font-size: 13px; font-weight: 600; }
 .countrow .total b { color: var(--primary); }
-.searchrow { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
-.searchrow .right { margin-left: auto; display: flex; gap: 8px; }
+.countrow .right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
 .searchbox { position: relative; display: inline-flex; }
 .searchbox .search { width: 260px; transition: width .15s ease; }
 .searchbox .search.expanded { width: 380px; }
