@@ -77,6 +77,8 @@
   // 배정/보유 변경 권한 — 개별형은 "배정", 수량형은 "보유"로 부르는 게 구조설계안 4.3 표현과도 맞고,
   // 화면이 항상 하나의 자산 유형으로 스코프돼 있으니(소분류 상세·생성/수정 폼) 더 정확하게 부를 수 있음
   const assignLabel = type => type === "individual" ? "배정 변경 권한" : "보유 변경 권한";
+  // 배정/보유 변경 권한 대상은 조회 권한 대상의 부분집합이어야 함(구조설계안 4.3) — 대상 선택 모달에서 비활성 처리할 때 쓰는 안내 문구
+  const RESTRICT_TIP = "변경 권한을 부여하려면 먼저 조회 권한이 부여되어야 합니다.";
 
   const assetsOf = (group, sub) => assets.filter(a => a.group === group && a.sub === sub);
 
@@ -424,13 +426,18 @@
       body.querySelectorAll('input[name="perm-pick"]').forEach(r => r.onchange = () => { picked = r.value; render(); });
       const openBtn = body.querySelector("[data-target-open]");
       if (openBtn) openBtn.onclick = () => {
+        // 배정/보유 변경 권한 쪽에서, 조회 권한 자체가 같은 "특정 그룹/관리자" 타입으로 좁혀져 있으면
+        // 조회 권한에서 고른 대상 밖은 선택 못 하게 제한(조회 권한이 회사 전체/관리자 전체처럼 넓으면 제한 없음)
+        const isNarrowedView = !isView && state.view === picked;
         if (picked === "특정 그룹 및 직무/직급") {
+          const restrict = isNarrowedView ? { groups: new Set(state.viewTarget.groups), jobTitles: new Set(state.viewTarget.jobTitles) } : null;
           openGroupJobPicker({ groups: draftTarget.groups, jobTitles: draftTarget.jobTitles }, res => {
             draftTarget.groups = res.groups; draftTarget.jobTitles = res.jobTitles;
             render();
-          });
+          }, restrict);
         } else if (picked === "특정 관리자/리더") {
-          openMemberPicker(draftTarget.members, res => { draftTarget.members = res; render(); });
+          const restrict = isNarrowedView ? new Set(state.viewTarget.members) : null;
+          openMemberPicker(draftTarget.members, res => { draftTarget.members = res; render(); }, restrict);
         }
       };
       const clearBtn = body.querySelector("[data-target-clear]");
@@ -468,7 +475,9 @@
   }
 
   // 그룹 및 직무/직급 선택 — 대시보드 공용 컴포넌트 참조(좌측 그룹/직무·직급 탭 + 우측 체크리스트)
-  function openGroupJobPicker(initial, onApply) {
+  // restrict가 있으면(배정/보유 변경 권한이 조회 권한과 같은 "특정 그룹 및 직무/직급" 타입일 때) 조회 권한에서
+  // 고르지 않은 그룹/직무·직급은 선택 자체를 막고 사유를 보여줌 — 변경 권한은 조회 권한의 부분집합이어야 함(구조설계안 4.3)
+  function openGroupJobPicker(initial, onApply, restrict) {
     const selGroups = new Set(initial.groups);
     const selJobTitles = new Set(initial.jobTitles);
     let activeTab = "groups";
@@ -478,6 +487,7 @@
 
     const flatten = nodes => nodes.reduce((out, n) => out.concat(n.name, n.children ? flatten(n.children) : []), []);
     const ALL_GROUP_NAMES = flatten(GROUP_TREE);
+    const selectableGroupNames = restrict ? ALL_GROUP_NAMES.filter(n => restrict.groups.has(n)) : ALL_GROUP_NAMES;
     function findNode(nodes, name) {
       for (const n of nodes) {
         if (n.name === name) return n;
@@ -498,10 +508,11 @@
       if (!matches(node)) return "";
       const hasChildren = node.children && node.children.length;
       const isCollapsed = collapsed.has(node.name);
+      const isDisabled = restrict && !restrict.groups.has(node.name);
       return `
         <div class="picker-tree-row" style="padding-left:${depth * 20}px">
           ${hasChildren ? `<button type="button" class="picker-tree-toggle" data-toggle-group="${node.name}">${isCollapsed ? "▸" : "▾"}</button>` : `<span class="picker-tree-toggle"></span>`}
-          <label class="picker-check"><input type="checkbox" data-group="${node.name}"${selGroups.has(node.name) ? " checked" : ""}><span>${node.name}</span></label>
+          <label class="picker-check${isDisabled ? " is-disabled" : ""}"${isDisabled ? ` data-tip="${RESTRICT_TIP}"` : ""}><input type="checkbox" data-group="${node.name}"${selGroups.has(node.name) ? " checked" : ""}${isDisabled ? " disabled" : ""}><span>${node.name}</span></label>
         </div>
         ${hasChildren && !isCollapsed ? node.children.map(c => groupRowHtml(c, depth + 1)).join("") : ""}`;
     }
@@ -532,7 +543,7 @@
 
     function renderContent() {
       if (activeTab === "groups") {
-        const allChecked = ALL_GROUP_NAMES.every(n => selGroups.has(n));
+        const allChecked = selectableGroupNames.length > 0 && selectableGroupNames.every(n => selGroups.has(n));
         content.innerHTML = `
           <input type="text" class="picker-search" placeholder="검색어를 입력하세요" value="${query}">
           <div class="picker-toolbar">
@@ -541,7 +552,7 @@
           </div>
           <div class="picker-tree">${GROUP_TREE.map(n => groupRowHtml(n, 0)).join("")}</div>`;
         content.querySelector(".picker-search").addEventListener("input", e => { query = e.target.value; renderContent(); });
-        content.querySelector("[data-select-all]").onchange = e => { ALL_GROUP_NAMES.forEach(n => e.target.checked ? selGroups.add(n) : selGroups.delete(n)); renderContent(); };
+        content.querySelector("[data-select-all]").onchange = e => { selectableGroupNames.forEach(n => e.target.checked ? selGroups.add(n) : selGroups.delete(n)); renderContent(); };
         content.querySelector("[data-cascade]").onchange = e => { cascade = e.target.checked; };
         content.querySelectorAll("[data-toggle-group]").forEach(b => b.onclick = () => {
           collapsed.has(b.dataset.toggleGroup) ? collapsed.delete(b.dataset.toggleGroup) : collapsed.add(b.dataset.toggleGroup);
@@ -556,7 +567,10 @@
         content.innerHTML = `
           <input type="text" class="picker-search" placeholder="검색어를 입력하세요" value="${query}">
           <div class="picker-flatlist">
-            ${filtered.map(t => `<label class="picker-check row"><input type="checkbox" data-jobtitle="${t}"${selJobTitles.has(t) ? " checked" : ""}><span>${t}</span></label>`).join("")}
+            ${filtered.map(t => {
+              const isDisabled = restrict && !restrict.jobTitles.has(t);
+              return `<label class="picker-check row${isDisabled ? " is-disabled" : ""}"${isDisabled ? ` data-tip="${RESTRICT_TIP}"` : ""}><input type="checkbox" data-jobtitle="${t}"${selJobTitles.has(t) ? " checked" : ""}${isDisabled ? " disabled" : ""}><span>${t}</span></label>`;
+            }).join("")}
           </div>`;
         content.querySelector(".picker-search").addEventListener("input", e => { query = e.target.value; renderContent(); });
         content.querySelectorAll("[data-jobtitle]").forEach(cb => cb.onchange = e => {
@@ -579,7 +593,9 @@
   }
 
   // 구성원(직원) 선택 — 대시보드 공용 컴포넌트 참조
-  function openMemberPicker(initial, onApply) {
+  // restrict가 있으면(배정/보유 변경 권한이 조회 권한과 같은 "특정 관리자/리더" 타입일 때) 조회 권한에서 고르지 않은
+  // 사람은 선택 자체를 막고 사유를 보여줌 — 변경 권한은 조회 권한의 부분집합이어야 함(구조설계안 4.3)
+  function openMemberPicker(initial, onApply, restrict) {
     const sel = new Set(initial);
     let query = "";
     const p = document.createElement("div");
@@ -600,12 +616,15 @@
     const list = p.querySelector("[data-list]");
     function renderList() {
       const filtered = MEMBERS.filter(m => !query || m.name.includes(query));
-      list.innerHTML = filtered.length ? filtered.map(m => `
-        <label class="picker-member-row">
-          <input type="checkbox" data-member="${m.name}"${sel.has(m.name) ? " checked" : ""}>
+      list.innerHTML = filtered.length ? filtered.map(m => {
+        const isDisabled = restrict && !restrict.has(m.name);
+        return `
+        <label class="picker-member-row${isDisabled ? " is-disabled" : ""}"${isDisabled ? ` data-tip="${RESTRICT_TIP}"` : ""}>
+          <input type="checkbox" data-member="${m.name}"${sel.has(m.name) ? " checked" : ""}${isDisabled ? " disabled" : ""}>
           <span class="picker-avatar" style="background:${avatarColor(m.name)}">${m.name[0]}</span>
           <span class="picker-member-info"><b>${m.name}</b><span>${m.team}</span></span>
-        </label>`).join("") : `<p class="muted" style="padding:16px 0">검색 결과가 없습니다</p>`;
+        </label>`;
+      }).join("") : `<p class="muted" style="padding:16px 0">검색 결과가 없습니다</p>`;
       list.querySelectorAll("[data-member]").forEach(cb => cb.onchange = e => {
         e.target.checked ? sel.add(e.target.dataset.member) : sel.delete(e.target.dataset.member);
       });
@@ -651,6 +670,10 @@
     saveBtn.onclick = () => {
       const name = state.name.trim();
       if (!name) return;
+      // 이름이 바뀌면 이 소분류에 걸린 자산들의 sub도 같이 갱신(대분류는 이 폼에서 안 바뀌므로 group은 그대로)
+      if (cat.sub !== name) {
+        assets.forEach(a => { if (a.group === cat.group && a.sub === cat.sub) a.sub = name; });
+      }
       cat.sub = name;
       cat.type = state.type;
       cat.hiddenFields = [...state.hiddenFields];
@@ -880,7 +903,15 @@
       const newEmptyGroups = [];
       draft.forEach(g => {
         if (!g.subs.length) { newEmptyGroups.push(g.name); return; }
-        g.subs.forEach(s => newCategories.push({ ...s.data, group: g.name, sub: s.name }));
+        g.subs.forEach(s => {
+          // 이름변경·대분류이동으로 소속이 바뀐 소분류는, 거기 걸린 자산들의 group/sub도 같이 옮겨줘야
+          // 자산 목록 조회(assetsOf)가 끊기지 않음 — 원래 소속(s.data.group/sub) 기준으로 자산을 찾아 갱신
+          const oldGroup = s.data.group, oldSub = s.data.sub;
+          if (oldGroup !== g.name || oldSub !== s.name) {
+            assets.forEach(a => { if (a.group === oldGroup && a.sub === oldSub) { a.group = g.name; a.sub = s.name; } });
+          }
+          newCategories.push({ ...s.data, group: g.name, sub: s.name });
+        });
       });
       categories.length = 0;
       categories.push(...newCategories);
