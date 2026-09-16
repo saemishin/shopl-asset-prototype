@@ -287,7 +287,17 @@
     }
     nameInput.addEventListener("input", checkValid);
     assetNoInput.addEventListener("input", () => {
-      assetNoInput.value = assetNoInput.value.replace(/[^A-Za-z0-9\-_]/g, "");
+      // value를 그냥 덮어쓰면 커서가 항상 맨 끝으로 튀어서, 중간에 타이핑하다 막힌 것처럼 느껴짐 —
+      // 제거된 글자 수만큼 커서 위치를 보정해서 원래 있던 자리에 그대로 남게 함
+      const before = assetNoInput.value;
+      const pos = assetNoInput.selectionStart;
+      const filtered = before.replace(/[^A-Za-z0-9\-_]/g, "");
+      if (filtered !== before) {
+        const removedBefore = before.slice(0, pos).length - before.slice(0, pos).replace(/[^A-Za-z0-9\-_]/g, "").length;
+        assetNoInput.value = filtered;
+        const newPos = Math.max(0, pos - removedBefore);
+        assetNoInput.setSelectionRange(newPos, newPos);
+      }
       checkValid();
     });
 
