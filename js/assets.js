@@ -9,7 +9,7 @@
   };
   const STATUS_ORDER = ["stock", "assigned", "repair", "lost", "disposed"];
   const TYPE_LABEL = { individual: "개별 자산", quantity: "수량 자산" };
-  const EXP_LABEL = { valid: "유효", soon: "임박", over: "만료", none: "미설정" };
+  const EXP_LABEL = { valid: "유효", soon: "만료 예정", over: "만료", none: "미설정" };
   const RESET_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 1 2.64 6.36"/><path d="M3 20v-6h6"/></svg>`;
 
   function expiryKey(d) {
@@ -282,7 +282,9 @@
 
     c.querySelectorAll(".statcol.click").forEach(el => el.onclick = () => {
       const p = JSON.parse(el.dataset.filter);
-      state.filters[p.k] = arrEq(state.filters[p.k], p.v) ? [] : p.v;
+      const isOn = arrEq(state.filters[p.k], p.v);
+      const base = { category: state.filters.category, type: [], status: [], expiry: [], labels: [], labelMode: state.filters.labelMode };
+      state.filters = isOn ? base : { ...base, [p.k]: p.v };
       render();
     });
 
@@ -338,7 +340,7 @@
         statCol({ k: "수량 자산", v: s.qtyN, sub: "종류", filter: { k: "type", v: ["quantity"] } }),
       ])}
       ${statCard("유효기간", [
-        statCol({ k: "임박", v: s.expSoon, cls: "warn", filter: { k: "expiry", v: ["soon"] } }),
+        statCol({ k: "만료 예정", v: s.expSoon, cls: "warn", filter: { k: "expiry", v: ["soon"] } }),
         statCol({ k: "만료", v: s.expOver, cls: "alert", filter: { k: "expiry", v: ["over"] } }),
       ])}
     </div>`;
