@@ -184,8 +184,8 @@
   /* ---------- views ---------- */
   function view_all(list) {
     const head = `<tr>
-      <th>고유관리번호</th><th>제품명</th><th>분류</th>
-      ${thFilter("자산 유형", "type")}${thFilter("상태", "status")}
+      <th>고유관리번호</th><th>제품명</th>
+      ${thFilter("자산 유형", "type")}<th>분류</th>${thFilter("상태", "status")}
       <th>배정·보유 현황</th>${thFilter("유효기한", "expiry")}<th>태그</th>${thFilter("메모", "note", "c")}<th>등록일</th></tr>`;
     const rows = pageSlice(sortList(list)).map(a => {
       const st = a.type === "quantity"
@@ -194,8 +194,8 @@
       return `<tr class="clickable" data-id="${a.id}">
         <td>${a.assetNo || '<span class="muted">—</span>'}</td>
         <td>${prodCell(a)}</td>
-        <td>${a.group} <span class="muted">›</span> ${a.sub}</td>
         <td><span class="type-pill">${TYPE_LABEL[a.type]}</span></td>
+        <td>${a.group} <span class="muted">›</span> ${a.sub}</td>
         <td>${st}</td>
         <td>${holderText(a)}</td>
         <td>${expiryCell(a.expiry)}</td>
