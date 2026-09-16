@@ -53,8 +53,13 @@
     const leaderOn = draft.leaderMode !== "none";
     return `
       <div class="settings-card">
-        <h4>자산관리 권한</h4>
-        <p class="hint">관리자는 분류·자산 등록/수정/삭제를 포함한 자산관리 기능 전체를 이용할 수 있고, 추가로 지정한 리더에게도 동일한 권한을 부여할 수 있습니다.</p>
+        <h4>자산 관리 권한</h4>
+        <ul class="settings-hint-list">
+          <li>대분류·소분류 카테고리를 생성·수정·삭제할 수 있습니다.</li>
+          <li>자산을 등록·수정·삭제할 수 있습니다.</li>
+          <li>소분류별로 설정된 조회/배정 권한과 무관하게, 모든 소분류의 자산을 조회하고 배정/보유를 변경할 수 있습니다.</li>
+          <li>일반 사용자에게는 조회 권한이 있는 소분류가 1개 이상 있는 대분류만 보이지만, 이 권한을 가진 사람에게는 모든 대분류·소분류가 항상 노출됩니다.</li>
+        </ul>
         <label class="opt is-disabled"><input type="checkbox" checked disabled><span>관리자</span></label>
         <label class="opt"><input type="checkbox" data-toggle-leader${leaderOn ? " checked" : ""}><span>리더</span></label>
         ${leaderOn ? `
@@ -77,7 +82,7 @@
         <a class="active">설정</a>
       </div>
       <div class="settings-head">
-        <h3>자산관리 권한 설정</h3>
+        <h3>자산 관리</h3>
         <button class="btn sm" data-guide>사용 가이드 보기</button>
       </div>
       <div id="settings-body"></div>`;
