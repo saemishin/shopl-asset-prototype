@@ -240,7 +240,7 @@
               <tbody>${products.map(productRowHtml).join("")}</tbody>
             </table>
           </div>
-          <p class="muted" data-search-empty hidden style="padding:12px 0">검색 결과가 없습니다.</p>` : assetEmptyHtml()}`;
+          <p class="muted" data-search-empty hidden style="padding:12px 0">결과가 없습니다.</p>` : assetEmptyHtml()}`;
     }
     const list = assetsOf(cat.group, cat.sub);
     return `
@@ -256,7 +256,7 @@
             <tbody>${list.map(stockRowHtml).join("")}</tbody>
           </table>
         </div>
-        <p class="muted" data-search-empty hidden style="padding:12px 0">검색 결과가 없습니다.</p>` : assetEmptyHtml()}`;
+        <p class="muted" data-search-empty hidden style="padding:12px 0">결과가 없습니다.</p>` : assetEmptyHtml()}`;
   }
 
   function detailHtml(cat) {
@@ -643,7 +643,7 @@
           <span class="picker-avatar" style="background:${avatarColor(m.name)}">${m.name[0]}</span>
           <span class="picker-member-info"><b>${m.name}</b><span>${m.team}</span></span>
         </label>`;
-      }).join("") : `<p class="muted" style="padding:16px 0">검색 결과가 없습니다</p>`;
+      }).join("") : `<p class="muted" style="padding:16px 0">결과가 없습니다</p>`;
       list.querySelectorAll("[data-member]").forEach(cb => cb.onchange = e => {
         e.target.checked ? sel.add(e.target.dataset.member) : sel.delete(e.target.dataset.member);
       });
