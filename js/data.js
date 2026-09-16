@@ -85,7 +85,10 @@ window.DATA = (function () {
       ] },
   ];
 
-  return { categories, assets, emptyGroups };
+  // 태그 마스터 목록 — 기존 자산들에 찍힌 distinct 라벨로 초기 시드(태그 관리 모달 도입 이후로는 이 배열이 기준이 됨)
+  const tags = [...new Set(assets.flatMap(a => a.labels || []))].sort((a, b) => a.localeCompare(b, "ko"));
+
+  return { categories, assets, emptyGroups, tags };
 })();
 
 /* 자산 관리 공통 날짜 표기: yyyy.mm.dd(요일) hh:mm / 날짜만: yyyy.mm.dd(요일) */
