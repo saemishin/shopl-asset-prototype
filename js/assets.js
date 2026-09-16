@@ -37,14 +37,12 @@
       if (as.length === 1) return targets.join(" ");                 // 단일 배정(복합이면 둘 다 표시)
       return `${targets[0]} <span class="muted">+${targets.length - 1}</span>`;  // 공동 배정: 첫 대상 + N
     }
+    // 수량 자산도 개별 자산과 동일한 패턴(보유처 이름, 총 개수 미표기)으로 통일
     const stocks = a.stocks || [];
-    const total = stocks.reduce((s, x) => s + x.qty, 0);
-    const ws = stocks.filter(x => x.worksite).length;
-    const emp = stocks.filter(x => x.employee).length;
-    let out = `${total}개`;
-    if (ws) out += ` <span class="hcnt">${IC_WS}${ws}</span>`;
-    if (emp) out += ` <span class="hcnt">${IC_EMP}${emp}</span>`;
-    return out;
+    if (!stocks.length) return '<span class="muted">재고</span>';
+    const targets = stocks.map(x => x.employee ? `${IC_EMP}${x.employee}` : `${IC_WS}${x.worksite}`);
+    if (stocks.length === 1) return targets.join(" ");
+    return `${targets[0]} <span class="muted">+${targets.length - 1}</span>`;
   }
   function thumb(a) {
     const ph = window.assetPhotos(a);            // 대표 사진 (상세와 공유)
