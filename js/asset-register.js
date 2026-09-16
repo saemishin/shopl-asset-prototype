@@ -62,7 +62,7 @@
           <input type="text" class="cat-manage-name-input" data-tm-rename="${i}" value="${t.name}" maxlength="20">
           <div class="cat-manage-row-acts">
             <button type="button" class="cat-manage-icon" data-tm-del="${i}" aria-label="삭제"
-              data-tip="이 태그를 사용 중인 자산에서 모두 삭제됩니다.">${TRASH_ICON}</button>
+              data-tip="삭제 시 이 태그를 사용 중인 자산에서 모두 삭제됩니다.">${TRASH_ICON}</button>
           </div>
         </div>`).join("") : `<p class="tag-manage-empty">등록된 태그가 없습니다.</p>`;
     }
@@ -117,6 +117,63 @@
     return back;
   }
 
+  // 소분류 선택 모달 — 검색 + 대분류/소분류 트리, 단일 선택, 푸터 [취소]/[적용]. 필터 모달의 분류 트리 구조를 단일 선택용으로 단순화.
+  function openCategoryPickModal(categories, currentValue, onApply) {
+    let selected = currentValue;
+    let query = "";
+
+    const back = document.createElement("div");
+    back.className = "modal-back";
+    back.innerHTML = `
+      <div class="modal">
+        <h3>소분류</h3>
+        <div class="body">
+          <input type="text" class="picker-search" data-cp-search placeholder="검색" autocomplete="off">
+          <div class="catpick-list" data-cp-list></div>
+        </div>
+        <div class="foot">
+          <button type="button" class="btn" data-cp-cancel>취소</button>
+          <button type="button" class="btn primary" data-cp-apply>적용</button>
+        </div>
+      </div>`;
+    document.body.appendChild(back);
+
+    const listEl = back.querySelector("[data-cp-list]");
+    const searchInput = back.querySelector("[data-cp-search]");
+
+    function groupsOf() {
+      const m = new Map();
+      categories.forEach(c => { if (!m.has(c.group)) m.set(c.group, []); m.get(c.group).push(c.sub); });
+      return m;
+    }
+    function renderList() {
+      const q = query.trim().toLowerCase();
+      let html = "";
+      groupsOf().forEach((subs, g) => {
+        const groupMatches = !q || g.toLowerCase().includes(q);
+        const filtered = subs.filter(s => groupMatches || s.toLowerCase().includes(q));
+        if (!filtered.length) return;
+        html += `<div class="catpick-group">
+          <div class="catpick-group-name">${g}</div>
+          ${filtered.map(s => {
+            const v = `${g}|${s}`;
+            return `<button type="button" class="catpick-row${selected === v ? " active" : ""}" data-v="${v}">${s}</button>`;
+          }).join("")}
+        </div>`;
+      });
+      listEl.innerHTML = html || `<p class="tag-manage-empty">결과가 없습니다.</p>`;
+      listEl.querySelectorAll("[data-v]").forEach(b => b.onclick = () => { selected = b.dataset.v; renderList(); });
+    }
+    renderList();
+
+    searchInput.addEventListener("input", () => { query = searchInput.value; renderList(); });
+    back.querySelector("[data-cp-cancel]").onclick = () => back.remove();
+    back.addEventListener("click", e => { if (e.target === back) back.remove(); });
+    back.querySelector("[data-cp-apply]").onclick = () => { back.remove(); onApply(selected); };
+
+    return back;
+  }
+
   window.openAssetAddModal = function (opts) {
     opts = opts || {};
     const categories = (window.DATA && window.DATA.categories) || [];
@@ -152,8 +209,8 @@
         <h3>자산 추가</h3>
         <div class="body">
           <div class="field"><label>소분류 <span class="req">*</span></label>
-            <div class="tag-input-wrap" id="areg-catwrap">
-              <input type="text" id="areg-cat-input" placeholder="검색" autocomplete="off">
+            <div class="tag-input-wrap" id="areg-catwrap" style="cursor:pointer">
+              <span id="areg-cat-display" style="flex:1;font-size:12.5px">선택</span>
               <button type="button" class="wrap-clear" id="areg-cat-clear" hidden aria-label="소분류 선택 해제">${CLOSE_ICON_SM}</button>
             </div>
           </div>
@@ -194,88 +251,46 @@
     nameInput.addEventListener("input", checkValid);
     assetNoInput.addEventListener("input", checkValid);
 
-    // 소분류 — 별도 모달 대신 태그와 동일한 검색+드롭다운(전체 8개뿐이라 모달을 띄울 만큼 많지 않음).
+    // 소분류 — 검색 + 대분류/소분류 트리 모달(openCategoryPickModal)에서 단일 선택.
     // 기본은 비워둔 상태(자동 첫 항목 선택 없음) — 미선택 상태에선 고유관리번호 등 유형별 필드를 모두 노출.
     const catWrap = back.querySelector("#areg-catwrap");
-    const catInput = back.querySelector("#areg-cat-input");
+    const catDisplay = back.querySelector("#areg-cat-display");
     const catClear = back.querySelector("#areg-cat-clear");
     let catValue = null;
-    let catMenu = null, catHi = -1;
 
     function catLabel(v) { const c = findCat(v); return c ? `${c.group} › ${c.sub}` : ""; }
-    function closeCatMenu() { if (catMenu) { catMenu.remove(); catMenu = null; } catHi = -1; }
     function updateCatClear() { catClear.hidden = !catValue; }
     function applyAssetNoVisibility() {
       assetNoField.style.display = (catValue && type === "quantity") ? "none" : "";
     }
+    function renderCatDisplay() {
+      if (catValue) { catDisplay.textContent = catLabel(catValue); catDisplay.style.color = "var(--text)"; }
+      else { catDisplay.textContent = "선택"; catDisplay.style.color = "var(--text-mut)"; }
+    }
     function selectCat(v) {
       catValue = v;
-      catInput.value = catLabel(v);
       const cat = findCat(v);
       type = (cat && cat.type) || "individual";
-      closeCatMenu();
+      renderCatDisplay();
       updateCatClear();
       applyAssetNoVisibility();
       checkValid();
     }
-    function catOptions() {
-      const q = catInput.value.trim().toLowerCase();
-      return categories.filter(c => !q || `${c.group} ${c.sub}`.toLowerCase().includes(q));
-    }
-    function renderCatMenu() {
-      const opts = catOptions();
-      closeCatMenu();
-      catMenu = document.createElement("div");
-      catMenu.className = "dropdown-menu";
-      catHi = opts.length ? 0 : -1;
-      catMenu.innerHTML = opts.length
-        ? opts.map((c, i) => `<button type="button" data-v="${c.group}|${c.sub}" class="${i === 0 ? "active" : ""}">${c.group} › ${c.sub}</button>`).join("")
-        : `<div class="dropdown-empty">결과가 없습니다.</div>`;
-      const r = catWrap.getBoundingClientRect();
-      catMenu.style.cssText = `position:fixed;top:${r.bottom + 4}px;left:${r.left}px;min-width:${r.width}px`;
-      document.body.appendChild(catMenu);
-      catMenu.querySelectorAll("[data-v]").forEach(b => b.onclick = () => selectCat(b.dataset.v));
-    }
-    function moveCatHi(delta) {
-      if (!catMenu) return;
-      const btns = [...catMenu.querySelectorAll("button")];
-      if (!btns.length) return;
-      if (btns[catHi]) btns[catHi].classList.remove("active");
-      catHi = Math.max(0, Math.min(btns.length - 1, catHi + delta));
-      btns[catHi].classList.add("active");
-      btns[catHi].scrollIntoView({ block: "nearest" });
-    }
-    catInput.addEventListener("focus", () => { catInput.select(); renderCatMenu(); });
-    catInput.addEventListener("input", () => {
-      catValue = null;
-      updateCatClear();
-      applyAssetNoVisibility();
-      checkValid();
-      renderCatMenu();
+    catWrap.addEventListener("click", e => {
+      if (catClear.contains(e.target)) return;
+      openCategoryPickModal(categories, catValue, v => selectCat(v));
     });
-    catInput.addEventListener("keydown", e => {
-      if (e.key === "ArrowDown") { e.preventDefault(); moveCatHi(1); }
-      else if (e.key === "ArrowUp") { e.preventDefault(); moveCatHi(-1); }
-      else if (e.key === "Enter") {
-        e.preventDefault();
-        if (catMenu) {
-          const btns = [...catMenu.querySelectorAll("button")];
-          if (btns[catHi]) selectCat(btns[catHi].dataset.v);
-        }
-      } else if (e.key === "Escape") { closeCatMenu(); }
-    });
-    catClear.onclick = () => {
+    catClear.onclick = e => {
+      e.stopPropagation();
       catValue = null;
-      catInput.value = "";
+      renderCatDisplay();
       updateCatClear();
       applyAssetNoVisibility();
       checkValid();
-      catInput.focus();
-      renderCatMenu();
     };
 
     if (preselectValue) selectCat(preselectValue);
-    else applyAssetNoVisibility();
+    else { renderCatDisplay(); applyAssetNoVisibility(); }
 
     // 태그 입력 위젯 — 마스터 목록(window.DATA.tags)에서 검색해 선택만 가능(즉석 생성 없음). 새 태그는 [태그 관리]에서만 추가
     const tagWrap = back.querySelector("#areg-tagwrap");
@@ -346,14 +361,12 @@
     });
     document.addEventListener("click", e => {
       if (menu && !menu.contains(e.target) && e.target !== tagInput) closeMenu();
-      if (catMenu && !catMenu.contains(e.target) && e.target !== catInput) closeCatMenu();
     });
     renderChips();
     checkValid();
 
     back.querySelector("#areg-tag-manage").onclick = () => {
       closeMenu();
-      closeCatMenu();
       openTagManageModal(({ renamed, deletedOrigs }) => {
         let changed = false;
         for (let i = tags.length - 1; i >= 0; i--) {
@@ -365,7 +378,7 @@
       });
     };
 
-    saveBtn.addEventListener("click", () => { closeMenu(); closeCatMenu(); toast("저장되었습니다. (프로토타입 — 반영 없음)"); });
+    saveBtn.addEventListener("click", () => { closeMenu(); toast("저장되었습니다. (프로토타입 — 반영 없음)"); });
 
     return back;
   };

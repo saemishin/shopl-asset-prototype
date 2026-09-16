@@ -668,6 +668,11 @@ button.usebullet { background: var(--panel); font: inherit; cursor: pointer; }
 .tag-manage-add input { flex: 1; }
 .tag-manage-list { display: flex; flex-direction: column; gap: 2px; }
 .tag-manage-empty { padding: 10px 4px; font-size: 12.5px; color: var(--text-mut); }
+.catpick-list { max-height: 320px; overflow-y: auto; }
+.catpick-group-name { font-size: 11px; font-weight: 700; color: var(--text-mut); padding: 10px 8px 4px; }
+.catpick-row { display: block; width: 100%; text-align: left; padding: 8px 10px; border-radius: 6px; font-size: 12.5px; }
+.catpick-row:hover { background: var(--primary-weak); color: var(--primary); }
+.catpick-row.active { background: var(--primary-weak); color: var(--primary); font-weight: 600; }
 .field .req { color: var(--danger); margin-left: 2px; }
 .field input[type=text], .field input[type=date], .field input[type=number], .field select, .field textarea {
   width: 100%; height: 34px; border: 1px solid var(--line-strong); border-radius: var(--radius); padding: 0 10px; background: var(--panel);
