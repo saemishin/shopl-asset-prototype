@@ -11,6 +11,15 @@
   const TYPE_LABEL = { individual: "개별 자산", quantity: "수량 자산" };
   const EXP_LABEL = { valid: "유효", soon: "만료 예정", over: "만료", none: "미설정" };
   const RESET_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 1 2.64 6.36"/><path d="M3 20v-6h6"/></svg>`;
+  const SORT_ASC_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M6 11l6-6 6 6"/></svg>`;
+  const SORT_DESC_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M6 13l6 6 6-6"/></svg>`;
+  // 정렬 기준별 기본 방향: 날짜(등록일·유효기한)는 최신순(desc), 문자열(제품명·고유관리번호)은 가나다순(asc)
+  const SORT_FIELDS = [
+    { k: "createdAt", label: "자산 등록일", defDir: "desc" },
+    { k: "assetNo", label: "고유 관리번호", defDir: "asc" },
+    { k: "product", label: "제품명", defDir: "asc" },
+    { k: "expiry", label: "유효기한", defDir: "desc" },
+  ];
 
   function expiryKey(d) {
     if (!d) return "none";
@@ -81,8 +90,23 @@
     search: "",
     page: 1,
     pageSize: 20,
+    sort: { key: "createdAt", dir: "desc" },
     filters: { category: [], type: [], status: [], expiry: [], labels: [], note: [], labelMode: "or" },
   };
+  function sortList(list) {
+    const { key, dir } = state.sort;
+    const mul = dir === "asc" ? 1 : -1;
+    const val = a => a[key] || "";
+    return [...list].sort((a, b) => {
+      const va = val(a), vb = val(b);
+      // 값이 없는 항목은 정렬 방향과 무관하게 항상 맨 뒤로
+      if (!va && !vb) return 0;
+      if (!va) return 1;
+      if (!vb) return -1;
+      if (key === "product" || key === "assetNo") return va.localeCompare(vb, "ko") * mul;
+      return (va < vb ? -1 : va > vb ? 1 : 0) * mul;
+    });
+  }
   function emptyFilters() {
     return { category: [], type: [], status: [], expiry: [], labels: [], note: [], labelMode: "or" };
   }
@@ -158,8 +182,8 @@
     const head = `<tr>
       <th>고유관리번호</th><th>제품명</th><th>분류</th>
       ${thFilter("자산 유형", "type")}${thFilter("상태", "status")}
-      <th>배정·보유 현황</th>${thFilter("유효기한", "expiry")}<th>태그</th>${thFilter("메모", "note", "c")}</tr>`;
-    const rows = pageSlice(list).map(a => {
+      <th>배정·보유 현황</th>${thFilter("유효기한", "expiry")}<th>태그</th>${thFilter("메모", "note", "c")}<th>등록일</th></tr>`;
+    const rows = pageSlice(sortList(list)).map(a => {
       const st = a.type === "quantity"
         ? '<span class="muted">—</span>'
         : `<span class="badge ${STATUS_LABEL[a.status][1]}">${STATUS_LABEL[a.status][0]}</span>`;
@@ -173,6 +197,7 @@
         <td>${expiryCell(a.expiry)}</td>
         <td>${labelsCell(a.labels)}</td>
         <td class="c">${memoCell(a)}</td>
+        <td>${window.fmtDate(a.createdAt)}</td>
       </tr>`;
     }).join("");
     return { head, rows, count: list.length };
@@ -240,6 +265,17 @@
   }
 
   /* ---------- render ---------- */
+  function sortHtml() {
+    if (state.view !== "all") return "";
+    const opts = SORT_FIELDS.map(f => `<option value="${f.k}" ${state.sort.key === f.k ? "selected" : ""}>${f.label}</option>`).join("");
+    return `
+      <div class="sortbar">
+        <select id="sort-key">${opts}</select>
+        <button class="sort-dir" id="sort-dir" aria-label="정렬 방향(${state.sort.dir === "asc" ? "오름차순" : "내림차순"})">
+          ${state.sort.dir === "asc" ? SORT_ASC_ICON : SORT_DESC_ICON}
+        </button>
+      </div>`;
+  }
   function pagerHtml(total) {
     const totalPages = Math.max(1, Math.ceil(total / state.pageSize));
     const p = state.page;
@@ -277,7 +313,7 @@
   }
 
   function tableInner(v) {
-    const empty = `<tr><td colspan="9" style="text-align:center;color:var(--text-mut);padding:32px">조건에 맞는 자산이 없습니다</td></tr>`;
+    const empty = `<tr><td colspan="10" style="text-align:center;color:var(--text-mut);padding:32px">조건에 맞는 자산이 없습니다</td></tr>`;
     return `<table class="tbl-${state.view}"><thead>${v.head}</thead><tbody>${v.rows || empty}</tbody></table>`;
   }
   function bindRows(scope) {
@@ -309,6 +345,7 @@
 
       <div class="countrow">
         <span class="total">전체 <b>${v.count}</b></span>
+        ${sortHtml()}
         <button class="filter-btn ${nAct ? 'set' : ''}" id="btn-filter">▤ 필터${nAct ? ` <b>${nAct}</b>` : ""}</button>
         <div class="right">
           <div class="searchbox${state.search ? ' has-term' : ''}">
@@ -369,6 +406,20 @@
     const pageSizeSel = document.getElementById("page-size");
     if (pageSizeSel) pageSizeSel.onchange = () => {
       state.pageSize = +pageSizeSel.value;
+      state.page = 1;
+      render();
+    };
+
+    const sortKeySel = document.getElementById("sort-key");
+    if (sortKeySel) sortKeySel.onchange = () => {
+      state.sort.key = sortKeySel.value;
+      state.sort.dir = SORT_FIELDS.find(f => f.k === state.sort.key).defDir;
+      state.page = 1;
+      render();
+    };
+    const sortDirBtn = document.getElementById("sort-dir");
+    if (sortDirBtn) sortDirBtn.onclick = () => {
+      state.sort.dir = state.sort.dir === "asc" ? "desc" : "asc";
       state.page = 1;
       render();
     };
