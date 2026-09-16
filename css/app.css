@@ -206,12 +206,15 @@ input { font: inherit; }
 }
 .stat.click { cursor: pointer; }
 .stat.click:hover { border-color: var(--line-strong); }
-.stat.active { border-color: var(--primary); background: var(--primary-weak); box-shadow: inset 0 0 0 1px var(--primary); }
 .stat .k { font-size: 11.5px; color: var(--text-sub); }
 .stat .v { font-size: 19px; font-weight: 700; margin-top: 3px; font-variant-numeric: tabular-nums; }
 .stat .v small { font-size: 11px; font-weight: 500; color: var(--text-mut); margin-left: 3px; }
+.stat.alert { background: #fdecec; border-color: #f6cbcb; }
 .stat.alert .v { color: var(--danger); }
+.stat.warn { background: #fff1e0; border-color: #f3ddb0; }
 .stat.warn .v { color: var(--warn); }
+/* active(현재 필터 적용중)는 alert/warn 배경보다 항상 우선 표시 */
+.stat.active { border-color: var(--primary); background: var(--primary-weak); box-shadow: inset 0 0 0 1px var(--primary); }
 
 /* ============ count / search rows ============ */
 .countrow { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }

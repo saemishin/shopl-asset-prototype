@@ -4,7 +4,7 @@
   const { assets } = window.DATA;
 
   const STATUS_LABEL = {
-    stock: ["재고", "stock"], assigned: ["배정 중", "assigned"], repair: ["수리중", "repair"],
+    stock: ["재고", "stock"], assigned: ["배정 중", "assigned"], repair: ["수리 중", "repair"],
     lost: ["분실", "lost"], disposed: ["폐기", "disposed"],
   };
   const STATUS_ORDER = ["stock", "assigned", "repair", "lost", "disposed"];
@@ -337,22 +337,21 @@
   function statsHtml() {
     const s = computeStats();
     const row1 = [
-      statTile({ k: "개별 자산", v: s.indivN, sub: "대", filter: { k: "type", v: ["individual"] } }),
+      statTile({ k: "개별 자산", v: s.indivN, sub: "개", filter: { k: "type", v: ["individual"] } }),
       statTile({ k: "수량 자산", v: s.qtyN, sub: "종류", filter: { k: "type", v: ["quantity"] } }),
-      statTile({ k: "배정 중", v: s.assigned, filter: { k: "status", v: ["assigned"] } }),
-      statTile({ k: "재고", v: s.stock, filter: { k: "status", v: ["stock"] } }),
-      statTile({ k: "배정률", v: s.rate + "%" }),
-    ].join("");
-    const row2 = [
       statTile({ k: "유효기한 지남", v: s.expOver, cls: "alert", filter: { k: "expiry", v: ["over"] } }),
       statTile({ k: "유효기한 임박", v: s.expSoon, cls: "warn", filter: { k: "expiry", v: ["soon"] } }),
+    ].join("");
+    const row2 = [
+      statTile({ k: "배정 중", v: s.assigned, sub: `${s.rate}%`, filter: { k: "status", v: ["assigned"] } }),
+      statTile({ k: "재고", v: s.stock, filter: { k: "status", v: ["stock"] } }),
       statTile({ k: "분실", v: s.lost, cls: "alert", filter: { k: "status", v: ["lost"] } }),
-      statTile({ k: "수리중", v: s.repair, cls: "warn", filter: { k: "status", v: ["repair"] } }),
+      statTile({ k: "수리 중", v: s.repair, cls: "warn", filter: { k: "status", v: ["repair"] } }),
     ].join("");
     return `
       <div class="statwrap">
         <h5>자산 현황</h5><div class="statgrid">${row1}</div>
-        <h5>조치 필요</h5><div class="statgrid">${row2}</div>
+        <h5>개별 자산 상태</h5><div class="statgrid">${row2}</div>
       </div>`;
   }
 
