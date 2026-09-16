@@ -36,7 +36,8 @@
   function holderText(a) {
     if (a.type === "individual") {
       const as = a.assignments || [];
-      if (!as.length) return '<span class="muted">재고</span>';
+      // "상태" 컬럼에 이미 재고 뱃지가 있어서 여기선 중복 표기하지 않음
+      if (!as.length) return '<span class="muted">—</span>';
       // 상세 페이지 배정 현황 카드와 동일하게 배정일 내림차순(최신이 첫번째)
       const sorted = [...as].sort((p, q) => p.since === q.since ? 0 : (p.since < q.since ? 1 : -1));
       // 배정 대상(구성원/근무지)을 레코드 순서대로 평탄화 — 복합 레코드는 구성원→근무지
@@ -95,7 +96,7 @@
     page: 1,
     pageSize: 20,
     sort: { key: "createdAt", dir: "desc" },
-    filters: { category: [], type: [], status: [], expiry: [], labels: [], note: [], labelMode: "or" },
+    filters: { category: [], type: [], status: [], expiry: [], labels: [], note: [] },
   };
   function sortList(list) {
     const { key, dir } = state.sort;
@@ -112,7 +113,7 @@
     });
   }
   function emptyFilters() {
-    return { category: [], type: [], status: [], expiry: [], labels: [], note: [], labelMode: "or" };
+    return { category: [], type: [], status: [], expiry: [], labels: [], note: [] };
   }
 
   function getFiltered() {
@@ -129,7 +130,7 @@
       if (f.note.length && !f.note.includes(a.note ? "has" : "none")) return false;
       if (f.labels.length) {
         const has = f.labels.filter(l => (a.labels || []).includes(l));
-        if (f.labelMode === "and" ? has.length !== f.labels.length : has.length === 0) return false;
+        if (has.length !== f.labels.length) return false;
       }
       if (q && !(`${a.product} ${a.assetNo || ""}`.toLowerCase().includes(q))) return false;
       return true;
@@ -332,7 +333,7 @@
     if (f.status.length) push("status", f.status.map(s => STATUS_LABEL[s][0]).join("·"), { k: "status" });
     if (f.expiry.length) push("expiry", f.expiry.map(e => EXP_LABEL[e]).join("·"), { k: "expiry" });
     if (f.note.length) push("note", f.note.map(v => v === "has" ? "있음" : "없음").join("·"), { k: "note" });
-    if (f.labels.length) push("labels", `태그(${f.labelMode.toUpperCase()}): ${f.labels.join("·")}`, { k: "labels" });
+    if (f.labels.length) push("labels", f.labels.join("·"), { k: "labels" });
     if (!chips.length) return "";
     return `<div class="filterbar"><button class="filter-reset" id="filter-reset" aria-label="필터 전체 해제">${RESET_ICON}</button>${chips.join("")}</div>`;
   }
@@ -410,7 +411,7 @@
     c.querySelectorAll(".statcol.click").forEach(el => el.onclick = () => {
       const p = JSON.parse(el.dataset.filter);
       const isOn = arrEq(state.filters[p.k], p.v);
-      const base = { ...emptyFilters(), category: state.filters.category, labelMode: state.filters.labelMode };
+      const base = { ...emptyFilters(), category: state.filters.category };
       state.filters = isOn ? base : { ...base, [p.k]: p.v };
       state.page = 1;
       render();
@@ -529,8 +530,8 @@
     let query = "";
 
     const GROUPS = [
-      { k: "category", name: "분류" },
       { k: "type", name: "자산 유형" },
+      { k: "category", name: "분류" },
       { k: "status", name: "상태" },
       { k: "expiry", name: "유효기한" },
       { k: "labels", name: "태그" },
@@ -539,14 +540,15 @@
     // 첫번째로 선택된 옵션 라벨 + 나머지 개수(예: "노트북 +2") — 아무것도 선택 안 했으면 빈 문자열(전체라고 적지 않음)
     const summary = k => {
       let labels = [];
-      if (k === "category") labels = draft.category.map(c => c.split("/")[1]);
+      // 소분류만 봐선 어느 대분류인지 알 수 없어서 "대분류 › 소분류"로 표시
+      if (k === "category") labels = draft.category.map(c => { const [g, s] = c.split("/"); return `${g} › ${s}`; });
       else if (k === "type") labels = draft.type.map(v => TYPE_LABEL[v]);
       else if (k === "status") labels = draft.status.map(v => STATUS_LABEL[v][0]);
       else if (k === "expiry") labels = draft.expiry.map(v => EXP_LABEL[v]);
       else if (k === "labels") labels = draft.labels;
       if (!labels.length) return "";
       const rest = labels.length > 1 ? ` +${labels.length - 1}` : "";
-      return k === "labels" ? `${labels[0]}${rest} · ${draft.labelMode.toUpperCase()}` : `${labels[0]}${rest}`;
+      return `${labels[0]}${rest}`;
     };
     // 그룹별 "전체 선택" 대상이 되는 leaf 값 목록(검색 중이면 검색에 걸리는 것만)
     function visibleValues() {
@@ -598,8 +600,23 @@
       return `<label class="opt ${cls}"><input type="checkbox" data-v="${val}" ${checked ? "checked" : ""}>${label}</label>`;
     }
 
+    // 검색 인풋은 그룹 전환시에만 새로 그리고, 타이핑 중엔 목록(#f-dynamic)만 갱신
+    // — 매 키 입력마다 인풋 자체를 다시 그리면 한글 조합(자모 분리)이 깨짐
     function drawOpts() {
       const box = back.querySelector("#f-opts");
+      const showSearch = SEARCHABLE.includes(group);
+      box.innerHTML = `
+        ${showSearch ? `<input type="text" class="picker-search" id="f-search" placeholder="검색" value="${query.replace(/"/g, "&quot;")}">` : ""}
+        <div id="f-dynamic"></div>
+      `;
+      if (showSearch) {
+        box.querySelector("#f-search").oninput = e => { query = e.target.value; renderDynamic(); };
+      }
+      renderDynamic();
+    }
+
+    function renderDynamic() {
+      const dyn = back.querySelector("#f-dynamic");
       const q = query.trim().toLowerCase();
       let listHtml = "";
       if (group === "category") {
@@ -616,29 +633,18 @@
       } else if (group === "type") {
         listHtml = Object.entries(TYPE_LABEL).map(([v, l]) => optRow(draft.type.includes(v), l, v)).join("");
       } else if (group === "status") {
-        listHtml = `<p class="hint" style="margin-bottom:6px">개별 자산에만 적용</p>` +
-          STATUS_ORDER.map(v => optRow(draft.status.includes(v), STATUS_LABEL[v][0], v)).join("");
+        listHtml = STATUS_ORDER.map(v => optRow(draft.status.includes(v), STATUS_LABEL[v][0], v)).join("");
       } else if (group === "expiry") {
         listHtml = Object.entries(EXP_LABEL).map(([v, l]) => optRow(draft.expiry.includes(v), l, v)).join("");
       } else if (group === "labels") {
         const filtered = ALL_LABELS.filter(l => !q || l.toLowerCase().includes(q));
-        listHtml = `
-          <div class="field" style="margin-bottom:10px">
-            <label>다중 선택 조건</label>
-            <div class="seg" id="lbl-mode">
-              <button data-m="or" class="${draft.labelMode === "or" ? "active" : ""}">OR (하나라도)</button>
-              <button data-m="and" class="${draft.labelMode === "and" ? "active" : ""}">AND (모두)</button>
-            </div>
-          </div>` +
-          (filtered.length ? filtered.map(l => optRow(draft.labels.includes(l), l, l)).join("")
-            : `<p class="muted" style="padding:12px 2px">결과가 없습니다.</p>`);
+        listHtml = filtered.length ? filtered.map(l => optRow(draft.labels.includes(l), l, l)).join("")
+          : `<p class="muted" style="padding:12px 2px">결과가 없습니다.</p>`;
       }
 
-      const showSearch = SEARCHABLE.includes(group);
       const vis = visibleValues();
       const allChecked = vis.length > 0 && vis.every(v => (draft[group] || []).includes(v));
-      box.innerHTML = `
-        ${showSearch ? `<input type="text" class="picker-search" id="f-search" placeholder="검색" value="${query.replace(/"/g, "&quot;")}">` : ""}
+      dyn.innerHTML = `
         <div class="picker-toolbar">
           <label class="picker-check"><input type="checkbox" id="f-select-all" ${allChecked ? "checked" : ""}><span>전체</span></label>
           <span class="right"><button class="filter-reset" id="f-group-reset" aria-label="이 항목 초기화">${RESET_ICON}</button></span>
@@ -646,32 +652,19 @@
         ${listHtml}
       `;
 
-      if (showSearch) {
-        const si = box.querySelector("#f-search");
-        si.oninput = () => { query = si.value; drawOpts(); };
-        si.focus();
-        si.selectionStart = si.selectionEnd = si.value.length;
-      }
-      if (group === "labels") {
-        box.querySelector("#lbl-mode").onclick = e => {
-          const b = e.target.closest("button"); if (!b) return;
-          draft.labelMode = b.dataset.m; drawOpts(); drawGroups();
-        };
-      }
-      box.querySelector("#f-select-all").onchange = e => {
+      dyn.querySelector("#f-select-all").onchange = e => {
         const vals = visibleValues();
         draft[group] = e.target.checked
           ? [...new Set([...draft[group], ...vals])]
           : draft[group].filter(v => !vals.includes(v));
-        drawOpts(); drawGroups(); drawSum();
+        renderDynamic(); drawGroups(); drawSum();
       };
-      box.querySelector("#f-group-reset").onclick = () => {
+      dyn.querySelector("#f-group-reset").onclick = () => {
         draft[group] = [];
-        if (group === "labels") draft.labelMode = "or";
-        drawOpts(); drawGroups(); drawSum();
+        renderDynamic(); drawGroups(); drawSum();
       };
 
-      box.querySelectorAll('input[type=checkbox][data-v]').forEach(cb => cb.onchange = () => {
+      dyn.querySelectorAll('input[type=checkbox][data-v]').forEach(cb => cb.onchange = () => {
         const v = cb.dataset.v;
         if (group === "category") {
           if (v.startsWith("grp:")) {
@@ -687,7 +680,7 @@
           const arr = draft[group];
           draft[group] = cb.checked ? [...arr, v] : arr.filter(x => x !== v);
         }
-        drawOpts(); drawGroups(); drawSum();
+        renderDynamic(); drawGroups(); drawSum();
       });
       drawSum();
     }
