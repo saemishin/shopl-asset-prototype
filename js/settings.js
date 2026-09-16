@@ -54,11 +54,11 @@
     return `
       <div class="settings-card">
         <h4>자산 관리 권한</h4>
+        <p class="hint" style="margin:0 0 10px">관리자는 항상 포함되며, 리더는 선택한 사람에게만 이 권한이 부여됩니다.</p>
         <ul class="settings-hint-list">
           <li>대분류·소분류 카테고리를 생성·수정·삭제할 수 있습니다.</li>
           <li>자산을 등록·수정·삭제할 수 있습니다.</li>
           <li>소분류별로 설정된 조회/배정 권한과 무관하게, 모든 소분류의 자산을 조회하고 배정/보유를 변경할 수 있습니다.</li>
-          <li>일반 사용자에게는 조회 권한이 있는 소분류가 1개 이상 있는 대분류만 보이지만, 이 권한을 가진 사람에게는 모든 대분류·소분류가 항상 노출됩니다.</li>
         </ul>
         <label class="opt is-disabled"><input type="checkbox" checked disabled><span>관리자</span></label>
         <label class="opt"><input type="checkbox" data-toggle-leader${leaderOn ? " checked" : ""}><span>리더</span></label>
@@ -117,22 +117,33 @@
     };
   }
 
-  // 직원 선택(리더 이상만) — 검색 + 전체선택 + 목록, 카테고리 화면의 구성원 선택 팝업과 같은 패턴
+  // 직원 선택(리더 이상만) — 대시보드 공용 "직원 선택" 팝업 패턴 참조: 좌측 검색+전체선택+목록, 우측 선택됨 요약+직접 추가+선택 리스트
   function openLeaderPicker(initial, onApply) {
     const sel = new Set(initial);
     let query = "";
     const p = document.createElement("div");
     p.className = "modal-back";
     p.innerHTML = `
-      <div class="modal picker-modal">
+      <div class="modal picker-modal" style="width:680px">
         <h3>직원 선택</h3>
-        <div class="body">
-          <input type="text" class="picker-search" placeholder="검색어를 입력하세요">
-          <label class="picker-check" style="padding:8px 0 4px"><input type="checkbox" data-select-all><span>전체 선택</span></label>
-          <div class="picker-memberlist" data-list></div>
+        <div class="picker-split">
+          <div class="picker-split-left">
+            <input type="text" class="picker-search" placeholder="이름/사번/휴대폰 번호">
+            <div class="picker-toolbar">
+              <label class="picker-check"><input type="checkbox" data-select-all><span>전체 선택</span></label>
+              <span class="right">전체 <b>${LEADERS.length}</b></span>
+            </div>
+            <div class="picker-memberlist" data-list></div>
+          </div>
+          <div class="picker-split-right">
+            <div class="picker-selected-head">
+              <span>선택됨 <b data-count>${sel.size}</b></span>
+              <button type="button" class="btn sm" data-direct-add>+ 직접 추가</button>
+            </div>
+            <div class="picker-selected-list" data-selected-list></div>
+          </div>
         </div>
         <div class="foot">
-          <span class="sum" data-count>선택됨 ${sel.size}</span>
           <button class="btn" data-close>취소</button>
           <button class="btn primary" data-ok>적용</button>
         </div>
@@ -140,6 +151,22 @@
     document.body.appendChild(p);
     const list = p.querySelector("[data-list]");
     const countEl = p.querySelector("[data-count]");
+    const selectedList = p.querySelector("[data-selected-list]");
+
+    function renderSelected() {
+      countEl.textContent = sel.size;
+      selectedList.innerHTML = sel.size ? [...sel].map(name => `
+        <div class="picker-selected-row">
+          <span class="picker-avatar sm" style="background:${avatarColor(name)}">${name[0]}</span>
+          <span>${name}</span>
+          <button type="button" class="picker-selected-remove" data-remove="${name}" aria-label="제거">${CLOSE_ICON}</button>
+        </div>`).join("") : '<p class="muted" style="padding:16px 0">선택된 인원이 없습니다.</p>';
+      selectedList.querySelectorAll("[data-remove]").forEach(b => b.onclick = () => {
+        sel.delete(b.dataset.remove);
+        renderSelected();
+        renderList();
+      });
+    }
     function renderList() {
       const filtered = LEADERS.filter(m => !query || m.name.includes(query));
       list.innerHTML = filtered.length ? filtered.map(m => `
@@ -151,17 +178,19 @@
       p.querySelector("[data-select-all]").checked = filtered.length > 0 && filtered.every(m => sel.has(m.name));
       list.querySelectorAll("[data-member]").forEach(cb => cb.onchange = e => {
         e.target.checked ? sel.add(e.target.dataset.member) : sel.delete(e.target.dataset.member);
-        countEl.textContent = `선택됨 ${sel.size}`;
         p.querySelector("[data-select-all]").checked = filtered.length > 0 && filtered.every(m => sel.has(m.name));
+        renderSelected();
       });
     }
     p.querySelector(".picker-search").addEventListener("input", e => { query = e.target.value; renderList(); });
     p.querySelector("[data-select-all]").onchange = e => {
       LEADERS.filter(m => !query || m.name.includes(query)).forEach(m => e.target.checked ? sel.add(m.name) : sel.delete(m.name));
-      countEl.textContent = `선택됨 ${sel.size}`;
+      renderSelected();
       renderList();
     };
+    p.querySelector("[data-direct-add]").onclick = () => toast(`"직접 추가" — 이후 단계에서 정의`);
     renderList();
+    renderSelected();
     p.addEventListener("click", e => { if (e.target === p) p.remove(); });
     p.querySelector("[data-close]").onclick = () => p.remove();
     p.querySelector("[data-ok]").onclick = () => { p.remove(); onApply([...sel]); };

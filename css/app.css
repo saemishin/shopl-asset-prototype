@@ -173,15 +173,15 @@ input { font: inherit; }
 .foot .sum { margin-right: auto; font-size: 12px; color: var(--text-sub); align-self: center; }
 
 /* ============ 설정 — 자산관리 권한 ============ */
-.settings-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.settings-head { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
 .settings-head h3 { font-size: 17px; font-weight: 700; }
-.settings-card { max-width: 620px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); padding: 20px; }
+.settings-card { max-width: 720px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); padding: 20px; }
 .settings-card h4 { font-size: 14px; font-weight: 700; margin-bottom: 8px; }
 .settings-card .hint { margin: 0 0 16px; }
 .settings-hint-list { list-style: disc; margin: 0 0 18px 18px; padding: 0; font-size: 12.5px; color: var(--text-sub); line-height: 1.6; }
 .settings-hint-list li + li { margin-top: 4px; }
 .settings-card .opt { padding: 8px 2px; }
-.settings-foot { max-width: 620px; display: flex; justify-content: flex-end; margin-top: 16px; }
+.settings-foot { max-width: 720px; display: flex; justify-content: flex-end; margin-top: 16px; }
 
 /* ============ dropdown ============ */
 .dropdown-menu {
@@ -445,6 +445,20 @@ button.usebullet { background: var(--panel); font: inherit; cursor: pointer; }
 .picker-tree-toggle { width: 16px; flex-shrink: 0; font-size: 10px; color: var(--text-mut); text-align: center; }
 .picker-flatlist { display: flex; flex-direction: column; }
 .picker-memberlist { display: flex; flex-direction: column; }
+/* 좌측 검색+목록 / 우측 선택됨 요약+직접추가+선택 리스트로 나뉜 직원 선택 팝업(설정 화면의 리더 선택 등) */
+.picker-split { display: flex; gap: 20px; padding: 18px 20px; flex: 1; overflow: hidden; }
+.picker-split-left { flex: 1.3; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
+.picker-split-left .picker-memberlist { flex: 1; overflow-y: auto; }
+.picker-split-right { flex: 1; min-width: 0; border-left: 1px solid var(--line); padding-left: 20px; display: flex; flex-direction: column; overflow: hidden; }
+.picker-selected-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; flex-shrink: 0; }
+.picker-selected-head b { color: var(--primary); }
+.picker-selected-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+.picker-selected-row { display: flex; align-items: center; gap: 8px; padding: 6px 4px; border-radius: 6px; font-size: 12.5px; }
+.picker-selected-row:hover { background: #f7f8f9; }
+.picker-selected-row > span:nth-child(2) { flex: 1; }
+.picker-selected-remove { width: 22px; height: 22px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; border-radius: 6px; color: var(--text-mut); }
+.picker-selected-remove svg { width: 12px; height: 12px; }
+.picker-selected-remove:hover { background: #eef0f2; color: var(--text); }
 .picker-member-row { display: flex; align-items: center; gap: 10px; padding: 8px 4px; border-radius: 8px; cursor: pointer; }
 .picker-member-row:hover { background: #f7f8f9; }
 /* 배정/보유 변경 권한 대상이 조회 권한 범위 밖일 때 선택 자체를 막고 사유를 보여줌 */
