@@ -33,6 +33,12 @@
     return a.length !== b.length || a.some((v, i) => v !== b[i]);
   }
 
+  // 특정 리더를 선택했는데 대상이 0명이면 저장 불가
+  function canSave() {
+    if (draft.leaderMode === "specific" && draft.leaderTargets.length === 0) return false;
+    return isDirty();
+  }
+
   function targetRowHtml() {
     if (!draft.leaderTargets.length) {
       return `<button type="button" class="perm-target-btn" data-target-open><span class="muted">선택</span><span class="chev">›</span></button>`;
@@ -54,7 +60,6 @@
     return `
       <div class="settings-card">
         <h4>자산 관리 권한</h4>
-        <p class="hint" style="margin:0 0 10px">관리자는 항상 포함되며, 리더는 선택한 사람에게만 이 권한이 부여됩니다.</p>
         <ul class="settings-hint-list">
           <li>대분류·소분류 카테고리를 생성·수정·삭제할 수 있습니다.</li>
           <li>자산을 등록·수정·삭제할 수 있습니다.</li>
@@ -69,7 +74,7 @@
         ` : ""}
       </div>
       <div class="settings-foot">
-        <button class="btn primary" data-save${isDirty() ? "" : " disabled"}>저장</button>
+        <button class="btn primary" data-save${canSave() ? "" : " disabled"}>저장</button>
       </div>`;
   }
 
