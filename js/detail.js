@@ -345,7 +345,7 @@
         const qty = x.qty;
         a.stocks.splice(idx, 1);
         logActivity(a, { script: "보유 대상 해제", target: x, before: `${qty}개`, after: "" });
-        toast("보유 대상에서 해제되었습니다");
+        toast("보유 대상에서 해제되었습니다.");
         render();
       });
     });
@@ -531,7 +531,7 @@
       document.querySelectorAll(".dropdown-menu").forEach(m => m.remove());
       const list = [];
       if (cur !== a._primary) list.push({ t: "대표 사진으로 지정", fn: () => confirmModal("자산 대표 사진으로 지정하시겠습니까?", () => {
-        a._primary = cur; toast("자산 대표 사진으로 지정되었습니다"); draw();
+        a._primary = cur; toast("자산 대표 사진으로 지정되었습니다."); draw();
       }) });
       list.push({ t: "다운로드", fn: () => toast("다운로드 — 원본 파일명 그대로 (프로토타입)") });
       list.push({ t: "삭제", fn: () => confirmModal("자산 사진을 삭제하시겠습니까?", delCur), danger: true });

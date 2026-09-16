@@ -118,7 +118,7 @@
     saveBtn.onclick = () => {
       if (saveBtn.disabled) return;
       saved = { leaderMode: draft.leaderMode, leaderTargets: [...draft.leaderTargets] };
-      toast("저장되었습니다");
+      toast("저장되었습니다.");
       renderBody();
     };
   }

@@ -701,7 +701,7 @@
       cat.viewTarget = TARGET_NEEDED.has(state.view) ? { ...state.viewTarget } : null;
       cat.assignTarget = TARGET_NEEDED.has(state.assign) ? { ...state.assignTarget } : null;
       back.remove();
-      toast("저장되었습니다");
+      toast("저장되었습니다.");
       render({ group: cat.group, sub: cat.sub });
     };
   }
@@ -793,7 +793,7 @@
             <input type="text" class="cat-manage-name-input" data-rename-group="${gi}" value="${g.name}" maxlength="30">
             <div class="cat-manage-row-acts">
               <button class="cat-manage-icon${blocked ? " is-disabled" : ""}" data-del-group="${gi}" aria-label="삭제"
-                data-tip="${blocked ? "등록된 하위 소분류가 있어 삭제할 수 없습니다" : "삭제"}">${TRASH_ICON}</button>
+                data-tip="${blocked ? "등록된 하위 소분류가 있어 삭제할 수 없습니다." : "삭제"}">${TRASH_ICON}</button>
             </div>
           </div>
           <div class="cat-manage-subs">
@@ -805,7 +805,7 @@
                 <input type="text" class="cat-manage-name-input" data-rename-sub="${gi}|${si}" value="${s.name}" maxlength="30">
                 <div class="cat-manage-row-acts">
                   <button class="cat-manage-icon${hasAssets ? " is-disabled" : ""}" data-del-sub="${gi}|${si}" aria-label="삭제"
-                    data-tip="${hasAssets ? "등록된 자산이 있어 삭제할 수 없습니다" : "삭제"}">${TRASH_ICON}</button>
+                    data-tip="${hasAssets ? "등록된 자산이 있어 삭제할 수 없습니다." : "삭제"}">${TRASH_ICON}</button>
                 </div>
               </div>`;
             }).join("")}
@@ -936,7 +936,7 @@
       categories.push(...newCategories);
       window.DATA.emptyGroups = newEmptyGroups;
       back.remove();
-      toast("분류 구조가 저장되었습니다");
+      toast("저장되었습니다.");
       render(null);
     }
 

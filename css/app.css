@@ -507,10 +507,9 @@ button.usebullet { background: var(--panel); font: inherit; cursor: pointer; }
 }
 .cat-manage-name-input {
   flex: 1; min-width: 0; height: 28px; font-size: 12.5px; color: var(--text);
-  border: 1px solid transparent; border-radius: 6px; padding: 0 6px; background: transparent;
+  border: 1px solid var(--line-strong); border-radius: 6px; padding: 0 6px; background: var(--panel);
 }
-.cat-manage-name-input:hover { border-color: var(--line-strong); }
-.cat-manage-name-input:focus { border-color: var(--primary); background: var(--panel); }
+.cat-manage-name-input:focus { border-color: var(--primary); }
 .cat-manage-group-row .cat-manage-name-input { font-weight: 700; }
 .cat-manage-row-acts { display: flex; gap: 1px; flex-shrink: 0; }
 .cat-manage-icon {

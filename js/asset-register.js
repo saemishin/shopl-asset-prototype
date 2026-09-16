@@ -55,7 +55,7 @@ window.openAssetAddModal = function (opts) {
     back.querySelectorAll("#areg-type-seg button").forEach(x => x.classList.toggle("active", x === b));
     back.querySelector("#areg-assetno").style.display = type === "quantity" ? "none" : "";
   };
-  back.querySelector("#areg-save").addEventListener("click", () => toast("저장되었습니다 (프로토타입 — 반영 없음)"));
+  back.querySelector("#areg-save").addEventListener("click", () => toast("저장되었습니다. (프로토타입 — 반영 없음)"));
 
   return back;
 };
