@@ -325,6 +325,8 @@ th.c, td.c { text-align: center; width: 52px; }
 /* 이 패널 폭에 비해 기본 table의 min-width(880px)가 과해서 컬럼 배치가 틀어짐 — fixed 레이아웃으로 폭 전체를 컬럼별 비율대로 분배 */
 .cat-asset-table { min-width: 0; table-layout: fixed; }
 .cat-asset-table th:first-child, .cat-asset-table td:first-child { width: 34%; }
+/* 컬럼 폭이 넓어지니 숫자를 오른쪽 정렬하면 옆 컬럼과 붙어 보임 — 이 표는 컬럼 폭 안에서 왼쪽 정렬이 더 보기 편함 */
+.cat-asset-table .num { text-align: left; }
 .cat-asset-search { margin-bottom: 10px; }
 .cat-asset-search input { width: 100%; height: 32px; border: 1px solid var(--line-strong); border-radius: var(--radius); padding: 0 10px; font-size: 12.5px; background: var(--panel); }
 .cat-unit-list { display: flex; flex-direction: column; gap: 2px; max-height: 50vh; overflow-y: auto; }
