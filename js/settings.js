@@ -91,6 +91,7 @@
         <button class="btn sm" data-guide>사용 가이드 보기</button>
       </div>
       <div id="settings-body"></div>`;
+    c.querySelector("[data-guide]").onclick = () => toast("사용 가이드 페이지 — 이후 URL 정의 예정");
     renderBody();
   }
 
