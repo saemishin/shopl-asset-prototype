@@ -723,7 +723,8 @@
   // 자산 추가 팝업은 js/asset-register.js의 window.openAssetAddModal()로 분류 화면과 공용
 
   function openQrDownloadModal() {
-    const list = getFiltered();  // 현재 테이블에 적용된 필터·검색 범위 안에서 선택
+    // 별도 정렬 UI 없이 제품명 가나다순 고정 — 이름으로 훑어보기 가장 쉬운 기본 정렬
+    const list = getFiltered().sort((a, b) => a.product.localeCompare(b.product, "ko"));
     const PAGE_SIZE = 20;
     let query = "";
     let page = 1;
