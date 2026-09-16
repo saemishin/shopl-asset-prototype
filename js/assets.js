@@ -4,7 +4,7 @@
   const { assets } = window.DATA;
 
   const STATUS_LABEL = {
-    stock: ["재고", "stock"], assigned: ["배정중", "assigned"], repair: ["수리중", "repair"],
+    stock: ["재고", "stock"], assigned: ["배정 중", "assigned"], repair: ["수리중", "repair"],
     lost: ["분실", "lost"], disposed: ["폐기", "disposed"],
   };
   const STATUS_ORDER = ["stock", "assigned", "repair", "lost", "disposed"];
@@ -313,13 +313,12 @@
     const indiv = list.filter(a => a.type === "individual");
     const qty = list.filter(a => a.type === "quantity");
     const cnt = k => indiv.filter(a => a.status === k).length;
-    const totalQty = qty.reduce((s, a) => s + (a.stocks || []).reduce((t, x) => t + x.qty, 0), 0);
     const zeroStocks = qty.reduce((s, a) => s + (a.stocks || []).filter(x => x.qty === 0).length, 0);
     const expOver = list.filter(a => a.expiry && expiryKey(a.expiry) === "over").length;
     const expSoon = list.filter(a => a.expiry && expiryKey(a.expiry) === "soon").length;
     const assignable = indiv.length - cnt("disposed");
     return {
-      indivN: indiv.length, qtyN: qty.length, totalQty,
+      indivN: indiv.length, qtyN: qty.length,
       stock: cnt("stock"), assigned: cnt("assigned"), repair: cnt("repair"),
       lost: cnt("lost"), disposed: cnt("disposed"),
       zeroStocks, expOver, expSoon,
@@ -340,9 +339,9 @@
     const s = computeStats();
     const row1 = [
       statTile({ k: "개별 자산", v: s.indivN, sub: "대", filter: { k: "type", v: ["individual"] } }),
-      statTile({ k: "수량 자산", v: s.qtyN, sub: `품목 · 총 ${s.totalQty}개`, filter: { k: "type", v: ["quantity"] } }),
-      statTile({ k: "배정중", v: s.assigned, filter: { k: "status", v: ["assigned"] } }),
-      statTile({ k: "재고(미배정)", v: s.stock, filter: { k: "status", v: ["stock"] } }),
+      statTile({ k: "수량 자산", v: s.qtyN, sub: "종류", filter: { k: "type", v: ["quantity"] } }),
+      statTile({ k: "배정 중", v: s.assigned, filter: { k: "status", v: ["assigned"] } }),
+      statTile({ k: "재고", v: s.stock, filter: { k: "status", v: ["stock"] } }),
       statTile({ k: "배정률", v: s.rate + "%" }),
     ].join("");
     const row2 = [

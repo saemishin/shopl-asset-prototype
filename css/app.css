@@ -280,7 +280,7 @@ th.c, td.c { text-align: center; width: 52px; }
   display: inline-flex; align-items: center; height: 20px; padding: 0 7px; border-radius: 10px;
   background: #eef3ff; color: var(--primary); font-size: 11px; margin: 1px 3px 1px 0;
 }
-.badge { display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border-radius: 5px; font-size: 11px; font-weight: 600; }
+.badge { display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border-radius: 5px; font-size: 11px; font-weight: 600; white-space: nowrap; }
 .badge.stock { background: #eef0f2; color: #5b6067; }
 .badge.assigned { background: #e7f0ff; color: #2f6df6; }
 .badge.repair { background: #fff1e0; color: #c9791b; }
@@ -292,7 +292,7 @@ th.c, td.c { text-align: center; width: 52px; }
 .badge.exp-valid { background: #eaf7ef; color: #1f9d55; }
 .badge.exp-soon { background: #fff4e0; color: #c9791b; }
 .badge.exp-over { background: #fdecec; color: #d23b40; }
-.type-pill { font-size: 11px; color: var(--text-sub); border: 1px solid var(--line-strong); border-radius: 4px; padding: 1px 5px; }
+.type-pill { font-size: 11px; color: var(--text-sub); border: 1px solid var(--line-strong); border-radius: 4px; padding: 1px 5px; white-space: nowrap; }
 
 /* ============ 분류 관리 ============ */
 .cat-layout { display: flex; gap: 24px; align-items: flex-start; }
