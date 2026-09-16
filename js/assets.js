@@ -535,6 +535,7 @@
       { k: "status", name: "상태" },
       { k: "expiry", name: "유효기한" },
       { k: "labels", name: "태그" },
+      { k: "note", name: "메모" },
     ];
     const SEARCHABLE = ["category", "labels"];
     // 첫번째로 선택된 옵션 라벨 + 나머지 개수(예: "노트북 +2") — 아무것도 선택 안 했으면 빈 문자열(전체라고 적지 않음)
@@ -546,6 +547,7 @@
       else if (k === "status") labels = draft.status.map(v => STATUS_LABEL[v][0]);
       else if (k === "expiry") labels = draft.expiry.map(v => EXP_LABEL[v]);
       else if (k === "labels") labels = draft.labels;
+      else if (k === "note") labels = draft.note.map(v => v === "has" ? "있음" : "없음");
       if (!labels.length) return "";
       const rest = labels.length > 1 ? ` +${labels.length - 1}` : "";
       return `${labels[0]}${rest}`;
@@ -563,6 +565,7 @@
       if (group === "type") return Object.keys(TYPE_LABEL);
       if (group === "status") return STATUS_ORDER;
       if (group === "expiry") return Object.keys(EXP_LABEL);
+      if (group === "note") return ["has", "none"];
       return ALL_LABELS.filter(l => !q || l.toLowerCase().includes(q));
     }
 
@@ -640,6 +643,9 @@
         const filtered = ALL_LABELS.filter(l => !q || l.toLowerCase().includes(q));
         listHtml = filtered.length ? filtered.map(l => optRow(draft.labels.includes(l), l, l)).join("")
           : `<p class="muted" style="padding:12px 2px">결과가 없습니다.</p>`;
+      } else if (group === "note") {
+        listHtml = [{ v: "has", l: "있음" }, { v: "none", l: "없음" }]
+          .map(o => optRow(draft.note.includes(o.v), o.l, o.v)).join("");
       }
 
       const vis = visibleValues();
@@ -684,8 +690,9 @@
       });
       drawSum();
     }
+    // 현재 그룹이 아니라 전체 그룹 누적 선택 개수(참고 이미지의 "선택됨 N"과 동일한 의미)
     function drawSum() {
-      const n = (draft[group] || []).length;
+      const n = GROUPS.reduce((sum, g) => sum + (draft[g.k] || []).length, 0);
       back.querySelector("#f-sum").textContent = `선택됨 ${n}`;
     }
 
