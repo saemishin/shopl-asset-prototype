@@ -197,6 +197,7 @@ input { font: inherit; }
   border-radius: 6px; white-space: nowrap;
 }
 .dropdown-menu button:hover { background: var(--primary-weak); color: var(--primary); }
+.dropdown-menu button.active { color: var(--primary); font-weight: 600; }
 .dropdown-sep { height: 1px; background: var(--line); margin: 4px 2px; }
 
 /* ============ stats ============ */
@@ -266,6 +267,10 @@ thead th {
   text-align: left; padding: 10px 12px; background: #fafbfc; color: var(--text-sub);
   font-weight: 600; border-bottom: 1px solid var(--line); white-space: nowrap;
 }
+.th-filter { cursor: pointer; user-select: none; }
+.th-filter:hover { color: var(--text); }
+.th-filter.active { color: var(--primary); }
+.th-caret { width: 10px; height: 10px; vertical-align: -1px; margin-left: 2px; opacity: .6; }
 tbody td { padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: middle; }
 tbody tr:last-child td { border-bottom: none; }
 tbody tr.clickable:hover { background: var(--primary-weak); cursor: pointer; }
@@ -555,6 +560,7 @@ button.usebullet { background: var(--panel); font: inherit; cursor: pointer; }
 .pager button { width: 28px; height: 28px; border-radius: 6px; color: var(--text-sub); }
 .pager button:hover { background: #eef0f2; }
 .pager button.active { background: var(--text); color: #fff; }
+.pager button:disabled { opacity: .35; pointer-events: none; }
 .pager .pagesize { position: absolute; right: 0; }
 .pager .pagesize select { height: 28px; border: 1px solid var(--line-strong); border-radius: 6px; padding: 0 6px; }
 

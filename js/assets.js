@@ -81,8 +81,13 @@
   const state = {
     view: "all",
     search: "",
-    filters: { category: [], type: [], status: [], expiry: [], labels: [], labelMode: "or" },
+    page: 1,
+    pageSize: 20,
+    filters: { category: [], type: [], status: [], expiry: [], labels: [], note: [], labelMode: "or" },
   };
+  function emptyFilters() {
+    return { category: [], type: [], status: [], expiry: [], labels: [], note: [], labelMode: "or" };
+  }
 
   function getFiltered() {
     const f = state.filters;
@@ -95,6 +100,7 @@
         if (!f.status.includes(a.status)) return false;
       }
       if (f.expiry.length && !f.expiry.includes(expiryKey(a.expiry))) return false;
+      if (f.note.length && !f.note.includes(a.note ? "has" : "none")) return false;
       if (f.labels.length) {
         const has = f.labels.filter(l => (a.labels || []).includes(l));
         if (f.labelMode === "and" ? has.length !== f.labels.length : has.length === 0) return false;
@@ -105,15 +111,57 @@
   }
   function activeFilterCount() {
     const f = state.filters;
-    return f.category.length + f.type.length + f.status.length + f.expiry.length + f.labels.length;
+    return f.category.length + f.type.length + f.status.length + f.expiry.length + f.labels.length + f.note.length;
+  }
+  function pageSlice(arr) {
+    const totalPages = Math.max(1, Math.ceil(arr.length / state.pageSize));
+    if (state.page > totalPages) state.page = totalPages;
+    if (state.page < 1) state.page = 1;
+    const start = (state.page - 1) * state.pageSize;
+    return arr.slice(start, start + state.pageSize);
+  }
+
+  /* ---------- header filters ---------- */
+  const CARET = `<svg class="th-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>`;
+  function thFilter(label, key, cls = "") {
+    const on = (state.filters[key] || []).length ? " active" : "";
+    return `<th class="th-filter${on} ${cls}" data-hf="${key}">${label}${CARET}</th>`;
+  }
+  function headerOptions(key) {
+    if (key === "type") return Object.entries(TYPE_LABEL).map(([v, l]) => ({ v, l }));
+    if (key === "status") return STATUS_ORDER.map(v => ({ v, l: STATUS_LABEL[v][0] }));
+    if (key === "expiry") return Object.entries(EXP_LABEL).map(([v, l]) => ({ v, l }));
+    if (key === "note") return [{ v: "has", l: "있음" }, { v: "none", l: "없음" }];
+  }
+  function openHeaderFilter(anchor, key) {
+    document.querySelectorAll(".dropdown-menu").forEach(m => m.remove());
+    const cur = (state.filters[key] || [])[0] || "";
+    const opts = [{ v: "", l: "전체" }, ...headerOptions(key)];
+    const menu = document.createElement("div");
+    menu.className = "dropdown-menu";
+    menu.innerHTML = opts.map(o => `<button data-v="${o.v}" class="${cur === o.v ? "active" : ""}">${o.l}</button>`).join("");
+    const r = anchor.getBoundingClientRect();
+    menu.style.cssText = `position:fixed;top:${r.bottom + 4}px;left:${r.left}px;min-width:${Math.max(r.width, 120)}px`;
+    document.body.appendChild(menu);
+    menu.querySelectorAll("button").forEach(b => b.onclick = () => {
+      menu.remove();
+      state.filters[key] = b.dataset.v ? [b.dataset.v] : [];
+      state.page = 1;
+      render();
+    });
+    setTimeout(() => {
+      const close = e => { if (!menu.contains(e.target)) { menu.remove(); document.removeEventListener("click", close); } };
+      document.addEventListener("click", close);
+    });
   }
 
   /* ---------- views ---------- */
   function view_all(list) {
     const head = `<tr>
-      <th>고유관리번호</th><th>제품명</th><th>분류</th><th>자산 유형</th><th>상태</th>
-      <th>배정·보유 현황</th><th>유효기한</th><th>태그</th><th class="c">메모</th></tr>`;
-    const rows = list.map(a => {
+      <th>고유관리번호</th><th>제품명</th><th>분류</th>
+      ${thFilter("자산 유형", "type")}${thFilter("상태", "status")}
+      <th>배정·보유 현황</th>${thFilter("유효기한", "expiry")}<th>태그</th>${thFilter("메모", "note", "c")}</tr>`;
+    const rows = pageSlice(list).map(a => {
       const st = a.type === "quantity"
         ? '<span class="muted">—</span>'
         : `<span class="badge ${STATUS_LABEL[a.status][1]}">${STATUS_LABEL[a.status][0]}</span>`;
@@ -141,7 +189,8 @@
     });
     const head = `<tr><th>제품명</th><th>분류</th><th>자산 유형</th><th class="num">자산 수</th>
       <th>상태 분포</th><th class="num">총 수량</th></tr>`;
-    const rows = [...map.values()].map(g => {
+    const groups = [...map.values()];
+    const rows = pageSlice(groups).map(g => {
       let dist = "—", totalQty = "—";
       if (g.type === "individual") {
         const c = {};
@@ -159,7 +208,7 @@
         <td class="num">${totalQty}</td>
       </tr>`;
     }).join("");
-    return { head, rows, count: map.size };
+    return { head, rows, count: groups.length };
   }
 
   function view_axis(list, axis) {
@@ -175,12 +224,13 @@
     });
     const label = axis === "employee" ? "구성원" : "근무지";
     const head = `<tr><th>${label}</th><th class="num">배정 자산 수</th><th class="num">보유 수량</th></tr>`;
-    const rows = [...map.values()].map(r => `<tr>
+    const rowsArr = [...map.values()];
+    const rows = pageSlice(rowsArr).map(r => `<tr>
       <td>${r.name}</td>
       <td class="num">${r.indiv || '<span class="muted">0</span>'}</td>
       <td class="num">${r.qty || '<span class="muted">0</span>'}</td>
     </tr>`).join("");
-    return { head, rows, count: map.size };
+    return { head, rows, count: rowsArr.length };
   }
 
   function currentView() {
@@ -192,6 +242,27 @@
   }
 
   /* ---------- render ---------- */
+  function pagerHtml(total) {
+    const totalPages = Math.max(1, Math.ceil(total / state.pageSize));
+    const p = state.page;
+    const winStart = Math.max(1, Math.min(p - 2, totalPages - 4));
+    const winEnd = Math.min(totalPages, Math.max(p + 2, winStart + 4));
+    const pages = [];
+    for (let i = Math.max(1, winStart); i <= winEnd; i++) pages.push(i);
+    const btn = (label, target, disabled, cls = "") =>
+      `<button data-page="${target}" ${disabled ? "disabled" : ""} class="${cls}">${label}</button>`;
+    return `
+      <div class="pager">
+        ${btn("«", 1, p === 1)}
+        ${btn("‹", p - 1, p === 1)}
+        ${pages.map(n => btn(n, n, false, n === p ? "active" : "")).join("")}
+        ${btn("›", p + 1, p === totalPages)}
+        ${btn("»", totalPages, p === totalPages)}
+        <span class="pagesize"><select id="page-size">
+          ${[20, 50, 100].map(n => `<option value="${n}" ${state.pageSize === n ? "selected" : ""}>${n}</option>`).join("")}
+        </select></span>
+      </div>`;
+  }
   function filterChips() {
     const f = state.filters;
     const chips = [];
@@ -201,6 +272,7 @@
     if (f.type.length) push("type", f.type.map(t => TYPE_LABEL[t]).join("·"), { k: "type" });
     if (f.status.length) push("status", f.status.map(s => STATUS_LABEL[s][0]).join("·"), { k: "status" });
     if (f.expiry.length) push("expiry", f.expiry.map(e => EXP_LABEL[e]).join("·"), { k: "expiry" });
+    if (f.note.length) push("note", f.note.map(v => v === "has" ? "있음" : "없음").join("·"), { k: "note" });
     if (f.labels.length) push("labels", `태그(${f.labelMode.toUpperCase()}): ${f.labels.join("·")}`, { k: "labels" });
     if (!chips.length) return "";
     return `<div class="filterbar"><button class="filter-reset" id="filter-reset" aria-label="필터 전체 해제">${RESET_ICON}</button>${chips.join("")}</div>`;
@@ -255,42 +327,51 @@
 
       <div class="table-wrap">${tableInner(v)}</div>
 
-      <div class="pager">
-        <button>«</button><button>‹</button>
-        <button class="active">1</button><button>2</button><button>3</button>
-        <button>›</button><button>»</button>
-        <span class="pagesize"><select><option>100</option><option>50</option><option>20</option></select></span>
-      </div>
+      ${pagerHtml(v.count)}
     `;
 
     c.querySelectorAll(".subtabs button").forEach(b =>
-      b.onclick = () => { state.view = b.dataset.view; render(); });
+      b.onclick = () => { state.view = b.dataset.view; state.page = 1; render(); });
     bindRows(c);
     c.querySelectorAll("[data-stub]").forEach(el =>
       el.onclick = () => toast(`"${el.dataset.stub}" — 이후 단계에서 정의`));
 
     const si = document.getElementById("search-input");
     const sbox = si.closest(".searchbox");
-    const commit = () => { state.search = si.value.trim(); render(); };
+    const commit = () => { state.search = si.value.trim(); state.page = 1; render(); };
     si.onfocus = () => { si.classList.add("expanded"); si.placeholder = "고유관리번호 / 제품명"; };
     si.onblur = () => { if (!si.value && !state.search) { si.classList.remove("expanded"); si.placeholder = "검색"; } };
     si.oninput = () => sbox.classList.toggle("has-term", !!si.value);   // ✕ 노출만, 검색 실행 X
     si.onkeydown = e => { if (e.key === "Enter") commit(); };
-    document.getElementById("search-clear").onclick = () => { si.value = ""; state.search = ""; render(); };
+    document.getElementById("search-clear").onclick = () => { si.value = ""; state.search = ""; state.page = 1; render(); };
     c.querySelectorAll("[data-clear]").forEach(b =>
-      b.onclick = () => { state.filters[JSON.parse(b.dataset.clear).k] = []; render(); });
+      b.onclick = () => { state.filters[JSON.parse(b.dataset.clear).k] = []; state.page = 1; render(); });
 
     c.querySelectorAll(".statcol.click").forEach(el => el.onclick = () => {
       const p = JSON.parse(el.dataset.filter);
       const isOn = arrEq(state.filters[p.k], p.v);
-      const base = { category: state.filters.category, type: [], status: [], expiry: [], labels: [], labelMode: state.filters.labelMode };
+      const base = { ...emptyFilters(), category: state.filters.category, labelMode: state.filters.labelMode };
       state.filters = isOn ? base : { ...base, [p.k]: p.v };
+      state.page = 1;
       render();
     });
 
     const resetBtn = document.getElementById("filter-reset");
     if (resetBtn) resetBtn.onclick = () => {
-      state.filters = { category: [], type: [], status: [], expiry: [], labels: [], labelMode: "or" };
+      state.filters = emptyFilters();
+      state.page = 1;
+      render();
+    };
+
+    c.querySelectorAll(".th-filter").forEach(th =>
+      th.onclick = () => openHeaderFilter(th, th.dataset.hf));
+
+    c.querySelectorAll(".pager button[data-page]").forEach(b =>
+      b.onclick = () => { state.page = +b.dataset.page; render(); });
+    const pageSizeSel = document.getElementById("page-size");
+    if (pageSizeSel) pageSizeSel.onchange = () => {
+      state.pageSize = +pageSizeSel.value;
+      state.page = 1;
       render();
     };
 
@@ -483,11 +564,12 @@
     }
 
     back.querySelector("#f-reset").onclick = () => {
-      Object.assign(draft, { category: [], type: [], status: [], expiry: [], labels: [], labelMode: "or" });
+      Object.assign(draft, emptyFilters());
       drawGroups(); drawOpts();
     };
     back.querySelector("#f-apply").onclick = () => {
       state.filters = draft;
+      state.page = 1;
       back.remove();
       render();
     };
