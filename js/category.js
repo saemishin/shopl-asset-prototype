@@ -290,6 +290,7 @@
       <div class="field">
         <label>소분류명<span class="req">*</span></label>
         <input type="text" class="cat-manage-input" data-f-name value="${state.name}" placeholder="입력" maxlength="30" style="width:100%">
+        <p class="field-err" data-f-name-err hidden>동일한 명칭이 존재합니다.</p>
       </div>
       <div class="field">
         <label>자산 유형<span class="req">*</span> <button type="button" class="help-icon" data-f-type-help aria-label="자산 유형 도움말">?</button></label>
@@ -325,11 +326,18 @@
         </div>
       </div>`;
 
-    container.querySelector("[data-f-name]").addEventListener("input", e => {
-      state.name = e.target.value;
-      opts.onNameChange(state.name.trim().length > 0);
-    });
-    opts.onNameChange(state.name.trim().length > 0);
+    // 소분류명은 같은 대분류 안에서만 유일하면 되도록 검증(다른 대분류의 동명 소분류는 무관 — 항상 "대분류 › 소분류"로 노출돼 혼동 없음)
+    const nameInputEl = container.querySelector("[data-f-name]");
+    const nameErrEl = container.querySelector("[data-f-name-err]");
+    function checkName() {
+      const val = state.name.trim();
+      const dup = !!val && (opts.siblingNames || []).includes(val);
+      nameInputEl.classList.toggle("has-err", dup);
+      nameErrEl.hidden = !dup;
+      opts.onNameChange(val.length > 0 && !dup);
+    }
+    nameInputEl.addEventListener("input", e => { state.name = e.target.value; checkName(); });
+    checkName();
 
     if (!typeLocked) {
       container.querySelector("[data-f-type]").addEventListener("click", e => {
@@ -753,6 +761,7 @@
     renderSubForm(form, state, {
       groupLabel: cat.group,
       typeLocked: hasAssets,
+      siblingNames: categories.filter(c => c.group === cat.group && c.sub !== cat.sub).map(c => c.sub),
       onNameChange: valid => { saveBtn.disabled = !valid; },
     });
     back.addEventListener("click", e => { if (e.target === back) back.remove(); });
@@ -804,7 +813,9 @@
           <input type="text" class="cat-manage-input" placeholder="입력" maxlength="30">
           <button class="btn primary" data-add-group>+ 대분류 추가</button>
         </div>
+        <p class="field-err" data-addgroup-err hidden style="margin:0 20px">동일한 명칭이 존재합니다.</p>
         <div class="body cat-manage-body"></div>
+        <p class="field-err" data-body-err hidden style="margin:0 20px 12px">동일한 명칭이 존재합니다.</p>
         <div class="cat-manage-create" hidden></div>
         <div class="foot">
           <button class="btn" data-cancel>취소</button>
@@ -821,8 +832,41 @@
     const cancelBtn = back.querySelector("[data-cancel]");
     const confirmBtn = back.querySelector("[data-confirm]");
     const addInput = back.querySelector(".cat-manage-add-group input");
+    const addGroupErr = back.querySelector("[data-addgroup-err]");
+    const bodyErr = back.querySelector("[data-body-err]");
     let currentMode = "list";
-    const markDirty = () => { dirty = true; if (currentMode === "list") confirmBtn.disabled = false; };
+    // 대분류명은 전체 통틀어, 소분류명은 같은 대분류 안에서만 유일하면 됨(다른 대분류의 동명 소분류는 무관)
+    function computeDups() {
+      const groupCounts = {};
+      draft.forEach(g => { const n = g.name.trim(); if (n) groupCounts[n] = (groupCounts[n] || 0) + 1; });
+      const groupDups = new Set(Object.keys(groupCounts).filter(n => groupCounts[n] > 1));
+      const subDupsByGi = draft.map(g => {
+        const counts = {};
+        g.subs.forEach(s => { const n = s.name.trim(); if (n) counts[n] = (counts[n] || 0) + 1; });
+        return new Set(Object.keys(counts).filter(n => counts[n] > 1));
+      });
+      return { groupDups, subDupsByGi };
+    }
+    function updateValidity() {
+      const { groupDups, subDupsByGi } = computeDups();
+      let anyDup = groupDups.size > 0;
+      body.querySelectorAll("[data-rename-group]").forEach(inp => {
+        inp.classList.toggle("has-err", groupDups.has(inp.value.trim()));
+      });
+      body.querySelectorAll("[data-rename-sub]").forEach(inp => {
+        const gi = +inp.dataset.renameSub.split("|")[0];
+        const dup = subDupsByGi[gi] && subDupsByGi[gi].has(inp.value.trim());
+        inp.classList.toggle("has-err", !!dup);
+        if (dup) anyDup = true;
+      });
+      bodyErr.hidden = !anyDup;
+      const addDup = draft.some(g => g.name.trim() === addInput.value.trim());
+      addInput.classList.toggle("has-err", !!addInput.value.trim() && addDup);
+      addGroupErr.hidden = !(addInput.value.trim() && addDup);
+      back.querySelector("[data-add-group]").disabled = !!addInput.value.trim() && addDup;
+      if (currentMode === "list") confirmBtn.disabled = !dirty || anyDup;
+    }
+    const markDirty = () => { dirty = true; updateValidity(); };
     const clearDragMarks = () => body.querySelectorAll(".drag-over-top,.drag-over-bottom")
       .forEach(el => el.classList.remove("drag-over-top", "drag-over-bottom"));
 
@@ -844,7 +888,7 @@
       createEl.hidden = isList;
       cancelBtn.hidden = !isList; // 소분류 생성 화면에선 헤더의 뒤로가기(←)가 같은 역할을 하므로 푸터 취소는 없앰
       confirmBtn.textContent = "저장";
-      confirmBtn.disabled = isList ? !dirty : true;
+      if (isList) updateValidity(); else confirmBtn.disabled = true;
       cancelBtn.onclick = () => { back.remove(); render(sel); };
       confirmBtn.onclick = isList ? saveAll : commitCreate;
     }
@@ -885,17 +929,19 @@
           </div>
         </div>`;
       }).join("");
+      updateValidity();
     }
     renderBody();
 
     function addGroup() {
       const name = addInput.value.trim();
-      if (!name) { addInput.focus(); return; }
+      if (!name || draft.some(g => g.name.trim() === name)) { addInput.focus(); return; }
       draft.unshift({ name, origName: null, subs: [] });
       addInput.value = "";
       markDirty(); renderBody();
     }
     back.querySelector("[data-add-group]").onclick = addGroup;
+    addInput.addEventListener("input", updateValidity);
     addInput.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); addGroup(); } });
 
     body.addEventListener("input", e => {
@@ -988,7 +1034,8 @@
     });
 
     function saveAll() {
-      if (!dirty) return;
+      const dups = computeDups();
+      if (!dirty || dups.groupDups.size > 0 || dups.subDupsByGi.some(s => s.size > 0)) return;
       const newCategories = [];
       const newEmptyGroups = [];
       draft.forEach(g => {
@@ -1031,6 +1078,7 @@
       renderSubForm(createEl, createState, {
         groupLabel: draft[createGi].name,
         typeLocked: false,
+        siblingNames: draft[createGi].subs.map(s => s.name),
         onNameChange: valid => { confirmBtn.disabled = !valid; },
       });
     }

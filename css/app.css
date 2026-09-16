@@ -676,6 +676,8 @@ button.usebullet { background: var(--panel); font: inherit; cursor: pointer; }
 .catpick-row:hover { background: var(--primary-weak); color: var(--primary); }
 .catpick-row.active { background: var(--primary-weak); color: var(--primary); font-weight: 600; }
 .field .req { color: var(--danger); margin-left: 2px; }
+.field-err { font-size: 11px; color: var(--danger); margin-top: 4px; }
+input.has-err, .cat-manage-input.has-err, .cat-manage-name-input.has-err { border-color: var(--danger) !important; }
 .field input[type=text], .field input[type=date], .field input[type=number], .field select, .field textarea {
   width: 100%; height: 34px; border: 1px solid var(--line-strong); border-radius: var(--radius); padding: 0 10px; background: var(--panel);
 }

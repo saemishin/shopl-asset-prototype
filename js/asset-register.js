@@ -42,7 +42,9 @@
             <input type="text" class="cat-manage-input" data-tm-input placeholder="입력" maxlength="20">
             <button type="button" class="btn primary" data-tm-add>+ 추가</button>
           </div>
+          <p class="field-err" data-tm-add-err hidden>동일한 명칭이 존재합니다.</p>
           <div class="tag-manage-list" data-tm-list style="margin-top:14px"></div>
+          <p class="field-err" data-tm-list-err hidden>동일한 명칭이 존재합니다.</p>
         </div>
         <div class="foot">
           <button type="button" class="btn" data-tm-cancel>취소</button>
@@ -52,10 +54,31 @@
     document.body.appendChild(back);
 
     const listEl = back.querySelector("[data-tm-list]");
+    const listErr = back.querySelector("[data-tm-list-err]");
     const addInput = back.querySelector("[data-tm-input]");
+    const addBtn = back.querySelector("[data-tm-add]");
+    const addErr = back.querySelector("[data-tm-add-err]");
     const saveBtn = back.querySelector("[data-tm-save]");
 
-    function markDirty() { dirty = true; saveBtn.disabled = false; }
+    // 태그명은 구조설계안상 대소문자 구분이라 중복 판정도 trim 후 대소문자 그대로 정확히 일치할 때만
+    function dupNameSet() {
+      const counts = {};
+      draft.forEach(t => { const n = t.name.trim(); if (n) counts[n] = (counts[n] || 0) + 1; });
+      return new Set(Object.keys(counts).filter(n => counts[n] > 1));
+    }
+    function updateValidity() {
+      const dups = dupNameSet();
+      listEl.querySelectorAll("[data-tm-rename]").forEach(inp => {
+        inp.classList.toggle("has-err", dups.has(inp.value.trim()));
+      });
+      listErr.hidden = dups.size === 0;
+      const addDup = draft.some(t => t.name.trim() === addInput.value.trim());
+      addInput.classList.toggle("has-err", !!addInput.value.trim() && addDup);
+      addErr.hidden = !(addInput.value.trim() && addDup);
+      addBtn.disabled = !!addInput.value.trim() && addDup;
+      saveBtn.disabled = !dirty || dups.size > 0;
+    }
+    function markDirty() { dirty = true; updateValidity(); }
     function renderList() {
       listEl.innerHTML = draft.length ? draft.map((t, i) => `
         <div class="cat-manage-row">
@@ -65,23 +88,25 @@
               data-tip="삭제 시 이 태그를 사용 중인 자산에서 모두 삭제됩니다.">${TRASH_ICON}</button>
           </div>
         </div>`).join("") : `<p class="tag-manage-empty">등록된 태그가 없습니다.</p>`;
+      updateValidity();
     }
     renderList();
 
     function addRow() {
       const name = addInput.value.trim().slice(0, 20);
-      if (!name) { addInput.focus(); return; }
+      if (!name || draft.some(t => t.name.trim() === name)) { addInput.focus(); return; }
       draft.unshift({ name, orig: null });
       addInput.value = "";
       markDirty();
       renderList();
     }
-    back.querySelector("[data-tm-add]").onclick = addRow;
+    addBtn.onclick = addRow;
+    addInput.addEventListener("input", updateValidity);
     addInput.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); addRow(); } });
 
     listEl.addEventListener("input", e => {
       const r = e.target.closest("[data-tm-rename]");
-      if (r) { draft[+r.dataset.tmRename].name = e.target.value; markDirty(); }
+      if (r) { draft[+r.dataset.tmRename].name = e.target.value; dirty = true; updateValidity(); }
     });
     listEl.addEventListener("click", e => {
       const d = e.target.closest("[data-tm-del]");
@@ -92,7 +117,7 @@
     back.addEventListener("click", e => { if (e.target === back) back.remove(); });
 
     saveBtn.onclick = () => {
-      if (!dirty) return;
+      if (!dirty || dupNameSet().size > 0) return;
       const finalNames = [...new Set(draft.map(t => t.name.trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, "ko"));
       const remainingOrigs = new Set(draft.filter(t => t.orig).map(t => t.orig));
       const deletedOrigs = master.filter(t => !remainingOrigs.has(t));
@@ -214,8 +239,10 @@
               <button type="button" class="wrap-clear" id="areg-cat-clear" hidden aria-label="소분류 선택 해제">${CLOSE_ICON_SM}</button>
             </div>
           </div>
-          <div class="field"><label>제품명 <span class="req">*</span></label><input type="text" id="areg-name" placeholder="입력"></div>
-          <div class="field" id="areg-assetno"><label>고유관리번호 <span class="req">*</span></label><input type="text" id="areg-assetno-input" placeholder="입력"></div>
+          <div class="field"><label>제품명 <span class="req">*</span></label><input type="text" id="areg-name" placeholder="입력" maxlength="50"></div>
+          <div class="field" id="areg-assetno"><label>고유관리번호 <span class="req">*</span></label><input type="text" id="areg-assetno-input" placeholder="입력" maxlength="30">
+            <p class="field-err" data-assetno-err hidden>동일한 명칭이 존재합니다.</p>
+          </div>
           <div class="field"><label>유효기한</label>${dateFieldHtml()}</div>
           <div class="field">
             <div class="field-label-row">
@@ -241,15 +268,28 @@
     const nameInput = back.querySelector("#areg-name");
     const assetNoField = back.querySelector("#areg-assetno");
     const assetNoInput = back.querySelector("#areg-assetno-input");
+    const assetNoErr = back.querySelector("[data-assetno-err]");
     const saveBtn = back.querySelector("#areg-save");
 
+    // 고유관리번호는 QR 라벨 파일명의 식별키로 그대로 쓰여서, 파일명에 부적합한 문자가 섞이지 않도록 영문·숫자·하이픈·언더스코어만 허용
+    function assetNoDup(v) {
+      if (!v) return false;
+      return (window.DATA.assets || []).some(a => a.assetNo && a.assetNo === v);
+    }
     function checkValid() {
       const nameOk = nameInput.value.trim().length > 0;
-      const noOk = type === "quantity" ? true : assetNoInput.value.trim().length > 0;
+      const noVal = assetNoInput.value.trim();
+      const dup = type !== "quantity" && assetNoDup(noVal);
+      assetNoErr.hidden = !dup;
+      assetNoInput.classList.toggle("has-err", dup);
+      const noOk = type === "quantity" ? true : (noVal.length > 0 && !dup);
       saveBtn.disabled = !(catValue && nameOk && noOk);
     }
     nameInput.addEventListener("input", checkValid);
-    assetNoInput.addEventListener("input", checkValid);
+    assetNoInput.addEventListener("input", () => {
+      assetNoInput.value = assetNoInput.value.replace(/[^A-Za-z0-9\-_]/g, "");
+      checkValid();
+    });
 
     // 소분류 — 검색 + 대분류/소분류 트리 모달(openCategoryPickModal)에서 단일 선택.
     // 기본은 비워둔 상태(자동 첫 항목 선택 없음) — 미선택 상태에선 고유관리번호 등 유형별 필드를 모두 노출.
@@ -267,13 +307,28 @@
       if (catValue) { catDisplay.textContent = catLabel(catValue); catDisplay.style.color = "var(--text)"; }
       else { catDisplay.textContent = "선택"; catDisplay.style.color = "var(--text-mut)"; }
     }
+    // 소분류를 바꿀 때마다(선택 해제 포함) 이미 입력해둔 값은 전부 초기화 — 다른 소분류의 값이 뒤섞여 남아있지 않도록
+    function resetOtherFields() {
+      nameInput.value = "";
+      assetNoInput.value = "";
+      assetNoErr.hidden = true;
+      assetNoInput.classList.remove("has-err");
+      const dtext = back.querySelector("[data-dtext]");
+      const dnative = back.querySelector("[data-dnative]");
+      if (dtext) dtext.value = "";
+      if (dnative) dnative.value = "";
+      tags.length = 0;
+      renderChips();
+    }
     function selectCat(v) {
+      const changed = v !== catValue;
       catValue = v;
       const cat = findCat(v);
       type = (cat && cat.type) || "individual";
       renderCatDisplay();
       updateCatClear();
       applyAssetNoVisibility();
+      if (changed) resetOtherFields();
       checkValid();
     }
     catWrap.addEventListener("click", e => {
@@ -282,10 +337,12 @@
     });
     catClear.onclick = e => {
       e.stopPropagation();
+      const changed = catValue !== null;
       catValue = null;
       renderCatDisplay();
       updateCatClear();
       applyAssetNoVisibility();
+      if (changed) resetOtherFields();
       checkValid();
     };
 
