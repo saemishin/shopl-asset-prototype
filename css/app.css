@@ -250,6 +250,18 @@ input { font: inherit; }
 .table-wrap { border: 1px solid var(--line); border-radius: var(--radius); overflow-x: auto; background: var(--panel); }
 table { width: 100%; border-collapse: collapse; font-size: 12.5px; min-width: 880px; }
 tbody td:nth-child(3), thead th:nth-child(3) { white-space: nowrap; }
+/* 전체 탭 테이블(9컬럼)은 필터링으로 행이 바뀌어도 컬럼 폭이 안 흔들리도록 폭 고정 */
+.tbl-all {
+  table-layout: fixed;
+}
+.tbl-all th:nth-child(1), .tbl-all td:nth-child(1) { width: 11%; }
+.tbl-all th:nth-child(2), .tbl-all td:nth-child(2) { width: 16%; }
+.tbl-all th:nth-child(3), .tbl-all td:nth-child(3) { width: 14%; }
+.tbl-all th:nth-child(4), .tbl-all td:nth-child(4) { width: 9%; }
+.tbl-all th:nth-child(5), .tbl-all td:nth-child(5) { width: 8%; }
+.tbl-all th:nth-child(6), .tbl-all td:nth-child(6) { width: 12%; }
+.tbl-all th:nth-child(7), .tbl-all td:nth-child(7) { width: 13%; }
+.tbl-all th:nth-child(8), .tbl-all td:nth-child(8) { width: 13%; }
 thead th {
   text-align: left; padding: 10px 12px; background: #fafbfc; color: var(--text-sub);
   font-weight: 600; border-bottom: 1px solid var(--line); white-space: nowrap;
@@ -293,7 +305,7 @@ th.c, td.c { text-align: center; width: 52px; }
 .badge.assigned { background: #e7f0ff; color: #2f6df6; }
 .badge.repair { background: #fff1e0; color: #c9791b; }
 .badge.lost { background: #fdecec; color: #d23b40; }
-.badge.disposed { background: #eceef0; color: #9aa0a6; text-decoration: line-through; }
+.badge.disposed { background: #eceef0; color: #9aa0a6; }
 .badge.clickable { cursor: pointer; gap: 3px; }
 .badge.clickable:hover { filter: brightness(0.96); }
 .badge.clickable .bchev { font-size: 9px; opacity: .7; }

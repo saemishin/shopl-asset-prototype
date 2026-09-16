@@ -208,7 +208,7 @@
 
   function tableInner(v) {
     const empty = `<tr><td colspan="9" style="text-align:center;color:var(--text-mut);padding:32px">조건에 맞는 자산이 없습니다</td></tr>`;
-    return `<table><thead>${v.head}</thead><tbody>${v.rows || empty}</tbody></table>`;
+    return `<table class="tbl-${state.view}"><thead>${v.head}</thead><tbody>${v.rows || empty}</tbody></table>`;
   }
   function bindRows(scope) {
     scope.querySelectorAll("tbody tr.clickable").forEach(tr =>
@@ -239,13 +239,13 @@
 
       <div class="countrow">
         <span class="total">전체 <b>${v.count}</b></span>
+        <button class="filter-btn ${nAct ? 'set' : ''}" id="btn-filter">▤ 필터${nAct ? ` <b>${nAct}</b>` : ""}</button>
         <div class="right">
           <div class="searchbox${state.search ? ' has-term' : ''}">
             <input class="search${state.search ? ' expanded' : ''}" id="search-input"
               placeholder="${state.search ? '고유관리번호 / 제품명' : '검색'}" value="${state.search.replace(/"/g, '&quot;')}">
             <button class="search-clear" id="search-clear" type="button" aria-label="검색어 지우기">✕</button>
           </div>
-          <button class="filter-btn ${nAct ? 'set' : ''}" id="btn-filter">▤ 필터${nAct ? ` <b>${nAct}</b>` : ""}</button>
           <button class="btn sm" id="btn-qr-dl">▦ QR 다운로드</button>
           <button class="btn sm" data-stub="자산 목록 엑셀 다운로드">⬇ 다운로드</button>
         </div>

@@ -55,6 +55,9 @@ window.DATA = (function () {
     { id: "A009", type: "individual", assetNo: "FN-2025-0102", product: "데스커 1400", group: "가구류", sub: "책상",
       status: "stock", serial: "", createdAt: "2025-03-11", purchaseDate: "2025-03-10", price: 210000, expiry: "",
       labels: [], assignments: [] },
+    { id: "A010", type: "individual", assetNo: "IT-2022-0210", product: "씽크패드 X1", group: "전자기기류", sub: "노트북",
+      status: "stock", serial: "PF-2K9X-11", createdAt: "2022-06-10", purchaseDate: "2022-06-09", price: 1650000, expiry: "2026-07-01",
+      labels: [], assignments: [] },
 
     { id: "A101", type: "quantity", assetNo: "", product: "2026 하복 유니폼", group: "소모품", sub: "유니폼",
       status: null, serial: "", createdAt: "2026-04-02", purchaseDate: "2026-04-01", price: 18000, manufactured: "2026-03-15",
