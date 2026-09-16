@@ -9,7 +9,7 @@
   };
   const STATUS_ORDER = ["stock", "assigned", "repair", "lost", "disposed"];
   const TYPE_LABEL = { individual: "개별 자산", quantity: "수량 자산" };
-  const EXP_LABEL = { valid: "유효", soon: "임박", over: "지남", none: "미설정" };
+  const EXP_LABEL = { valid: "유효", soon: "임박", over: "만료", none: "미설정" };
 
   function expiryKey(d) {
     if (!d) return "none";
@@ -197,12 +197,12 @@
     const push = (grp, label, clear) => chips.push(
       `<span class="fchip">${label}<button data-clear='${JSON.stringify(clear)}'>✕</button></span>`);
     if (f.category.length) push("category", `분류: ${f.category.map(c => c.split("/")[1]).join("·")}`, { k: "category" });
-    if (f.type.length) push("type", `자산 유형: ${f.type.map(t => TYPE_LABEL[t]).join("·")}`, { k: "type" });
-    if (f.status.length) push("status", `상태: ${f.status.map(s => STATUS_LABEL[s][0]).join("·")}`, { k: "status" });
-    if (f.expiry.length) push("expiry", `유효기한: ${f.expiry.map(e => EXP_LABEL[e]).join("·")}`, { k: "expiry" });
+    if (f.type.length) push("type", f.type.map(t => TYPE_LABEL[t]).join("·"), { k: "type" });
+    if (f.status.length) push("status", f.status.map(s => STATUS_LABEL[s][0]).join("·"), { k: "status" });
+    if (f.expiry.length) push("expiry", f.expiry.map(e => EXP_LABEL[e]).join("·"), { k: "expiry" });
     if (f.labels.length) push("labels", `태그(${f.labelMode.toUpperCase()}): ${f.labels.join("·")}`, { k: "labels" });
     if (!chips.length) return "";
-    return `<div class="filterbar">${chips.join("")}<button class="fclear" id="fclear-all">전체 해제</button></div>`;
+    return `<div class="filterbar">${chips.join("")}</div>`;
   }
 
   function tableInner(v) {
@@ -281,11 +281,6 @@
     document.getElementById("search-clear").onclick = () => { si.value = ""; state.search = ""; render(); };
     c.querySelectorAll("[data-clear]").forEach(b =>
       b.onclick = () => { state.filters[JSON.parse(b.dataset.clear).k] = []; render(); });
-    const clearAll = document.getElementById("fclear-all");
-    if (clearAll) clearAll.onclick = () => {
-      state.filters = { category: [], type: [], status: [], expiry: [], labels: [], labelMode: "or" };
-      render();
-    };
 
     c.querySelectorAll(".statcol.click").forEach(el => el.onclick = () => {
       const p = JSON.parse(el.dataset.filter);
@@ -319,7 +314,7 @@
     return {
       indivN: indiv.length, qtyN: qty.length,
       stock: cnt("stock"), assigned: cnt("assigned"), repair: cnt("repair"),
-      lost: cnt("lost"), disposed: cnt("disposed"),
+      lost: cnt("lost"), disposed: cnt("disposed"), assignable,
       expOver, expSoon,
       rate: assignable ? Math.round(cnt("assigned") / assignable * 100) : 0,
     };
@@ -330,8 +325,7 @@
     return ["type", "status", "expiry", "labels"].every(d => d === f.k ? arrEq(s[d], f.v) : !(s[d] || []).length);
   }
   function statCol({ k, v, sub, cls = "", filter, extra = "" }) {
-    const on = filter && cardActive(filter) ? " active" : "";
-    const attr = filter ? ` class="statcol click ${cls}${on}" data-filter='${JSON.stringify(filter)}'` : ` class="statcol ${cls}"`;
+    const attr = filter ? ` class="statcol click ${cls}" data-filter='${JSON.stringify(filter)}'` : ` class="statcol ${cls}"`;
     return `<div${attr}>${extra}<div><div class="statcol-k">${k}</div><div class="statcol-v">${v}${sub ? ` <small>${sub}</small>` : ""}</div></div></div>`;
   }
   function statCard(title, cols) {
@@ -352,7 +346,7 @@
     const row2 = `<div class="statrow2">
       ${statCard("개별 자산", [
         statCol({
-          k: "배정 중", v: s.assigned, sub: `${s.rate}%`, filter: { k: "status", v: ["assigned"] },
+          k: "배정 중", v: `${s.rate}%`, sub: `${s.assigned}/${s.assignable}`, filter: { k: "status", v: ["assigned"] },
           extra: `<div class="donut" style="--pct:${s.rate}"><div class="donut-hole"></div></div>`,
         }),
         statCol({ k: "재고", v: s.stock, filter: { k: "status", v: ["stock"] } }),

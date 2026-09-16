@@ -10,7 +10,7 @@
   function expiryBadge(d) {
     if (!d) return '<span class="muted">—</span>';
     const days = Math.ceil((new Date(d) - TODAY) / 86400000);
-    const [t, c] = days < 0 ? ["지남", "exp-over"] : days <= 7 ? ["임박", "exp-soon"] : ["유효", "exp-valid"];
+    const [t, c] = days < 0 ? ["만료", "exp-over"] : days <= 7 ? ["임박", "exp-soon"] : ["유효", "exp-valid"];
     return `${window.fmtDate(d)} <span class="badge ${c}">${t}</span>`;
   }
   const chips = arr => (arr && arr.length) ? arr.map(l => `<span class="tag">${l}</span>`).join("") : '<span class="muted">—</span>';
