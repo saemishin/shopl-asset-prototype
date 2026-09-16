@@ -144,10 +144,13 @@ input { font: inherit; }
 .filter-btn.set { color: var(--text); border-color: var(--primary); background: var(--primary-weak); }
 
 .sortbar { display: flex; align-items: center; gap: 4px; }
-.sortbar select {
-  height: 32px; padding: 0 8px; border: 1px solid var(--line-strong); border-radius: var(--radius);
+.sort-key-btn {
+  height: 32px; padding: 0 10px; border: 1px solid var(--line-strong); border-radius: var(--radius);
   background: var(--panel); font-size: 12.5px; color: var(--text);
+  display: inline-flex; align-items: center; gap: 4px;
 }
+.sort-key-btn:hover { background: #f7f8f9; }
+.sort-key-btn .th-caret { opacity: .55; }
 .sort-dir {
   width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
   border: 1px solid var(--line-strong); border-radius: var(--radius); color: var(--text-sub);

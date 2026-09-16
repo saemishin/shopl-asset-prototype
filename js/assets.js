@@ -15,10 +15,10 @@
   const SORT_DESC_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M6 13l6 6 6-6"/></svg>`;
   // 정렬 기준별 기본 방향: 날짜(등록일·유효기한)는 최신순(desc), 문자열(제품명·고유관리번호)은 가나다순(asc)
   const SORT_FIELDS = [
-    { k: "createdAt", label: "자산 등록일", defDir: "desc" },
     { k: "assetNo", label: "고유 관리번호", defDir: "asc" },
     { k: "product", label: "제품명", defDir: "asc" },
     { k: "expiry", label: "유효기한", defDir: "desc" },
+    { k: "createdAt", label: "자산 등록일", defDir: "desc" },
   ];
 
   function expiryKey(d) {
@@ -37,20 +37,24 @@
     if (a.type === "individual") {
       const as = a.assignments || [];
       if (!as.length) return '<span class="muted">재고</span>';
+      // 상세 페이지 배정 현황 카드와 동일하게 배정일 내림차순(최신이 첫번째)
+      const sorted = [...as].sort((p, q) => p.since === q.since ? 0 : (p.since < q.since ? 1 : -1));
       // 배정 대상(구성원/근무지)을 레코드 순서대로 평탄화 — 복합 레코드는 구성원→근무지
       const targets = [];
-      as.forEach(x => {
+      sorted.forEach(x => {
         if (x.employee) targets.push(`${IC_EMP}${x.employee}`);
         if (x.worksite) targets.push(`${IC_WS}${x.worksite}`);
       });
-      if (as.length === 1) return targets.join(" ");                 // 단일 배정(복합이면 둘 다 표시)
+      if (sorted.length === 1) return targets.join(" ");              // 단일 배정(복합이면 둘 다 표시)
       return `${targets[0]} <span class="muted">+${targets.length - 1}</span>`;  // 공동 배정: 첫 대상 + N
     }
     // 수량 자산도 개별 자산과 동일한 패턴(보유처 이름, 총 개수 미표기)으로 통일
     const stocks = a.stocks || [];
     if (!stocks.length) return '<span class="muted">재고</span>';
-    const targets = stocks.map(x => x.employee ? `${IC_EMP}${x.employee}` : `${IC_WS}${x.worksite}`);
-    if (stocks.length === 1) return targets.join(" ");
+    // 상세 페이지 보유 현황 카드와 동일하게 이름 가나다순
+    const sorted = [...stocks].sort((p, q) => (p.employee || p.worksite).localeCompare(q.employee || q.worksite, "ko"));
+    const targets = sorted.map(x => x.employee ? `${IC_EMP}${x.employee}` : `${IC_WS}${x.worksite}`);
+    if (sorted.length === 1) return targets.join(" ");
     return `${targets[0]} <span class="muted">+${targets.length - 1}</span>`;
   }
   function thumb(a) {
@@ -158,7 +162,7 @@
   function openHeaderFilter(anchor, key) {
     document.querySelectorAll(".dropdown-menu").forEach(m => m.remove());
     const cur = (state.filters[key] || [])[0] || "";
-    const opts = [{ v: "", l: "전체" }, ...headerOptions(key)];
+    const opts = headerOptions(key);
     const menu = document.createElement("div");
     menu.className = "dropdown-menu";
     menu.innerHTML = opts.map(o => `<button data-v="${o.v}" class="${cur === o.v ? "active" : ""}">${o.l}</button>`).join("");
@@ -267,14 +271,34 @@
   /* ---------- render ---------- */
   function sortHtml() {
     if (state.view !== "all") return "";
-    const opts = SORT_FIELDS.map(f => `<option value="${f.k}" ${state.sort.key === f.k ? "selected" : ""}>${f.label}</option>`).join("");
+    const cur = SORT_FIELDS.find(f => f.k === state.sort.key);
     return `
       <div class="sortbar">
-        <select id="sort-key">${opts}</select>
+        <button class="sort-key-btn" id="sort-key-btn">${cur.label}${CARET}</button>
         <button class="sort-dir" id="sort-dir" aria-label="정렬 방향(${state.sort.dir === "asc" ? "오름차순" : "내림차순"})">
           ${state.sort.dir === "asc" ? SORT_ASC_ICON : SORT_DESC_ICON}
         </button>
       </div>`;
+  }
+  function openSortKeyMenu(anchor) {
+    document.querySelectorAll(".dropdown-menu").forEach(m => m.remove());
+    const menu = document.createElement("div");
+    menu.className = "dropdown-menu";
+    menu.innerHTML = SORT_FIELDS.map(f => `<button data-k="${f.k}" class="${state.sort.key === f.k ? "active" : ""}">${f.label}</button>`).join("");
+    const r = anchor.getBoundingClientRect();
+    menu.style.cssText = `position:fixed;top:${r.bottom + 4}px;left:${r.left}px;min-width:${Math.max(r.width, 120)}px`;
+    document.body.appendChild(menu);
+    menu.querySelectorAll("button").forEach(b => b.onclick = () => {
+      menu.remove();
+      state.sort.key = b.dataset.k;
+      state.sort.dir = SORT_FIELDS.find(f => f.k === b.dataset.k).defDir;
+      state.page = 1;
+      render();
+    });
+    setTimeout(() => {
+      const close = e => { if (!menu.contains(e.target)) { menu.remove(); document.removeEventListener("click", close); } };
+      document.addEventListener("click", close);
+    });
   }
   function pagerHtml(total) {
     const totalPages = Math.max(1, Math.ceil(total / state.pageSize));
@@ -410,13 +434,8 @@
       render();
     };
 
-    const sortKeySel = document.getElementById("sort-key");
-    if (sortKeySel) sortKeySel.onchange = () => {
-      state.sort.key = sortKeySel.value;
-      state.sort.dir = SORT_FIELDS.find(f => f.k === state.sort.key).defDir;
-      state.page = 1;
-      render();
-    };
+    const sortKeyBtn = document.getElementById("sort-key-btn");
+    if (sortKeyBtn) sortKeyBtn.onclick = () => openSortKeyMenu(sortKeyBtn);
     const sortDirBtn = document.getElementById("sort-dir");
     if (sortDirBtn) sortDirBtn.onclick = () => {
       state.sort.dir = state.sort.dir === "asc" ? "desc" : "asc";
