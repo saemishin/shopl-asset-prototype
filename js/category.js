@@ -74,6 +74,9 @@
   // 구조설계안 3.3: 필드 노출 설정 대상은 S/N·IMEI·구매일·구매가격·제조연월일·유효기한 6개(IMEI·S/N은 개별형 전용) — 기본값: IMEI·유효기한 off, 나머지 on
   const FIELD_LABEL = { serial: "S/N", imei: "IMEI", purchaseDate: "구매일", purchasePrice: "구매가격", manufactured: "제조연월일", expiry: "유효기한" };
   const DEFAULT_HIDDEN_FIELDS = { individual: ["imei", "expiry"], quantity: ["expiry"] };
+  // 배정/보유 변경 권한 — 개별형은 "배정", 수량형은 "보유"로 부르는 게 구조설계안 4.3 표현과도 맞고,
+  // 화면이 항상 하나의 자산 유형으로 스코프돼 있으니(소분류 상세·생성/수정 폼) 더 정확하게 부를 수 있음
+  const assignLabel = type => type === "individual" ? "배정 변경 권한" : "보유 변경 권한";
 
   const assetsOf = (group, sub) => assets.filter(a => a.group === group && a.sub === sub);
 
@@ -214,12 +217,14 @@
           <p class="cat-asset-count">전체 ${total}</p>
         </div>
         ${products.length ? `
+          <div class="cat-asset-search"><input type="text" data-product-search placeholder="제품명 검색"></div>
           <div class="table-wrap">
             <table class="cat-asset-table">
               <thead><tr><th>제품명</th><th class="num">전체</th><th class="num">배정중</th><th class="num">재고</th><th class="num">기타</th></tr></thead>
               <tbody>${products.map(productRowHtml).join("")}</tbody>
             </table>
-          </div>` : '<p class="muted" style="padding:12px 0">등록된 자산이 없습니다</p>'}`;
+          </div>
+          <p class="muted" data-search-empty hidden style="padding:12px 0">검색 결과가 없습니다</p>` : '<p class="muted" style="padding:12px 0">등록된 자산이 없습니다</p>'}`;
     }
     const list = assetsOf(cat.group, cat.sub);
     return `
@@ -228,12 +233,14 @@
         <p class="cat-asset-count">전체 ${list.length}</p>
       </div>
       ${list.length ? `
+        <div class="cat-asset-search"><input type="text" data-product-search placeholder="제품명 검색"></div>
         <div class="table-wrap">
           <table class="cat-asset-table">
             <thead><tr><th>제품명</th><th class="num">보유 수량</th><th class="num">보유 대상</th><th>유효기한</th></tr></thead>
             <tbody>${list.map(stockRowHtml).join("")}</tbody>
           </table>
-        </div>` : '<p class="muted" style="padding:12px 0">등록된 자산이 없습니다</p>'}`;
+        </div>
+        <p class="muted" data-search-empty hidden style="padding:12px 0">검색 결과가 없습니다</p>` : '<p class="muted" style="padding:12px 0">등록된 자산이 없습니다</p>'}`;
   }
 
   function detailHtml(cat) {
@@ -244,7 +251,7 @@
       </div>
       <div class="kv2 cat-detail-kv">
         <div><div class="k">자산 조회 권한</div><div class="v">${cat.view}</div></div>
-        <div><div class="k">배정/보유 변경 권한</div><div class="v">${cat.assign}</div></div>
+        <div><div class="k">${assignLabel(cat.type)}</div><div class="v">${cat.assign}</div></div>
       </div>
       <div class="cat-usage">
         <div class="k">관리 정보</div>
@@ -286,8 +293,8 @@
         <button type="button" class="cat-manage-select-btn" data-f-view-btn><span>${state.view}</span><span class="chev">▾</span></button>
       </div>
       <div class="field">
-        <label>배정/보유 변경 권한<span class="req">*</span></label>
-        <p class="hint" style="margin-top:0;margin-bottom:8px">이 소분류의 자산에 대해 배정·보유 변경을 할 수 있는 대상을 설정합니다.</p>
+        <label>${assignLabel(state.type)}<span class="req">*</span></label>
+        <p class="hint" style="margin-top:0;margin-bottom:8px">이 소분류의 자산에 대해 ${state.type === "individual" ? "배정" : "보유"} 변경을 할 수 있는 대상을 설정합니다.</p>
         <button type="button" class="cat-manage-select-btn" data-f-assign-btn><span>${state.assign}</span><span class="chev">▾</span></button>
       </div>
       <div class="field">
@@ -369,7 +376,7 @@
     p.className = "modal-back";
     p.innerHTML = `
       <div class="modal">
-        <h3>${isView ? "자산 조회 권한" : "배정/보유 변경 권한"}</h3>
+        <h3>${isView ? "자산 조회 권한" : assignLabel(state.type)}</h3>
         <div class="body" data-picker-body></div>
         <div class="foot">
           <button class="btn" data-close>취소</button>
@@ -936,6 +943,21 @@
       e.stopPropagation();
       window.open(`asset-detail.html?id=${row.dataset.asset}`, "_blank", "noopener");
     });
+    const searchInput = c.querySelector("[data-product-search]");
+    if (searchInput) {
+      const rows = [...c.querySelectorAll(".cat-asset-table tbody tr")];
+      const emptyMsg = c.querySelector("[data-search-empty]");
+      searchInput.addEventListener("input", e => {
+        const q = e.target.value.trim().toLowerCase();
+        let anyVisible = false;
+        rows.forEach(tr => {
+          const match = !q || tr.querySelector("td").textContent.toLowerCase().includes(q);
+          tr.hidden = !match;
+          if (match) anyVisible = true;
+        });
+        if (emptyMsg) emptyMsg.hidden = anyVisible;
+      });
+    }
   }
 
   function render(sel) {
