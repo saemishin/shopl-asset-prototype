@@ -11,8 +11,8 @@
   const TYPE_LABEL = { individual: "개별 자산", quantity: "수량 자산" };
   const EXP_LABEL = { valid: "유효", soon: "만료 예정", over: "만료", none: "미설정" };
   const RESET_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 1 2.64 6.36"/><path d="M3 20v-6h6"/></svg>`;
-  const SORT_ASC_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M6 11l6-6 6 6"/></svg>`;
-  const SORT_DESC_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M6 13l6 6 6-6"/></svg>`;
+  const SORT_ASC_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 18V6M5 6l-3 3M5 6l3 3"/><path d="M11 7h4M11 12h7M11 17h10"/></svg>`;
+  const SORT_DESC_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 6v12M5 18l-3-3M5 18l3-3"/><path d="M11 7h10M11 12h7M11 17h4"/></svg>`;
   // 정렬 기준별 기본 방향: 날짜(등록일·유효기한)는 최신순(desc), 문자열(제품명·고유관리번호)은 가나다순(asc)
   const SORT_FIELDS = [
     { k: "assetNo", label: "고유 관리번호", defDir: "asc" },
@@ -275,9 +275,10 @@
     return `
       <div class="sortbar">
         <button class="sort-key-btn" id="sort-key-btn">${cur.label}${CARET}</button>
-        <button class="sort-dir" id="sort-dir" aria-label="정렬 방향(${state.sort.dir === "asc" ? "오름차순" : "내림차순"})">
-          ${state.sort.dir === "asc" ? SORT_ASC_ICON : SORT_DESC_ICON}
-        </button>
+        <div class="sort-dir-group">
+          <button class="sort-dir-btn ${state.sort.dir === "asc" ? "active" : ""}" data-dir="asc" aria-label="오름차순">${SORT_ASC_ICON}</button>
+          <button class="sort-dir-btn ${state.sort.dir === "desc" ? "active" : ""}" data-dir="desc" aria-label="내림차순">${SORT_DESC_ICON}</button>
+        </div>
       </div>`;
   }
   function openSortKeyMenu(anchor) {
@@ -436,12 +437,11 @@
 
     const sortKeyBtn = document.getElementById("sort-key-btn");
     if (sortKeyBtn) sortKeyBtn.onclick = () => openSortKeyMenu(sortKeyBtn);
-    const sortDirBtn = document.getElementById("sort-dir");
-    if (sortDirBtn) sortDirBtn.onclick = () => {
-      state.sort.dir = state.sort.dir === "asc" ? "desc" : "asc";
+    c.querySelectorAll(".sort-dir-btn").forEach(b => b.onclick = () => {
+      state.sort.dir = b.dataset.dir;
       state.page = 1;
       render();
-    };
+    });
 
     document.getElementById("btn-filter").onclick = openFilterModal;
     document.getElementById("btn-add").onclick = () => window.openAssetAddModal();
@@ -494,7 +494,7 @@
       ])}
     </div>`;
     const row2 = `<div class="statrow2">
-      ${statCard("개별 자산", [
+      ${statCard("개별 자산 요약", [
         statCol({
           k: "배정 중", v: `${s.rate}%`, sub: `${s.assigned}/${s.assignable}`, filter: { k: "status", v: ["assigned"] },
           extra: `<div class="donut" style="--pct:${s.rate}"><div class="donut-hole"></div></div>`,

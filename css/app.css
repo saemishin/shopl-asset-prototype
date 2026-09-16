@@ -151,12 +151,16 @@ input { font: inherit; }
 }
 .sort-key-btn:hover { background: #f7f8f9; }
 .sort-key-btn .th-caret { opacity: .55; }
-.sort-dir {
-  width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
-  border: 1px solid var(--line-strong); border-radius: var(--radius); color: var(--text-sub);
+.sort-dir-group {
+  display: flex; border: 1px solid var(--line-strong); border-radius: var(--radius); overflow: hidden;
 }
-.sort-dir:hover { background: #f7f8f9; }
-.sort-dir svg { width: 15px; height: 15px; }
+.sort-dir-btn {
+  width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; color: var(--text-sub);
+}
+.sort-dir-btn:not(:last-child) { border-right: 1px solid var(--line-strong); }
+.sort-dir-btn:hover { background: #f7f8f9; }
+.sort-dir-btn.active { background: var(--primary-weak); color: var(--primary); }
+.sort-dir-btn svg { width: 15px; height: 15px; }
 
 /* ============ applied filter chips ============ */
 .filterbar { display: flex; gap: 6px; flex-wrap: wrap; margin: 0 0 14px; align-items: center; }
