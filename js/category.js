@@ -612,13 +612,87 @@
   }
 
   // 구성원(직원) 선택 — 대시보드 공용 컴포넌트 참조
-  // restrict가 있으면(배정/보유 변경 권한이 조회 권한과 같은 "특정 관리자/리더" 타입일 때) 조회 권한에서 고르지 않은
-  // 사람은 선택 자체를 막고 사유를 보여줌 — 변경 권한은 조회 권한의 부분집합이어야 함(구조설계안 4.3)
+  // restrict 없음(조회 권한): 좌우 분할(전체 목록 + 선택됨 목록), 자유 선택
+  // restrict 있음(배정/보유 변경 권한 — 조회 권한의 부분집합이어야 함, 구조설계안 4.3): 단일 목록으로 전환하고
+  // 조회 권한 범위 밖 인원은 비활성화가 아니라 목록에서 완전히 제외(실제 대시보드 "구성원 추가 정보" 등 restrict형
+  // 직원 선택 팝업과 동일한 패턴)
   function openMemberPicker(initial, onApply, restrict) {
     const sel = new Set(initial);
     let query = "";
     const p = document.createElement("div");
     p.className = "modal-back";
+
+    if (!restrict) {
+      p.innerHTML = `
+        <div class="modal picker-modal" style="width:680px">
+          <h3>직원 선택</h3>
+          <div class="picker-split">
+            <div class="picker-split-left">
+              <input type="text" class="picker-search" placeholder="검색어를 입력하세요">
+              <div class="picker-toolbar">
+                <label class="picker-check"><input type="checkbox" data-select-all><span>전체 선택</span></label>
+                <span class="right">전체 <b>${MEMBERS.length}</b></span>
+              </div>
+              <div class="picker-memberlist" data-list></div>
+            </div>
+            <div class="picker-split-right">
+              <div class="picker-selected-head"><span>선택됨 <b data-count>${sel.size}</b></span></div>
+              <div class="picker-selected-list" data-selected-list></div>
+            </div>
+          </div>
+          <div class="foot">
+            <button class="btn" data-close>취소</button>
+            <button class="btn primary" data-ok>적용</button>
+          </div>
+        </div>`;
+      document.body.appendChild(p);
+      const list = p.querySelector("[data-list]");
+      const countEl = p.querySelector("[data-count]");
+      const selectedList = p.querySelector("[data-selected-list]");
+
+      function renderSelected() {
+        countEl.textContent = sel.size;
+        selectedList.innerHTML = sel.size ? [...sel].map(name => `
+          <div class="picker-selected-row">
+            <span class="picker-avatar sm" style="background:${avatarColor(name)}">${name[0]}</span>
+            <span>${name}</span>
+            <button type="button" class="picker-selected-remove" data-remove="${name}" aria-label="제거">${CLOSE_ICON}</button>
+          </div>`).join("") : '<p class="muted" style="padding:16px 0">선택된 인원이 없습니다.</p>';
+        selectedList.querySelectorAll("[data-remove]").forEach(b => b.onclick = () => {
+          sel.delete(b.dataset.remove);
+          renderSelected(); renderList();
+        });
+      }
+      function renderList() {
+        const filtered = MEMBERS.filter(m => !query || m.name.includes(query));
+        list.innerHTML = filtered.length ? filtered.map(m => `
+          <label class="picker-member-row">
+            <input type="checkbox" data-member="${m.name}"${sel.has(m.name) ? " checked" : ""}>
+            <span class="picker-avatar" style="background:${avatarColor(m.name)}">${m.name[0]}</span>
+            <span class="picker-member-info"><b>${m.name}</b><span>${m.team}</span></span>
+          </label>`).join("") : `<p class="muted" style="padding:16px 0">결과가 없습니다.</p>`;
+        p.querySelector("[data-select-all]").checked = filtered.length > 0 && filtered.every(m => sel.has(m.name));
+        list.querySelectorAll("[data-member]").forEach(cb => cb.onchange = e => {
+          e.target.checked ? sel.add(e.target.dataset.member) : sel.delete(e.target.dataset.member);
+          p.querySelector("[data-select-all]").checked = filtered.length > 0 && filtered.every(m => sel.has(m.name));
+          renderSelected();
+        });
+      }
+      p.querySelector(".picker-search").addEventListener("input", e => { query = e.target.value; renderList(); });
+      p.querySelector("[data-select-all]").onchange = e => {
+        MEMBERS.filter(m => !query || m.name.includes(query)).forEach(m => e.target.checked ? sel.add(m.name) : sel.delete(m.name));
+        renderSelected(); renderList();
+      };
+      renderList();
+      renderSelected();
+      p.addEventListener("click", e => { if (e.target === p) p.remove(); });
+      p.querySelector("[data-close]").onclick = () => p.remove();
+      p.querySelector("[data-ok]").onclick = () => { p.remove(); onApply([...sel]); };
+      return;
+    }
+
+    // restrict 있음 — 조회 권한 범위 안의 인원만 후보로 제공
+    const candidates = MEMBERS.filter(m => restrict.has(m.name));
     p.innerHTML = `
       <div class="modal picker-modal">
         <h3>직원 선택</h3>
@@ -634,16 +708,13 @@
     document.body.appendChild(p);
     const list = p.querySelector("[data-list]");
     function renderList() {
-      const filtered = MEMBERS.filter(m => !query || m.name.includes(query));
-      list.innerHTML = filtered.length ? filtered.map(m => {
-        const isDisabled = restrict && !restrict.has(m.name);
-        return `
-        <label class="picker-member-row${isDisabled ? " is-disabled" : ""}"${isDisabled ? ` data-tip="${RESTRICT_TIP}"` : ""}>
-          <input type="checkbox" data-member="${m.name}"${sel.has(m.name) ? " checked" : ""}${isDisabled ? " disabled" : ""}>
+      const filtered = candidates.filter(m => !query || m.name.includes(query));
+      list.innerHTML = filtered.length ? filtered.map(m => `
+        <label class="picker-member-row">
+          <input type="checkbox" data-member="${m.name}"${sel.has(m.name) ? " checked" : ""}>
           <span class="picker-avatar" style="background:${avatarColor(m.name)}">${m.name[0]}</span>
           <span class="picker-member-info"><b>${m.name}</b><span>${m.team}</span></span>
-        </label>`;
-      }).join("") : `<p class="muted" style="padding:16px 0">결과가 없습니다</p>`;
+        </label>`).join("") : `<p class="muted" style="padding:16px 0">결과가 없습니다.</p>`;
       list.querySelectorAll("[data-member]").forEach(cb => cb.onchange = e => {
         e.target.checked ? sel.add(e.target.dataset.member) : sel.delete(e.target.dataset.member);
       });
