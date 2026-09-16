@@ -721,40 +721,89 @@
   // 자산 추가 팝업은 js/asset-register.js의 window.openAssetAddModal()로 분류 화면과 공용
 
   function openQrDownloadModal() {
-    const list = getFiltered();
-    const rows = list.map(a => `<label class="opt">
-      <input type="checkbox" data-id="${a.id}">
-      <span style="flex:1">${a.product} <span class="muted">${a.assetNo || a.id}</span></span>
-      <span class="type-pill">${TYPE_LABEL[a.type]}</span></label>`).join("");
+    const list = getFiltered();  // 현재 테이블에 적용된 필터·검색 범위 안에서 선택
+    const PAGE_SIZE = 20;
+    let query = "";
+    let page = 1;
+    const sel = new Set();
+
+    function filteredList() {
+      const q = query.trim().toLowerCase();
+      if (!q) return list;
+      return list.filter(a => `${a.product} ${a.assetNo || ""}`.toLowerCase().includes(q));
+    }
+
     const m = modal(`
       <div class="modal lg">
-        <h3>QR 라벨 다운로드</h3>
-        <div class="body" style="max-height:52vh;overflow:auto;padding-top:6px">
-          <div class="hint" style="margin-bottom:6px">현재 목록 기준 ${list.length}건. QR 라벨을 내려받을 자산을 선택하세요.</div>
-          <label class="opt" style="border-bottom:1px solid var(--line);font-weight:600">
-            <input type="checkbox" id="qr-all"> 전체 선택</label>
-          ${rows || '<p class="muted" style="padding:16px 0">대상 자산이 없습니다</p>'}
+        <h3>QR 다운로드</h3>
+        <div class="body">
+          <input type="text" class="picker-search" id="qr-search" placeholder="고유관리번호/제품명">
+          <div id="qr-dynamic"></div>
         </div>
         <div class="foot">
-          <span class="sum" id="qr-sum">선택 0건</span>
+          <span class="sum" id="qr-sum">선택됨 0</span>
           <button class="btn" data-close>취소</button>
           <button class="btn primary" id="qr-go" disabled>다운로드</button>
         </div>
       </div>`);
-    const boxes = () => [...m.querySelectorAll('.body input[data-id]')];
-    const upd = () => {
-      const n = boxes().filter(b => b.checked).length;
-      m.querySelector("#qr-sum").textContent = `선택 ${n}건`;
-      m.querySelector("#qr-go").disabled = !n;
-      const all = m.querySelector("#qr-all");
-      all.checked = n > 0 && n === boxes().length;
-    };
-    m.querySelector("#qr-all").onchange = e => { boxes().forEach(b => b.checked = e.target.checked); upd(); };
-    boxes().forEach(b => b.onchange = upd);
+    m.querySelector("#qr-search").oninput = e => { query = e.target.value; page = 1; renderList(); };
+
+    function renderList() {
+      const dyn = m.querySelector("#qr-dynamic");
+      const fl = filteredList();
+      const totalPages = Math.max(1, Math.ceil(fl.length / PAGE_SIZE));
+      if (page > totalPages) page = totalPages;
+      const pageItems = fl.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+      const rows = pageItems.map(a => `<label class="picker-member-row">
+        <input type="checkbox" data-id="${a.id}" ${sel.has(a.id) ? "checked" : ""}>
+        <span class="picker-member-info" style="flex:1">
+          <b>${a.product}</b><span>${a.group} › ${a.sub}</span>
+        </span>
+        <span class="muted">${a.assetNo || "—"}</span>
+      </label>`).join("");
+      const pageAllChecked = pageItems.length > 0 && pageItems.every(a => sel.has(a.id));
+      dyn.innerHTML = `
+        <div class="picker-toolbar">
+          <label class="picker-check"><input type="checkbox" id="qr-page-all" ${pageAllChecked ? "checked" : ""}><span>현재 페이지 전체 선택</span></label>
+        </div>
+        ${rows || '<p class="muted" style="padding:16px 0">대상 자산이 없습니다.</p>'}
+        ${fl.length > PAGE_SIZE ? `
+          <div class="pager" style="padding:12px 0 0">
+            <button data-qp="prev" ${page === 1 ? "disabled" : ""}>‹</button>
+            <span style="padding:0 6px;font-size:12.5px;color:var(--text-sub)">${page} / ${totalPages}</span>
+            <button data-qp="next" ${page === totalPages ? "disabled" : ""}>›</button>
+          </div>` : ""}
+      `;
+      dyn.querySelector("#qr-page-all").onchange = e => {
+        pageItems.forEach(a => e.target.checked ? sel.add(a.id) : sel.delete(a.id));
+        renderList();
+      };
+      dyn.querySelectorAll("input[data-id]").forEach(cb => cb.onchange = () => {
+        cb.checked ? sel.add(cb.dataset.id) : sel.delete(cb.dataset.id);
+        renderList();
+      });
+      dyn.querySelectorAll("[data-qp]").forEach(b => b.onclick = () => {
+        page += b.dataset.qp === "prev" ? -1 : 1;
+        renderList();
+      });
+      m.querySelector("#qr-sum").textContent = `선택됨 ${sel.size}`;
+      m.querySelector("#qr-go").disabled = sel.size === 0;
+    }
+
     m.querySelector("#qr-go").onclick = () => {
-      toast(`QR 라벨 ${boxes().filter(b => b.checked).length}건 다운로드 (프로토타입)`);
+      const items = list.filter(a => sel.has(a.id));
+      if (items.length === 1) {
+        const a = items[0];
+        toast(`"${a.assetNo || a.id}_${a.product}.png" 다운로드 (프로토타입 — 반영 없음)`);
+      } else {
+        const d = new Date(), p2 = n => String(n).padStart(2, "0");
+        const ts = `${d.getFullYear()}${p2(d.getMonth() + 1)}${p2(d.getDate())}${p2(d.getHours())}${p2(d.getMinutes())}${p2(d.getSeconds())}`;
+        toast(`"Asset_QR_${ts}.zip" (${items.length}건) 다운로드 (프로토타입 — 반영 없음)`);
+      }
       m.remove();
     };
+
+    renderList();
   }
 
   function toast(msg) {
