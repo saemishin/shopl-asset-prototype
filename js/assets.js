@@ -287,7 +287,7 @@
       render();
     };
 
-    c.querySelectorAll(".stat.click").forEach(el => el.onclick = () => {
+    c.querySelectorAll(".statcol.click").forEach(el => el.onclick = () => {
       const p = JSON.parse(el.dataset.filter);
       const base = { category: state.filters.category, type: [], status: [], expiry: [], labels: [], labelMode: state.filters.labelMode };
       state.filters = cardActive(p) ? base : { ...base, [p.k]: p.v };
@@ -329,30 +329,38 @@
     const s = state.filters;
     return ["type", "status", "expiry", "labels"].every(d => d === f.k ? arrEq(s[d], f.v) : !(s[d] || []).length);
   }
-  function statTile({ k, v, sub, cls = "", filter }) {
+  function statCol({ k, v, sub, cls = "", filter, extra = "" }) {
     const on = filter && cardActive(filter) ? " active" : "";
-    const attr = filter ? ` class="stat click ${cls}${on}" data-filter='${JSON.stringify(filter)}'` : ` class="stat ${cls}"`;
-    return `<div${attr}><div class="k">${k}</div><div class="v">${v}${sub ? ` <small>${sub}</small>` : ""}</div></div>`;
+    const attr = filter ? ` class="statcol click ${cls}${on}" data-filter='${JSON.stringify(filter)}'` : ` class="statcol ${cls}"`;
+    return `<div${attr}>${extra}<div><div class="statcol-k">${k}</div><div class="statcol-v">${v}${sub ? ` <small>${sub}</small>` : ""}</div></div></div>`;
+  }
+  function statCard(title, cols) {
+    return `<div class="statcard"><div class="statcard-title">${title}</div><div class="statcard-body">${cols.join("")}</div></div>`;
   }
   function statsHtml() {
     const s = computeStats();
-    const row1 = [
-      statTile({ k: "개별 자산", v: s.indivN, sub: "개", filter: { k: "type", v: ["individual"] } }),
-      statTile({ k: "수량 자산", v: s.qtyN, sub: "종류", filter: { k: "type", v: ["quantity"] } }),
-      statTile({ k: "유효기한 지남", v: s.expOver, cls: "alert", filter: { k: "expiry", v: ["over"] } }),
-      statTile({ k: "유효기한 임박", v: s.expSoon, cls: "warn", filter: { k: "expiry", v: ["soon"] } }),
-    ].join("");
-    const row2 = [
-      statTile({ k: "배정 중", v: s.assigned, sub: `${s.rate}%`, filter: { k: "status", v: ["assigned"] } }),
-      statTile({ k: "재고", v: s.stock, filter: { k: "status", v: ["stock"] } }),
-      statTile({ k: "분실", v: s.lost, cls: "alert", filter: { k: "status", v: ["lost"] } }),
-      statTile({ k: "수리 중", v: s.repair, cls: "warn", filter: { k: "status", v: ["repair"] } }),
-    ].join("");
-    return `
-      <div class="statwrap">
-        <h5>자산 현황</h5><div class="statgrid">${row1}</div>
-        <h5>개별 자산 상태</h5><div class="statgrid">${row2}</div>
-      </div>`;
+    const row1 = `<div class="statrow2">
+      ${statCard("자산 유형", [
+        statCol({ k: "개별 자산", v: s.indivN, sub: "개", filter: { k: "type", v: ["individual"] } }),
+        statCol({ k: "수량 자산", v: s.qtyN, sub: "종류", filter: { k: "type", v: ["quantity"] } }),
+      ])}
+      ${statCard("유효기간", [
+        statCol({ k: "임박", v: s.expSoon, cls: "warn", filter: { k: "expiry", v: ["soon"] } }),
+        statCol({ k: "만료", v: s.expOver, cls: "alert", filter: { k: "expiry", v: ["over"] } }),
+      ])}
+    </div>`;
+    const row2 = `<div class="statrow2">
+      ${statCard("개별 자산", [
+        statCol({
+          k: "배정 중", v: s.assigned, sub: `${s.rate}%`, filter: { k: "status", v: ["assigned"] },
+          extra: `<div class="donut" style="--pct:${s.rate}"><div class="donut-hole"></div></div>`,
+        }),
+        statCol({ k: "재고", v: s.stock, filter: { k: "status", v: ["stock"] } }),
+        statCol({ k: "분실", v: s.lost, cls: "alert", filter: { k: "status", v: ["lost"] } }),
+        statCol({ k: "수리 중", v: s.repair, cls: "warn", filter: { k: "status", v: ["repair"] } }),
+      ])}
+    </div>`;
+    return `<div class="statwrap">${row1}${row2}</div>`;
   }
 
   function dropdown(anchor, items) {
