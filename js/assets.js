@@ -380,7 +380,7 @@
             <button class="search-clear" id="search-clear" type="button" aria-label="검색어 지우기">✕</button>
           </div>
           <button class="btn sm" id="btn-qr-dl">▦ QR 다운로드</button>
-          <button class="btn sm" data-stub="자산 목록 엑셀 다운로드">⬇ 다운로드</button>
+          <button class="btn sm" id="btn-list-dl">⬇ 다운로드</button>
         </div>
       </div>
 
@@ -447,10 +447,48 @@
     document.getElementById("btn-filter").onclick = openFilterModal;
     document.getElementById("btn-add").onclick = () => window.openAssetAddModal();
     document.getElementById("btn-qr-dl").onclick = openQrDownloadModal;
+    document.getElementById("btn-list-dl").onclick = downloadAssetList;
     document.getElementById("btn-bulk").onclick = e => dropdown(e.currentTarget, [
       { label: "일괄 자산 추가", fn: () => location.href = "batch-register.html" },
       { label: "일괄 배정·보유 변경", fn: () => location.href = "batch-assign.html" },
     ]);
+  }
+
+  // 배정·보유 현황을 엑셀용 순수 텍스트로 — holderText()와 동일한 정렬 기준(개별=배정일 최신순, 수량=이름 가나다순)
+  function holderPlainText(a) {
+    if (a.type === "individual") {
+      const as = a.assignments || [];
+      if (!as.length) return "";
+      const sorted = [...as].sort((p, q) => p.since === q.since ? 0 : (p.since < q.since ? 1 : -1));
+      return sorted.map(x => x.employee || x.worksite).join(", ");
+    }
+    const stocks = a.stocks || [];
+    if (!stocks.length) return "";
+    const sorted = [...stocks].sort((p, q) => (p.employee || p.worksite).localeCompare(q.employee || q.worksite, "ko"));
+    return sorted.map(x => `${x.employee || x.worksite}(${x.qty}개)`).join(", ");
+  }
+  // 현황 "다운로드" — 지금 적용된 필터·검색 전체 범위(페이지네이션 무관)를 실제 엑셀로 즉시 생성해 다운로드.
+  // 컬럼 구성은 테이블에 보이는 컬럼을 그대로 옮긴 1차안(구조설계안 7장 TODO — 정식 컬럼 정의 필요)
+  function downloadAssetList() {
+    const list = getFiltered();
+    const rows = list.map(a => ({
+      "고유관리번호": a.assetNo || "",
+      "제품명": a.product,
+      "분류": `${a.group} › ${a.sub}`,
+      "자산 유형": TYPE_LABEL[a.type],
+      "상태": a.type === "quantity" ? "" : STATUS_LABEL[a.status][0],
+      "배정·보유 현황": holderPlainText(a),
+      "유효기한": a.expiry ? `${window.fmtDate(a.expiry)} (${EXP_LABEL[expiryKey(a.expiry)]})` : "",
+      "태그": (a.labels || []).join(", "),
+      "메모": a.note || "",
+      "등록일": window.fmtDate(a.createdAt),
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "자산 목록");
+    const d = new Date(), p2 = n => String(n).padStart(2, "0");
+    const ts = `${d.getFullYear()}${p2(d.getMonth() + 1)}${p2(d.getDate())}${p2(d.getHours())}${p2(d.getMinutes())}${p2(d.getSeconds())}`;
+    XLSX.writeFile(wb, `Asset_List_${ts}.xlsx`);
   }
 
   /* ---------- stats (분류 필터까지만 반영) ---------- */
