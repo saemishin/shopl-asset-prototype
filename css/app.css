@@ -328,8 +328,8 @@ th.c, td.c { text-align: center; width: 52px; }
 /* 컬럼 폭이 넓어지니 숫자를 오른쪽 정렬하면 옆 컬럼과 붙어 보임 — 이 표는 컬럼 폭 안에서 왼쪽 정렬이 더 보기 편함 */
 .cat-asset-table .num { text-align: left; }
 .cat-asset-search { margin-bottom: 10px; }
-.cat-asset-empty { display: flex; align-items: center; gap: 12px; padding: 12px 0; }
-.cat-asset-empty p { margin: 0; }
+.cat-asset-empty { padding: 12px 0; }
+.cat-asset-empty p { margin: 0 0 10px; }
 .cat-unit-list { display: flex; flex-direction: column; gap: 2px; max-height: 50vh; overflow-y: auto; }
 .cat-unit-row {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;

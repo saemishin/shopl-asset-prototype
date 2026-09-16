@@ -1016,7 +1016,7 @@
       clearBtn.onclick = () => { searchInput.value = ""; applyFilter(); searchInput.focus(); };
     }
     const addAssetBtn = c.querySelector("[data-add-asset]");
-    if (addAssetBtn) addAssetBtn.onclick = () => window.openAssetAddModal({ type: cat.type });
+    if (addAssetBtn) addAssetBtn.onclick = () => window.openAssetAddModal({ type: cat.type, group: cat.group, sub: cat.sub });
   }
 
   function render(sel) {

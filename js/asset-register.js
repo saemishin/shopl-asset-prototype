@@ -3,6 +3,9 @@
 window.openAssetAddModal = function (opts) {
   opts = opts || {};
   let type = opts.type || "individual";
+  // 분류 화면에서 열면 지금 보고 있던 소분류가, 현황 화면에서 열면(group/sub 없음) 첫 소분류가 기본 선택됨
+  const categories = (window.DATA && window.DATA.categories) || [];
+  const preselectValue = opts.group && opts.sub ? `${opts.group}|${opts.sub}` : null;
 
   function toast(msg) {
     const t = document.createElement("div");
@@ -27,7 +30,10 @@ window.openAssetAddModal = function (opts) {
           <div class="hint">유형은 선택한 소분류에서 상속됩니다. (구조안 3.4)</div>
         </div>
         <div class="field"><label>소분류 <span class="req">*</span></label>
-          <select><option>전자기기류 › 노트북</option><option>가구류 › 의자</option><option>소모품 › 유니폼</option></select></div>
+          <select>${categories.map(c => {
+            const v = `${c.group}|${c.sub}`;
+            return `<option value="${v}"${v === preselectValue ? " selected" : ""}>${c.group} › ${c.sub}</option>`;
+          }).join("")}</select></div>
         <div class="field"><label>제품명 <span class="req">*</span></label><input type="text" placeholder="예: 그램 16 (2024)"></div>
         <div class="field" id="areg-assetno"${type === "quantity" ? ' style="display:none"' : ""}><label>고유관리번호 <span class="req">*</span></label><input type="text" placeholder="예: IT-2026-0001"></div>
         <div class="field"><label>유효기한</label><input type="date"><div class="hint">소분류 필드 노출 설정이 on일 때만 표시 (기본 off)</div></div>
