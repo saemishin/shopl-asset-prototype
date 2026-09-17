@@ -111,7 +111,7 @@
     const rects = mods.map(([x, y]) => `<rect x="${x * cell}" y="${y * cell}" width="${cell}" height="${cell}"/>`).join("");
     return `<svg viewBox="0 0 ${size} ${size}" fill="#1b1d1f"><rect width="${size}" height="${size}" fill="#fff"/>${rects}</svg>`;
   }
-  // 실제 라벨(다운로드 파일) 구성 — QR + 제품명 + 고유번호(개별형만) + 대분류 › 소분류
+  // 실제 라벨(다운로드 파일) 구성 — QR + 품목명 + 고유번호(개별형만) + 대분류 › 소분류
   function labelSheetHtml(a) {
     return `
       <div class="label-sheet">
@@ -162,7 +162,7 @@
     document.body.appendChild(pop);
     pop.querySelector("[data-close]").onclick = () => pop.remove();
     pop.querySelector("[data-preview]").onclick = () => openLabelPreview(a);
-    // 구조설계안 5.4 사진 다운로드와 동일한 식별 라벨 규칙(개별=고유관리번호, 수량=제품명) + QR 접두어
+    // 구조설계안 5.4 사진 다운로드와 동일한 식별 라벨 규칙(개별=고유관리번호, 수량=품목명) + QR 접두어
     pop.querySelector("[data-dl]").onclick = () => {
       const d = new Date(), p2 = n => String(n).padStart(2, "0");
       const ts = `${d.getFullYear()}${p2(d.getMonth() + 1)}${p2(d.getDate())}${p2(d.getHours())}${p2(d.getMinutes())}${p2(d.getSeconds())}`;

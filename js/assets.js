@@ -13,15 +13,15 @@
   // 근무지 코드는 구조설계안에 없는 필드 — 근무지가 "기존 재사용" 엔티티라 여기선 프로토타입 데모용 샘플값만 매핑(detail.js의 WS_CODE와 동일)
   const WS_CODE = { "강남점": "GN-01", "판교점": "PG-01", "본사": "HQ-01" };
   const SEARCH_PLACEHOLDER = {
-    all: "고유관리번호 / 제품명", product: "제품명", employee: "이름/사번/휴대폰번호", worksite: "근무지명/코드",
+    all: "고유관리번호 / 품목명", product: "품목명", employee: "이름/사번/휴대폰번호", worksite: "근무지명/코드",
   };
   const RESET_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 1 2.64 6.36"/><path d="M3 20v-6h6"/></svg>`;
   const SORT_ASC_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 18V6M5 6l-3 3M5 6l3 3"/><path d="M11 7h4M11 12h7M11 17h10"/></svg>`;
   const SORT_DESC_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 6v12M5 18l-3-3M5 18l3-3"/><path d="M11 7h10M11 12h7M11 17h4"/></svg>`;
-  // 정렬 기준별 기본 방향: 날짜(등록일·유효기한)는 최신순(desc), 문자열(제품명·고유관리번호)은 가나다순(asc)
+  // 정렬 기준별 기본 방향: 날짜(등록일·유효기한)는 최신순(desc), 문자열(품목명·고유관리번호)은 가나다순(asc)
   const SORT_FIELDS = [
     { k: "assetNo", label: "고유 관리번호", defDir: "asc" },
-    { k: "product", label: "제품명", defDir: "asc" },
+    { k: "product", label: "품목명", defDir: "asc" },
     { k: "expiry", label: "유효기한", defDir: "desc" },
     { k: "createdAt", label: "자산 등록일", defDir: "desc" },
   ];
@@ -137,7 +137,7 @@
         const has = f.labels.filter(l => (a.labels || []).includes(l));
         if (has.length !== f.labels.length) return false;
       }
-      // 검색 대상은 뷰마다 다름 — 전체는 고유관리번호+제품명, 제품별은 제품명만. 구성원별·근무지별은
+      // 검색 대상은 뷰마다 다름 — 전체는 고유관리번호+품목명, 품목별은 품목명만. 구성원별·근무지별은
       // 자산이 아니라 집계된 사람/근무지 이름(+코드)을 대상으로 하므로 여기가 아니라 view_axis()에서 걸러냄
       if (q && state.view === "all" && !(`${a.product} ${a.assetNo || ""}`.toLowerCase().includes(q))) return false;
       if (q && state.view === "product" && !a.product.toLowerCase().includes(q)) return false;
@@ -193,7 +193,7 @@
   /* ---------- views ---------- */
   function view_all(list) {
     const head = `<tr>
-      <th>고유관리번호</th><th>제품명</th>
+      <th>고유관리번호</th><th>품목명</th>
       ${thFilter("자산 유형", "type")}<th>분류</th>${thFilter("상태", "status")}
       <th>배정·보유 현황</th>${thFilter("유효기한", "expiry")}<th>태그</th>${thFilter("메모", "note", "c")}<th>등록일</th></tr>`;
     const rows = pageSlice(sortList(list)).map(a => {
@@ -223,7 +223,7 @@
       if (!map.has(key)) map.set(key, { product: a.product, group: a.group, sub: a.sub, type: a.type, list: [] });
       map.get(key).list.push(a);
     });
-    const head = `<tr><th>제품명</th><th>분류</th><th>자산 유형</th><th class="num">자산 수</th>
+    const head = `<tr><th>품목명</th><th>분류</th><th>자산 유형</th><th class="num">자산 수</th>
       <th>상태 분포</th><th class="num">총 수량</th></tr>`;
     const groups = [...map.values()];
     const rows = pageSlice(groups).map(g => {
@@ -378,7 +378,7 @@
       </div>
 
       <div class="subtabs">
-        ${[["all","전체"],["product","제품별"],["employee","구성원별"],["worksite","근무지별"]]
+        ${[["all","전체"],["product","품목별"],["employee","구성원별"],["worksite","근무지별"]]
           .map(([k,t]) => `<button data-view="${k}" class="${state.view===k?'active':''}">${t}</button>`).join("")}
         ${state.view === "all" ? `
         <div class="sub-actions">
@@ -500,7 +500,7 @@
     const list = getFiltered();
     const rows = list.map(a => ({
       "고유관리번호": a.assetNo || "",
-      "제품명": a.product,
+      "품목명": a.product,
       "분류": `${a.group} › ${a.sub}`,
       "자산 유형": TYPE_LABEL[a.type],
       "상태": a.type === "quantity" ? "" : STATUS_LABEL[a.status][0],
@@ -788,7 +788,7 @@
   // 자산 추가 팝업은 js/asset-register.js의 window.openAssetAddModal()로 분류 화면과 공용
 
   function openQrDownloadModal() {
-    // 별도 정렬 UI 없이 제품명 가나다순 고정 — 이름으로 훑어보기 가장 쉬운 기본 정렬
+    // 별도 정렬 UI 없이 품목명 가나다순 고정 — 이름으로 훑어보기 가장 쉬운 기본 정렬
     const list = getFiltered().sort((a, b) => a.product.localeCompare(b.product, "ko"));
     const PAGE_SIZE = 20;
     let query = "";
@@ -805,7 +805,7 @@
       <div class="modal lg">
         <h3>QR 다운로드</h3>
         <div class="body" style="display:flex;flex-direction:column;max-height:56vh">
-          <input type="text" class="picker-search" id="qr-search" placeholder="고유관리번호/제품명">
+          <input type="text" class="picker-search" id="qr-search" placeholder="고유관리번호/품목명">
           <div class="picker-toolbar">
             <label class="picker-check"><input type="checkbox" id="qr-page-all"><span>현재 페이지 전체 선택</span></label>
           </div>
@@ -866,7 +866,7 @@
       const ts = `${d.getFullYear()}${p2(d.getMonth() + 1)}${p2(d.getDate())}${p2(d.getHours())}${p2(d.getMinutes())}${p2(d.getSeconds())}`;
       if (items.length === 1) {
         const a = items[0];
-        // 구조설계안 5.4 사진 다운로드와 동일한 식별 라벨 규칙(개별=고유관리번호, 수량=제품명) + QR 접두어
+        // 구조설계안 5.4 사진 다운로드와 동일한 식별 라벨 규칙(개별=고유관리번호, 수량=품목명) + QR 접두어
         const label = a.type === "individual" ? (a.assetNo || a.id) : a.product;
         toast(`"QR_${label}_${ts}.png" 다운로드 (프로토타입 — 반영 없음)`);
       } else {

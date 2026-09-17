@@ -1,4 +1,4 @@
-/* 분류 관리 — 분류-1 메인 화면. 좌측 트리(대분류는 그룹 헤더, 소분류만 선택 가능) + 우측(선택된 소분류 정보 + 제품 목록) */
+/* 분류 관리 — 분류-1 메인 화면. 좌측 트리(대분류는 그룹 헤더, 소분류만 선택 가능) + 우측(선택된 소분류 정보 + 품목 목록) */
 (function () {
   const { categories, assets } = window.DATA;
 
@@ -125,7 +125,7 @@
     return head + body;
   }
 
-  // 개별형 자산 목록을 제품(제품명) 단위로 집계 — 제품 식별키는 구조안 3.1과 동일하게 "소분류+제품명"
+  // 개별형 자산 목록을 품목(품목명) 단위로 집계 — 품목 식별키는 구조안 3.1과 동일하게 "소분류+품목명"
   function productsOf(group, sub) {
     const list = assetsOf(group, sub);
     const order = [];
@@ -157,7 +157,7 @@
       </tr>`;
   }
 
-  // 개별 자산 제품 행 클릭 시 S/N 단위 목록을 모달로 — 대시보드 테이블엔 행 확장 구조가 없어서 모달로 전환.
+  // 개별 자산 품목 행 클릭 시 S/N 단위 목록을 모달로 — 대시보드 테이블엔 행 확장 구조가 없어서 모달로 전환.
   // 모달 내 한 줄을 누르면 그 자산의 상세 페이지를 새 탭으로 엶(target=_blank)
   function openProductUnitsModal(p) {
     const m = document.createElement("div");
@@ -209,7 +209,7 @@
     }).join("");
   }
 
-  // 현황 페이지 검색창(searchbox/search/search-clear)과 동일한 패턴 — 평소엔 좁고 "검색", 포커스하면 넓어지며 "제품명"
+  // 현황 페이지 검색창(searchbox/search/search-clear)과 동일한 패턴 — 평소엔 좁고 "검색", 포커스하면 넓어지며 "품목명"
   const ASSET_SEARCH_HTML = `
     <div class="cat-asset-search">
       <div class="searchbox">
@@ -229,7 +229,7 @@
       const total = products.reduce((s, p) => s + p.total, 0);
       return `
         <div class="cat-asset-head">
-          <h4>제품 목록</h4>
+          <h4>품목 목록</h4>
         </div>
         <div class="cat-asset-countrow">
           <p class="cat-asset-count">전체 ${total}</p>
@@ -238,7 +238,7 @@
         ${products.length ? `
           <div class="table-wrap">
             <table class="cat-asset-table">
-              <thead><tr><th>제품명</th><th class="num">자산 수</th><th class="num">배정 중</th><th class="num">재고</th><th class="num">기타</th></tr></thead>
+              <thead><tr><th>품목명</th><th class="num">자산 수</th><th class="num">배정 중</th><th class="num">재고</th><th class="num">기타</th></tr></thead>
               <tbody>${products.map(productRowHtml).join("")}</tbody>
             </table>
           </div>
@@ -247,7 +247,7 @@
     const list = assetsOf(cat.group, cat.sub);
     return `
       <div class="cat-asset-head">
-        <h4>제품 목록</h4>
+        <h4>품목 목록</h4>
       </div>
       <div class="cat-asset-countrow">
         <p class="cat-asset-count">전체 ${list.length}</p>
@@ -256,7 +256,7 @@
       ${list.length ? `
         <div class="table-wrap">
           <table class="cat-asset-table">
-            <thead><tr><th>제품명</th><th class="num">보유 수량</th><th class="num">보유 대상</th><th>유효기한</th></tr></thead>
+            <thead><tr><th>품목명</th><th class="num">보유 수량</th><th class="num">보유 대상</th><th>유효기한</th></tr></thead>
             <tbody>${list.map(stockRowHtml).join("")}</tbody>
           </table>
         </div>
@@ -1134,7 +1134,7 @@
         sbox.classList.toggle("has-term", !!searchInput.value);
       };
       searchInput.addEventListener("input", applyFilter);
-      searchInput.onfocus = () => { searchInput.classList.add("expanded"); searchInput.placeholder = "제품명"; };
+      searchInput.onfocus = () => { searchInput.classList.add("expanded"); searchInput.placeholder = "품목명"; };
       searchInput.onblur = () => { if (!searchInput.value) { searchInput.classList.remove("expanded"); searchInput.placeholder = "검색"; } };
       clearBtn.onclick = () => { searchInput.value = ""; applyFilter(); searchInput.focus(); };
     }

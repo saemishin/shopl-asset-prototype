@@ -243,7 +243,7 @@
               <span id="areg-cat-display" style="flex:1;font-size:12.5px">선택</span>
             </div>
           </div>
-          <div class="field" id="areg-name-field"><label>제품명 <span class="req">*</span></label><input type="text" id="areg-name" placeholder="입력" maxlength="50" autocomplete="off"></div>
+          <div class="field" id="areg-name-field"><label>품목명 <span class="req">*</span></label><input type="text" id="areg-name" placeholder="입력" maxlength="50" autocomplete="off"></div>
           <div class="field" id="areg-assetno"><label>고유관리번호 <span class="req">*</span></label><input type="text" id="areg-assetno-input" placeholder="입력" maxlength="30">
             <p class="field-err" data-assetno-err hidden>동일한 명칭이 존재합니다.</p>
           </div>
@@ -293,8 +293,8 @@
       const noOk = type === "quantity" ? true : (noVal.length > 0 && !dup);
       saveBtn.disabled = !(catValue && nameOk && noOk);
     }
-    // 제품명 자동완성 — "소분류+제품명" 조합이 제품 단위라, 같은 소분류에 이미 등록된 제품명을 제안해서
-    // 띄어쓰기·표기 차이로 같은 제품이 여러 이름으로 쪼개지는 걸 막음. 태그와 달리 목록에 없는 새 이름도 항상 입력 가능(강제 선택 아님)
+    // 품목명 자동완성 — "소분류+품목명" 조합이 품목 단위라, 같은 소분류에 이미 등록된 품목명을 제안해서
+    // 띄어쓰기·표기 차이로 같은 품목이 여러 이름으로 쪼개지는 걸 막음. 태그와 달리 목록에 없는 새 이름도 항상 입력 가능(강제 선택 아님)
     let prodMenu = null, prodHi = -1;
     function closeProdMenu() { if (prodMenu) { prodMenu.remove(); prodMenu = null; } prodHi = -1; }
     function productOptions() {
@@ -306,7 +306,7 @@
         .filter(a => a.group === cat.group && a.sub === cat.sub)
         .map(a => a.product).filter(Boolean))];
       // 포커스만 하고 아직 안 쳤으면(q 없음) 전체 목록을 보여줌(태그 검색과 동일) — 검색어가 있는데 매칭이
-      // 없으면 자동완성 성격상 "결과 없음" 표시 없이 그냥 드롭다운을 띄우지 않음(새 제품명 입력이 정상 상태)
+      // 없으면 자동완성 성격상 "결과 없음" 표시 없이 그냥 드롭다운을 띄우지 않음(새 품목명 입력이 정상 상태)
       return q ? names.filter(n => n.toLowerCase().includes(q)) : names;
     }
     function openProdMenu() {
