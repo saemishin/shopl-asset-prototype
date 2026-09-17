@@ -310,7 +310,9 @@ tbody td:nth-child(4), thead th:nth-child(4) { white-space: nowrap; }
 .tbl-product-quantity th:nth-child(4), .tbl-product-quantity td:nth-child(4) { width: 14%; }
 .tbl-product-quantity th:nth-child(5), .tbl-product-quantity td:nth-child(5) { width: 26%; }
 /* 개별/수량 자산 구분 토글 — 참고 이미지(리스트/캘린더 세그먼트) 스타일: 옅은 트랙 위에 흰 알약(active) */
-.type-toggle { display: inline-flex; background: var(--bg); border-radius: 10px; padding: 3px; gap: 2px; margin-bottom: 10px; }
+/* 트랙 배경(--bg)이 페이지 배경과 완전히 같아서 비활성 상태에서 경계가 거의 안 보였음 — 다른 컨트롤(.btn 등)과 동일한
+   border(--line-strong)를 둘러 배경색과 무관하게 항상 구분되게 함 */
+.type-toggle { display: inline-flex; background: var(--bg); border: 1px solid var(--line-strong); border-radius: 10px; padding: 3px; gap: 2px; margin-bottom: 10px; }
 .type-toggle button { padding: 6px 14px; border-radius: 8px; font-size: 12.5px; font-weight: 600; color: var(--text-sub); }
 .type-toggle button.active { background: var(--panel); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
 thead th {
@@ -438,19 +440,19 @@ th.c, td.c { text-align: center; width: 52px; }
 .cat-asset-empty { padding: 12px 0; }
 .cat-asset-empty p { margin: 0 0 10px; }
 .cat-unit-product { font-size: 15px; font-weight: 700; }
-.cat-unit-list { display: flex; flex-direction: column; gap: 2px; max-height: 50vh; overflow-y: auto; }
-.cat-unit-group + .cat-unit-group { margin-top: 8px; }
-.cat-unit-group-label {
-  position: sticky; top: 0; z-index: 1; background: var(--panel);
-  padding: 8px 8px 4px; font-size: 12px; font-weight: 700; color: var(--text-sub);
+/* 상태 5개를 가로 5열 고정 그리드로 — 열 타이틀이 상태를 말해주니 행엔 고유관리번호만.
+   개수 0인 열도 그대로 유지(빈 채로)해서 품목이 달라져도 열 배치가 안 흔들림. 스크롤은 모달 전체 하나로(.modal 기본 동작 그대로 사용) */
+.cat-unit-list { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0 12px; }
+.cat-unit-col-label {
+  padding-bottom: 8px; margin-bottom: 6px; border-bottom: 1px solid var(--line);
+  font-size: 12px; font-weight: 700; color: var(--text-sub);
 }
-.cat-unit-group-label .muted { font-weight: 400; }
-.cat-unit-row {
-  display: flex; align-items: center; justify-content: space-between; gap: 10px;
-  padding: 10px 8px; border-radius: 6px; font-size: 12.5px; color: var(--text); text-decoration: none;
+.cat-unit-col-label .muted { font-weight: 400; }
+.cat-unit-no-row {
+  display: block; padding: 6px; border-radius: 6px; font-size: 12.5px; color: var(--text);
+  text-decoration: none; font-variant-numeric: tabular-nums;
 }
-.cat-unit-row:hover { background: #eef0f2; }
-.cat-unit-no { color: var(--text-sub); font-variant-numeric: tabular-nums; }
+.cat-unit-no-row:hover { background: #eef0f2; }
 
 /* 분류 관리 모달 — 구조 편집 전용(추가·이름변경·순서·삭제·대분류이동만. 유형/권한/필드노출은 별도 폼) */
 /* 리스트/소분류 생성 화면 전환 시 모달이 내용 크기에 따라 출렁이지 않도록 높이 고정(각 화면 내부만 스크롤) */
