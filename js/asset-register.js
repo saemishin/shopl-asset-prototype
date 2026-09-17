@@ -30,7 +30,6 @@
   function openTagManageModal(onSaved) {
     const master = (window.DATA && window.DATA.tags) || [];
     let draft = master.map(t => ({ name: t, orig: t }));
-    let dirty = false;
 
     const back = document.createElement("div");
     back.className = "modal-back";
@@ -66,6 +65,14 @@
       draft.forEach(t => { const n = t.name.trim(); if (n) counts[n] = (counts[n] || 0) + 1; });
       return new Set(Object.keys(counts).filter(n => counts[n] > 1));
     }
+    // "변경 있음" 여부는 플래그가 아니라 원본(master)과의 실제 내용 비교로 판정 —
+    // 추가했다가 도로 지우는 것처럼 순가감이 상쇄돼 원래 상태로 돌아왔으면 저장 비활성화가 맞음
+    function isDirty() {
+      const current = [...new Set(draft.map(t => t.name.trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, "ko"));
+      const orig = [...master].sort((a, b) => a.localeCompare(b, "ko"));
+      if (current.length !== orig.length) return true;
+      return current.some((v, i) => v !== orig[i]);
+    }
     function updateValidity() {
       const dups = dupNameSet();
       listEl.querySelectorAll("[data-tm-rename]").forEach(inp => {
@@ -76,9 +83,8 @@
       addInput.classList.toggle("has-err", !!addInput.value.trim() && addDup);
       addErr.hidden = !(addInput.value.trim() && addDup);
       addBtn.disabled = !!addInput.value.trim() && addDup;
-      saveBtn.disabled = !dirty || dups.size > 0;
+      saveBtn.disabled = !isDirty() || dups.size > 0;
     }
-    function markDirty() { dirty = true; updateValidity(); }
     function renderList() {
       listEl.innerHTML = draft.length ? draft.map((t, i) => `
         <div class="cat-manage-row">
@@ -97,7 +103,6 @@
       if (!name || draft.some(t => t.name.trim() === name)) { addInput.focus(); return; }
       draft.unshift({ name, orig: null });
       addInput.value = "";
-      markDirty();
       renderList();
     }
     addBtn.onclick = addRow;
@@ -106,18 +111,18 @@
 
     listEl.addEventListener("input", e => {
       const r = e.target.closest("[data-tm-rename]");
-      if (r) { draft[+r.dataset.tmRename].name = e.target.value; dirty = true; updateValidity(); }
+      if (r) { draft[+r.dataset.tmRename].name = e.target.value; updateValidity(); }
     });
     listEl.addEventListener("click", e => {
       const d = e.target.closest("[data-tm-del]");
-      if (d) { draft.splice(+d.dataset.tmDel, 1); markDirty(); renderList(); }
+      if (d) { draft.splice(+d.dataset.tmDel, 1); renderList(); }
     });
 
     back.querySelector("[data-tm-cancel]").onclick = () => back.remove();
     back.addEventListener("click", e => { if (e.target === back) back.remove(); });
 
     saveBtn.onclick = () => {
-      if (!dirty || dupNameSet().size > 0) return;
+      if (!isDirty() || dupNameSet().size > 0) return;
       const finalNames = [...new Set(draft.map(t => t.name.trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, "ko"));
       const remainingOrigs = new Set(draft.filter(t => t.orig).map(t => t.orig));
       const deletedOrigs = master.filter(t => !remainingOrigs.has(t));
