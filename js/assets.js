@@ -20,6 +20,7 @@
   const SORT_DESC_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 6v12M5 18l-3-3M5 18l3-3"/><path d="M11 7h10M11 12h7M11 17h4"/></svg>`;
   // 정렬 기준별 기본 방향: 날짜(등록일·유효기한)는 최신순(desc), 문자열(품목명·고유관리번호)은 가나다순(asc)
   const SORT_FIELDS = [
+    { k: "updatedAt", label: "최근 수정일시", defDir: "desc" },
     { k: "assetNo", label: "고유 관리번호", defDir: "asc" },
     { k: "product", label: "품목명", defDir: "asc" },
     { k: "expiry", label: "유효기한", defDir: "desc" },
@@ -100,7 +101,7 @@
     search: "",
     page: 1,
     pageSize: 20,
-    sort: { key: "createdAt", dir: "desc" },
+    sort: { key: "updatedAt", dir: "desc" },
     filters: { category: [], type: [], status: [], expiry: [], labels: [], note: [] },
   };
   function sortList(list) {
@@ -223,7 +224,7 @@
       if (!map.has(key)) map.set(key, { product: a.product, group: a.group, sub: a.sub, type: a.type, list: [] });
       map.get(key).list.push(a);
     });
-    const head = `<tr><th>품목명</th><th>분류</th><th>자산 유형</th><th class="num">자산 수</th>
+    const head = `<tr><th>품목명</th><th>분류</th>${thFilter("자산 유형", "type")}<th class="num">자산 수</th>
       <th>상태 분포</th><th class="num">총 수량</th></tr>`;
     const groups = [...map.values()];
     const rows = pageSlice(groups).map(g => {
@@ -369,7 +370,8 @@
   function render() {
     const c = document.getElementById("content");
     const v = currentView();
-    const nAct = activeFilterCount();
+    // 품목별은 필터 범위가 분류 하나뿐(자산 유형은 헤더 필터로 별도 제공)이라 뱃지 카운트도 그 하나만 봄
+    const nAct = state.view === "product" ? state.filters.category.length : activeFilterCount();
     c.innerHTML = `
       <div class="tabs">
         <a class="active">현황</a>
@@ -392,7 +394,7 @@
       <div class="countrow">
         <span class="total">전체 <b>${v.count}</b></span>
         ${sortHtml()}
-        <button class="filter-btn ${nAct ? 'set' : ''}" id="btn-filter">▤ 필터${nAct ? ` <b>${nAct}</b>` : ""}</button>
+        <button class="filter-btn ${nAct ? 'set' : ''}" id="btn-filter">▤ ${state.view === "product" ? "분류" : "필터"}${nAct ? ` <b>${nAct}</b>` : ""}</button>
         <div class="right">
           <div class="searchbox${state.search ? ' has-term' : ''}">
             <input class="search${state.search ? ' expanded' : ''}" id="search-input"
@@ -464,7 +466,7 @@
       render();
     });
 
-    document.getElementById("btn-filter").onclick = openFilterModal;
+    document.getElementById("btn-filter").onclick = state.view === "product" ? openCategoryFilterModal : openFilterModal;
     // QR 다운로드도 개별 유닛(고유관리번호) 단위 액션이라 전체 탭에서만 제공 — 자산 추가/일괄 작업과 동일한 이유
     if (state.view === "all") {
       document.getElementById("btn-qr-dl").onclick = openQrDownloadModal;
@@ -772,6 +774,91 @@
 
     drawGroups();
     drawOpts();
+  }
+
+  // 품목별 전용 필터 — 이 뷰는 분류 하나만 필터로 의미가 있어서(자산 유형은 헤더 필터로 커버),
+  // 6개 그룹짜리 필터 모달 대신 분류 그룹 하나만 떼어낸 가벼운 팝업으로 제공
+  function openCategoryFilterModal() {
+    const draft = [...state.filters.category];
+    let query = "";
+
+    function optRow(checked, label, val, cls = "") {
+      return `<label class="opt ${cls}"><input type="checkbox" data-v="${val}" ${checked ? "checked" : ""}>${label}</label>`;
+    }
+    function visibleValues() {
+      const q = query.trim().toLowerCase();
+      const out = [];
+      CAT_GROUPS.forEach((subs, g) => subs.forEach(s => {
+        if (!q || g.toLowerCase().includes(q) || s.toLowerCase().includes(q)) out.push(`${g}/${s}`);
+      }));
+      return out;
+    }
+
+    const back = modal(`
+      <div class="modal">
+        <h3>분류</h3>
+        <div class="body">
+          <input type="text" class="picker-search" id="cf-search" placeholder="검색">
+          <div id="cf-dynamic" style="margin-top:10px"></div>
+        </div>
+        <div class="foot">
+          <button class="btn" data-close>취소</button>
+          <button class="btn primary" id="cf-apply">적용</button>
+        </div>
+      </div>`);
+
+    function renderList() {
+      let listHtml = [...CAT_GROUPS.entries()].map(([g, subs]) => {
+        const q = query.trim().toLowerCase();
+        const groupMatches = !q || g.toLowerCase().includes(q);
+        const filtered = subs.filter(s => groupMatches || s.toLowerCase().includes(q));
+        if (!filtered.length) return "";
+        const keys = filtered.map(s => `${g}/${s}`);
+        const all = keys.every(k => draft.includes(k));
+        const parent = groupMatches ? optRow(all, `<b>${g}</b>`, `grp:${g}`) : "";
+        const kids = filtered.map(s => optRow(draft.includes(`${g}/${s}`), s, `${g}/${s}`, groupMatches ? "child" : "")).join("");
+        return parent + kids;
+      }).join("");
+      if (!listHtml) listHtml = `<p class="muted" style="padding:12px 2px">결과가 없습니다.</p>`;
+
+      const vis = visibleValues();
+      const allChecked = vis.length > 0 && vis.every(v => draft.includes(v));
+      const dyn = back.querySelector("#cf-dynamic");
+      dyn.innerHTML = `
+        <div class="picker-toolbar">
+          <label class="picker-check"><input type="checkbox" id="cf-select-all" ${allChecked ? "checked" : ""}><span>전체</span></label>
+          <span class="right"><button class="filter-reset" id="cf-reset" aria-label="초기화">${RESET_ICON}</button></span>
+        </div>
+        ${listHtml}
+      `;
+      dyn.querySelector("#cf-select-all").onchange = e => {
+        const vals = visibleValues();
+        if (e.target.checked) vals.forEach(v => { if (!draft.includes(v)) draft.push(v); });
+        else vals.forEach(v => { const i = draft.indexOf(v); if (i > -1) draft.splice(i, 1); });
+        renderList();
+      };
+      dyn.querySelector("#cf-reset").onclick = () => { draft.length = 0; renderList(); };
+      dyn.querySelectorAll("input[type=checkbox][data-v]").forEach(cb => cb.onchange = () => {
+        const v = cb.dataset.v;
+        if (v.startsWith("grp:")) {
+          const g = v.slice(4);
+          const keys = CAT_GROUPS.get(g).map(s => `${g}/${s}`);
+          if (cb.checked) keys.forEach(k => { if (!draft.includes(k)) draft.push(k); });
+          else keys.forEach(k => { const i = draft.indexOf(k); if (i > -1) draft.splice(i, 1); });
+        } else if (cb.checked) draft.push(v);
+        else { const i = draft.indexOf(v); if (i > -1) draft.splice(i, 1); }
+        renderList();
+      });
+    }
+    renderList();
+
+    back.querySelector("#cf-search").oninput = e => { query = e.target.value; renderList(); };
+    back.querySelector("#cf-apply").onclick = () => {
+      state.filters.category = draft;
+      state.page = 1;
+      back.remove();
+      render();
+    };
   }
 
   /* ---------- other modals ---------- */

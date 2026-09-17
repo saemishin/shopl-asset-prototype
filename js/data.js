@@ -88,6 +88,19 @@ window.DATA = (function () {
   // 태그 마스터 목록 — 기존 자산들에 찍힌 distinct 라벨로 초기 시드(태그 관리 모달 도입 이후로는 이 배열이 기준이 됨)
   const tags = [...new Set(assets.flatMap(a => a.labels || []))].sort((a, b) => a.localeCompare(b, "ko"));
 
+  // 최근 수정일시 — 실제로는 AssetActivity(5.5)에서 자산별 최근 이벤트 시각을 파생하는 것과 동일한 개념.
+  // 상세 화면 이력(detail.js의 activityOf)이 만들어내는 이벤트와 같은 소스 기준으로, 그중 가장 늦은 날짜를 미리 계산해둠
+  assets.forEach(a => {
+    const dates = [a.createdAt || a.purchaseDate || "2024-01-01"];
+    (a.assignments || []).forEach(x => dates.push(x.since));
+    if ((a.stocks || []).length) dates.push(a.purchaseDate || "2025-01-01");
+    if (a.status === "repair") dates.push("2026-08-14");
+    if (a.status === "lost") dates.push("2026-07-21");
+    if (a.status === "disposed") dates.push("2025-12-30");
+    if (a.note) dates.push("2026-06-02");
+    a.updatedAt = dates.reduce((max, d) => (d > max ? d : max));
+  });
+
   return { categories, assets, emptyGroups, tags };
 })();
 
