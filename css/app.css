@@ -681,7 +681,11 @@ input.has-err, .cat-manage-input.has-err, .cat-manage-name-input.has-err { borde
   background: #1b1d1f; color: #fff; font-size: 11px; padding: 4px 8px;
   border-radius: 6px; white-space: nowrap; z-index: 20;
 }
-.field input:disabled, .dfield input:disabled { background: #f4f5f6; color: var(--text-mut); cursor: not-allowed; }
+/* .field input[type=text] 등 기본 규칙과 명시도가 같아서(클래스+엘리먼트+속성 vs +가상클래스) 소스 순서로
+   밀릴 수 있어, [type=...]까지 붙여 명시도를 한 단계 더 높임(태그 인풋 이중 테두리 때와 동일한 이유) */
+.field input[type=text]:disabled, .field input[type=date]:disabled, .field input[type=number]:disabled {
+  background: #f4f5f6; color: var(--text-mut); cursor: not-allowed;
+}
 .tag-input-wrap.is-locked { background: #f4f5f6; cursor: not-allowed; }
 .field input[type=text], .field input[type=date], .field input[type=number], .field select, .field textarea {
   width: 100%; height: 34px; border: 1px solid var(--line-strong); border-radius: var(--radius); padding: 0 10px; background: var(--panel);
