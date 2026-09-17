@@ -290,14 +290,18 @@ tbody td:nth-child(4), thead th:nth-child(4) { white-space: nowrap; }
 .tbl-all th:nth-child(7), .tbl-all td:nth-child(7) { width: 12%; }
 .tbl-all th:nth-child(8), .tbl-all td:nth-child(8) { width: 11%; }
 .tbl-all th:nth-child(10), .tbl-all td:nth-child(10) { width: 11%; }
-/* 품목별 테이블(6컬럼)도 동일한 이유로 폭 고정 — 필터링돼 행이 바뀌어도 컬럼 폭이 안 흔들리게 */
+/* 품목별 테이블(10컬럼 — 상태 분포를 배정중/재고/수리중/분실/폐기로 다 나눠서)도 동일한 이유로 폭 고정 */
 .tbl-product { table-layout: fixed; }
-.tbl-product th:nth-child(1), .tbl-product td:nth-child(1) { width: 22%; }
-.tbl-product th:nth-child(2), .tbl-product td:nth-child(2) { width: 12%; }
-.tbl-product th:nth-child(3), .tbl-product td:nth-child(3) { width: 18%; }
-.tbl-product th:nth-child(4), .tbl-product td:nth-child(4) { width: 10%; }
-.tbl-product th:nth-child(5), .tbl-product td:nth-child(5) { width: 24%; }
-.tbl-product th:nth-child(6), .tbl-product td:nth-child(6) { width: 14%; }
+.tbl-product th:nth-child(1), .tbl-product td:nth-child(1) { width: 20%; }
+.tbl-product th:nth-child(2), .tbl-product td:nth-child(2) { width: 10%; }
+.tbl-product th:nth-child(3), .tbl-product td:nth-child(3) { width: 15%; }
+.tbl-product th:nth-child(4), .tbl-product td:nth-child(4) { width: 7%; }
+.tbl-product th:nth-child(5), .tbl-product td:nth-child(5) { width: 7%; }
+.tbl-product th:nth-child(6), .tbl-product td:nth-child(6) { width: 7%; }
+.tbl-product th:nth-child(7), .tbl-product td:nth-child(7) { width: 7%; }
+.tbl-product th:nth-child(8), .tbl-product td:nth-child(8) { width: 7%; }
+.tbl-product th:nth-child(9), .tbl-product td:nth-child(9) { width: 7%; }
+.tbl-product th:nth-child(10), .tbl-product td:nth-child(10) { width: 13%; }
 /* 자산 수·총 수량은 컬럼이 넓어서 우측 정렬하면 옆 칸과 붙어 보임 — 왼쪽 정렬이 더 보기 편함(분류 화면의 품목 테이블과 동일한 이유) */
 .tbl-product .num { text-align: left; }
 thead th {

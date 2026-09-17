@@ -133,7 +133,8 @@
     const f = state.filters;
     const q = state.search.trim().toLowerCase();
     return assets.filter(a => {
-      if (f.category.length && !f.category.includes(`${a.group}/${a.sub}`)) return false;
+      // 분류 필터 항목은 "대분류"(부모 체크 시 자체로도 들어감) 또는 "대분류/소분류"(leaf) 둘 다 올 수 있음
+      if (f.category.length && !f.category.some(c => c === a.group || c === `${a.group}/${a.sub}`)) return false;
       if (f.type.length && !f.type.includes(a.type)) return false;
       if (f.status.length) {
         if (a.type !== "individual") return false;
@@ -232,26 +233,31 @@
       map.get(key).list.push(a);
     });
     const head = `<tr><th>품목명</th>${thFilter("자산 유형", "type")}<th>분류</th><th class="num">자산 수</th>
-      <th>상태 분포</th><th class="num">총 수량</th></tr>`;
+      <th class="num">배정 중</th><th class="num">재고</th><th class="num">수리 중</th><th class="num">분실</th><th class="num">폐기</th>
+      <th class="num">총 수량</th></tr>`;
     const groups = [...map.values()];
     // 최근 수정일시 정렬용 — 이 품목에 속한 유닛들의 updatedAt 중 최댓값을 그룹 자체의 값으로 둠
     groups.forEach(g => { g.updatedAt = g.list.reduce((max, a) => (a.updatedAt > max ? a.updatedAt : max), ""); });
     const sorted = sortList(groups);
     const rows = pageSlice(sorted).map(g => {
-      let dist = "—", totalQty = "—";
+      const counts = { assigned: 0, stock: 0, repair: 0, lost: 0, disposed: 0 };
+      let totalQty = "—";
       if (g.type === "individual") {
-        const c = {};
-        g.list.forEach(a => c[a.status] = (c[a.status] || 0) + 1);
-        dist = STATUS_ORDER.filter(k => c[k]).map(k => `${STATUS_LABEL[k][0]} ${c[k]}`).join(" · ");
+        g.list.forEach(a => { counts[a.status] = (counts[a.status] || 0) + 1; });
       } else {
         totalQty = g.list.reduce((s, a) => s + (a.stocks || []).reduce((t, x) => t + x.qty, 0), 0);
       }
+      const statusCell = k => g.type === "individual" ? counts[k] : '<span class="muted">—</span>';
       return `<tr>
         <td>${g.product}</td>
         <td><span class="type-pill">${TYPE_LABEL[g.type]}</span></td>
         <td>${g.group} <span class="muted">›</span> ${g.sub}</td>
         <td class="num">${g.list.length}</td>
-        <td>${dist}</td>
+        <td class="num">${statusCell("assigned")}</td>
+        <td class="num">${statusCell("stock")}</td>
+        <td class="num">${statusCell("repair")}</td>
+        <td class="num">${statusCell("lost")}</td>
+        <td class="num">${statusCell("disposed")}</td>
         <td class="num">${totalQty}</td>
       </tr>`;
     }).join("");
@@ -356,7 +362,7 @@
     const chips = [];
     const push = (k, label, v) => chips.push(
       `<span class="fchip">${label}<button data-clear='${JSON.stringify({ k, v })}'>✕</button></span>`);
-    f.category.forEach(c => push("category", c.split("/")[1], c));
+    f.category.forEach(c => { const [g, s] = c.split("/"); push("category", s || g, c); });
     f.type.forEach(t => push("type", TYPE_LABEL[t], t));
     f.status.forEach(s => push("status", STATUS_LABEL[s][0], s));
     f.expiry.forEach(e => push("expiry", EXP_LABEL[e], e));
@@ -548,7 +554,7 @@
   /* ---------- stats (분류 필터까지만 반영) ---------- */
   function catScoped() {
     const cat = state.filters.category;
-    return cat.length ? assets.filter(a => cat.includes(`${a.group}/${a.sub}`)) : assets;
+    return cat.length ? assets.filter(a => cat.some(c => c === a.group || c === `${a.group}/${a.sub}`)) : assets;
   }
   function computeStats() {
     const list = catScoped();
@@ -634,7 +640,7 @@
     const summary = k => {
       let labels = [];
       // 소분류만 봐선 어느 대분류인지 알 수 없어서 "대분류 › 소분류"로 표시
-      if (k === "category") labels = draft.category.map(c => { const [g, s] = c.split("/"); return `${g} › ${s}`; });
+      if (k === "category") labels = draft.category.map(c => { const [g, s] = c.split("/"); return s ? `${g} › ${s}` : g; });
       else if (k === "type") labels = draft.type.map(v => TYPE_LABEL[v]);
       else if (k === "status") labels = draft.status.map(v => STATUS_LABEL[v][0]);
       else if (k === "expiry") labels = draft.expiry.map(v => EXP_LABEL[v]);
@@ -649,9 +655,13 @@
       const q = query.trim().toLowerCase();
       if (group === "category") {
         const out = [];
-        CAT_GROUPS.forEach((subs, g) => subs.forEach(s => {
-          if (!q || g.toLowerCase().includes(q) || s.toLowerCase().includes(q)) out.push(`${g}/${s}`);
-        }));
+        CAT_GROUPS.forEach((subs, g) => {
+          const groupMatches = !q || g.toLowerCase().includes(q);
+          const filtered = subs.filter(s => groupMatches || s.toLowerCase().includes(q));
+          if (!filtered.length) return;
+          out.push(g);
+          filtered.forEach(s => out.push(`${g}/${s}`));
+        });
         return out;
       }
       if (group === "type") return Object.keys(TYPE_LABEL);
@@ -769,7 +779,8 @@
         if (group === "category") {
           if (v.startsWith("grp:")) {
             const g = v.slice(4);
-            const keys = CAT_GROUPS.get(g).map(s => `${g}/${s}`);
+            // 대분류를 체크하면 그 자체도 소분류들과 별개로 draft에 들어가서, 칩도 "대분류 + 소분류 N개"로 각각 따로 뜸(병합 안 함)
+            const keys = [g, ...CAT_GROUPS.get(g).map(s => `${g}/${s}`)];
             draft.category = cb.checked
               ? [...new Set([...draft.category, ...keys])]
               : draft.category.filter(k => !keys.includes(k));
@@ -813,9 +824,13 @@
     function visibleValues() {
       const q = query.trim().toLowerCase();
       const out = [];
-      CAT_GROUPS.forEach((subs, g) => subs.forEach(s => {
-        if (!q || g.toLowerCase().includes(q) || s.toLowerCase().includes(q)) out.push(`${g}/${s}`);
-      }));
+      CAT_GROUPS.forEach((subs, g) => {
+        const groupMatches = !q || g.toLowerCase().includes(q);
+        const filtered = subs.filter(s => groupMatches || s.toLowerCase().includes(q));
+        if (!filtered.length) return;
+        out.push(g);
+        filtered.forEach(s => out.push(`${g}/${s}`));
+      });
       return out;
     }
 
@@ -867,7 +882,8 @@
         const v = cb.dataset.v;
         if (v.startsWith("grp:")) {
           const g = v.slice(4);
-          const keys = CAT_GROUPS.get(g).map(s => `${g}/${s}`);
+          // 대분류를 체크하면 그 자체도 소분류들과 별개로 draft에 들어가서, 칩도 "대분류 + 소분류 N개"로 각각 따로 뜸(병합 안 함)
+          const keys = [g, ...CAT_GROUPS.get(g).map(s => `${g}/${s}`)];
           if (cb.checked) keys.forEach(k => { if (!draft.includes(k)) draft.push(k); });
           else keys.forEach(k => { const i = draft.indexOf(k); if (i > -1) draft.splice(i, 1); });
         } else if (cb.checked) draft.push(v);

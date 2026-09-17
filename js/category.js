@@ -69,7 +69,6 @@
     for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) % 997;
     return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length];
   }
-  // 배정중/재고 외 상태(수리중·분실·폐기)는 "기타"로 묶어서 보여줌 — 구조설계안 3.4 status 정의 기준
   const STATUS_LABEL = { stock: "재고", assigned: "배정 중", repair: "수리 중", lost: "분실", disposed: "폐기" };
   // 구조설계안 3.3: 필드 노출 설정 대상은 S/N·IMEI·구매일·구매가격·제조연월일·유효기한 6개(IMEI·S/N은 개별형 전용) — 기본값: IMEI·유효기한 off, 나머지 on
   const FIELD_LABEL = { serial: "S/N", imei: "IMEI", purchaseDate: "구매일", purchasePrice: "구매가격", manufactured: "제조연월일", expiry: "유효기한" };
@@ -141,19 +140,20 @@
       const repair = items.filter(a => a.status === "repair").length;
       const lost = items.filter(a => a.status === "lost").length;
       const disposed = items.filter(a => a.status === "disposed").length;
-      return { product, items, total: items.length, assigned, stock, other: repair + lost + disposed, repair, lost, disposed };
+      return { product, items, total: items.length, assigned, stock, repair, lost, disposed };
     });
   }
 
   function productRowHtml(p) {
-    const otherTitle = p.other ? ` title="수리 중 ${p.repair} · 분실 ${p.lost} · 폐기 ${p.disposed}"` : "";
     return `
       <tr class="clickable cat-prod-row" data-product="${p.product}">
         <td>${p.product}</td>
         <td class="num">${p.total}</td>
         <td class="num">${p.assigned}</td>
         <td class="num">${p.stock}</td>
-        <td class="num"${otherTitle}>${p.other}</td>
+        <td class="num">${p.repair}</td>
+        <td class="num">${p.lost}</td>
+        <td class="num">${p.disposed}</td>
       </tr>`;
   }
 
@@ -238,7 +238,7 @@
         ${products.length ? `
           <div class="table-wrap">
             <table class="cat-asset-table">
-              <thead><tr><th>품목명</th><th class="num">자산 수</th><th class="num">배정 중</th><th class="num">재고</th><th class="num">기타</th></tr></thead>
+              <thead><tr><th>품목명</th><th class="num">자산 수</th><th class="num">배정 중</th><th class="num">재고</th><th class="num">수리 중</th><th class="num">분실</th><th class="num">폐기</th></tr></thead>
               <tbody>${products.map(productRowHtml).join("")}</tbody>
             </table>
           </div>
