@@ -300,12 +300,14 @@
     function productOptions() {
       if (!catValue) return [];
       const cat = findCat(catValue);
+      if (!cat) return [];
       const q = nameInput.value.trim().toLowerCase();
-      if (!cat || !q) return [];
       const names = [...new Set((window.DATA.assets || [])
         .filter(a => a.group === cat.group && a.sub === cat.sub)
         .map(a => a.product).filter(Boolean))];
-      return names.filter(n => n.toLowerCase().includes(q));
+      // 포커스만 하고 아직 안 쳤으면(q 없음) 전체 목록을 보여줌(태그 검색과 동일) — 검색어가 있는데 매칭이
+      // 없으면 자동완성 성격상 "결과 없음" 표시 없이 그냥 드롭다운을 띄우지 않음(새 제품명 입력이 정상 상태)
+      return q ? names.filter(n => n.toLowerCase().includes(q)) : names;
     }
     function openProdMenu() {
       const opts = productOptions();
