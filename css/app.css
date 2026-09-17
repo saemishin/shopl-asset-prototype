@@ -349,10 +349,6 @@ th.c, td.c { text-align: center; width: 52px; }
   flex: 1; min-width: 90px; height: auto; width: auto; border: none; outline: none;
   background: transparent; font-size: 12.5px; padding: 4px 2px;
 }
-.wrap-clear[hidden] { display: none; }
-.wrap-clear { display: flex; align-items: center; padding: 3px; color: var(--text-sub); opacity: .65; flex-shrink: 0; }
-.wrap-clear:hover { opacity: 1; color: var(--text); }
-.wrap-clear svg { width: 12px; height: 12px; }
 .badge { display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border-radius: 5px; font-size: 11px; font-weight: 600; white-space: nowrap; }
 .badge.stock { background: #eef0f2; color: #5b6067; }
 .badge.assigned { background: #e7f0ff; color: #2f6df6; }

@@ -241,7 +241,6 @@
           <div class="field"><label>소분류 <span class="req">*</span></label>
             <div class="tag-input-wrap" id="areg-catwrap" style="cursor:pointer">
               <span id="areg-cat-display" style="flex:1;font-size:12.5px">선택</span>
-              <button type="button" class="wrap-clear" id="areg-cat-clear" hidden aria-label="소분류 선택 해제">${CLOSE_ICON_SM}</button>
             </div>
           </div>
           <div class="field" id="areg-name-field"><label>제품명 <span class="req">*</span></label><input type="text" id="areg-name" placeholder="입력" maxlength="50" autocomplete="off"></div>
@@ -369,11 +368,9 @@
     // 기본은 비워둔 상태(자동 첫 항목 선택 없음) — 미선택 상태에선 고유관리번호 등 유형별 필드를 모두 노출.
     const catWrap = back.querySelector("#areg-catwrap");
     const catDisplay = back.querySelector("#areg-cat-display");
-    const catClear = back.querySelector("#areg-cat-clear");
     let catValue = null;
 
     function catLabel(v) { const c = findCat(v); return c ? `${c.group} › ${c.sub}` : ""; }
-    function updateCatClear() { catClear.hidden = !catValue; }
     function applyAssetNoVisibility() {
       assetNoField.style.display = (catValue && type === "quantity") ? "none" : "";
     }
@@ -394,7 +391,7 @@
     }
     // 소분류를 아직 안 골랐으면 나머지 필드는 채워봐야 소용없으니(어차피 소분류 바뀌면 초기화됨) 비활성화 —
     // hover 시 이유를 안내(data-tip). [태그 관리]는 이 자산과 무관한 전역 기능이라 잠그지 않음
-    const LOCK_TIP = "소분류를 먼저 선택해주세요";
+    const LOCK_TIP = "소분류를 먼저 선택해주세요.";
     function setLocked(locked) {
       [nameInput, assetNoInput, dtext, dnative, tagInput].forEach(el => { el.disabled = locked; });
       [nameField, assetNoField, expiryField].forEach(el => {
@@ -411,27 +408,14 @@
       const cat = findCat(v);
       type = (cat && cat.type) || "individual";
       renderCatDisplay();
-      updateCatClear();
       applyAssetNoVisibility();
       setLocked(!catValue);
       if (changed) resetOtherFields();
       checkValid();
     }
-    catWrap.addEventListener("click", e => {
-      if (catClear.contains(e.target)) return;
+    catWrap.addEventListener("click", () => {
       openCategoryPickModal(categories, catValue, v => selectCat(v));
     });
-    catClear.onclick = e => {
-      e.stopPropagation();
-      const changed = catValue !== null;
-      catValue = null;
-      renderCatDisplay();
-      updateCatClear();
-      applyAssetNoVisibility();
-      setLocked(true);
-      if (changed) resetOtherFields();
-      checkValid();
-    };
 
     // 소분류 초기값 반영(과 그에 딸린 setLocked/resetOtherFields 호출)은 태그 위젯(renderChips 등)까지
     // 다 준비된 뒤로 미룸 — 그 전에 부르면 아직 선언되기 전(TDZ)인 tagInput/chipsEl을 참조해서 에러
