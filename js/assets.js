@@ -340,17 +340,18 @@
         </select></span>
       </div>`;
   }
+  // 칩은 "라벨: 값" 접두어 없이 값만 표시, 한 차원에서 여러 개 선택돼도 하나로 뭉치지 않고 값마다 별도 칩(각각 개별 해제)
   function filterChips() {
     const f = state.filters;
     const chips = [];
-    const push = (grp, label, clear) => chips.push(
-      `<span class="fchip">${label}<button data-clear='${JSON.stringify(clear)}'>✕</button></span>`);
-    if (f.category.length) push("category", `분류: ${f.category.map(c => c.split("/")[1]).join("·")}`, { k: "category" });
-    if (f.type.length) push("type", f.type.map(t => TYPE_LABEL[t]).join("·"), { k: "type" });
-    if (f.status.length) push("status", f.status.map(s => STATUS_LABEL[s][0]).join("·"), { k: "status" });
-    if (f.expiry.length) push("expiry", f.expiry.map(e => EXP_LABEL[e]).join("·"), { k: "expiry" });
-    if (f.note.length) push("note", f.note.map(v => v === "has" ? "있음" : "없음").join("·"), { k: "note" });
-    if (f.labels.length) push("labels", f.labels.join("·"), { k: "labels" });
+    const push = (k, label, v) => chips.push(
+      `<span class="fchip">${label}<button data-clear='${JSON.stringify({ k, v })}'>✕</button></span>`);
+    f.category.forEach(c => push("category", c.split("/")[1], c));
+    f.type.forEach(t => push("type", TYPE_LABEL[t], t));
+    f.status.forEach(s => push("status", STATUS_LABEL[s][0], s));
+    f.expiry.forEach(e => push("expiry", EXP_LABEL[e], e));
+    f.note.forEach(n => push("note", n === "has" ? "있음" : "없음", n));
+    f.labels.forEach(l => push("labels", l, l));
     if (!chips.length) return "";
     return `<div class="filterbar"><button class="filter-reset" id="filter-reset" aria-label="필터 전체 해제">${RESET_ICON}</button>${chips.join("")}</div>`;
   }
@@ -428,7 +429,12 @@
     si.onkeydown = e => { if (e.key === "Enter") commit(); };
     document.getElementById("search-clear").onclick = () => { si.value = ""; state.search = ""; state.page = 1; render(); };
     c.querySelectorAll("[data-clear]").forEach(b =>
-      b.onclick = () => { state.filters[JSON.parse(b.dataset.clear).k] = []; state.page = 1; render(); });
+      b.onclick = () => {
+        const { k, v } = JSON.parse(b.dataset.clear);
+        state.filters[k] = state.filters[k].filter(x => x !== v);
+        state.page = 1;
+        render();
+      });
 
     c.querySelectorAll(".statcol.click").forEach(el => el.onclick = () => {
       const p = JSON.parse(el.dataset.filter);
