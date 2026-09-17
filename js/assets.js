@@ -26,6 +26,13 @@
     { k: "expiry", label: "유효기한", defDir: "desc" },
     { k: "createdAt", label: "자산 등록일", defDir: "desc" },
   ];
+  // 품목별은 행이 자산(유닛)이 아니라 품목 단위라, 유닛에만 있는 값(고유관리번호·유효기한·등록일)은 정렬 기준에서 제외.
+  // 최근 수정일시는 그 품목에 속한 유닛들의 값 중 최댓값으로 파생(전체 탭과 기본 방향은 동일하게 맞춤)
+  const SORT_FIELDS_PRODUCT = [
+    { k: "updatedAt", label: "최근 수정일시", defDir: "desc" },
+    { k: "product", label: "품목명", defDir: "asc" },
+  ];
+  function sortFieldsFor(view) { return view === "product" ? SORT_FIELDS_PRODUCT : SORT_FIELDS; }
 
   function expiryKey(d) {
     if (!d) return "none";
@@ -227,7 +234,10 @@
     const head = `<tr><th>품목명</th><th>분류</th>${thFilter("자산 유형", "type")}<th class="num">자산 수</th>
       <th>상태 분포</th><th class="num">총 수량</th></tr>`;
     const groups = [...map.values()];
-    const rows = pageSlice(groups).map(g => {
+    // 최근 수정일시 정렬용 — 이 품목에 속한 유닛들의 updatedAt 중 최댓값을 그룹 자체의 값으로 둠
+    groups.forEach(g => { g.updatedAt = g.list.reduce((max, a) => (a.updatedAt > max ? a.updatedAt : max), ""); });
+    const sorted = sortList(groups);
+    const rows = pageSlice(sorted).map(g => {
       let dist = "—", totalQty = "—";
       if (g.type === "individual") {
         const c = {};
@@ -288,8 +298,8 @@
 
   /* ---------- render ---------- */
   function sortHtml() {
-    if (state.view !== "all") return "";
-    const cur = SORT_FIELDS.find(f => f.k === state.sort.key);
+    if (state.view !== "all" && state.view !== "product") return "";
+    const cur = sortFieldsFor(state.view).find(f => f.k === state.sort.key);
     return `
       <div class="sortbar">
         <button class="sort-key-btn" id="sort-key-btn">${cur.label}${CARET}</button>
@@ -303,14 +313,14 @@
     document.querySelectorAll(".dropdown-menu").forEach(m => m.remove());
     const menu = document.createElement("div");
     menu.className = "dropdown-menu";
-    menu.innerHTML = SORT_FIELDS.map(f => `<button data-k="${f.k}" class="${state.sort.key === f.k ? "active" : ""}">${f.label}</button>`).join("");
+    menu.innerHTML = sortFieldsFor(state.view).map(f => `<button data-k="${f.k}" class="${state.sort.key === f.k ? "active" : ""}">${f.label}</button>`).join("");
     const r = anchor.getBoundingClientRect();
     menu.style.cssText = `position:fixed;top:${r.bottom + 4}px;left:${r.left}px;min-width:${Math.max(r.width, 120)}px`;
     document.body.appendChild(menu);
     menu.querySelectorAll("button").forEach(b => b.onclick = () => {
       menu.remove();
       state.sort.key = b.dataset.k;
-      state.sort.dir = SORT_FIELDS.find(f => f.k === b.dataset.k).defDir;
+      state.sort.dir = sortFieldsFor(state.view).find(f => f.k === b.dataset.k).defDir;
       state.page = 1;
       render();
     });
@@ -415,7 +425,16 @@
     `;
 
     c.querySelectorAll(".subtabs button").forEach(b =>
-      b.onclick = () => { state.view = b.dataset.view; state.page = 1; state.filters = emptyFilters(); render(); });
+      b.onclick = () => {
+        state.view = b.dataset.view;
+        state.page = 1;
+        state.filters = emptyFilters();
+        // 이 뷰에서 안 쓰는 정렬 기준으로 넘어가는 경우(예: 전체>유효기한 정렬 중 품목별로 이동)를 대비해
+        // 현재 정렬 기준이 새 뷰에 없으면 그 뷰의 기본 기준으로 리셋
+        const fields = sortFieldsFor(state.view);
+        if (!fields.some(f => f.k === state.sort.key)) state.sort = { key: fields[0].k, dir: fields[0].defDir };
+        render();
+      });
     bindRows(c);
     c.querySelectorAll("[data-stub]").forEach(el =>
       el.onclick = () => toast(`"${el.dataset.stub}" — 이후 단계에서 정의`));
