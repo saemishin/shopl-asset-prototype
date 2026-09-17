@@ -21,7 +21,7 @@ window.openProductUnitsModal = function (product, items) {
   const m = document.createElement("div");
   m.className = "modal-back";
   m.innerHTML = `
-    <div class="modal lg help-modal">
+    <div class="modal units-modal help-modal">
       <div class="help-modal-head">
         <h3>자산 목록</h3>
         <button type="button" class="btn icon-only sm" data-close aria-label="닫기">${CLOSE_ICON}</button>
