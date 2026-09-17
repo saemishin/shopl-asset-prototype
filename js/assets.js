@@ -231,7 +231,7 @@
       if (!map.has(key)) map.set(key, { product: a.product, group: a.group, sub: a.sub, type: a.type, list: [] });
       map.get(key).list.push(a);
     });
-    const head = `<tr><th>품목명</th><th>분류</th>${thFilter("자산 유형", "type")}<th class="num">자산 수</th>
+    const head = `<tr><th>품목명</th>${thFilter("자산 유형", "type")}<th>분류</th><th class="num">자산 수</th>
       <th>상태 분포</th><th class="num">총 수량</th></tr>`;
     const groups = [...map.values()];
     // 최근 수정일시 정렬용 — 이 품목에 속한 유닛들의 updatedAt 중 최댓값을 그룹 자체의 값으로 둠
@@ -248,8 +248,8 @@
       }
       return `<tr>
         <td>${g.product}</td>
-        <td>${g.group} <span class="muted">›</span> ${g.sub}</td>
         <td><span class="type-pill">${TYPE_LABEL[g.type]}</span></td>
+        <td>${g.group} <span class="muted">›</span> ${g.sub}</td>
         <td class="num">${g.list.length}</td>
         <td>${dist}</td>
         <td class="num">${totalQty}</td>
