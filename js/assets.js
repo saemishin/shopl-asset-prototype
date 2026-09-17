@@ -12,6 +12,39 @@
   const EXP_LABEL = { valid: "유효", soon: "만료 예정", over: "만료", none: "미설정" };
   // 근무지 코드는 구조설계안에 없는 필드 — 근무지가 "기존 재사용" 엔티티라 여기선 프로토타입 데모용 샘플값만 매핑(detail.js의 WS_CODE와 동일)
   const WS_CODE = { "강남점": "GN-01", "판교점": "PG-01", "본사": "HQ-01" };
+  // 구성원도 근무지와 동일하게 "기존 재사용" 엔티티라 프로토타입 데모용 샘플만 매핑 — 팀은 category.js의 MEMBERS와 동일 값으로 통일,
+  // 사번·휴대폰번호는 검색 placeholder(아래)가 이미 약속해놓고 실제 필드가 없던 걸 이번에 시드
+  const MEMBER_INFO = {
+    "김민수": { team: "개발팀", empNo: "2021001", phone: "010-2001-1234" },
+    "이서연": { team: "디자인팀", empNo: "2021015", phone: "010-3412-5678" },
+    "박지훈": { team: "영업팀", empNo: "2020032", phone: "010-8823-9910" },
+    "정우성": { team: "CS팀", empNo: "2022041", phone: "010-5567-2231" },
+    "김철수": { team: "운영팀", empNo: "2019008", phone: "010-9012-4456" },
+    "최유진": { team: "개발팀", empNo: "2023019", phone: "010-6634-8821" },
+    "한소희": { team: "디자인팀", empNo: "2022055", phone: "010-4478-2093" },
+  };
+  const AVATAR_COLORS = ["#5b8def", "#8f6ef0", "#eb7f8b", "#3fb37f", "#e0a63c", "#4dabf7"];
+  function avatarColor(name) {
+    let h = 0;
+    for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) % 997;
+    return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length];
+  }
+  // 배정 현황 카드(detail.js의 assignIdentity)와 동일한 프로필+이름+그룹 컴포넌트 재사용
+  function memberIdentity(name) {
+    const team = (MEMBER_INFO[name] || {}).team;
+    return `<span class="acard-avatar" style="background:${avatarColor(name)}">${name[0]}</span>
+      <div><div class="acard-name">${name}</div><div class="acard-sub">${team || '<span class="muted">—</span>'}</div></div>`;
+  }
+  // 구성원 필터 — 실제 대시보드의 공통 "직원 필터" 팝업 목업. 복잡한 실사용 필터 로직은 이 프로토타입 범위 밖이라
+  // 버튼을 누르면 뜨는 모달 형태만 재현(적용해도 실제 목록엔 반영 안 됨). 그룹 트리는 category.js의 GROUP_TREE와 동일 구조 재사용
+  const MEMBER_GROUP_TREE = [
+    { name: "샤플앤컴퍼니", children: [
+      { name: "개발팀" }, { name: "디자인팀" },
+      { name: "영업팀", children: [{ name: "국내영업" }, { name: "해외영업" }] },
+      { name: "운영팀" }, { name: "CS팀" },
+    ] },
+  ];
+  const MEMBER_JOB_TITLES = ["직무/직급 없음", "팀장", "매니저", "주임", "사원"];
   const SEARCH_PLACEHOLDER = {
     all: "고유관리번호 / 품목명", product: "품목명", employee: "이름/사번/휴대폰번호", worksite: "근무지명/코드",
   };
@@ -295,7 +328,56 @@
     return { head, rows, count: groups.length };
   }
 
-  function view_axis(list, axis) {
+  // 배정된 자산 요약 셀 — 개별/수량 구분 없이 합친 총 개수 + 소분류별 개수 내림차순(많은 것부터), labelsCell()과
+  // 동일한 "앞 2개 + 나머지 N" 오버플로 패턴
+  function assetsSummaryCell(items) {
+    if (!items.length) return '<span class="muted">—</span>';
+    const total = items.reduce((s, x) => s + x.qty, 0);
+    const bySub = new Map();
+    items.forEach(x => bySub.set(x.sub, (bySub.get(x.sub) || 0) + x.qty));
+    const sorted = [...bySub.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "ko"));
+    const shown = sorted.slice(0, 2).map(([sub, n]) => `${sub} ${n}`).join(", ");
+    const rest = sorted.length > 2 ? ` <span class="muted">+${sorted.length - 2}</span>` : "";
+    return `<b>${total}개</b> <span class="muted">${shown}</span>${rest}`;
+  }
+
+  function view_employee(list) {
+    const map = new Map();
+    list.forEach(a => {
+      if (a.type === "individual") {
+        (a.assignments || []).forEach(x => {
+          if (!x.employee) return;
+          if (!map.has(x.employee)) map.set(x.employee, { name: x.employee, items: [] });
+          map.get(x.employee).items.push({ sub: a.sub, qty: 1 });
+        });
+      } else {
+        (a.stocks || []).forEach(x => {
+          if (!x.employee) return;
+          if (!map.has(x.employee)) map.set(x.employee, { name: x.employee, items: [] });
+          map.get(x.employee).items.push({ sub: a.sub, qty: x.qty });
+        });
+      }
+    });
+    const head = `<tr><th>이름</th><th>사번</th><th>휴대폰번호</th><th>배정된 자산</th></tr>`;
+    const q = state.search.trim().toLowerCase();
+    const rowsArr = [...map.values()].filter(r => {
+      if (!q) return true;
+      const info = MEMBER_INFO[r.name] || {};
+      return r.name.toLowerCase().includes(q) || (info.empNo || "").toLowerCase().includes(q) || (info.phone || "").includes(q);
+    });
+    const rows = pageSlice(rowsArr).map(r => {
+      const info = MEMBER_INFO[r.name] || {};
+      return `<tr>
+        <td><div class="acard-id">${memberIdentity(r.name)}</div></td>
+        <td>${info.empNo || '<span class="muted">—</span>'}</td>
+        <td>${info.phone || '<span class="muted">—</span>'}</td>
+        <td>${assetsSummaryCell(r.items)}</td>
+      </tr>`;
+    }).join("");
+    return { head, rows, count: rowsArr.length };
+  }
+
+  function view_worksite(list) {
     const map = new Map();
     const bump = (name, kind, n) => {
       if (!name) return;
@@ -303,19 +385,15 @@
       map.get(name)[kind] += n;
     };
     list.forEach(a => {
-      if (a.type === "individual") (a.assignments || []).forEach(x => bump(x[axis], "indiv", 1));
-      else (a.stocks || []).forEach(x => bump(x[axis], "qty", x.qty));
+      if (a.type === "individual") (a.assignments || []).forEach(x => bump(x.worksite, "indiv", 1));
+      else (a.stocks || []).forEach(x => bump(x.worksite, "qty", x.qty));
     });
-    const label = axis === "employee" ? "구성원" : "근무지";
-    const head = `<tr><th>${label}</th><th class="num">배정 자산 수</th><th class="num">보유 수량</th></tr>`;
+    const head = `<tr><th>근무지</th><th class="num">배정 자산 수</th><th class="num">보유 수량</th></tr>`;
     const q = state.search.trim().toLowerCase();
     const rowsArr = [...map.values()].filter(r => {
       if (!q) return true;
-      if (axis === "worksite") {
-        const code = (WS_CODE[r.name] || "").toLowerCase();
-        return r.name.toLowerCase().includes(q) || code.includes(q);
-      }
-      return r.name.toLowerCase().includes(q);
+      const code = (WS_CODE[r.name] || "").toLowerCase();
+      return r.name.toLowerCase().includes(q) || code.includes(q);
     });
     const rows = pageSlice(rowsArr).map(r => `<tr>
       <td>${r.name}</td>
@@ -329,8 +407,8 @@
     const list = getFiltered();
     if (state.view === "all") return view_all(list);
     if (state.view === "product") return view_product(list);
-    if (state.view === "employee") return view_axis(list, "employee");
-    if (state.view === "worksite") return view_axis(list, "worksite");
+    if (state.view === "employee") return view_employee(list);
+    if (state.view === "worksite") return view_worksite(list);
   }
 
   /* ---------- render ---------- */
@@ -407,7 +485,8 @@
     // 필터·검색 조건 때문에 0건인 것과 애초에 등록된 자산 자체가 없는 것을 구분
     const filtering = activeFilterCount() > 0 || !!state.search.trim();
     const emptyMsg = filtering ? "결과가 없습니다." : "등록된 자산이 없습니다.";
-    const colspan = state.view === "product" ? (state.productType === "quantity" ? 5 : 8) : 10;
+    const colspan = state.view === "product" ? (state.productType === "quantity" ? 5 : 8)
+      : state.view === "employee" ? 4 : state.view === "worksite" ? 3 : 10;
     const empty = `<tr><td colspan="${colspan}" style="text-align:center;color:var(--text-mut);padding:32px">${emptyMsg}</td></tr>`;
     const cls = state.view === "product" ? `tbl-product tbl-product-${state.productType}` : `tbl-${state.view}`;
     return `<table class="${cls}"><thead>${v.head}</thead><tbody>${v.rows || empty}</tbody></table>`;
@@ -451,7 +530,7 @@
       <div class="countrow">
         <span class="total">전체 <b>${v.count}</b></span>
         ${sortHtml()}
-        <button class="filter-btn ${nAct ? 'set' : ''}" id="btn-filter">▤ ${state.view === "product" ? "분류" : "필터"}${nAct ? ` <b>${nAct}</b>` : ""}</button>
+        <button class="filter-btn ${nAct ? 'set' : ''}" id="btn-filter">▤ ${state.view === "product" ? "분류" : state.view === "employee" ? "구성원" : "필터"}${nAct ? ` <b>${nAct}</b>` : ""}</button>
         <div class="right">
           <div class="searchbox${state.search ? ' has-term' : ''}">
             <input class="search${state.search ? ' expanded' : ''}" id="search-input"
@@ -550,7 +629,10 @@
       render();
     });
 
-    document.getElementById("btn-filter").onclick = state.view === "product" ? openCategoryFilterModal : openFilterModal;
+    document.getElementById("btn-filter").onclick =
+      state.view === "product" ? openCategoryFilterModal :
+      state.view === "employee" ? openMemberFilterModal :
+      openFilterModal;
     // QR 다운로드도 개별 유닛(고유관리번호) 단위 액션이라 전체 탭에서만 제공 — 자산 추가/일괄 작업과 동일한 이유
     if (state.view === "all") {
       document.getElementById("btn-qr-dl").onclick = openQrDownloadModal;
@@ -952,6 +1034,55 @@
       state.page = 1;
       back.remove();
       render();
+    };
+  }
+
+  // 구성원별 전용 "직원 필터" — 대시보드 공용 컴포넌트 목업. 실제 조직도 연동·필터 반영 로직은 이 프로토타입 범위 밖이라
+  // 버튼을 누르면 뜨는 모달의 형태(좌측 카테고리 + 우측 검색·트리)만 재현, 적용해도 실제 목록엔 반영되지 않음
+  function openMemberFilterModal() {
+    let cat = "그룹";
+
+    function nodeRow(n, isChild) {
+      const kids = n.children ? n.children.map(c => nodeRow(c, true)).join("") : "";
+      return `<label class="opt ${isChild ? "child" : ""}"><input type="checkbox" checked>${n.name}</label>${kids}`;
+    }
+    function optsHtml() {
+      if (cat === "그룹") return MEMBER_GROUP_TREE.map(n => nodeRow(n, false)).join("");
+      return MEMBER_JOB_TITLES.map(j => `<label class="opt"><input type="checkbox" checked>${j}</label>`).join("");
+    }
+
+    const back = modal(`
+      <div class="modal lg">
+        <h3>직원 필터</h3>
+        <div class="fmodal">
+          <div class="groups" id="mf-groups">
+            ${["그룹", "직무/직급"].map(g => `<button data-g="${g}" class="${g === cat ? "active" : ""}">
+              <span class="g-text"><span class="g-name">${g}</span></span>
+            </button>`).join("")}
+          </div>
+          <div class="opts">
+            <input type="text" class="picker-search" placeholder="검색">
+            <div class="picker-toolbar">
+              <label class="picker-check"><input type="checkbox" checked><span>하위그룹도 한번에 체크</span></label>
+              <span class="right"><button class="filter-reset" aria-label="초기화">${RESET_ICON}</button></span>
+            </div>
+            <div id="mf-opts-list">${optsHtml()}</div>
+          </div>
+        </div>
+        <div class="foot">
+          <button class="btn" data-close>취소</button>
+          <button class="btn primary" id="mf-apply">적용</button>
+        </div>
+      </div>`);
+
+    back.querySelectorAll("#mf-groups button").forEach(b => b.onclick = () => {
+      cat = b.dataset.g;
+      back.querySelectorAll("#mf-groups button").forEach(x => x.classList.toggle("active", x === b));
+      back.querySelector("#mf-opts-list").innerHTML = optsHtml();
+    });
+    back.querySelector("#mf-apply").onclick = () => {
+      back.remove();
+      toast(`"직원 필터" 적용 (프로토타입 — 실제 반영 없음)`);
     };
   }
 
