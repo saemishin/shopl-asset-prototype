@@ -10,6 +10,11 @@
   const STATUS_ORDER = ["stock", "assigned", "repair", "lost", "disposed"];
   const TYPE_LABEL = { individual: "개별 자산", quantity: "수량 자산" };
   const EXP_LABEL = { valid: "유효", soon: "만료 예정", over: "만료", none: "미설정" };
+  // 근무지 코드는 구조설계안에 없는 필드 — 근무지가 "기존 재사용" 엔티티라 여기선 프로토타입 데모용 샘플값만 매핑(detail.js의 WS_CODE와 동일)
+  const WS_CODE = { "강남점": "GN-01", "판교점": "PG-01", "본사": "HQ-01" };
+  const SEARCH_PLACEHOLDER = {
+    all: "고유관리번호 / 제품명", product: "제품명", employee: "이름/사번/휴대폰번호", worksite: "근무지명/코드",
+  };
   const RESET_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 1 2.64 6.36"/><path d="M3 20v-6h6"/></svg>`;
   const SORT_ASC_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 18V6M5 6l-3 3M5 6l3 3"/><path d="M11 7h4M11 12h7M11 17h10"/></svg>`;
   const SORT_DESC_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 6v12M5 18l-3-3M5 18l3-3"/><path d="M11 7h10M11 12h7M11 17h4"/></svg>`;
@@ -132,7 +137,10 @@
         const has = f.labels.filter(l => (a.labels || []).includes(l));
         if (has.length !== f.labels.length) return false;
       }
-      if (q && !(`${a.product} ${a.assetNo || ""}`.toLowerCase().includes(q))) return false;
+      // 검색 대상은 뷰마다 다름 — 전체는 고유관리번호+제품명, 제품별은 제품명만. 구성원별·근무지별은
+      // 자산이 아니라 집계된 사람/근무지 이름(+코드)을 대상으로 하므로 여기가 아니라 view_axis()에서 걸러냄
+      if (q && state.view === "all" && !(`${a.product} ${a.assetNo || ""}`.toLowerCase().includes(q))) return false;
+      if (q && state.view === "product" && !a.product.toLowerCase().includes(q)) return false;
       return true;
     });
   }
@@ -252,7 +260,15 @@
     });
     const label = axis === "employee" ? "구성원" : "근무지";
     const head = `<tr><th>${label}</th><th class="num">배정 자산 수</th><th class="num">보유 수량</th></tr>`;
-    const rowsArr = [...map.values()];
+    const q = state.search.trim().toLowerCase();
+    const rowsArr = [...map.values()].filter(r => {
+      if (!q) return true;
+      if (axis === "worksite") {
+        const code = (WS_CODE[r.name] || "").toLowerCase();
+        return r.name.toLowerCase().includes(q) || code.includes(q);
+      }
+      return r.name.toLowerCase().includes(q);
+    });
     const rows = pageSlice(rowsArr).map(r => `<tr>
       <td>${r.name}</td>
       <td class="num">${r.indiv || '<span class="muted">0</span>'}</td>
@@ -380,7 +396,7 @@
         <div class="right">
           <div class="searchbox${state.search ? ' has-term' : ''}">
             <input class="search${state.search ? ' expanded' : ''}" id="search-input"
-              placeholder="${state.search ? '고유관리번호 / 제품명' : '검색'}" value="${state.search.replace(/"/g, '&quot;')}">
+              placeholder="${state.search ? SEARCH_PLACEHOLDER[state.view] : '검색'}" value="${state.search.replace(/"/g, '&quot;')}">
             <button class="search-clear" id="search-clear" type="button" aria-label="검색어 지우기">✕</button>
           </div>
           ${state.view === "all" ? '<button class="btn sm" id="btn-qr-dl">▦ QR 다운로드</button>' : ""}
@@ -404,7 +420,7 @@
     const si = document.getElementById("search-input");
     const sbox = si.closest(".searchbox");
     const commit = () => { state.search = si.value.trim(); state.page = 1; render(); };
-    si.onfocus = () => { si.classList.add("expanded"); si.placeholder = "고유관리번호 / 제품명"; };
+    si.onfocus = () => { si.classList.add("expanded"); si.placeholder = SEARCH_PLACEHOLDER[state.view]; };
     si.onblur = () => { if (!si.value && !state.search) { si.classList.remove("expanded"); si.placeholder = "검색"; } };
     si.oninput = () => sbox.classList.toggle("has-term", !!si.value);   // ✕ 노출만, 검색 실행 X
     si.onkeydown = e => { if (e.key === "Enter") commit(); };
