@@ -244,11 +244,11 @@
               <button type="button" class="wrap-clear" id="areg-cat-clear" hidden aria-label="소분류 선택 해제">${CLOSE_ICON_SM}</button>
             </div>
           </div>
-          <div class="field"><label>제품명 <span class="req">*</span></label><input type="text" id="areg-name" placeholder="입력" maxlength="50"></div>
+          <div class="field" id="areg-name-field"><label>제품명 <span class="req">*</span></label><input type="text" id="areg-name" placeholder="입력" maxlength="50" autocomplete="off"></div>
           <div class="field" id="areg-assetno"><label>고유관리번호 <span class="req">*</span></label><input type="text" id="areg-assetno-input" placeholder="입력" maxlength="30">
             <p class="field-err" data-assetno-err hidden>동일한 명칭이 존재합니다.</p>
           </div>
-          <div class="field"><label>유효기한</label>${dateFieldHtml()}</div>
+          <div class="field" id="areg-expiry-field"><label>유효기한</label>${dateFieldHtml()}</div>
           <div class="field">
             <div class="field-label-row">
               <label>태그</label>
@@ -270,10 +270,14 @@
     document.body.appendChild(back);
     wireDateField(back.querySelector(".dfield"));
 
+    const nameField = back.querySelector("#areg-name-field");
     const nameInput = back.querySelector("#areg-name");
     const assetNoField = back.querySelector("#areg-assetno");
     const assetNoInput = back.querySelector("#areg-assetno-input");
     const assetNoErr = back.querySelector("[data-assetno-err]");
+    const expiryField = back.querySelector("#areg-expiry-field");
+    const dtext = back.querySelector("[data-dtext]");
+    const dnative = back.querySelector("[data-dnative]");
     const saveBtn = back.querySelector("#areg-save");
 
     // 고유관리번호는 QR 라벨 파일명의 식별키로 그대로 쓰여서, 파일명에 부적합한 문자가 섞이지 않도록 영문·숫자·하이픈·언더스코어만 허용
@@ -290,7 +294,62 @@
       const noOk = type === "quantity" ? true : (noVal.length > 0 && !dup);
       saveBtn.disabled = !(catValue && nameOk && noOk);
     }
-    nameInput.addEventListener("input", checkValid);
+    // 제품명 자동완성 — "소분류+제품명" 조합이 제품 단위라, 같은 소분류에 이미 등록된 제품명을 제안해서
+    // 띄어쓰기·표기 차이로 같은 제품이 여러 이름으로 쪼개지는 걸 막음. 태그와 달리 목록에 없는 새 이름도 항상 입력 가능(강제 선택 아님)
+    let prodMenu = null, prodHi = -1;
+    function closeProdMenu() { if (prodMenu) { prodMenu.remove(); prodMenu = null; } prodHi = -1; }
+    function productOptions() {
+      if (!catValue) return [];
+      const cat = findCat(catValue);
+      const q = nameInput.value.trim().toLowerCase();
+      if (!cat || !q) return [];
+      const names = [...new Set((window.DATA.assets || [])
+        .filter(a => a.group === cat.group && a.sub === cat.sub)
+        .map(a => a.product).filter(Boolean))];
+      return names.filter(n => n.toLowerCase().includes(q));
+    }
+    function openProdMenu() {
+      const opts = productOptions();
+      closeProdMenu();
+      if (!opts.length) return;
+      prodMenu = document.createElement("div");
+      prodMenu.className = "dropdown-menu";
+      prodHi = 0;
+      prodMenu.innerHTML = opts.map((n, i) => `<button type="button" data-v="${n}" class="${i === 0 ? "active" : ""}">${n}</button>`).join("");
+      const r = nameInput.getBoundingClientRect();
+      prodMenu.style.cssText = `position:fixed;top:${r.bottom + 4}px;left:${r.left}px;min-width:${r.width}px`;
+      document.body.appendChild(prodMenu);
+      prodMenu.querySelectorAll("[data-v]").forEach(b => b.onclick = () => {
+        nameInput.value = b.dataset.v;
+        closeProdMenu();
+        checkValid();
+      });
+    }
+    function moveProdHi(delta) {
+      if (!prodMenu) return;
+      const btns = [...prodMenu.querySelectorAll("button")];
+      if (!btns.length) return;
+      if (btns[prodHi]) btns[prodHi].classList.remove("active");
+      prodHi = Math.max(0, Math.min(btns.length - 1, prodHi + delta));
+      btns[prodHi].classList.add("active");
+      btns[prodHi].scrollIntoView({ block: "nearest" });
+    }
+    nameInput.addEventListener("input", () => { checkValid(); openProdMenu(); });
+    nameInput.addEventListener("focus", () => { if (!nameInput.disabled) openProdMenu(); });
+    nameInput.addEventListener("keydown", e => {
+      if (!prodMenu) return;
+      if (e.key === "ArrowDown") { e.preventDefault(); moveProdHi(1); }
+      else if (e.key === "ArrowUp") { e.preventDefault(); moveProdHi(-1); }
+      else if (e.key === "Enter") {
+        e.preventDefault();
+        const btns = [...prodMenu.querySelectorAll("button")];
+        const b = btns[prodHi];
+        if (b) { nameInput.value = b.dataset.v; closeProdMenu(); checkValid(); }
+      } else if (e.key === "Escape") { closeProdMenu(); }
+    });
+    document.addEventListener("click", e => {
+      if (prodMenu && !prodMenu.contains(e.target) && e.target !== nameInput) closeProdMenu();
+    });
     assetNoInput.addEventListener("input", () => {
       // value를 그냥 덮어쓰면 커서가 항상 맨 끝으로 튀어서, 중간에 타이핑하다 막힌 것처럼 느껴짐 —
       // 제거된 글자 수만큼 커서 위치를 보정해서 원래 있던 자리에 그대로 남게 함
@@ -328,12 +387,23 @@
       assetNoInput.value = "";
       assetNoErr.hidden = true;
       assetNoInput.classList.remove("has-err");
-      const dtext = back.querySelector("[data-dtext]");
-      const dnative = back.querySelector("[data-dnative]");
-      if (dtext) dtext.value = "";
-      if (dnative) dnative.value = "";
+      dtext.value = "";
+      dnative.value = "";
       tags.length = 0;
       renderChips();
+    }
+    // 소분류를 아직 안 골랐으면 나머지 필드는 채워봐야 소용없으니(어차피 소분류 바뀌면 초기화됨) 비활성화 —
+    // hover 시 이유를 안내(data-tip). [태그 관리]는 이 자산과 무관한 전역 기능이라 잠그지 않음
+    const LOCK_TIP = "소분류를 먼저 선택해주세요";
+    function setLocked(locked) {
+      [nameInput, assetNoInput, dtext, dnative, tagInput].forEach(el => { el.disabled = locked; });
+      [nameField, assetNoField, expiryField].forEach(el => {
+        el.classList.toggle("lock-hint", locked);
+        if (locked) el.setAttribute("data-tip", LOCK_TIP); else el.removeAttribute("data-tip");
+      });
+      tagWrap.classList.toggle("is-locked", locked);
+      tagWrap.classList.toggle("lock-hint", locked);
+      if (locked) tagWrap.setAttribute("data-tip", LOCK_TIP); else tagWrap.removeAttribute("data-tip");
     }
     function selectCat(v) {
       const changed = v !== catValue;
@@ -343,6 +413,7 @@
       renderCatDisplay();
       updateCatClear();
       applyAssetNoVisibility();
+      setLocked(!catValue);
       if (changed) resetOtherFields();
       checkValid();
     }
@@ -357,12 +428,13 @@
       renderCatDisplay();
       updateCatClear();
       applyAssetNoVisibility();
+      setLocked(true);
       if (changed) resetOtherFields();
       checkValid();
     };
 
-    // 소분류 초기값 반영은 태그 위젯(renderChips 등)까지 다 준비된 뒤로 미룸 — preselectValue가 있으면
-    // selectCat()이 resetOtherFields() 경유로 renderChips()를 곧바로 호출하는데, 그게 아직 선언되기 전(TDZ)이면 에러
+    // 소분류 초기값 반영(과 그에 딸린 setLocked/resetOtherFields 호출)은 태그 위젯(renderChips 등)까지
+    // 다 준비된 뒤로 미룸 — 그 전에 부르면 아직 선언되기 전(TDZ)인 tagInput/chipsEl을 참조해서 에러
     renderCatDisplay();
     applyAssetNoVisibility();
 
@@ -439,6 +511,7 @@
     renderChips();
     checkValid();
     if (preselectValue) selectCat(preselectValue);
+    else setLocked(true);
 
     back.querySelector("#areg-tag-manage").onclick = () => {
       closeMenu();
