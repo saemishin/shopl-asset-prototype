@@ -361,13 +361,14 @@
       <div class="subtabs">
         ${[["all","전체"],["product","제품별"],["employee","구성원별"],["worksite","근무지별"]]
           .map(([k,t]) => `<button data-view="${k}" class="${state.view===k?'active':''}">${t}</button>`).join("")}
+        ${state.view === "all" ? `
         <div class="sub-actions">
           <button class="btn primary sm" id="btn-add">＋ 자산 추가 <span class="chev">▾</span></button>
           <button class="btn sm" id="btn-bulk">일괄 작업 <span class="chev">▾</span></button>
-        </div>
+        </div>` : ""}
       </div>
 
-      ${statsHtml()}
+      ${state.view === "all" ? statsHtml() : ""}
 
       <div class="countrow">
         <span class="total">전체 <b>${v.count}</b></span>
@@ -445,13 +446,16 @@
     });
 
     document.getElementById("btn-filter").onclick = openFilterModal;
-    document.getElementById("btn-add").onclick = () => window.openAssetAddModal();
     document.getElementById("btn-qr-dl").onclick = openQrDownloadModal;
     document.getElementById("btn-list-dl").onclick = downloadAssetList;
-    document.getElementById("btn-bulk").onclick = e => dropdown(e.currentTarget, [
-      { label: "일괄 자산 추가", fn: () => location.href = "batch-register.html" },
-      { label: "일괄 배정·보유 변경", fn: () => location.href = "batch-assign.html" },
-    ]);
+    // 자산 추가/일괄 작업은 개별 유닛(고유관리번호) 단위 액션이라 전체 탭에서만 제공 — 제품별 등은 자산을 다른 관점으로 묶어보는 조회 화면
+    if (state.view === "all") {
+      document.getElementById("btn-add").onclick = () => window.openAssetAddModal();
+      document.getElementById("btn-bulk").onclick = e => dropdown(e.currentTarget, [
+        { label: "일괄 자산 추가", fn: () => location.href = "batch-register.html" },
+        { label: "일괄 배정·보유 변경", fn: () => location.href = "batch-assign.html" },
+      ]);
+    }
   }
 
   // 배정·보유 현황을 엑셀용 순수 텍스트로 — holderText()와 동일한 정렬 기준(개별=배정일 최신순, 수량=이름 가나다순)
