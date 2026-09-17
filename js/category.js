@@ -1,4 +1,4 @@
-/* 분류 관리 — 분류-1 메인 화면. 좌측 트리(대분류는 그룹 헤더, 소분류만 선택 가능) + 우측(선택된 소분류 정보 + 자산 목록) */
+/* 분류 관리 — 분류-1 메인 화면. 좌측 트리(대분류는 그룹 헤더, 소분류만 선택 가능) + 우측(선택된 소분류 정보 + 제품 목록) */
 (function () {
   const { categories, assets } = window.DATA;
 
@@ -229,14 +229,14 @@
       const total = products.reduce((s, p) => s + p.total, 0);
       return `
         <div class="cat-asset-head">
-          <h4>자산 목록</h4>
+          <h4>제품 목록</h4>
           <p class="cat-asset-count">전체 ${total}</p>
         </div>
         ${products.length ? `
           ${ASSET_SEARCH_HTML}
           <div class="table-wrap">
             <table class="cat-asset-table">
-              <thead><tr><th>제품명</th><th class="num">전체</th><th class="num">배정 중</th><th class="num">재고</th><th class="num">기타</th></tr></thead>
+              <thead><tr><th>제품명</th><th class="num">자산 수</th><th class="num">배정 중</th><th class="num">재고</th><th class="num">기타</th></tr></thead>
               <tbody>${products.map(productRowHtml).join("")}</tbody>
             </table>
           </div>
@@ -245,7 +245,7 @@
     const list = assetsOf(cat.group, cat.sub);
     return `
       <div class="cat-asset-head">
-        <h4>자산 목록</h4>
+        <h4>제품 목록</h4>
         <p class="cat-asset-count">전체 ${list.length}</p>
       </div>
       ${list.length ? `
