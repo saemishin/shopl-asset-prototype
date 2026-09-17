@@ -110,6 +110,8 @@
     pageSize: 20,
     sort: { key: "updatedAt", dir: "desc" },
     filters: { category: [], type: [], status: [], expiry: [], labels: [], note: [] },
+    // 품목별 탭 전용 — 개별 자산/수량 자산은 컬럼 구성·클릭 동작이 아예 달라서 한 테이블에 섞지 않고 토글로 구분
+    productType: "individual",
   };
   // 품목별 행 클릭 시 필요한 품목 그룹(품목명+자산 목록)을 렌더링 시점의 키로 찾기 위한 조회용 — view_product()가 매번 다시 채움
   let productGroupsByKey = new Map();
@@ -227,42 +229,67 @@
     return { head, rows, count: list.length };
   }
 
-  function view_product(list) {
+  function groupByProduct(list) {
     const map = new Map();
     list.forEach(a => {
       const key = a.sub + "|" + a.product;
       if (!map.has(key)) map.set(key, { product: a.product, group: a.group, sub: a.sub, type: a.type, list: [] });
       map.get(key).list.push(a);
     });
-    const head = `<tr><th>품목명</th>${thFilter("자산 유형", "type")}<th>분류</th><th class="num">자산 수</th>
-      <th class="num">배정 중</th><th class="num">재고</th><th class="num">수리 중</th><th class="num">분실</th><th class="num">폐기</th>
-      <th class="num">총 수량</th></tr>`;
     const groups = [...map.values()];
     // 최근 수정일시 정렬용 — 이 품목에 속한 유닛들의 updatedAt 중 최댓값을 그룹 자체의 값으로 둠
     groups.forEach(g => { g.updatedAt = g.list.reduce((max, a) => (a.updatedAt > max ? a.updatedAt : max), ""); });
+    return groups;
+  }
+
+  // 품목별 탭은 개별 자산/수량 자산 토글(state.productType)로 완전히 다른 테이블을 그림 — 컬럼 구성도, 행 클릭 동작(모달 vs 상세이동)도
+  // 유형마다 달라서 한 테이블에 섞으면 어색했던 걸(수량형 행이 상태 컬럼 전부 "—") 분리해서 해결. 두 테이블 다 분류 화면의 품목 목록 표와
+  // 동일한 컬럼 구성(+분류 컬럼만 추가 — 이 화면은 여러 소분류를 가로지르니 분류 표기가 필요)
+  function view_product(list) {
+    return state.productType === "quantity" ? view_product_quantity(list) : view_product_individual(list);
+  }
+
+  function view_product_individual(list) {
+    const head = `<tr><th>품목명</th><th>분류</th><th class="num">자산 수</th>
+      <th class="num">배정 중</th><th class="num">재고</th><th class="num">수리 중</th><th class="num">분실</th><th class="num">폐기</th></tr>`;
+    const groups = groupByProduct(list.filter(a => a.type === "individual"));
     const sorted = sortList(groups);
     const paged = pageSlice(sorted);
     productGroupsByKey = new Map(paged.map(g => [`${g.sub}|${g.product}`, g]));
     const rows = paged.map(g => {
       const counts = { assigned: 0, stock: 0, repair: 0, lost: 0, disposed: 0 };
-      let totalQty = "—";
-      if (g.type === "individual") {
-        g.list.forEach(a => { counts[a.status] = (counts[a.status] || 0) + 1; });
-      } else {
-        totalQty = g.list.reduce((s, a) => s + (a.stocks || []).reduce((t, x) => t + x.qty, 0), 0);
-      }
-      const statusCell = k => g.type === "individual" ? counts[k] : '<span class="muted">—</span>';
+      g.list.forEach(a => { counts[a.status] = (counts[a.status] || 0) + 1; });
       return `<tr class="clickable" data-pkey="${g.sub}|${g.product}">
         <td>${g.product}</td>
-        <td><span class="type-pill">${TYPE_LABEL[g.type]}</span></td>
         <td>${g.group} <span class="muted">›</span> ${g.sub}</td>
         <td class="num">${g.list.length}</td>
-        <td class="num">${statusCell("assigned")}</td>
-        <td class="num">${statusCell("stock")}</td>
-        <td class="num">${statusCell("repair")}</td>
-        <td class="num">${statusCell("lost")}</td>
-        <td class="num">${statusCell("disposed")}</td>
-        <td class="num">${totalQty}</td>
+        <td class="num">${counts.assigned}</td>
+        <td class="num">${counts.stock}</td>
+        <td class="num">${counts.repair}</td>
+        <td class="num">${counts.lost}</td>
+        <td class="num">${counts.disposed}</td>
+      </tr>`;
+    }).join("");
+    return { head, rows, count: groups.length };
+  }
+
+  function view_product_quantity(list) {
+    const head = `<tr><th>품목명</th><th>분류</th><th class="num">보유 수량</th><th class="num">보유 대상</th><th>유효기한</th></tr>`;
+    const groups = groupByProduct(list.filter(a => a.type === "quantity"));
+    const sorted = sortList(groups);
+    const paged = pageSlice(sorted);
+    productGroupsByKey = new Map(paged.map(g => [`${g.sub}|${g.product}`, g]));
+    const rows = paged.map(g => {
+      // 수량형은 품목=자산이 1:1이라 그룹의 유일한 원소를 그대로 표시(분류 화면 stockRowHtml과 동일 계산)
+      const a = g.list[0];
+      const qty = (a.stocks || []).reduce((s, x) => s + x.qty, 0);
+      const targets = (a.stocks || []).length;
+      return `<tr class="clickable" data-pkey="${g.sub}|${g.product}">
+        <td>${g.product}</td>
+        <td>${g.group} <span class="muted">›</span> ${g.sub}</td>
+        <td class="num">${qty}</td>
+        <td class="num">${targets}</td>
+        <td>${a.expiry ? window.fmtDate(a.expiry) : '<span class="muted">—</span>'}</td>
       </tr>`;
     }).join("");
     return { head, rows, count: groups.length };
@@ -380,8 +407,16 @@
     // 필터·검색 조건 때문에 0건인 것과 애초에 등록된 자산 자체가 없는 것을 구분
     const filtering = activeFilterCount() > 0 || !!state.search.trim();
     const emptyMsg = filtering ? "결과가 없습니다." : "등록된 자산이 없습니다.";
-    const empty = `<tr><td colspan="10" style="text-align:center;color:var(--text-mut);padding:32px">${emptyMsg}</td></tr>`;
-    return `<table class="tbl-${state.view}"><thead>${v.head}</thead><tbody>${v.rows || empty}</tbody></table>`;
+    const colspan = state.view === "product" ? (state.productType === "quantity" ? 5 : 8) : 10;
+    const empty = `<tr><td colspan="${colspan}" style="text-align:center;color:var(--text-mut);padding:32px">${emptyMsg}</td></tr>`;
+    const cls = state.view === "product" ? `tbl-product tbl-product-${state.productType}` : `tbl-${state.view}`;
+    return `<table class="${cls}"><thead>${v.head}</thead><tbody>${v.rows || empty}</tbody></table>`;
+  }
+  function typeToggleHtml() {
+    return `<div class="type-toggle">
+      <button data-ptype="individual" class="${state.productType === "individual" ? "active" : ""}">개별 자산</button>
+      <button data-ptype="quantity" class="${state.productType === "quantity" ? "active" : ""}">수량 자산</button>
+    </div>`;
   }
   function bindRows(scope) {
     scope.querySelectorAll("tbody tr.clickable").forEach(tr =>
@@ -411,6 +446,7 @@
       </div>
 
       ${state.view === "all" ? statsHtml() : ""}
+      ${state.view === "product" ? typeToggleHtml() : ""}
 
       <div class="countrow">
         <span class="total">전체 <b>${v.count}</b></span>
@@ -439,6 +475,7 @@
         state.view = b.dataset.view;
         state.page = 1;
         state.filters = emptyFilters();
+        state.productType = "individual";
         // 이 뷰에서 안 쓰는 정렬 기준으로 넘어가는 경우(예: 전체>유효기한 정렬 중 품목별로 이동)를 대비해
         // 현재 정렬 기준이 새 뷰에 없으면 그 뷰의 기본 기준으로 리셋
         const fields = sortFieldsFor(state.view);
@@ -446,6 +483,11 @@
         render();
       });
     bindRows(c);
+    c.querySelectorAll("[data-ptype]").forEach(b => b.onclick = () => {
+      state.productType = b.dataset.ptype;
+      state.page = 1;
+      render();
+    });
     // 품목별 행 클릭 — 개별형은 분류 화면과 동일한 공용 자산 목록 모달, 수량형은 품목=자산이 1:1이라 중간 목록 없이 바로 상세로
     c.querySelectorAll("tbody tr[data-pkey]").forEach(tr => tr.onclick = () => {
       const g = productGroupsByKey.get(tr.dataset.pkey);
