@@ -403,7 +403,9 @@ th.c, td.c { text-align: center; width: 52px; }
 .usebullet.on { border-color: var(--primary); color: var(--primary); }
 .cat-asset-head { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); margin-bottom: 10px; }
 .cat-asset-head h4 { font-size: 13px; font-weight: 700; }
-.cat-asset-count { font-size: 12px; color: var(--text-mut); margin-top: 4px; }
+.cat-asset-countrow { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.cat-asset-count { font-size: 12px; color: var(--text-mut); }
+.cat-asset-countrow .cat-asset-search { margin-left: auto; margin-bottom: 0; }
 /* 이 패널 폭에 비해 기본 table의 min-width(880px)가 과해서 컬럼 배치가 틀어짐 — fixed 레이아웃으로 폭 전체를 컬럼별 비율대로 분배 */
 .cat-asset-table { min-width: 0; table-layout: fixed; }
 .cat-asset-table th:first-child, .cat-asset-table td:first-child { width: 34%; }

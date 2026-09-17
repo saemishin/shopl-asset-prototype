@@ -230,10 +230,12 @@
       return `
         <div class="cat-asset-head">
           <h4>제품 목록</h4>
+        </div>
+        <div class="cat-asset-countrow">
           <p class="cat-asset-count">전체 ${total}</p>
+          ${products.length ? ASSET_SEARCH_HTML : ""}
         </div>
         ${products.length ? `
-          ${ASSET_SEARCH_HTML}
           <div class="table-wrap">
             <table class="cat-asset-table">
               <thead><tr><th>제품명</th><th class="num">자산 수</th><th class="num">배정 중</th><th class="num">재고</th><th class="num">기타</th></tr></thead>
@@ -246,10 +248,12 @@
     return `
       <div class="cat-asset-head">
         <h4>제품 목록</h4>
+      </div>
+      <div class="cat-asset-countrow">
         <p class="cat-asset-count">전체 ${list.length}</p>
+        ${list.length ? ASSET_SEARCH_HTML : ""}
       </div>
       ${list.length ? `
-        ${ASSET_SEARCH_HTML}
         <div class="table-wrap">
           <table class="cat-asset-table">
             <thead><tr><th>제품명</th><th class="num">보유 수량</th><th class="num">보유 대상</th><th>유효기한</th></tr></thead>
