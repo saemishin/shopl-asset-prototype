@@ -339,7 +339,10 @@
   }
 
   function tableInner(v) {
-    const empty = `<tr><td colspan="10" style="text-align:center;color:var(--text-mut);padding:32px">조건에 맞는 자산이 없습니다</td></tr>`;
+    // 필터·검색 조건 때문에 0건인 것과 애초에 등록된 자산 자체가 없는 것을 구분
+    const filtering = activeFilterCount() > 0 || !!state.search.trim();
+    const emptyMsg = filtering ? "결과가 없습니다." : "등록된 자산이 없습니다.";
+    const empty = `<tr><td colspan="10" style="text-align:center;color:var(--text-mut);padding:32px">${emptyMsg}</td></tr>`;
     return `<table class="tbl-${state.view}"><thead>${v.head}</thead><tbody>${v.rows || empty}</tbody></table>`;
   }
   function bindRows(scope) {
@@ -393,7 +396,7 @@
     `;
 
     c.querySelectorAll(".subtabs button").forEach(b =>
-      b.onclick = () => { state.view = b.dataset.view; state.page = 1; render(); });
+      b.onclick = () => { state.view = b.dataset.view; state.page = 1; state.filters = emptyFilters(); render(); });
     bindRows(c);
     c.querySelectorAll("[data-stub]").forEach(el =>
       el.onclick = () => toast(`"${el.dataset.stub}" — 이후 단계에서 정의`));
