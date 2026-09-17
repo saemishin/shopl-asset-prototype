@@ -111,6 +111,8 @@
     sort: { key: "updatedAt", dir: "desc" },
     filters: { category: [], type: [], status: [], expiry: [], labels: [], note: [] },
   };
+  // 품목별 행 클릭 시 필요한 품목 그룹(품목명+자산 목록)을 렌더링 시점의 키로 찾기 위한 조회용 — view_product()가 매번 다시 채움
+  let productGroupsByKey = new Map();
   function sortList(list) {
     const { key, dir } = state.sort;
     const mul = dir === "asc" ? 1 : -1;
@@ -239,7 +241,9 @@
     // 최근 수정일시 정렬용 — 이 품목에 속한 유닛들의 updatedAt 중 최댓값을 그룹 자체의 값으로 둠
     groups.forEach(g => { g.updatedAt = g.list.reduce((max, a) => (a.updatedAt > max ? a.updatedAt : max), ""); });
     const sorted = sortList(groups);
-    const rows = pageSlice(sorted).map(g => {
+    const paged = pageSlice(sorted);
+    productGroupsByKey = new Map(paged.map(g => [`${g.sub}|${g.product}`, g]));
+    const rows = paged.map(g => {
       const counts = { assigned: 0, stock: 0, repair: 0, lost: 0, disposed: 0 };
       let totalQty = "—";
       if (g.type === "individual") {
@@ -248,7 +252,7 @@
         totalQty = g.list.reduce((s, a) => s + (a.stocks || []).reduce((t, x) => t + x.qty, 0), 0);
       }
       const statusCell = k => g.type === "individual" ? counts[k] : '<span class="muted">—</span>';
-      return `<tr>
+      return `<tr class="clickable" data-pkey="${g.sub}|${g.product}">
         <td>${g.product}</td>
         <td><span class="type-pill">${TYPE_LABEL[g.type]}</span></td>
         <td>${g.group} <span class="muted">›</span> ${g.sub}</td>
@@ -442,6 +446,13 @@
         render();
       });
     bindRows(c);
+    // 품목별 행 클릭 — 개별형은 분류 화면과 동일한 공용 자산 목록 모달, 수량형은 품목=자산이 1:1이라 중간 목록 없이 바로 상세로
+    c.querySelectorAll("tbody tr[data-pkey]").forEach(tr => tr.onclick = () => {
+      const g = productGroupsByKey.get(tr.dataset.pkey);
+      if (!g) return;
+      if (g.type === "individual") window.openProductUnitsModal(g.product, g.list);
+      else location.href = `asset-detail.html?id=${g.list[0].id}`;
+    });
     c.querySelectorAll("[data-stub]").forEach(el =>
       el.onclick = () => toast(`"${el.dataset.stub}" — 이후 단계에서 정의`));
 

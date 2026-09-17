@@ -428,6 +428,7 @@ th.c, td.c { text-align: center; width: 52px; }
 .cat-asset-search { margin-bottom: 10px; }
 .cat-asset-empty { padding: 12px 0; }
 .cat-asset-empty p { margin: 0 0 10px; }
+.cat-unit-product { font-size: 15px; font-weight: 700; }
 .cat-unit-list { display: flex; flex-direction: column; gap: 2px; max-height: 50vh; overflow-y: auto; }
 .cat-unit-row {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;

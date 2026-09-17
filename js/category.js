@@ -69,7 +69,6 @@
     for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) % 997;
     return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length];
   }
-  const STATUS_LABEL = { stock: "재고", assigned: "배정 중", repair: "수리 중", lost: "분실", disposed: "폐기" };
   // 구조설계안 3.3: 필드 노출 설정 대상은 S/N·IMEI·구매일·구매가격·제조연월일·유효기한 6개(IMEI·S/N은 개별형 전용) — 기본값: IMEI·유효기한 off, 나머지 on
   const FIELD_LABEL = { serial: "S/N", imei: "IMEI", purchaseDate: "구매일", purchasePrice: "구매가격", manufactured: "제조연월일", expiry: "유효기한" };
   const DEFAULT_HIDDEN_FIELDS = { individual: ["imei", "expiry"], quantity: ["expiry"] };
@@ -155,32 +154,6 @@
         <td class="num">${p.lost}</td>
         <td class="num">${p.disposed}</td>
       </tr>`;
-  }
-
-  // 개별 자산 품목 행 클릭 시 S/N 단위 목록을 모달로 — 대시보드 테이블엔 행 확장 구조가 없어서 모달로 전환.
-  // 모달 내 한 줄을 누르면 그 자산의 상세 페이지를 새 탭으로 엶(target=_blank)
-  function openProductUnitsModal(p) {
-    const m = document.createElement("div");
-    m.className = "modal-back";
-    m.innerHTML = `
-      <div class="modal help-modal">
-        <div class="help-modal-head">
-          <h3>${p.product}</h3>
-          <button type="button" class="btn icon-only sm" data-close aria-label="닫기">${CLOSE_ICON}</button>
-        </div>
-        <div class="body">
-          <div class="cat-unit-list">
-            ${p.items.map(a => `
-              <a class="cat-unit-row" href="asset-detail.html?id=${a.id}" target="_blank" rel="noopener">
-                <span class="cat-unit-no">${a.assetNo || "—"}</span>
-                <span class="badge ${a.status}">${STATUS_LABEL[a.status]}</span>
-              </a>`).join("")}
-          </div>
-        </div>
-      </div>`;
-    document.body.appendChild(m);
-    m.addEventListener("click", e => { if (e.target === m) m.remove(); });
-    m.querySelector("[data-close]").onclick = () => m.remove();
   }
 
   function stockRowHtml(a) {
@@ -1110,7 +1083,7 @@
   function wireAssetSection(c, cat) {
     c.querySelectorAll(".cat-prod-row").forEach(row => row.onclick = () => {
       const p = productsOf(cat.group, cat.sub).find(x => x.product === row.dataset.product);
-      if (p) openProductUnitsModal(p);
+      if (p) window.openProductUnitsModal(p.product, p.items);
     });
     c.querySelectorAll("[data-asset]").forEach(row => row.onclick = e => {
       e.stopPropagation();
