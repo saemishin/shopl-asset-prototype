@@ -361,8 +361,10 @@
       checkValid();
     };
 
-    if (preselectValue) selectCat(preselectValue);
-    else { renderCatDisplay(); applyAssetNoVisibility(); }
+    // 소분류 초기값 반영은 태그 위젯(renderChips 등)까지 다 준비된 뒤로 미룸 — preselectValue가 있으면
+    // selectCat()이 resetOtherFields() 경유로 renderChips()를 곧바로 호출하는데, 그게 아직 선언되기 전(TDZ)이면 에러
+    renderCatDisplay();
+    applyAssetNoVisibility();
 
     // 태그 입력 위젯 — 마스터 목록(window.DATA.tags)에서 검색해 선택만 가능(즉석 생성 없음). 새 태그는 [태그 관리]에서만 추가
     const tagWrap = back.querySelector("#areg-tagwrap");
@@ -436,6 +438,7 @@
     });
     renderChips();
     checkValid();
+    if (preselectValue) selectCat(preselectValue);
 
     back.querySelector("#areg-tag-manage").onclick = () => {
       closeMenu();
