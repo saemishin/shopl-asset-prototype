@@ -380,7 +380,7 @@
               placeholder="${state.search ? '고유관리번호 / 제품명' : '검색'}" value="${state.search.replace(/"/g, '&quot;')}">
             <button class="search-clear" id="search-clear" type="button" aria-label="검색어 지우기">✕</button>
           </div>
-          <button class="btn sm" id="btn-qr-dl">▦ QR 다운로드</button>
+          ${state.view === "all" ? '<button class="btn sm" id="btn-qr-dl">▦ QR 다운로드</button>' : ""}
           <button class="btn sm" id="btn-list-dl">⬇ 다운로드</button>
         </div>
       </div>
@@ -446,16 +446,20 @@
     });
 
     document.getElementById("btn-filter").onclick = openFilterModal;
-    document.getElementById("btn-qr-dl").onclick = openQrDownloadModal;
-    document.getElementById("btn-list-dl").onclick = downloadAssetList;
-    // 자산 추가/일괄 작업은 개별 유닛(고유관리번호) 단위 액션이라 전체 탭에서만 제공 — 제품별 등은 자산을 다른 관점으로 묶어보는 조회 화면
+    // QR 다운로드도 개별 유닛(고유관리번호) 단위 액션이라 전체 탭에서만 제공 — 자산 추가/일괄 작업과 동일한 이유
     if (state.view === "all") {
+      document.getElementById("btn-qr-dl").onclick = openQrDownloadModal;
       document.getElementById("btn-add").onclick = () => window.openAssetAddModal();
       document.getElementById("btn-bulk").onclick = e => dropdown(e.currentTarget, [
         { label: "일괄 자산 추가", fn: () => location.href = "batch-register.html" },
         { label: "일괄 배정·보유 변경", fn: () => location.href = "batch-assign.html" },
       ]);
     }
+    // 엑셀 다운로드는 4개 뷰 전부 버튼은 노출 — 전체 탭은 실제 동작, 나머지는 뷰별 컬럼 양식이
+    // 아직 정의되지 않아 전체 탭 컬럼을 그대로 내보내면 화면과 다른 게 다운로드되므로 자리만 잡아둠
+    document.getElementById("btn-list-dl").onclick = state.view === "all"
+      ? downloadAssetList
+      : () => toast(`"다운로드" — 이후 단계에서 정의`);
   }
 
   // 배정·보유 현황을 엑셀용 순수 텍스트로 — holderText()와 동일한 정렬 기준(개별=배정일 최신순, 수량=이름 가나다순)
