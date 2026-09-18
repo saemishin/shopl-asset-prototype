@@ -163,6 +163,9 @@
   };
   // 품목별 행 클릭 시 필요한 품목 그룹(품목명+자산 목록)을 렌더링 시점의 키로 찾기 위한 조회용 — view_product()가 매번 다시 채움
   let productGroupsByKey = new Map();
+  // 구성원별·근무지별 행 클릭 시 필요한 조회용 — 위와 동일한 패턴(view_employee()/view_worksite()가 매번 다시 채움)
+  let memberRowsByName = new Map();
+  let worksiteRowsByName = new Map();
   function sortList(list) {
     const { key, dir } = state.sort;
     const mul = dir === "asc" ? 1 : -1;
@@ -359,6 +362,54 @@
     return `<span class="chip-row">${shown}${rest}</span>`;
   }
 
+  // 구성원별·근무지별 행 클릭 — 배정된 자산 전체 목록. 품목 모달(product-units-modal.js)과 시각 언어는
+  // 같지만 그룹 기준이 다름: 거기는 상태(고정 5종)라 5열 그리드가 맞았고, 여기는 소분류(사람/장소마다
+  // 1~8개로 가변적)라 세로 섹션 리스트가 더 자연스러움. 개별형은 고유관리번호+상태뱃지, 수량형은 품목명+수량.
+  function openAssignedAssetsModal(subtitle, items) {
+    const CLOSE_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg>`;
+    const bySub = new Map();
+    items.forEach(x => { if (!bySub.has(x.sub)) bySub.set(x.sub, []); bySub.get(x.sub).push(x); });
+    // 요약 칩과 동일한 순서(많은 소분류부터)로 섹션을 배치해 컬럼-모달 간 일관성 유지
+    const groups = [...bySub.entries()].sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0], "ko"));
+    groups.forEach(([, list]) => list.sort((p, q) => {
+      const pk = p.asset.type === "individual" ? (p.asset.assetNo || "") : p.asset.product;
+      const qk = q.asset.type === "individual" ? (q.asset.assetNo || "") : q.asset.product;
+      return pk.localeCompare(qk, "ko");
+    }));
+
+    function rowHtml(x) {
+      const a = x.asset;
+      if (a.type === "individual") {
+        return `<a class="assign-row" href="asset-detail.html?id=${a.id}" target="_blank" rel="noopener">
+          <span>${a.assetNo || "—"}</span>
+          <span class="badge ${STATUS_LABEL[a.status][1]}">${STATUS_LABEL[a.status][0]}</span>
+        </a>`;
+      }
+      return `<a class="assign-row" href="asset-detail.html?id=${a.id}" target="_blank" rel="noopener">
+        <span>${a.product}</span>
+        <span class="muted">${x.qty}개</span>
+      </a>`;
+    }
+
+    const groupsHtml = groups.map(([sub, list]) => `
+      <div class="assign-group">
+        <p class="assign-group-label">${sub} <span class="muted">${list.length}</span></p>
+        ${list.map(rowHtml).join("")}
+      </div>`).join("");
+
+    modal(`
+      <div class="modal help-modal">
+        <div class="help-modal-head">
+          <h3>배정된 자산</h3>
+          <button type="button" class="btn icon-only sm" data-close aria-label="닫기">${CLOSE_ICON}</button>
+        </div>
+        <div class="body">
+          <p class="cat-unit-product">${subtitle}</p>
+          <div>${groupsHtml}</div>
+        </div>
+      </div>`);
+  }
+
   function view_employee(list) {
     const map = new Map();
     list.forEach(a => {
@@ -366,13 +417,13 @@
         (a.assignments || []).forEach(x => {
           if (!x.employee) return;
           if (!map.has(x.employee)) map.set(x.employee, { name: x.employee, empNo: (MEMBER_INFO[x.employee] || {}).empNo || "", items: [] });
-          map.get(x.employee).items.push({ sub: a.sub, qty: 1 });
+          map.get(x.employee).items.push({ sub: a.sub, qty: 1, asset: a });
         });
       } else {
         (a.stocks || []).forEach(x => {
           if (!x.employee) return;
           if (!map.has(x.employee)) map.set(x.employee, { name: x.employee, empNo: (MEMBER_INFO[x.employee] || {}).empNo || "", items: [] });
-          map.get(x.employee).items.push({ sub: a.sub, qty: x.qty });
+          map.get(x.employee).items.push({ sub: a.sub, qty: x.qty, asset: a });
         });
       }
     });
@@ -384,9 +435,11 @@
       return r.name.toLowerCase().includes(q) || (info.empNo || "").toLowerCase().includes(q) || (info.phone || "").includes(q);
     });
     const sorted = sortList(rowsArr);
-    const rows = pageSlice(sorted).map(r => {
+    const paged = pageSlice(sorted);
+    memberRowsByName = new Map(paged.map(r => [r.name, r]));
+    const rows = paged.map(r => {
       const info = MEMBER_INFO[r.name] || {};
-      return `<tr>
+      return `<tr class="clickable" data-mkey="${r.name}">
         <td><div class="acard-id">${memberIdentity(r.name)}</div></td>
         <td>${info.empNo || '<span class="muted">—</span>'}</td>
         <td>${info.phone || '<span class="muted">—</span>'}</td>
@@ -404,13 +457,13 @@
         (a.assignments || []).forEach(x => {
           if (!x.worksite) return;
           if (!map.has(x.worksite)) map.set(x.worksite, { name: x.worksite, code: WS_CODE[x.worksite] || "", items: [] });
-          map.get(x.worksite).items.push({ sub: a.sub, qty: 1 });
+          map.get(x.worksite).items.push({ sub: a.sub, qty: 1, asset: a });
         });
       } else {
         (a.stocks || []).forEach(x => {
           if (!x.worksite) return;
           if (!map.has(x.worksite)) map.set(x.worksite, { name: x.worksite, code: WS_CODE[x.worksite] || "", items: [] });
-          map.get(x.worksite).items.push({ sub: a.sub, qty: x.qty });
+          map.get(x.worksite).items.push({ sub: a.sub, qty: x.qty, asset: a });
         });
       }
     });
@@ -421,7 +474,9 @@
       return r.name.toLowerCase().includes(q) || r.code.toLowerCase().includes(q);
     });
     const sorted = sortList(rowsArr);
-    const rows = pageSlice(sorted).map(r => `<tr>
+    const paged = pageSlice(sorted);
+    worksiteRowsByName = new Map(paged.map(r => [r.name, r]));
+    const rows = paged.map(r => `<tr class="clickable" data-wkey="${r.name}">
       <td>${r.name}</td>
       <td>${r.code || '<span class="muted">—</span>'}</td>
       <td>${assetsSummaryCell(r.items)}</td>
@@ -599,6 +654,15 @@
       if (!g) return;
       if (g.type === "individual") window.openProductUnitsModal(g.product, g.list);
       else location.href = `asset-detail.html?id=${g.list[0].id}`;
+    });
+    // 구성원별·근무지별 행 클릭 — 배정된 자산 전체 목록 모달
+    c.querySelectorAll("tbody tr[data-mkey]").forEach(tr => tr.onclick = () => {
+      const r = memberRowsByName.get(tr.dataset.mkey);
+      if (r) openAssignedAssetsModal(r.name, r.items);
+    });
+    c.querySelectorAll("tbody tr[data-wkey]").forEach(tr => tr.onclick = () => {
+      const r = worksiteRowsByName.get(tr.dataset.wkey);
+      if (r) openAssignedAssetsModal(r.name, r.items);
     });
     c.querySelectorAll("[data-stub]").forEach(el =>
       el.onclick = () => toast(`"${el.dataset.stub}" — 이후 단계에서 정의`));
