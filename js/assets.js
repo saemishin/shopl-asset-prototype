@@ -1271,7 +1271,7 @@
       const rowsEl = m.querySelector("#qr-rows");
       rowsEl.innerHTML = pageItems.map(a => `<label class="picker-member-row">
         <input type="checkbox" data-id="${a.id}" ${sel.has(a.id) ? "checked" : ""}>
-        ${thumb(a)}
+        ${a.type === "quantity" ? thumb(a) : '<span class="thumb" style="visibility:hidden"></span>'}
         <span class="picker-member-info" style="flex:1">
           <b>${a.product}</b><span>${a.assetNo || "—"}</span>
         </span>
