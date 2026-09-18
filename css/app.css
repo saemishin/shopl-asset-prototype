@@ -520,6 +520,9 @@ button.usebullet { background: var(--panel); font: inherit; cursor: pointer; }
 .help-modal .body { display: flex; flex-direction: column; gap: 16px; font-size: 13px; line-height: 1.6; color: var(--text); }
 .help-modal .body b { display: block; margin-bottom: 4px; }
 .radio-row { display: flex; align-items: center; gap: 8px; padding: 9px 4px; font-size: 13px; cursor: pointer; }
+/* .field label{display:block}이 .radio-row(라디오도 <label>)보다 명시도가 높아서(0-1-1 > 0-1-0) .field 안에
+   놓이면 flex가 깨지고 간격도 사라졌음(배정 추가 모달에서 처음 발견) — .field 안에서도 이기도록 결합 선택자로 덮음 */
+.field .radio-row { display: flex; }
 .radio-row.is-disabled { opacity: .4; cursor: not-allowed; }
 .radio-row input { width: 16px; height: 16px; accent-color: var(--primary); flex-shrink: 0; }
 .cat-manage-fieldlist { display: flex; flex-direction: column; }
@@ -553,6 +556,20 @@ button.usebullet { background: var(--panel); font: inherit; cursor: pointer; }
 }
 .perm-target-clear svg { width: 13px; height: 13px; }
 .perm-target-clear:hover { background: #eef0f2; color: var(--text); }
+/* 배정 추가의 대상 선택 결과 — .perm-target-chips/.perm-target-clear(별도 박스 2개)와 달리 아바타+이름+해제(X)를
+   한 박스 안에 같이 담음(요청 반영) */
+.aa-target-selected {
+  width: 100%; min-height: 32px; display: flex; align-items: center; gap: 8px;
+  padding: 5px 6px 5px 10px; border: 1px solid var(--line-strong); border-radius: var(--radius);
+  background: var(--panel); cursor: pointer;
+}
+.aa-target-selected .perm-chip { flex: 1; min-width: 0; }
+.aa-target-x {
+  width: 24px; height: 24px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+  border-radius: 5px; color: var(--text-mut);
+}
+.aa-target-x svg { width: 12px; height: 12px; }
+.aa-target-x:hover { background: #eef0f2; color: var(--text); }
 .perm-info-note {
   display: flex; align-items: flex-start; gap: 8px; margin-top: 14px; padding: 12px 14px;
   background: #f6f7f8; border-radius: var(--radius); font-size: 12px; color: var(--text-sub); line-height: 1.5;
@@ -899,7 +916,9 @@ button.dthumb:hover { filter: brightness(0.94); }
   width: 16px; height: 16px; color: var(--text-mut); pointer-events: none;
 }
 .dfield-pick svg { width: 100%; height: 100%; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
-.dfield-pick input[type="date"] { position: absolute; inset: -6px; opacity: 0; cursor: pointer; pointer-events: auto; }
+/* 네이티브 date input은 inset만으로는 브라우저 자체 최소 크기(가로가 세로보다 작게 잡힘)가 우선돼서 클릭 판정
+   영역이 아이콘보다 좁고 한쪽으로 치우쳐 있었음(실측 22×34, 기대 28×28) — width/height를 명시로 강제 */
+.dfield-pick input[type="date"] { position: absolute; inset: -8px; width: 32px; height: 32px; opacity: 0; cursor: pointer; pointer-events: auto; }
 .qty-pop-acts { display: flex; justify-content: flex-end; gap: 6px; margin-top: 8px; }
 .btn:disabled { opacity: .45; pointer-events: none; }
 

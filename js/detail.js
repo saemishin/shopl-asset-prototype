@@ -30,11 +30,20 @@
   };
   const WS_CODE = { "강남점": "GN-01", "판교점": "PG-01", "본사": "HQ-01" };
   // 배정 추가 시 대상 후보 목록 — category.js의 MEMBERS와 동일 값(전사 인원 12명, 프로토타입 데모용)
+  // empNo·phone은 assets.js의 MEMBER_INFO와 동일 값(8명), 나머지 4명은 같은 형식으로 새로 시드
   const MEMBERS = [
-    { name: "김민수", team: "개발팀" }, { name: "이서연", team: "디자인팀" }, { name: "박지훈", team: "영업팀" },
-    { name: "정우성", team: "CS팀" }, { name: "김철수", team: "운영팀" }, { name: "최유진", team: "개발팀" },
-    { name: "한소희", team: "디자인팀" }, { name: "장민호", team: "국내영업" }, { name: "오세훈", team: "운영팀" },
-    { name: "배수지", team: "CS팀" }, { name: "윤재현", team: "해외영업" }, { name: "임하늘", team: "개발팀" },
+    { name: "김민수", team: "개발팀", empNo: "2021001", phone: "010-2001-1234" },
+    { name: "이서연", team: "디자인팀", empNo: "2021015", phone: "010-3412-5678" },
+    { name: "박지훈", team: "영업팀", empNo: "2020032", phone: "010-8823-9910" },
+    { name: "정우성", team: "CS팀", empNo: "2022041", phone: "010-5567-2231" },
+    { name: "김철수", team: "운영팀", empNo: "2019008", phone: "010-9012-4456" },
+    { name: "최유진", team: "개발팀", empNo: "2023019", phone: "010-6634-8821" },
+    { name: "한소희", team: "디자인팀", empNo: "2022055", phone: "010-4478-2093" },
+    { name: "장민호", team: "국내영업", empNo: "2020018", phone: "010-2345-6712" },
+    { name: "오세훈", team: "운영팀", empNo: "2018014", phone: "010-7712-3345" },
+    { name: "배수지", team: "CS팀", empNo: "2021028", phone: "010-3356-7789" },
+    { name: "윤재현", team: "해외영업", empNo: "2019033", phone: "010-4467-8890" },
+    { name: "임하늘", team: "개발팀", empNo: "2022009", phone: "010-5578-9901" },
   ];
   const CLOSE_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg>`;
   const AVATAR_COLORS = ["#5b8def", "#8f6ef0", "#eb7f8b", "#3fb37f", "#e0a63c", "#4dabf7"];
@@ -481,6 +490,7 @@
   function openAssignAddModal(a) {
     let picked = null; // "employee" | "worksite"
     const draftTarget = { employee: null, worksite: null };
+    let dateText = ""; // draw()가 매번 body를 다시 그려도 이미 입력한 배정일 텍스트가 안 날아가게 별도 보존
 
     const back = document.createElement("div");
     back.className = "modal-back";
@@ -497,14 +507,16 @@
     const body = back.querySelector("[data-body]");
     const saveBtn = back.querySelector("[data-save]");
 
+    // 선택 전엔 "선택 ›" 버튼, 선택 후엔 아바타+이름+해제(X)가 전부 한 박스 안에 같이 들어감(X만 따로 떨어진
+    // 박스였던 걸 병합) — 박스 자체(X 제외)를 클릭하면 재선택 팝업이 다시 열림
     function targetSummaryHtml(k) {
       const val = draftTarget[k];
       if (!val) return `<button type="button" class="perm-target-btn" data-target-open><span class="muted">선택</span><span class="chev">›</span></button>`;
       const avatar = k === "employee" ? `<span class="picker-avatar sm" style="background:${avatarColor(val)}">${val[0]}</span>` : "";
       return `
-        <div class="perm-target-row">
-          <button type="button" class="perm-target-chips" data-target-open>${avatar}<span class="perm-chip">${val}</span></button>
-          <button type="button" class="perm-target-clear" data-target-clear aria-label="선택 해제">${CLOSE_ICON}</button>
+        <div class="aa-target-selected" data-target-open>
+          ${avatar}<span class="perm-chip">${val}</span>
+          <button type="button" class="aa-target-x" data-target-clear aria-label="선택 해제">${CLOSE_ICON}</button>
         </div>`;
     }
 
@@ -522,6 +534,8 @@
           <label>배정일</label>
           ${dateFieldHtml("")}
         </div>`;
+      const dtext = body.querySelector("[data-dtext]");
+      if (dateText) dtext.value = dateText;
 
       body.querySelectorAll('input[name="aa-kind"]').forEach(r => r.onchange = () => { picked = r.value; draw(); });
       const openBtn = body.querySelector("[data-target-open]");
@@ -530,9 +544,9 @@
         else openAssignWorksitePicker(draftTarget.worksite, v => { draftTarget.worksite = v; draw(); });
       };
       const clearBtn = body.querySelector("[data-target-clear]");
-      if (clearBtn) clearBtn.onclick = () => { draftTarget[picked] = null; draw(); };
+      if (clearBtn) clearBtn.onclick = e => { e.stopPropagation(); draftTarget[picked] = null; draw(); };
 
-      getDate = wireDateField(body, todayStr(), updateSaveState);
+      getDate = wireDateField(body, todayStr(), () => { dateText = dtext.value; updateSaveState(); });
       updateSaveState();
     }
     function updateSaveState() {
@@ -548,20 +562,22 @@
       const record = picked === "employee"
         ? { employee: draftTarget.employee, worksite: null, since: d }
         : { employee: null, worksite: draftTarget.worksite, since: d };
-      back.remove();
+      // 배정 추가 모달은 그대로 띄워둔 채(뒤에 겹쳐 보이게) 확인 모달만 위에 띄움 — 확인 취소 시 다시 편집 가능해야 하므로
       confirmModal("배정을 추가하시겠습니까?", () => {
+        back.remove();
         (a.assignments || (a.assignments = [])).push(record);
         // 재고⟷배정중만 배정/반납으로 자동 파생(수리중·분실·폐기는 배정 여부와 무관하게 별도 관리 — 상태 변경 드롭다운 참조)
         if (a.status === "stock") a.status = "assigned";
         logActivity(a, { script: "신규 배정", target: record, before: "", after: window.fmtDate(d) });
-        toast("배정이 추가되었습니다.");
+        toast("추가되었습니다.");
         render();
       });
     };
   }
 
-  // 구성원 선택 — 단일 선택(라디오), 검색+목록 한 화면. category.js의 openMemberPicker(다중선택)와 달리
-  // 배정 대상은 정확히 1명이라 더 가벼운 단일 리스트로 구성. 2차 모달이라 .modal.sm(다른 모달 위에 겹쳐 뜸을 시각적으로 인지)
+  // 구성원 선택 — 단일 선택(라디오), 검색(이름/사번/휴대폰번호)+목록. category.js의 openMemberPicker(다중선택)와
+  // 달리 배정 대상은 정확히 1명이라 더 가벼운 단일 리스트로 구성. 2차 모달이라 .modal.sm(뒤 모달 가장자리가
+  // 보이게 해서 겹쳐 떠 있음을 인지시킴). 검색창은 고정, 목록만 스크롤(footer가 항상 보이게)
   function openAssignMemberPicker(initial, onApply) {
     let picked = initial;
     let query = "";
@@ -571,9 +587,9 @@
     p.innerHTML = `
       <div class="modal sm">
         <h3>구성원 선택</h3>
-        <div class="body">
-          <input type="text" class="picker-search" placeholder="검색">
-          <div data-list style="margin-top:8px"></div>
+        <div class="body" style="display:flex;flex-direction:column;max-height:56vh">
+          <input type="text" class="picker-search" placeholder="이름/사번/휴대폰번호">
+          <div data-list style="flex:1;min-height:0;overflow-y:auto;margin-top:8px"></div>
         </div>
         <div class="foot">
           <button class="btn" data-close>취소</button>
@@ -583,7 +599,8 @@
     document.body.appendChild(p);
     const list = p.querySelector("[data-list]");
     function renderList() {
-      const filtered = MEMBERS.filter(m => !query || m.name.includes(query));
+      const q = query.trim().toLowerCase();
+      const filtered = MEMBERS.filter(m => !q || m.name.includes(q) || m.empNo.includes(q) || m.phone.includes(q));
       list.innerHTML = filtered.length ? filtered.map(m => `
         <label class="picker-member-row">
           <input type="radio" name="aa-member" value="${m.name}"${picked === m.name ? " checked" : ""}>
@@ -599,17 +616,20 @@
     p.querySelector("[data-ok]").onclick = () => { p.remove(); onApply(picked); };
   }
 
-  // 근무지 선택 — 3곳뿐이라 검색 없이 단일 리스트만
+  // 근무지 선택 — 검색(근무지명/코드)+목록(대표 사진 없이 이름·코드만 — 구성원과 달리 프로필 사진이 의미가
+  // 약해서 뺌). 지금은 3곳뿐이라 검색 체감은 적지만 구성원 선택과 구조를 통일해둠
   function openAssignWorksitePicker(initial, onApply) {
     let picked = initial;
+    let query = "";
     const p = document.createElement("div");
     p.className = "modal-back";
     p.style.zIndex = 340;
     p.innerHTML = `
       <div class="modal sm">
         <h3>근무지 선택</h3>
-        <div class="body">
-          <div data-list></div>
+        <div class="body" style="display:flex;flex-direction:column;max-height:56vh">
+          <input type="text" class="picker-search" placeholder="근무지명/코드">
+          <div data-list style="flex:1;min-height:0;overflow-y:auto;margin-top:8px"></div>
         </div>
         <div class="foot">
           <button class="btn" data-close>취소</button>
@@ -618,13 +638,18 @@
       </div>`;
     document.body.appendChild(p);
     const list = p.querySelector("[data-list]");
-    list.innerHTML = Object.keys(WS_CODE).map(name => `
-      <label class="picker-member-row">
-        <input type="radio" name="aa-worksite" value="${name}"${picked === name ? " checked" : ""}>
-        <span class="acard-avatar ws" style="width:30px;height:30px">${AVATAR_WS_ICON}</span>
-        <span class="picker-member-info"><b>${name}</b><span>${WS_CODE[name]}</span></span>
-      </label>`).join("");
-    list.querySelectorAll('input[name="aa-worksite"]').forEach(r => r.onchange = () => { picked = r.value; });
+    function renderList() {
+      const q = query.trim().toLowerCase();
+      const filtered = Object.keys(WS_CODE).filter(name => !q || name.toLowerCase().includes(q) || WS_CODE[name].toLowerCase().includes(q));
+      list.innerHTML = filtered.length ? filtered.map(name => `
+        <label class="picker-member-row">
+          <input type="radio" name="aa-worksite" value="${name}"${picked === name ? " checked" : ""}>
+          <span class="picker-member-info"><b>${name}</b><span>${WS_CODE[name]}</span></span>
+        </label>`).join("") : `<p class="muted" style="padding:16px 0">결과가 없습니다.</p>`;
+      list.querySelectorAll('input[name="aa-worksite"]').forEach(r => r.onchange = () => { picked = r.value; });
+    }
+    p.querySelector(".picker-search").addEventListener("input", e => { query = e.target.value; renderList(); });
+    renderList();
     p.addEventListener("click", e => { if (e.target === p) p.remove(); });
     p.querySelector("[data-close]").onclick = () => p.remove();
     p.querySelector("[data-ok]").onclick = () => { p.remove(); onApply(picked); };
