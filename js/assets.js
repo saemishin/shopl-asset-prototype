@@ -330,15 +330,16 @@
 
   // 배정된 자산 요약 셀 — 개별/수량 구분 없이 합친 총 개수 + 소분류별 개수 내림차순(많은 것부터), labelsCell()과
   // 동일한 "앞 2개 + 나머지 N" 오버플로 패턴
+  // 소분류별 개수만 보여줌(총합 없음) — 개별형(유닛 1개=1)과 수량형(재고 수량)을 그냥 더하면 "옷 12벌+노트북 1대=13개"처럼
+  // 단위가 다른 값이 섞여 의미 없는 숫자가 되므로, 애초에 동질적인 소분류 단위로만 집계
   function assetsSummaryCell(items) {
     if (!items.length) return '<span class="muted">—</span>';
-    const total = items.reduce((s, x) => s + x.qty, 0);
     const bySub = new Map();
     items.forEach(x => bySub.set(x.sub, (bySub.get(x.sub) || 0) + x.qty));
     const sorted = [...bySub.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "ko"));
     const shown = sorted.slice(0, 2).map(([sub, n]) => `${sub} ${n}`).join(", ");
     const rest = sorted.length > 2 ? ` <span class="muted">+${sorted.length - 2}</span>` : "";
-    return `<b>${total}개</b> <span class="muted">${shown}</span>${rest}`;
+    return `${shown}${rest}`;
   }
 
   function view_employee(list) {

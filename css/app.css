@@ -309,6 +309,12 @@ tbody td:nth-child(4), thead th:nth-child(4) { white-space: nowrap; }
 .tbl-product-quantity th:nth-child(3), .tbl-product-quantity td:nth-child(3) { width: 14%; }
 .tbl-product-quantity th:nth-child(4), .tbl-product-quantity td:nth-child(4) { width: 14%; }
 .tbl-product-quantity th:nth-child(5), .tbl-product-quantity td:nth-child(5) { width: 26%; }
+/* 구성원별: 이름·사번·휴대폰번호는 짧은 고정값이라 좁게, 배정된 자산은 소분류별 개수 목록이 길어질 수 있어 넉넉하게 */
+.tbl-employee { table-layout: fixed; }
+.tbl-employee th:nth-child(1), .tbl-employee td:nth-child(1) { width: 22%; }
+.tbl-employee th:nth-child(2), .tbl-employee td:nth-child(2) { width: 14%; }
+.tbl-employee th:nth-child(3), .tbl-employee td:nth-child(3) { width: 16%; }
+.tbl-employee th:nth-child(4), .tbl-employee td:nth-child(4) { width: 48%; }
 /* 개별/수량 자산 구분 토글 — 참고 이미지(리스트/캘린더 세그먼트) 스타일: 옅은 트랙 위에 흰 알약(active) */
 /* 트랙 배경(--bg)이 페이지 배경과 완전히 같아서 비활성 상태에서 경계가 거의 안 보였음 — border 대신
    페이지 배경보다 한 단계 진한 --line 색으로 채워서 구분되게 함(테두리보다 자연스러움) */
