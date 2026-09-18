@@ -315,6 +315,11 @@ tbody td:nth-child(4), thead th:nth-child(4) { white-space: nowrap; }
 .tbl-employee th:nth-child(2), .tbl-employee td:nth-child(2) { width: 14%; }
 .tbl-employee th:nth-child(3), .tbl-employee td:nth-child(3) { width: 16%; }
 .tbl-employee th:nth-child(4), .tbl-employee td:nth-child(4) { width: 48%; }
+/* 근무지별: 구성원별과 동일한 구조(정체성 컬럼 + 배정된 자산), 정체성 컬럼이 2개뿐이라 배정된 자산에 더 많이 배분 */
+.tbl-worksite { table-layout: fixed; }
+.tbl-worksite th:nth-child(1), .tbl-worksite td:nth-child(1) { width: 22%; }
+.tbl-worksite th:nth-child(2), .tbl-worksite td:nth-child(2) { width: 16%; }
+.tbl-worksite th:nth-child(3), .tbl-worksite td:nth-child(3) { width: 62%; }
 /* 개별/수량 자산 구분 토글 — 참고 이미지(리스트/캘린더 세그먼트) 스타일: 옅은 트랙 위에 흰 알약(active) */
 /* 트랙 배경(--bg)이 페이지 배경과 완전히 같아서 비활성 상태에서 경계가 거의 안 보였음 — border 대신
    페이지 배경보다 한 단계 진한 --line 색으로 채워서 구분되게 함(테두리보다 자연스러움) */
@@ -358,6 +363,9 @@ th.c, td.c { text-align: center; width: 52px; }
   display: inline-flex; align-items: center; height: 20px; padding: 0 7px; border-radius: 5px;
   background: #f0f1f3; color: var(--text-sub); font-size: 11px; margin: 1px 3px 1px 0;
 }
+/* 구성원별·근무지별 "배정된 자산" 컬럼 — 소분류별 개수를 칩으로 나열, 셀 폭에 맞춰 줄바꿈 */
+.chip-row { display: flex; flex-wrap: wrap; gap: 4px; }
+.chip-row .chip { margin: 0; }
 .tag {
   display: inline-flex; align-items: center; height: 20px; padding: 0 7px; border-radius: 10px;
   background: #eef3ff; color: var(--primary); font-size: 11px; margin: 1px 3px 1px 0;

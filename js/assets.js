@@ -53,19 +53,34 @@
   const SORT_DESC_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 6v12M5 18l-3-3M5 18l3-3"/><path d="M11 7h10M11 12h7M11 17h4"/></svg>`;
   // 정렬 기준별 기본 방향: 날짜(등록일·유효기한)는 최신순(desc), 문자열(품목명·고유관리번호)은 가나다순(asc)
   const SORT_FIELDS = [
-    { k: "updatedAt", label: "최근 수정일시", defDir: "desc" },
+    { k: "updatedAt", label: "최근 변경일시", defDir: "desc" },
     { k: "assetNo", label: "고유 관리번호", defDir: "asc" },
     { k: "product", label: "품목명", defDir: "asc" },
     { k: "expiry", label: "유효기한", defDir: "desc" },
     { k: "createdAt", label: "자산 등록일", defDir: "desc" },
   ];
   // 품목별은 행이 자산(유닛)이 아니라 품목 단위라, 유닛에만 있는 값(고유관리번호·유효기한·등록일)은 정렬 기준에서 제외.
-  // 최근 수정일시는 그 품목에 속한 유닛들의 값 중 최댓값으로 파생(전체 탭과 기본 방향은 동일하게 맞춤)
+  // 최근 변경일시는 그 품목에 속한 유닛들의 값 중 최댓값으로 파생(전체 탭과 기본 방향은 동일하게 맞춤)
   const SORT_FIELDS_PRODUCT = [
-    { k: "updatedAt", label: "최근 수정일시", defDir: "desc" },
+    { k: "updatedAt", label: "최근 변경일시", defDir: "desc" },
     { k: "product", label: "품목명", defDir: "asc" },
   ];
-  function sortFieldsFor(view) { return view === "product" ? SORT_FIELDS_PRODUCT : SORT_FIELDS; }
+  // 구성원별·근무지별은 자산이 아니라 사람/장소 단위 행이라 "최근 변경일시" 같은 자산 이벤트 파생값은 개념이
+  // 헷갈릴 수 있어 제외 — 이미 컬럼으로 노출된 정체성 값(이름/사번, 근무지명/코드)만 정렬 기준으로 제공
+  const SORT_FIELDS_MEMBER = [
+    { k: "name", label: "이름", defDir: "asc" },
+    { k: "empNo", label: "사번", defDir: "asc" },
+  ];
+  const SORT_FIELDS_WORKSITE = [
+    { k: "name", label: "근무지명", defDir: "asc" },
+    { k: "code", label: "근무지 코드", defDir: "asc" },
+  ];
+  function sortFieldsFor(view) {
+    if (view === "product") return SORT_FIELDS_PRODUCT;
+    if (view === "employee") return SORT_FIELDS_MEMBER;
+    if (view === "worksite") return SORT_FIELDS_WORKSITE;
+    return SORT_FIELDS;
+  }
 
   function expiryKey(d) {
     if (!d) return "none";
@@ -158,7 +173,7 @@
       if (!va && !vb) return 0;
       if (!va) return 1;
       if (!vb) return -1;
-      if (key === "product" || key === "assetNo") return va.localeCompare(vb, "ko") * mul;
+      if (key === "product" || key === "assetNo" || key === "name" || key === "empNo" || key === "code") return va.localeCompare(vb, "ko") * mul;
       return (va < vb ? -1 : va > vb ? 1 : 0) * mul;
     });
   }
@@ -332,14 +347,16 @@
   // 동일한 "앞 2개 + 나머지 N" 오버플로 패턴
   // 소분류별 개수만 보여줌(총합 없음) — 개별형(유닛 1개=1)과 수량형(재고 수량)을 그냥 더하면 "옷 12벌+노트북 1대=13개"처럼
   // 단위가 다른 값이 섞여 의미 없는 숫자가 되므로, 애초에 동질적인 소분류 단위로만 집계
+  // 소분류별 개수를 칩(박스) 하나에 "소분류명 개수"로 같이 담아 나열 — 5개 넘으면 나머지는 동일한 칩 형태의 "+N"으로 축약
+  // (셀 너비가 넉넉해도 무한정 늘어나지 않도록 상한)
   function assetsSummaryCell(items) {
     if (!items.length) return '<span class="muted">—</span>';
     const bySub = new Map();
     items.forEach(x => bySub.set(x.sub, (bySub.get(x.sub) || 0) + x.qty));
     const sorted = [...bySub.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "ko"));
-    const shown = sorted.slice(0, 2).map(([sub, n]) => `${sub} ${n}`).join(", ");
-    const rest = sorted.length > 2 ? ` <span class="muted">+${sorted.length - 2}</span>` : "";
-    return `${shown}${rest}`;
+    const shown = sorted.slice(0, 5).map(([sub, n]) => `<span class="chip">${sub} ${n}</span>`).join("");
+    const rest = sorted.length > 5 ? `<span class="chip">+${sorted.length - 5}</span>` : "";
+    return `<span class="chip-row">${shown}${rest}</span>`;
   }
 
   function view_employee(list) {
@@ -348,13 +365,13 @@
       if (a.type === "individual") {
         (a.assignments || []).forEach(x => {
           if (!x.employee) return;
-          if (!map.has(x.employee)) map.set(x.employee, { name: x.employee, items: [] });
+          if (!map.has(x.employee)) map.set(x.employee, { name: x.employee, empNo: (MEMBER_INFO[x.employee] || {}).empNo || "", items: [] });
           map.get(x.employee).items.push({ sub: a.sub, qty: 1 });
         });
       } else {
         (a.stocks || []).forEach(x => {
           if (!x.employee) return;
-          if (!map.has(x.employee)) map.set(x.employee, { name: x.employee, items: [] });
+          if (!map.has(x.employee)) map.set(x.employee, { name: x.employee, empNo: (MEMBER_INFO[x.employee] || {}).empNo || "", items: [] });
           map.get(x.employee).items.push({ sub: a.sub, qty: x.qty });
         });
       }
@@ -366,7 +383,8 @@
       const info = MEMBER_INFO[r.name] || {};
       return r.name.toLowerCase().includes(q) || (info.empNo || "").toLowerCase().includes(q) || (info.phone || "").includes(q);
     });
-    const rows = pageSlice(rowsArr).map(r => {
+    const sorted = sortList(rowsArr);
+    const rows = pageSlice(sorted).map(r => {
       const info = MEMBER_INFO[r.name] || {};
       return `<tr>
         <td><div class="acard-id">${memberIdentity(r.name)}</div></td>
@@ -378,28 +396,35 @@
     return { head, rows, count: rowsArr.length };
   }
 
+  // 근무지별 — 구성원별과 동일한 구조(정체성 컬럼들 + "배정된 자산" 요약 컬럼)로 통일
   function view_worksite(list) {
     const map = new Map();
-    const bump = (name, kind, n) => {
-      if (!name) return;
-      if (!map.has(name)) map.set(name, { name, indiv: 0, qty: 0 });
-      map.get(name)[kind] += n;
-    };
     list.forEach(a => {
-      if (a.type === "individual") (a.assignments || []).forEach(x => bump(x.worksite, "indiv", 1));
-      else (a.stocks || []).forEach(x => bump(x.worksite, "qty", x.qty));
+      if (a.type === "individual") {
+        (a.assignments || []).forEach(x => {
+          if (!x.worksite) return;
+          if (!map.has(x.worksite)) map.set(x.worksite, { name: x.worksite, code: WS_CODE[x.worksite] || "", items: [] });
+          map.get(x.worksite).items.push({ sub: a.sub, qty: 1 });
+        });
+      } else {
+        (a.stocks || []).forEach(x => {
+          if (!x.worksite) return;
+          if (!map.has(x.worksite)) map.set(x.worksite, { name: x.worksite, code: WS_CODE[x.worksite] || "", items: [] });
+          map.get(x.worksite).items.push({ sub: a.sub, qty: x.qty });
+        });
+      }
     });
-    const head = `<tr><th>근무지</th><th class="num">배정 자산 수</th><th class="num">보유 수량</th></tr>`;
+    const head = `<tr><th>근무지명</th><th>근무지 코드</th><th>배정된 자산</th></tr>`;
     const q = state.search.trim().toLowerCase();
     const rowsArr = [...map.values()].filter(r => {
       if (!q) return true;
-      const code = (WS_CODE[r.name] || "").toLowerCase();
-      return r.name.toLowerCase().includes(q) || code.includes(q);
+      return r.name.toLowerCase().includes(q) || r.code.toLowerCase().includes(q);
     });
-    const rows = pageSlice(rowsArr).map(r => `<tr>
+    const sorted = sortList(rowsArr);
+    const rows = pageSlice(sorted).map(r => `<tr>
       <td>${r.name}</td>
-      <td class="num">${r.indiv || '<span class="muted">0</span>'}</td>
-      <td class="num">${r.qty || '<span class="muted">0</span>'}</td>
+      <td>${r.code || '<span class="muted">—</span>'}</td>
+      <td>${assetsSummaryCell(r.items)}</td>
     </tr>`).join("");
     return { head, rows, count: rowsArr.length };
   }
@@ -414,7 +439,7 @@
 
   /* ---------- render ---------- */
   function sortHtml() {
-    if (state.view !== "all" && state.view !== "product") return "";
+    if (!["all", "product", "employee", "worksite"].includes(state.view)) return "";
     const cur = sortFieldsFor(state.view).find(f => f.k === state.sort.key);
     return `
       <div class="sortbar">
