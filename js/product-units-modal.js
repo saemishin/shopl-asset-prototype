@@ -3,6 +3,15 @@
 window.openProductUnitsModal = function (product, items) {
   const CLOSE_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg>`;
   const STATUS_LABEL = { assigned: "배정 중", stock: "재고", repair: "수리 중", lost: "분실", disposed: "폐기" };
+  // 현황/분류의 thumb()와 동일 — 대표 사진(window.assetPhotos, data.js 공유), 대표로 items[0] 사용
+  function thumb(a) {
+    const ph = window.assetPhotos(a);
+    if (ph.length) {
+      const c = ph[a._primary || 0].color;
+      return `<span class="thumb" style="background:${c}"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10" r="1.6"/><path d="m21 16-5-5-9 8"/></svg></span>`;
+    }
+    return `<span class="thumb empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 15 5-4 4 3 4-4 5 4"/></svg></span>`;
+  }
   // 상태 5개를 가로 5열로 고정 배치 — 열 타이틀이 이미 상태를 말해줘서 행마다 뱃지를 또 붙일 필요가 없고(고유관리번호만 표시),
   // 개수가 0인 상태도 열 자체는 항상 유지(빈 채로 둠, 별도 문구 없음)해서 품목이 달라져도 열 배치가 흔들리지 않게 함.
   // 컬럼 순서는 테이블과 동일(배정중/재고/수리중/분실/폐기), 열 안은 고유관리번호 오름차순.
@@ -27,7 +36,7 @@ window.openProductUnitsModal = function (product, items) {
         <button type="button" class="btn icon-only sm" data-close aria-label="닫기">${CLOSE_ICON}</button>
       </div>
       <div class="body">
-        <p class="cat-unit-product">${product}</p>
+        <div class="prodcell">${thumb(items[0])}<span class="pname cat-unit-product">${product}</span></div>
         <div class="cat-unit-list">${colsHtml}</div>
       </div>
     </div>`;

@@ -365,7 +365,7 @@
   // 구성원별·근무지별 행 클릭 — 배정된 자산 전체 목록. 품목 모달(product-units-modal.js)과 시각 언어는
   // 같지만 그룹 기준이 다름: 거기는 상태(고정 5종)라 5열 그리드가 맞았고, 여기는 소분류(사람/장소마다
   // 1~8개로 가변적)라 세로 섹션 리스트가 더 자연스러움. 개별형은 고유관리번호+상태뱃지, 수량형은 품목명+수량.
-  function openAssignedAssetsModal(subtitle, items) {
+  function openAssignedAssetsModal(headerHtml, items) {
     const CLOSE_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg>`;
     const bySub = new Map();
     items.forEach(x => { if (!bySub.has(x.sub)) bySub.set(x.sub, []); bySub.get(x.sub).push(x); });
@@ -404,7 +404,7 @@
           <button type="button" class="btn icon-only sm" data-close aria-label="닫기">${CLOSE_ICON}</button>
         </div>
         <div class="body">
-          <p class="cat-unit-product">${subtitle}</p>
+          ${headerHtml}
           <div>${groupsHtml}</div>
         </div>
       </div>`);
@@ -655,14 +655,16 @@
       if (g.type === "individual") window.openProductUnitsModal(g.product, g.list);
       else location.href = `asset-detail.html?id=${g.list[0].id}`;
     });
-    // 구성원별·근무지별 행 클릭 — 배정된 자산 전체 목록 모달
+    // 구성원별·근무지별 행 클릭 — 배정된 자산 전체 목록 모달. 헤더는 테이블의 정체성 컬럼과 동일한 정보를 보여줌
+    // (구성원=프로필+이름+그룹, memberIdentity() 재사용 / 근무지=근무지명+코드)
     c.querySelectorAll("tbody tr[data-mkey]").forEach(tr => tr.onclick = () => {
       const r = memberRowsByName.get(tr.dataset.mkey);
-      if (r) openAssignedAssetsModal(r.name, r.items);
+      if (r) openAssignedAssetsModal(`<div class="acard-id">${memberIdentity(r.name)}</div>`, r.items);
     });
     c.querySelectorAll("tbody tr[data-wkey]").forEach(tr => tr.onclick = () => {
       const r = worksiteRowsByName.get(tr.dataset.wkey);
-      if (r) openAssignedAssetsModal(r.name, r.items);
+      const codeHtml = r.code || '<span class="muted">—</span>';
+      if (r) openAssignedAssetsModal(`<div><div class="cat-unit-product">${r.name}</div><div class="acard-sub">${codeHtml}</div></div>`, r.items);
     });
     c.querySelectorAll("[data-stub]").forEach(el =>
       el.onclick = () => toast(`"${el.dataset.stub}" — 이후 단계에서 정의`));
