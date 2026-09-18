@@ -556,7 +556,7 @@
       <div class="countrow">
         <span class="total">전체 <b>${v.count}</b></span>
         ${sortHtml()}
-        <button class="filter-btn ${nAct ? 'set' : ''}" id="btn-filter">▤ ${state.view === "product" ? "분류" : state.view === "employee" ? "구성원" : "필터"}${nAct ? ` <b>${nAct}</b>` : ""}</button>
+        <button class="filter-btn ${nAct ? 'set' : ''}" id="btn-filter">▤ ${state.view === "product" ? "분류" : state.view === "employee" ? "구성원" : state.view === "worksite" ? "근무지" : "필터"}${nAct ? ` <b>${nAct}</b>` : ""}</button>
         <div class="right">
           <div class="searchbox${state.search ? ' has-term' : ''}">
             <input class="search${state.search ? ' expanded' : ''}" id="search-input"
@@ -658,6 +658,7 @@
     document.getElementById("btn-filter").onclick =
       state.view === "product" ? openCategoryFilterModal :
       state.view === "employee" ? openMemberFilterModal :
+      state.view === "worksite" ? openWorksiteFilterModal :
       openFilterModal;
     // QR 다운로드도 개별 유닛(고유관리번호) 단위 액션이라 전체 탭에서만 제공 — 자산 추가/일괄 작업과 동일한 이유
     if (state.view === "all") {
@@ -1109,6 +1110,42 @@
     back.querySelector("#mf-apply").onclick = () => {
       back.remove();
       toast(`"직원 필터" 적용 (프로토타입 — 실제 반영 없음)`);
+    };
+  }
+
+  // 근무지별 전용 "근무지 필터" — 역시 공통 컴포넌트 목업(직원 필터와 동일 취급). 실제 화면엔 도/도시 외에도
+  // 이 프로토타입과 무관한 필드가 많았지만, 우리 근무지 데이터로 실제 의미가 통하는 "도"(전국 17개 광역단위,
+  // 실존하는 일반 행정구역명이라 특정 회사 데이터 아님)만 대표로 구현 — 적당한 수준의 목업, 실제 필터링 없음
+  const WS_PROVINCES = [
+    "도 미지정", "강원도", "경기도", "경상남도", "경상북도", "광주광역시", "대구광역시", "대전광역시",
+    "부산광역시", "서울특별시", "세종특별자치시", "울산광역시", "인천광역시", "전라남도", "전라북도",
+    "제주특별자치도", "충청남도", "충청북도",
+  ];
+  function openWorksiteFilterModal() {
+    const back = modal(`
+      <div class="modal lg">
+        <h3>근무지 필터</h3>
+        <div class="fmodal">
+          <div class="groups" id="wf-groups">
+            <button class="active"><span class="g-text"><span class="g-name">도</span></span></button>
+          </div>
+          <div class="opts">
+            <input type="text" class="picker-search" placeholder="검색">
+            <div class="picker-toolbar">
+              <label class="picker-check"><input type="checkbox" checked><span>전체</span></label>
+              <span class="right"><button class="filter-reset" aria-label="초기화">${RESET_ICON}</button></span>
+            </div>
+            <div>${WS_PROVINCES.map(p => `<label class="opt"><input type="checkbox" checked>${p}</label>`).join("")}</div>
+          </div>
+        </div>
+        <div class="foot">
+          <button class="btn" data-close>취소</button>
+          <button class="btn primary" id="wf-apply">적용</button>
+        </div>
+      </div>`);
+    back.querySelector("#wf-apply").onclick = () => {
+      back.remove();
+      toast(`"근무지 필터" 적용 (프로토타입 — 실제 반영 없음)`);
     };
   }
 
