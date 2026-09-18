@@ -386,7 +386,7 @@
         </a>`;
       }
       return `<a class="assign-row" href="asset-detail.html?id=${a.id}" target="_blank" rel="noopener">
-        <span>${a.product}</span>
+        <span class="prodcell">${thumb(a)}<span class="pname">${a.product}</span></span>
         <span class="muted">${x.qty}개</span>
       </a>`;
     }
@@ -1269,6 +1269,7 @@
       const rowsEl = m.querySelector("#qr-rows");
       rowsEl.innerHTML = pageItems.map(a => `<label class="picker-member-row">
         <input type="checkbox" data-id="${a.id}" ${sel.has(a.id) ? "checked" : ""}>
+        ${thumb(a)}
         <span class="picker-member-info" style="flex:1">
           <b>${a.product}</b><span>${a.assetNo || "—"}</span>
         </span>
