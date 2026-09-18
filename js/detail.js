@@ -29,6 +29,14 @@
     "최유진": "개발팀", "한소희": "디자인팀", "오세훈": "운영팀",
   };
   const WS_CODE = { "강남점": "GN-01", "판교점": "PG-01", "본사": "HQ-01" };
+  // 배정 추가 시 대상 후보 목록 — category.js의 MEMBERS와 동일 값(전사 인원 12명, 프로토타입 데모용)
+  const MEMBERS = [
+    { name: "김민수", team: "개발팀" }, { name: "이서연", team: "디자인팀" }, { name: "박지훈", team: "영업팀" },
+    { name: "정우성", team: "CS팀" }, { name: "김철수", team: "운영팀" }, { name: "최유진", team: "개발팀" },
+    { name: "한소희", team: "디자인팀" }, { name: "장민호", team: "국내영업" }, { name: "오세훈", team: "운영팀" },
+    { name: "배수지", team: "CS팀" }, { name: "윤재현", team: "해외영업" }, { name: "임하늘", team: "개발팀" },
+  ];
+  const CLOSE_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg>`;
   const AVATAR_COLORS = ["#5b8def", "#8f6ef0", "#eb7f8b", "#3fb37f", "#e0a63c", "#4dabf7"];
   function avatarColor(name) {
     let h = 0;
@@ -466,6 +474,162 @@
     });
   }
 
+  // 배정 추가 — 대상(구성원/근무지 중 1개, 구조설계안 2.1 "정확히 1개 필수") + 배정일.
+  // 대상 선택 UI는 분류 관리의 권한 대상 선택(category.js openPermPicker)과 동일한 패턴: 라디오 선택 시
+  // "선택 ›" 버튼이 뜨고 눌러야 하위 피커가 열림, 라디오를 구성원↔근무지로 왔다갔다 해도 각자 골라둔 값은
+  // draftTarget에 독립적으로 남아있어서 재선택이 필요 없음(모달 열려있는 동안 한정, 적용/취소로 닫으면 사라짐)
+  function openAssignAddModal(a) {
+    let picked = null; // "employee" | "worksite"
+    const draftTarget = { employee: null, worksite: null };
+
+    const back = document.createElement("div");
+    back.className = "modal-back";
+    back.innerHTML = `
+      <div class="modal" style="width:400px">
+        <h3>배정 추가</h3>
+        <div class="body" data-body></div>
+        <div class="foot">
+          <button class="btn" data-close>취소</button>
+          <button class="btn primary" data-save disabled>저장</button>
+        </div>
+      </div>`;
+    document.body.appendChild(back);
+    const body = back.querySelector("[data-body]");
+    const saveBtn = back.querySelector("[data-save]");
+
+    function targetSummaryHtml(k) {
+      const val = draftTarget[k];
+      if (!val) return `<button type="button" class="perm-target-btn" data-target-open><span class="muted">선택</span><span class="chev">›</span></button>`;
+      const avatar = k === "employee" ? `<span class="picker-avatar sm" style="background:${avatarColor(val)}">${val[0]}</span>` : "";
+      return `
+        <div class="perm-target-row">
+          <button type="button" class="perm-target-chips" data-target-open>${avatar}<span class="perm-chip">${val}</span></button>
+          <button type="button" class="perm-target-clear" data-target-clear aria-label="선택 해제">${CLOSE_ICON}</button>
+        </div>`;
+    }
+
+    let getDate = () => null;
+    function draw() {
+      body.innerHTML = `
+        <div class="field">
+          <label>배정 대상</label>
+          <label class="radio-row"><input type="radio" name="aa-kind" value="employee"${picked === "employee" ? " checked" : ""}><span>구성원</span></label>
+          ${picked === "employee" ? `<div class="perm-target-wrap">${targetSummaryHtml("employee")}</div>` : ""}
+          <label class="radio-row"><input type="radio" name="aa-kind" value="worksite"${picked === "worksite" ? " checked" : ""}><span>근무지</span></label>
+          ${picked === "worksite" ? `<div class="perm-target-wrap">${targetSummaryHtml("worksite")}</div>` : ""}
+        </div>
+        <div class="field">
+          <label>배정일</label>
+          ${dateFieldHtml("")}
+        </div>`;
+
+      body.querySelectorAll('input[name="aa-kind"]').forEach(r => r.onchange = () => { picked = r.value; draw(); });
+      const openBtn = body.querySelector("[data-target-open]");
+      if (openBtn) openBtn.onclick = () => {
+        if (picked === "employee") openAssignMemberPicker(draftTarget.employee, v => { draftTarget.employee = v; draw(); });
+        else openAssignWorksitePicker(draftTarget.worksite, v => { draftTarget.worksite = v; draw(); });
+      };
+      const clearBtn = body.querySelector("[data-target-clear]");
+      if (clearBtn) clearBtn.onclick = () => { draftTarget[picked] = null; draw(); };
+
+      getDate = wireDateField(body, todayStr(), updateSaveState);
+      updateSaveState();
+    }
+    function updateSaveState() {
+      saveBtn.disabled = !(picked && draftTarget[picked] && getDate());
+    }
+    draw();
+
+    back.addEventListener("click", e => { if (e.target === back) back.remove(); });
+    back.querySelector("[data-close]").onclick = () => back.remove();
+    saveBtn.onclick = () => {
+      if (saveBtn.disabled) return;
+      const d = getDate();
+      const record = picked === "employee"
+        ? { employee: draftTarget.employee, worksite: null, since: d }
+        : { employee: null, worksite: draftTarget.worksite, since: d };
+      back.remove();
+      confirmModal("배정을 추가하시겠습니까?", () => {
+        (a.assignments || (a.assignments = [])).push(record);
+        // 재고⟷배정중만 배정/반납으로 자동 파생(수리중·분실·폐기는 배정 여부와 무관하게 별도 관리 — 상태 변경 드롭다운 참조)
+        if (a.status === "stock") a.status = "assigned";
+        logActivity(a, { script: "신규 배정", target: record, before: "", after: window.fmtDate(d) });
+        toast("배정이 추가되었습니다.");
+        render();
+      });
+    };
+  }
+
+  // 구성원 선택 — 단일 선택(라디오), 검색+목록 한 화면. category.js의 openMemberPicker(다중선택)와 달리
+  // 배정 대상은 정확히 1명이라 더 가벼운 단일 리스트로 구성. 2차 모달이라 .modal.sm(다른 모달 위에 겹쳐 뜸을 시각적으로 인지)
+  function openAssignMemberPicker(initial, onApply) {
+    let picked = initial;
+    let query = "";
+    const p = document.createElement("div");
+    p.className = "modal-back";
+    p.style.zIndex = 340;
+    p.innerHTML = `
+      <div class="modal sm">
+        <h3>구성원 선택</h3>
+        <div class="body">
+          <input type="text" class="picker-search" placeholder="검색">
+          <div data-list style="margin-top:8px"></div>
+        </div>
+        <div class="foot">
+          <button class="btn" data-close>취소</button>
+          <button class="btn primary" data-ok>적용</button>
+        </div>
+      </div>`;
+    document.body.appendChild(p);
+    const list = p.querySelector("[data-list]");
+    function renderList() {
+      const filtered = MEMBERS.filter(m => !query || m.name.includes(query));
+      list.innerHTML = filtered.length ? filtered.map(m => `
+        <label class="picker-member-row">
+          <input type="radio" name="aa-member" value="${m.name}"${picked === m.name ? " checked" : ""}>
+          <span class="picker-avatar" style="background:${avatarColor(m.name)}">${m.name[0]}</span>
+          <span class="picker-member-info"><b>${m.name}</b><span>${m.team}</span></span>
+        </label>`).join("") : `<p class="muted" style="padding:16px 0">결과가 없습니다.</p>`;
+      list.querySelectorAll('input[name="aa-member"]').forEach(r => r.onchange = () => { picked = r.value; });
+    }
+    p.querySelector(".picker-search").addEventListener("input", e => { query = e.target.value; renderList(); });
+    renderList();
+    p.addEventListener("click", e => { if (e.target === p) p.remove(); });
+    p.querySelector("[data-close]").onclick = () => p.remove();
+    p.querySelector("[data-ok]").onclick = () => { p.remove(); onApply(picked); };
+  }
+
+  // 근무지 선택 — 3곳뿐이라 검색 없이 단일 리스트만
+  function openAssignWorksitePicker(initial, onApply) {
+    let picked = initial;
+    const p = document.createElement("div");
+    p.className = "modal-back";
+    p.style.zIndex = 340;
+    p.innerHTML = `
+      <div class="modal sm">
+        <h3>근무지 선택</h3>
+        <div class="body">
+          <div data-list></div>
+        </div>
+        <div class="foot">
+          <button class="btn" data-close>취소</button>
+          <button class="btn primary" data-ok>적용</button>
+        </div>
+      </div>`;
+    document.body.appendChild(p);
+    const list = p.querySelector("[data-list]");
+    list.innerHTML = Object.keys(WS_CODE).map(name => `
+      <label class="picker-member-row">
+        <input type="radio" name="aa-worksite" value="${name}"${picked === name ? " checked" : ""}>
+        <span class="acard-avatar ws" style="width:30px;height:30px">${AVATAR_WS_ICON}</span>
+        <span class="picker-member-info"><b>${name}</b><span>${WS_CODE[name]}</span></span>
+      </label>`).join("");
+    list.querySelectorAll('input[name="aa-worksite"]').forEach(r => r.onchange = () => { picked = r.value; });
+    p.addEventListener("click", e => { if (e.target === p) p.remove(); });
+    p.querySelector("[data-close]").onclick = () => p.remove();
+    p.querySelector("[data-ok]").onclick = () => { p.remove(); onApply(picked); };
+  }
+
   /* ---------- 공통 사진 뷰어 ---------- */
   function openViewer(a, start) {
     const items = photosOf(a);
@@ -755,6 +919,9 @@
       const body = card.querySelector("#assign-body");
       const actions = card.querySelector("#assign-actions");
       wireAssignCards(body, a);
+      // bindActs(c)가 위에서 이미 이 버튼도 잡아 스텁 토스트로 바인딩했으므로, 실제 핸들러로 덮어씀
+      const addBtn = actions.querySelector("[data-act]");
+      if (addBtn) addBtn.onclick = () => openAssignAddModal(a);
       card.querySelectorAll("[data-atab]").forEach(t => t.onclick = () => {
         card.querySelectorAll("[data-atab]").forEach(x => x.classList.toggle("active", x === t));
         const isCurrent = t.dataset.atab === "current";
