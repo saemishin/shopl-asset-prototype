@@ -597,7 +597,7 @@
     </div>`;
   }
   function bindRows(scope) {
-    scope.querySelectorAll("tbody tr.clickable").forEach(tr =>
+    scope.querySelectorAll("tbody tr[data-id]").forEach(tr =>
       tr.onclick = () => location.href = `asset-detail.html?id=${tr.dataset.id}`);
   }
 
@@ -653,6 +653,7 @@
         state.view = b.dataset.view;
         state.page = 1;
         state.filters = emptyFilters();
+        state.search = "";
         state.productType = "individual";
         // 이 뷰에서 안 쓰는 정렬 기준으로 넘어가는 경우(예: 전체>유효기한 정렬 중 품목별로 이동)를 대비해
         // 현재 정렬 기준이 새 뷰에 없으면 그 뷰의 기본 기준으로 리셋
