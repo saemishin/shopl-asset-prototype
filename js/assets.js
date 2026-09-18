@@ -311,7 +311,7 @@
       const counts = { assigned: 0, stock: 0, repair: 0, lost: 0, disposed: 0 };
       g.list.forEach(a => { counts[a.status] = (counts[a.status] || 0) + 1; });
       return `<tr class="clickable" data-pkey="${g.sub}|${g.product}">
-        <td>${g.product}</td>
+        <td><div class="prodcell">${thumb(g.list[0])}<span class="pname">${g.product}</span></div></td>
         <td>${g.group} <span class="muted">›</span> ${g.sub}</td>
         <td class="num">${g.list.length}</td>
         <td class="num">${counts.assigned}</td>
@@ -336,7 +336,7 @@
       const qty = (a.stocks || []).reduce((s, x) => s + x.qty, 0);
       const targets = (a.stocks || []).length;
       return `<tr class="clickable" data-pkey="${g.sub}|${g.product}">
-        <td>${g.product}</td>
+        <td><div class="prodcell">${thumb(a)}<span class="pname">${g.product}</span></div></td>
         <td>${g.group} <span class="muted">›</span> ${g.sub}</td>
         <td class="num">${qty}</td>
         <td class="num">${targets}</td>

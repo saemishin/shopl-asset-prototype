@@ -143,10 +143,23 @@
     });
   }
 
+  // 현황(assets.js)의 thumb()와 동일 — 대표 사진(window.assetPhotos, data.js 공유)을 품목명 옆에 표시
+  function thumb(a) {
+    const ph = window.assetPhotos(a);
+    if (ph.length) {
+      const c = ph[a._primary || 0].color;
+      return `<span class="thumb" style="background:${c}"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10" r="1.6"/><path d="m21 16-5-5-9 8"/></svg></span>`;
+    }
+    return `<span class="thumb empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 15 5-4 4 3 4-4 5 4"/></svg></span>`;
+  }
+  function prodCell(a, name) {
+    return `<div class="prodcell">${thumb(a)}<span class="pname">${name}</span></div>`;
+  }
+
   function productRowHtml(p) {
     return `
       <tr class="clickable cat-prod-row" data-product="${p.product}">
-        <td>${p.product}</td>
+        <td>${prodCell(p.items[0], p.product)}</td>
         <td class="num">${p.total}</td>
         <td class="num">${p.assigned}</td>
         <td class="num">${p.stock}</td>
@@ -161,7 +174,7 @@
     const targets = (a.stocks || []).length;
     return `
       <tr class="clickable" data-asset="${a.id}">
-        <td>${a.product}</td>
+        <td>${prodCell(a, a.product)}</td>
         <td class="num">${qty}</td>
         <td class="num">${targets}</td>
         <td>${a.expiry ? window.fmtDate(a.expiry) : '<span class="muted">—</span>'}</td>
