@@ -454,6 +454,8 @@ th.c, td.c { text-align: center; width: 52px; }
 .cat-asset-empty { padding: 12px 0; }
 .cat-asset-empty p { margin: 0 0 10px; }
 .cat-unit-product { font-size: 15px; font-weight: 700; }
+/* 자산 목록/배정된 자산 모달 상단의 대상 정보(품목·구성원·근무지)를 아래 목록과 시각적으로 구분하는 박스 */
+.modal-info-box { background: var(--bg); border-radius: 8px; padding: 10px 12px; }
 /* 자산 목록 모달 전용 너비 — 5열이 답답해 보이지 않게 .modal.lg(620px, 다른 모달과 공용)보다 더 넓게.
    .modal.lg/.modal.sm과 동일하게 .modal과 결합한 선택자로 써야 함 — 단독 클래스는 명시도가 같아서
    소스 순서상 뒤에 나오는 기본 .modal{width:480px}에 덮여버림 */
@@ -473,13 +475,16 @@ th.c, td.c { text-align: center; width: 52px; }
 }
 .cat-unit-no-row:hover { background: #eef0f2; }
 
-/* 구성원별·근무지별 "배정된 자산" 모달 — 소분류별 세로 섹션(개수가 가변적이라 위 5열 그리드보다 리스트가 맞음) */
+/* 구성원별·근무지별 "배정된 자산" 모달 — 소분류별 세로 섹션(개수가 가변적이라 위 5열 그리드보다 리스트가 맞음).
+   섹션 헤더는 접기/펼치기 가능한 버튼(기본 전부 펼침) — category.js 대분류 트리의 ▾/▸ 컨벤션 재사용 */
 .assign-group + .assign-group { margin-top: 10px; }
 .assign-group-label {
-  padding-bottom: 6px; margin-bottom: 4px; border-bottom: 1px solid var(--line);
+  display: flex; align-items: center; gap: 5px; width: 100%; padding-bottom: 6px; margin-bottom: 4px;
+  border: 0; border-bottom: 1px solid var(--line); background: none; cursor: pointer; text-align: left;
   font-size: 12px; font-weight: 700; color: var(--text-sub);
 }
 .assign-group-label .muted { font-weight: 400; }
+.assign-chevron { flex-shrink: 0; width: 10px; font-size: 10px; color: var(--text-mut); }
 .assign-row {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
   padding: 8px; border-radius: 6px; font-size: 12.5px; color: var(--text); text-decoration: none;

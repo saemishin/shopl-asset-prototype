@@ -390,28 +390,39 @@
         </a>`;
       }
       return `<a class="assign-row" href="asset-detail.html?id=${a.id}" target="_blank" rel="noopener">
-        <span class="prodcell">${thumb(a)}<span class="pname">${a.product}</span></span>
+        <span>${a.product}</span>
         <span class="muted">${x.qty}개</span>
       </a>`;
     }
 
+    // 소분류만으론 어느 대분류인지 알 수 없어서(필터 모달의 분류 트리 미리보기와 동일한 이유) "대분류 › 소분류"로 표기.
+    // 같은 소분류의 모든 항목은 항상 같은 대분류에 속하므로 list[0]의 값을 대표로 사용.
+    // 섹션은 접고 펼 수 있게(기본은 전부 펼침) — category.js의 대분류 트리 접기/펼치기와 동일한 패턴
     const groupsHtml = groups.map(([sub, list]) => `
       <div class="assign-group">
-        <p class="assign-group-label">${sub} <span class="muted">${list.length}</span></p>
-        ${list.map(rowHtml).join("")}
+        <button type="button" class="assign-group-label" data-sub="${sub}">
+          <span class="assign-chevron">▾</span>${list[0].asset.group} <span class="muted">›</span> ${sub} <span class="muted">${list.length}</span>
+        </button>
+        <div class="assign-group-body">${list.map(rowHtml).join("")}</div>
       </div>`).join("");
 
-    modal(`
+    const back = modal(`
       <div class="modal help-modal">
         <div class="help-modal-head">
           <h3>배정된 자산</h3>
           <button type="button" class="btn icon-only sm" data-close aria-label="닫기">${CLOSE_ICON}</button>
         </div>
         <div class="body">
-          ${headerHtml}
+          <div class="modal-info-box">${headerHtml}</div>
           <div>${groupsHtml}</div>
         </div>
       </div>`);
+    back.querySelectorAll(".assign-group-label").forEach(btn => btn.onclick = () => {
+      const body = btn.nextElementSibling;
+      const chevron = btn.querySelector(".assign-chevron");
+      if (body.hasAttribute("hidden")) { body.removeAttribute("hidden"); chevron.textContent = "▾"; }
+      else { body.setAttribute("hidden", ""); chevron.textContent = "▸"; }
+    });
   }
 
   function view_employee(list) {
@@ -1275,7 +1286,6 @@
       const rowsEl = m.querySelector("#qr-rows");
       rowsEl.innerHTML = pageItems.map(a => `<label class="picker-member-row">
         <input type="checkbox" data-id="${a.id}" ${sel.has(a.id) ? "checked" : ""}>
-        ${a.type === "quantity" ? thumb(a) : '<span class="thumb" style="visibility:hidden"></span>'}
         <span class="picker-member-info" style="flex:1">
           <b>${a.product}</b><span>${a.assetNo || "—"}</span>
         </span>

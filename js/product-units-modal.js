@@ -36,7 +36,7 @@ window.openProductUnitsModal = function (product, items) {
         <button type="button" class="btn icon-only sm" data-close aria-label="닫기">${CLOSE_ICON}</button>
       </div>
       <div class="body">
-        <div class="prodcell">${thumb(items[0])}<span class="pname cat-unit-product">${product}</span></div>
+        <div class="modal-info-box"><div class="prodcell">${thumb(items[0])}<span class="pname cat-unit-product">${product}</span></div></div>
         <div class="cat-unit-list">${colsHtml}</div>
       </div>
     </div>`;
