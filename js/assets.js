@@ -22,6 +22,7 @@
     "김철수": { team: "운영팀", empNo: "2019008", phone: "010-9012-4456" },
     "최유진": { team: "개발팀", empNo: "2023019", phone: "010-6634-8821" },
     "한소희": { team: "디자인팀", empNo: "2022055", phone: "010-4478-2093" },
+    "오세훈": { team: "운영팀", empNo: "2018014", phone: "010-7712-3345" },
   };
   const AVATAR_COLORS = ["#5b8def", "#8f6ef0", "#eb7f8b", "#3fb37f", "#e0a63c", "#4dabf7"];
   function avatarColor(name) {
@@ -389,9 +390,11 @@
           <span class="badge ${STATUS_LABEL[a.status][1]}">${STATUS_LABEL[a.status][0]}</span>
         </a>`;
       }
+      // 개별형의 상태 뱃지와 시각적으로 짝이 맞도록 뱃지 형태 유지, 다만 배정중/수리중/분실 등 상태색과
+      // 혼동되지 않게 무채색(.badge.stock의 회색 톤)만 재사용 — 수량은 상태가 아니라 그냥 수치라서
       return `<a class="assign-row" href="asset-detail.html?id=${a.id}" target="_blank" rel="noopener">
         <span>${a.product}</span>
-        <span class="muted">${x.qty}개</span>
+        <span class="badge stock">${x.qty}개</span>
       </a>`;
     }
 

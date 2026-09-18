@@ -477,7 +477,7 @@ th.c, td.c { text-align: center; width: 52px; }
 
 /* 구성원별·근무지별 "배정된 자산" 모달 — 소분류별 세로 섹션(개수가 가변적이라 위 5열 그리드보다 리스트가 맞음).
    섹션 헤더는 접기/펼치기 가능한 버튼(기본 전부 펼침) — category.js 대분류 트리의 ▾/▸ 컨벤션 재사용 */
-.assign-group + .assign-group { margin-top: 10px; }
+.assign-group + .assign-group { margin-top: 22px; }
 .assign-group-label {
   display: flex; align-items: center; gap: 5px; width: 100%; padding-bottom: 6px; margin-bottom: 4px;
   border: 0; border-bottom: 1px solid var(--line); background: none; cursor: pointer; text-align: left;
