@@ -150,6 +150,10 @@
     });
     return m;
   })();
+  // 소분류명 → 분류 관리(구조설계안 sort_order)에 저장된 등장 순서. 구성원별·근무지별 "배정된 자산" 요약/모달의
+  // 소분류 정렬 기준으로 사용 — 개수순이 아니라 분류 화면과 동일한 순서로 보여야 두 화면 간에 일관됨
+  const CATEGORY_ORDER = new Map(window.DATA.categories.map((c, i) => [c.sub, i]));
+  function subOrder(sub) { return CATEGORY_ORDER.has(sub) ? CATEGORY_ORDER.get(sub) : 999; }
 
   const state = {
     view: "all",
@@ -356,7 +360,7 @@
     if (!items.length) return '<span class="muted">—</span>';
     const bySub = new Map();
     items.forEach(x => bySub.set(x.sub, (bySub.get(x.sub) || 0) + x.qty));
-    const sorted = [...bySub.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "ko"));
+    const sorted = [...bySub.entries()].sort((a, b) => subOrder(a[0]) - subOrder(b[0]));
     const shown = sorted.slice(0, 5).map(([sub, n]) => `<span class="chip">${sub} ${n}</span>`).join("");
     const rest = sorted.length > 5 ? `<span class="chip">+${sorted.length - 5}</span>` : "";
     return `<span class="chip-row">${shown}${rest}</span>`;
@@ -369,8 +373,8 @@
     const CLOSE_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg>`;
     const bySub = new Map();
     items.forEach(x => { if (!bySub.has(x.sub)) bySub.set(x.sub, []); bySub.get(x.sub).push(x); });
-    // 요약 칩과 동일한 순서(많은 소분류부터)로 섹션을 배치해 컬럼-모달 간 일관성 유지
-    const groups = [...bySub.entries()].sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0], "ko"));
+    // 요약 칩과 동일하게 분류 화면에 저장된 소분류 순서(subOrder)로 섹션을 배치해 컬럼-모달 간 일관성 유지
+    const groups = [...bySub.entries()].sort((a, b) => subOrder(a[0]) - subOrder(b[0]));
     groups.forEach(([, list]) => list.sort((p, q) => {
       const pk = p.asset.type === "individual" ? (p.asset.assetNo || "") : p.asset.product;
       const qk = q.asset.type === "individual" ? (q.asset.assetNo || "") : q.asset.product;
