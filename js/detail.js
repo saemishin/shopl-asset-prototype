@@ -21,6 +21,7 @@
   const IC_EMP = `<svg class="hi" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5.5 20c0-4 3-6.5 6.5-6.5s6.5 2.5 6.5 6.5"/></svg>`;
   const IC_WS = `<svg class="hi" viewBox="0 0 24 24"><path d="M4 20V9.5L12 4l8 5.5V20"/><path d="M9.5 20v-5h5v5"/></svg>`;
   const IC_EDIT = `<svg viewBox="0 0 24 24"><path d="M4 20l1-4L16 5l3 3L8 19l-4 1z"/><path d="M13.5 6.5l4 4"/></svg>`;
+  const INFO_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 8v.01"/></svg>`;
 
   // 배정 현황 카드 — 구성원/근무지 여부에 따른 아이덴티티 표현.
   // ※ 그룹(부서)·근무지 코드는 구조설계안에 없는 필드 — 구성원/근무지가 "기존 재사용" 엔티티라 여기선 프로토타입 데모용 샘플값만 매핑
@@ -481,6 +482,11 @@
       const row = b.closest(".acard");
       openDatePopover(b, a, +row.dataset.idx);
     });
+    // bindActs(scope)가 위에서 이미 이 버튼도 스텁 토스트로 바인딩했으므로, 실제 핸들러로 덮어씀
+    scope.querySelectorAll('[data-act="재배정"]').forEach(b => b.onclick = () => {
+      const row = b.closest(".acard");
+      openReassignModal(a, +row.dataset.idx);
+    });
   }
 
   // 배정 추가 — 대상(구성원/근무지 중 1개, 구조설계안 2.1 "정확히 1개 필수") + 배정일.
@@ -575,10 +581,108 @@
     };
   }
 
+  // 재배정 — 구조설계안 2.3 "별도 액션이 아니라 반납 후 신규 배정을 이어서 실행하는 조합". 배정 추가와
+  // 거의 같은 UI(대상 라디오+피커+날짜)를 세로로 이어붙이되: (1) 위에 현재 배정을 읽기전용 카드로 보여주고,
+  // (2) 새 대상 후보에서 현재 대상은 제외(같은 대상으로 날짜만 바꾸고 싶으면 배정일 수정을 쓰면 되므로 역할이
+  // 안 겹치게), (3) 무슨 일이 일어나는지 모달 상단에 상시 안내(확인 팝업까지 가기 전에 알 수 있어야 함)
+  function openReassignModal(a, idx) {
+    const old = a.assignments[idx];
+    let picked = null; // "employee" | "worksite"
+    const draftTarget = { employee: null, worksite: null };
+    let dateText = "";
+
+    const back = document.createElement("div");
+    back.className = "modal-back";
+    back.innerHTML = `
+      <div class="modal" style="width:400px">
+        <h3>재배정</h3>
+        <div class="body" data-body></div>
+        <div class="foot">
+          <button class="btn" data-close>취소</button>
+          <button class="btn primary" data-save disabled>저장</button>
+        </div>
+      </div>`;
+    document.body.appendChild(back);
+    const body = back.querySelector("[data-body]");
+    const saveBtn = back.querySelector("[data-save]");
+
+    function targetSummaryHtml(k) {
+      const val = draftTarget[k];
+      if (!val) return `<button type="button" class="perm-target-btn" data-target-open><span class="muted">선택</span><span class="chev">›</span></button>`;
+      const avatar = k === "employee" ? `<span class="picker-avatar sm" style="background:${avatarColor(val)}">${val[0]}</span>` : "";
+      return `
+        <div class="aa-target-selected" data-target-open>
+          ${avatar}<span class="perm-chip">${val}</span>
+          <button type="button" class="aa-target-x" data-target-clear aria-label="선택 해제">${CLOSE_ICON}</button>
+        </div>`;
+    }
+
+    let getDate = () => null;
+    function draw() {
+      body.innerHTML = `
+        <div class="perm-info-note">${INFO_ICON}<span>기존 배정은 반납 처리되고, 새 배정이 추가됩니다.</span></div>
+        <div class="field">
+          <label>현재 배정</label>
+          <div class="acard">
+            ${typeBadge(old)}
+            <div class="acard-id">${assignIdentity(old)}</div>
+            <div class="acard-foot"><span class="acard-date">배정일 <b>${window.fmtDate(old.since)}</b></span></div>
+          </div>
+        </div>
+        <div class="field">
+          <label>새 배정 대상</label>
+          <label class="radio-row"><input type="radio" name="ra-kind" value="employee"${picked === "employee" ? " checked" : ""}><span>구성원</span></label>
+          ${picked === "employee" ? `<div class="perm-target-wrap">${targetSummaryHtml("employee")}</div>` : ""}
+          <label class="radio-row"><input type="radio" name="ra-kind" value="worksite"${picked === "worksite" ? " checked" : ""}><span>근무지</span></label>
+          ${picked === "worksite" ? `<div class="perm-target-wrap">${targetSummaryHtml("worksite")}</div>` : ""}
+        </div>
+        <div class="field">
+          <label>새 배정일</label>
+          ${dateFieldHtml("")}
+        </div>`;
+      const dtext = body.querySelector("[data-dtext]");
+      if (dateText) dtext.value = dateText;
+
+      body.querySelectorAll('input[name="ra-kind"]').forEach(r => r.onchange = () => { picked = r.value; draw(); });
+      const openBtn = body.querySelector("[data-target-open]");
+      if (openBtn) openBtn.onclick = () => {
+        if (picked === "employee") openAssignMemberPicker(draftTarget.employee, v => { draftTarget.employee = v; draw(); }, old.employee);
+        else openAssignWorksitePicker(draftTarget.worksite, v => { draftTarget.worksite = v; draw(); }, old.worksite);
+      };
+      const clearBtn = body.querySelector("[data-target-clear]");
+      if (clearBtn) clearBtn.onclick = e => { e.stopPropagation(); draftTarget[picked] = null; draw(); };
+
+      getDate = wireDateField(body, todayStr(), () => { dateText = dtext.value; updateSaveState(); });
+      updateSaveState();
+    }
+    function updateSaveState() {
+      saveBtn.disabled = !(picked && draftTarget[picked] && getDate());
+    }
+    draw();
+
+    back.addEventListener("click", e => { if (e.target === back) back.remove(); });
+    back.querySelector("[data-close]").onclick = () => back.remove();
+    saveBtn.onclick = () => {
+      if (saveBtn.disabled) return;
+      const d = getDate();
+      const record = picked === "employee"
+        ? { employee: draftTarget.employee, worksite: null, since: d }
+        : { employee: null, worksite: draftTarget.worksite, since: d };
+      confirmModal("재배정하시겠습니까?", () => {
+        back.remove();
+        a.assignments.splice(idx, 1, record); // 반납(기존 레코드 제거) + 신규 배정(같은 자리에 교체)을 한 번에
+        logActivity(a, { script: "반납", target: old, before: window.fmtDate(old.since), after: "" });
+        logActivity(a, { script: "신규 배정", target: record, before: "", after: window.fmtDate(d) });
+        toast("재배정되었습니다.");
+        render();
+      });
+    };
+  }
+
   // 구성원 선택 — 단일 선택(라디오), 검색(이름/사번/휴대폰번호)+목록. category.js의 openMemberPicker(다중선택)와
   // 달리 배정 대상은 정확히 1명이라 더 가벼운 단일 리스트로 구성. 2차 모달이라 .modal.sm(뒤 모달 가장자리가
   // 보이게 해서 겹쳐 떠 있음을 인지시킴). 검색창은 고정, 목록만 스크롤(footer가 항상 보이게)
-  function openAssignMemberPicker(initial, onApply) {
+  function openAssignMemberPicker(initial, onApply, exclude) {
     let picked = initial;
     let query = "";
     const p = document.createElement("div");
@@ -600,7 +704,7 @@
     const list = p.querySelector("[data-list]");
     function renderList() {
       const q = query.trim().toLowerCase();
-      const filtered = MEMBERS.filter(m => !q || m.name.includes(q) || m.empNo.includes(q) || m.phone.includes(q));
+      const filtered = MEMBERS.filter(m => m.name !== exclude && (!q || m.name.includes(q) || m.empNo.includes(q) || m.phone.includes(q)));
       list.innerHTML = filtered.length ? filtered.map(m => `
         <label class="picker-member-row">
           <input type="radio" name="aa-member" value="${m.name}"${picked === m.name ? " checked" : ""}>
@@ -618,7 +722,7 @@
 
   // 근무지 선택 — 검색(근무지명/코드)+목록(대표 사진 없이 이름·코드만 — 구성원과 달리 프로필 사진이 의미가
   // 약해서 뺌). 지금은 3곳뿐이라 검색 체감은 적지만 구성원 선택과 구조를 통일해둠
-  function openAssignWorksitePicker(initial, onApply) {
+  function openAssignWorksitePicker(initial, onApply, exclude) {
     let picked = initial;
     let query = "";
     const p = document.createElement("div");
@@ -640,7 +744,7 @@
     const list = p.querySelector("[data-list]");
     function renderList() {
       const q = query.trim().toLowerCase();
-      const filtered = Object.keys(WS_CODE).filter(name => !q || name.toLowerCase().includes(q) || WS_CODE[name].toLowerCase().includes(q));
+      const filtered = Object.keys(WS_CODE).filter(name => name !== exclude && (!q || name.toLowerCase().includes(q) || WS_CODE[name].toLowerCase().includes(q)));
       list.innerHTML = filtered.length ? filtered.map(name => `
         <label class="picker-member-row">
           <input type="radio" name="aa-worksite" value="${name}"${picked === name ? " checked" : ""}>
