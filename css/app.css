@@ -576,6 +576,11 @@ button.usebullet { background: var(--panel); font: inherit; cursor: pointer; }
 }
 .perm-info-note svg { width: 15px; height: 15px; flex-shrink: 0; margin-top: 1px; color: var(--text-mut); }
 
+/* 재배정 모달 — 안내문구+현재 배정 카드를 한 덩어리로(내부 간격 좁게), 아래 새 배정 대상/배정일
+   필드 그룹과는 확실히 분리되도록 간격을 넓게(22px) 줌 */
+.ra-current { margin-bottom: 22px; }
+.ra-current .perm-info-note { margin-bottom: 10px; }
+
 /* 그룹/직무·직급 선택, 구성원 선택 모달 */
 .picker-modal { width: 560px; display: flex; flex-direction: column; max-height: 88vh; }
 .picker-modal .body { flex: 1; overflow-y: auto; min-height: 0; }

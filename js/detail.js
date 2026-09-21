@@ -620,9 +620,8 @@
     let getDate = () => null;
     function draw() {
       body.innerHTML = `
-        <div class="perm-info-note">${INFO_ICON}<span>기존 배정은 반납 처리되고, 새 배정이 추가됩니다.</span></div>
-        <div class="field">
-          <label>현재 배정</label>
+        <div class="ra-current">
+          <div class="perm-info-note">${INFO_ICON}<span>기존 배정은 반납 처리되고, 새 배정이 추가됩니다.</span></div>
           <div class="acard">
             ${typeBadge(old)}
             <div class="acard-id">${assignIdentity(old)}</div>
