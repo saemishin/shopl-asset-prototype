@@ -811,7 +811,9 @@
       const syncQty = () => {
         const v = val();
         minus.disabled = v === null || v <= 1;
-        plus.disabled = v === null || v >= remaining;
+        // 비어있을 땐(v===null) +를 눌러 1부터 시작할 수 있어야 하므로 비활성화하지 않음 — remaining은
+        // 이 모달이 열릴 때 이미 1 이상임을 보장(0이면 모달 자체를 안 엶)
+        plus.disabled = v !== null && v >= remaining;
         updateSaveState();
       };
       qinput.addEventListener("input", () => { qinput.value = qinput.value.replace(/[^0-9]/g, ""); qtyText = qinput.value; syncQty(); });
