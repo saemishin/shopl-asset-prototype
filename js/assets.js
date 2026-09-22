@@ -103,10 +103,11 @@
     return a.type === "quantity" && a.totalQty - (a.stocks || []).reduce((s, x) => s + x.qty, 0) === 0;
   }
   // 미보유대상 — 소진과는 다른 개념. 보유 대상(AssetStock 레코드) 중 수량이 0인 것 — "이 품목을 다
-  // 나눠줬다"가 아니라 "이 특정 대상은 지금 0개다"를 가리킴(재입고 필요 대상을 짚어주는 신호). 다만 품목이
-  // 이미 소진(전량 배분완료) 상태면 재배분으로 해결할 여유 자체가 없으므로 소진에 밀려 카운트에서 제외
+  // 나눠줬다"가 아니라 "이 특정 대상은 지금 0개다"를 가리킴(재입고 필요 대상을 짚어주는 신호). 소진 여부와
+  // 무관하게 그대로 집계(소진일 때 제외하는 건 배정·보유 현황 셀의 뱃지 중복 방지용이었는데 그 뱃지 자체를
+  // 뺐으므로 통계·필터에선 더 이상 제외할 이유가 없음 — 레코드가 quantity=0이면 항상 카운트)
   function unheldHolders(a) {
-    if (a.type !== "quantity" || isDepleted(a)) return [];
+    if (a.type !== "quantity") return [];
     return (a.stocks || []).filter(x => x.qty === 0);
   }
   function hasUnheldHolder(a) {
@@ -849,7 +850,7 @@
       qtyRate: qty.length ? Math.round(qtyCnt("held") / qty.length * 100) : 0,
       qtyDepleted: qty.filter(isDepleted).length,
       // 미보유대상은 품목이 아니라 보유 대상(레코드) 단위 카운트 — 한 품목에 0개짜리 보유 대상이 여러 명이면
-      // 그만큼 더해짐(단, 그 품목이 이미 소진이면 unheldHolders()가 제외하므로 이중 집계 안 됨)
+      // 그만큼 더해짐. 소진인 품목의 0개짜리 레코드도 그대로 포함(소진과 별개 집계)
       qtyUnheld: qty.reduce((s, a) => s + unheldHolders(a).length, 0),
     };
   }
