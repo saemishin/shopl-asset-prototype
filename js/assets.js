@@ -842,7 +842,7 @@
     const row1 = `<div class="statrow2">
       ${statCard("자산 유형", [
         statCol({ k: "개별 자산", v: s.indivN, sub: "개", filter: { type: ["individual"] } }),
-        statCol({ k: "수량 자산", v: s.qtyN, sub: "종류", filter: { type: ["quantity"] } }),
+        statCol({ k: "수량 자산", v: s.qtyN, sub: "품목", filter: { type: ["quantity"] } }),
       ])}
       ${statCard("유효기간", [
         statCol({ k: "만료 예정", v: s.expSoon, cls: "warn", filter: { expiry: ["soon"] } }),
