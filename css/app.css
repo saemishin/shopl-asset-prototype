@@ -124,6 +124,9 @@ input { font: inherit; }
 .btn.primary { background: var(--primary); border-color: var(--primary); color: #fff; }
 .btn.primary:hover { background: var(--primary-press); }
 .btn.primary:disabled { background: #c7d3ea; border-color: #c7d3ea; color: #fff; cursor: not-allowed; }
+.btn.danger { background: var(--danger); border-color: var(--danger); color: #fff; }
+.btn.danger:hover { background: #d23b40; }
+.btn.danger:disabled { background: #f3c6c8; border-color: #f3c6c8; color: #fff; cursor: not-allowed; }
 .btn.sm { height: 28px; padding: 0 9px; font-size: 12px; }
 .btn.icon-only { width: 32px; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
 .btn.icon-only svg { width: 15px; height: 15px; }
@@ -584,6 +587,11 @@ button.usebullet { background: var(--panel); font: inherit; cursor: pointer; }
   background: #f6f7f8; border-radius: var(--radius); font-size: 12px; color: var(--text-sub); line-height: 1.5;
 }
 .perm-info-note svg { width: 15px; height: 15px; flex-shrink: 0; margin-top: 1px; color: var(--text-mut); }
+.danger-note {
+  display: flex; align-items: flex-start; gap: 8px; padding: 12px 14px;
+  background: #fdecec; border-radius: var(--radius); font-size: 12px; color: #d23b40; line-height: 1.5;
+}
+.danger-note svg { width: 15px; height: 15px; flex-shrink: 0; margin-top: 1px; color: #d23b40; }
 
 /* 재배정 모달 — 안내문구+현재 배정 카드를 한 덩어리로(내부 간격 좁게), 아래 새 배정 대상/배정일
    필드 그룹과는 확실히 분리되도록 간격을 넓게(22px) 줌 */

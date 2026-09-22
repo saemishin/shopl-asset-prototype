@@ -110,6 +110,63 @@
     cb.querySelector("[data-cok]").onclick = () => { cb.remove(); onOk(); };
     document.body.appendChild(cb);
   }
+  const WARN_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 9v4M12 16.5h.01M10.3 3.9 2.5 17.5a1.7 1.7 0 0 0 1.47 2.55h16.06a1.7 1.7 0 0 0 1.47-2.55L13.7 3.9a1.7 1.7 0 0 0-2.94 0z"/></svg>`;
+  // 중요 데이터 삭제 확인 패턴 — 실수 방지를 위해 "DELETE"를 정확히 입력해야 삭제 버튼 활성화
+  function openDeleteAssetModal(a) {
+    const cb = document.createElement("div");
+    cb.className = "modal-back";
+    cb.style.zIndex = 340;
+    cb.innerHTML = `
+      <div class="modal" style="width:380px">
+        <h3>삭제하시겠습니까?</h3>
+        <div class="body">
+          <div class="danger-note">${WARN_ICON}<span>삭제하면 복구할 수 없으니 신중하게 결정해주세요.</span></div>
+          <div class="field" style="margin-top:14px;margin-bottom:0">
+            <input type="text" data-del-input placeholder="입력">
+          </div>
+          <p class="muted" style="margin-top:6px">박스에 DELETE를 입력하면 [삭제] 버튼이 활성화됩니다.</p>
+        </div>
+        <div class="foot">
+          <button class="btn" data-cclose>취소</button>
+          <button class="btn danger" data-cok disabled>삭제</button>
+        </div>
+      </div>`;
+    cb.addEventListener("click", e => { if (e.target === cb) cb.remove(); });
+    cb.querySelector("[data-cclose]").onclick = () => cb.remove();
+    const input = cb.querySelector("[data-del-input]");
+    const okBtn = cb.querySelector("[data-cok]");
+    input.addEventListener("input", () => { okBtn.disabled = input.value !== "DELETE"; });
+    okBtn.onclick = () => {
+      if (input.value !== "DELETE") return;
+      assets.splice(assets.indexOf(a), 1);
+      cb.remove();
+      toast("삭제되었습니다.");
+      location.href = "assets.html";
+    };
+    document.body.appendChild(cb);
+    input.focus();
+  }
+  // "···" 자산관리 메뉴 전용 드롭다운 — 상태 변경 드롭다운(dropdown())과 공용 함수를 쓰면 항목별 분기가 안 돼서
+  // 분리. "자산 삭제"만 실제 동작(danger 스타일 + 삭제 모달), 나머지는 기존과 동일한 스텁 토스트
+  function moreDropdown(anchor, items, a) {
+    document.querySelectorAll(".dropdown-menu").forEach(m => m.remove());
+    const menu = document.createElement("div");
+    menu.className = "dropdown-menu";
+    menu.innerHTML = items.map((x, i) => `<button data-i="${i}"${x === "자산 삭제" ? ' class="danger"' : ""}>${x}</button>`).join("");
+    const r = anchor.getBoundingClientRect();
+    menu.style.cssText = `position:fixed;top:${r.bottom + 4}px;left:${Math.max(8, r.right - 180)}px;min-width:180px`;
+    document.body.appendChild(menu);
+    menu.querySelectorAll("button").forEach(b => b.onclick = () => {
+      menu.remove();
+      const label = items[+b.dataset.i];
+      if (label === "자산 삭제") openDeleteAssetModal(a);
+      else toast(`"${label}" — 이후 단계에서 정의`);
+    });
+    setTimeout(() => {
+      const close = e => { if (!menu.contains(e.target)) { menu.remove(); document.removeEventListener("click", close); } };
+      document.addEventListener("click", close);
+    });
+  }
   const btn = (label, cls = "btn sm") => `<button class="${cls}" data-act="${label}">${label}</button>`;
   const bindActs = scope => scope.querySelectorAll("[data-act]").forEach(b =>
     b.onclick = () => toast(`"${b.dataset.act}" — 이후 단계에서 정의`));
@@ -1203,7 +1260,7 @@
 
     bindActs(c);
     c.querySelector("[data-qr]").onclick = e => openQrPopover(a, e.currentTarget);
-    c.querySelector("[data-more]").onclick = e => dropdown(e.currentTarget, moreItems);
+    c.querySelector("[data-more]").onclick = e => moreDropdown(e.currentTarget, moreItems, a);
     const sc = c.querySelector("[data-statuschange]");
     if (sc) sc.onclick = e => dropdown(e.currentTarget, statusItems);
     const tb = c.querySelector("[data-viewer]");
