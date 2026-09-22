@@ -2,9 +2,10 @@
 (function () {
   const TODAY = new Date("2026-09-04");
   const { assets } = window.DATA;
+  // held(보유 중)는 수량형 전용 — assets.js STATUS_LABEL과 동일하게 유지(파일별 로컬 상수, 공용 모듈 아님)
   const STATUS_LABEL = {
     stock: ["재고", "stock"], assigned: ["배정 중", "assigned"], repair: ["수리 중", "repair"],
-    lost: ["분실", "lost"], disposed: ["폐기", "disposed"],
+    lost: ["분실", "lost"], disposed: ["폐기", "disposed"], held: ["보유 중", "assigned"],
   };
 
   function expiryBadge(d) {
@@ -945,15 +946,12 @@
       lost: ["분실 회수", "폐기 처리"],
       disposed: [],
     };
+    // 수량형은 상태 변경 액션 자체가 없음(재고·보유중만, AssetStock 레코드 유무로 자동 파생) — 항상 읽기전용 뱃지
     const statusItems = isIndiv ? STATUS_TRANSITIONS[a.status] : [];
-    const statusBadge = isIndiv
-      ? (statusItems.length
-          ? `<button class="badge ${STATUS_LABEL[a.status][1]} clickable" data-statuschange>${STATUS_LABEL[a.status][0]} <span class="bchev">▾</span></button>`
-          : `<span class="badge ${STATUS_LABEL[a.status][1]}">${STATUS_LABEL[a.status][0]}</span>`)
-      : "";   // 수량 자산 뱃지는 분류(kv2)에 이미 노출돼 중복 — 헤더엔 표기하지 않음
-    const subMeta = isIndiv
-      ? `<div>${statusBadge}</div>${a.assetNo ? `<div style="margin-top:5px">고유관리번호 <b>${a.assetNo}</b></div>` : ""}`
-      : "";
+    const statusBadge = isIndiv && statusItems.length
+      ? `<button class="badge ${STATUS_LABEL[a.status][1]} clickable" data-statuschange>${STATUS_LABEL[a.status][0]} <span class="bchev">▾</span></button>`
+      : `<span class="badge ${STATUS_LABEL[a.status][1]}">${STATUS_LABEL[a.status][0]}</span>`;
+    const subMeta = `<div>${statusBadge}</div>${isIndiv && a.assetNo ? `<div style="margin-top:5px">고유관리번호 <b>${a.assetNo}</b></div>` : ""}`;
 
     const QR_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM19 14h2v2h-2zM14 19h2v2h-2zM19 19h2v2h-2z"/></svg>`;
     const qrBtn = `<button class="btn sm icon-only" data-qr aria-label="QR 라벨" title="QR 라벨">${QR_ICON}</button>`;
