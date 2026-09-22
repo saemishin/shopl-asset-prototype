@@ -98,10 +98,14 @@
   }
   const IC_EMP = `<svg class="hi" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5.5 20c0-4 3-6.5 6.5-6.5s6.5 2.5 6.5 6.5"/></svg>`;
   const IC_WS = `<svg class="hi" viewBox="0 0 24 24"><path d="M4 20V9.5L12 4l8 5.5V20"/><path d="M9.5 20v-5h5v5"/></svg>`;
-  // 소진 — 수량형 전용, 잔여 수량(total_qty - 배분합계)이 0인 상태(구조설계안 2.1). 상태값(재고/보유중)과는
-  // 별개의 파생 조건이라 STATUS_LABEL이 아니라 이 헬퍼로 별도 계산
-  function isDepleted(a) {
-    return a.type === "quantity" && a.totalQty - (a.stocks || []).reduce((s, x) => s + x.qty, 0) === 0;
+  // 소진 — 수량형 전용, 보유 대상(AssetStock 레코드) 중 수량이 0인 것. 품목 전체의 잔여 수량(total_qty
+  // - 배분합계)과는 다른 개념 — "이 품목을 다 나눠줬다"가 아니라 "이 보유 대상은 지금 0개다"를 가리킴
+  // (재고를 채워줘야 할 대상을 짚어주는 신호라 회사 입장에서 더 실무적인 데이터로 판단해 이 기준으로 확정)
+  function depletedHolders(a) {
+    return a.type === "quantity" ? (a.stocks || []).filter(x => x.qty === 0) : [];
+  }
+  function hasDepletedHolder(a) {
+    return depletedHolders(a).length > 0;
   }
   function holderText(a) {
     if (a.type === "individual") {
@@ -126,8 +130,10 @@
     // 상세 페이지 보유 현황 카드와 동일하게 이름 가나다순
     const sorted = [...stocks].sort((p, q) => (p.employee || p.worksite).localeCompare(q.employee || q.worksite, "ko"));
     const targets = sorted.map(x => x.employee ? `${IC_EMP}${x.employee}` : `${IC_WS}${x.worksite}`);
-    // 소진(잔여 0)은 상태 컬럼에 드러나지 않아서, 필터 결과가 왜 걸렸는지 알 수 있도록 여기 작게 표시
-    const depletedTag = isDepleted(a) ? ' <span class="muted">· 소진</span>' : "";
+    // 소진(0개짜리 보유 대상)은 상태 컬럼에 드러나지 않아서, 필터 결과가 왜 걸렸는지 알 수 있도록 여기
+    // 뱃지로 표시. 나열된 보유 대상 전부가 아니라 그중 일부만 0개일 수 있어 "소진"이 아니라 "소진 있음"
+    // (유효기한 뱃지와 동일한 패턴으로 이름 뒤에 붙임, 톤은 통계 카드의 "소진"과 맞춰 warn(repair) 재사용)
+    const depletedTag = hasDepletedHolder(a) ? ' <span class="badge repair">소진 있음</span>' : "";
     if (sorted.length === 1) return targets.join(" ") + depletedTag;
     return `${targets[0]} <span class="muted">+${targets.length - 1}</span>${depletedTag}`;
   }
@@ -213,7 +219,7 @@
       // 타입별로 겹치지 않아(held는 수량형만, assigned/repair/lost/disposed는 개별형만) 자연히 분리됨
       if (f.status.length && !f.status.includes(a.status)) return false;
       if (f.expiry.length && !f.expiry.includes(expiryKey(a.expiry))) return false;
-      if (f.depleted.length && !isDepleted(a)) return false;
+      if (f.depleted.length && !hasDepletedHolder(a)) return false;
       if (f.note.length && !f.note.includes(a.note ? "has" : "none")) return false;
       if (f.labels.length) {
         const has = f.labels.filter(l => (a.labels || []).includes(l));
@@ -788,7 +794,7 @@
     if (!stocks.length) return "";
     const sorted = [...stocks].sort((p, q) => (p.employee || p.worksite).localeCompare(q.employee || q.worksite, "ko"));
     const list = sorted.map(x => `${x.employee || x.worksite}(${x.qty}개)`).join(", ");
-    return isDepleted(a) ? `${list} (소진)` : list;
+    return hasDepletedHolder(a) ? `${list} (소진 있음)` : list;
   }
   // 현황 "다운로드" — 지금 적용된 필터·검색 전체 범위(페이지네이션 무관)를 실제 엑셀로 즉시 생성해 다운로드.
   // 컬럼 구성은 테이블에 보이는 컬럼을 그대로 옮긴 1차안(구조설계안 7장 TODO — 정식 컬럼 정의 필요)
@@ -837,7 +843,8 @@
       // 수량형은 폐기 개념이 없어 제외 없이 전체 대비 비율(개별형 배정률과 동일 원리, 4.3 "보유 대상 없음" 참조)
       qtyHeld: qtyCnt("held"), qtyStock: qtyCnt("stock"),
       qtyRate: qty.length ? Math.round(qtyCnt("held") / qty.length * 100) : 0,
-      qtyDepleted: qty.filter(isDepleted).length,
+      // 소진은 품목이 아니라 보유 대상(레코드) 단위 카운트 — 한 품목에 0개짜리 보유 대상이 여러 명이면 그만큼 더해짐
+      qtyDepleted: qty.reduce((s, a) => s + depletedHolders(a).length, 0),
     };
   }
   function arrEq(a, b) { a = a || []; b = b || []; return a.length === b.length && a.every(x => b.includes(x)); }
