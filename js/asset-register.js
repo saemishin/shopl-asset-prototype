@@ -249,7 +249,7 @@
           </div>
           <div class="field" id="areg-totalqty-field"><label>총 수량 <span class="req">*</span></label><input type="text" inputmode="numeric" id="areg-totalqty-input" placeholder="입력" maxlength="6"></div>
           <div class="field" id="areg-expiry-field"><label>유효기한</label>${dateFieldHtml()}</div>
-          <div class="field">
+          <div class="field" id="areg-tag-field">
             <div class="field-label-row">
               <label>태그</label>
               <button type="button" class="btn sm" id="areg-tag-manage">태그 관리</button>
@@ -278,6 +278,7 @@
     const totalQtyField = back.querySelector("#areg-totalqty-field");
     const totalQtyInput = back.querySelector("#areg-totalqty-input");
     const expiryField = back.querySelector("#areg-expiry-field");
+    const tagFieldEl = back.querySelector("#areg-tag-field");
     const dtext = back.querySelector("[data-dtext]");
     const dnative = back.querySelector("[data-dnative]");
     const saveBtn = back.querySelector("#areg-save");
@@ -375,17 +376,19 @@
     });
 
     // 소분류 — 검색 + 대분류/소분류 트리 모달(openCategoryPickModal)에서 단일 선택.
-    // 기본은 비워둔 상태(자동 첫 항목 선택 없음) — 미선택 상태에선 고유관리번호 등 유형별 필드를 모두 노출.
+    // 기본은 비워둔 상태(자동 첫 항목 선택 없음) — 미선택 상태에선 소분류 필드만 보이고 나머지는 아예 숨김
+    // (골라야 알 수 있는 유형별 필드를 미리 잠긴 채로 보여주는 것보다, 선택 후 필요한 것만 드러나는 쪽이 더 간결)
     const catWrap = back.querySelector("#areg-catwrap");
     const catDisplay = back.querySelector("#areg-cat-display");
     let catValue = null;
 
     function catLabel(v) { const c = findCat(v); return c ? `${c.group} › ${c.sub}` : ""; }
-    function applyAssetNoVisibility() {
-      assetNoField.style.display = (catValue && type === "quantity") ? "none" : "";
-      // 총 수량은 개별형엔 없는 개념(실물 1개=Asset 1건이라 총 수량이 항상 1, 구조설계안 3.4) — 고유관리번호와
-      // 반대로 개별형일 때만 숨김(미선택 상태에선 다른 유형별 필드와 동일하게 노출)
-      totalQtyField.style.display = (catValue && type === "individual") ? "none" : "";
+    function applyFieldVisibility() {
+      const show = !!catValue;
+      [nameField, expiryField, tagFieldEl].forEach(el => { el.style.display = show ? "" : "none"; });
+      assetNoField.style.display = show && type !== "quantity" ? "" : "none";
+      // 총 수량은 개별형엔 없는 개념(실물 1개=Asset 1건이라 총 수량이 항상 1, 구조설계안 3.4)
+      totalQtyField.style.display = show && type !== "individual" ? "" : "none";
     }
     function renderCatDisplay() {
       if (catValue) { catDisplay.textContent = catLabel(catValue); catDisplay.style.color = "var(--text)"; }
@@ -403,27 +406,13 @@
       tags.length = 0;
       renderChips();
     }
-    // 소분류를 아직 안 골랐으면 나머지 필드는 채워봐야 소용없으니(어차피 소분류 바뀌면 초기화됨) 비활성화 —
-    // hover 시 이유를 안내(data-tip). [태그 관리]는 이 자산과 무관한 전역 기능이라 잠그지 않음
-    const LOCK_TIP = "소분류를 먼저 선택해주세요.";
-    function setLocked(locked) {
-      [nameInput, assetNoInput, totalQtyInput, dtext, dnative, tagInput].forEach(el => { el.disabled = locked; });
-      [nameField, assetNoField, totalQtyField, expiryField].forEach(el => {
-        el.classList.toggle("lock-hint", locked);
-        if (locked) el.setAttribute("data-tip", LOCK_TIP); else el.removeAttribute("data-tip");
-      });
-      tagWrap.classList.toggle("is-locked", locked);
-      tagWrap.classList.toggle("lock-hint", locked);
-      if (locked) tagWrap.setAttribute("data-tip", LOCK_TIP); else tagWrap.removeAttribute("data-tip");
-    }
     function selectCat(v) {
       const changed = v !== catValue;
       catValue = v;
       const cat = findCat(v);
       type = (cat && cat.type) || "individual";
       renderCatDisplay();
-      applyAssetNoVisibility();
-      setLocked(!catValue);
+      applyFieldVisibility();
       if (changed) resetOtherFields();
       checkValid();
     }
@@ -431,10 +420,11 @@
       openCategoryPickModal(categories, catValue, v => selectCat(v));
     });
 
-    // 소분류 초기값 반영(과 그에 딸린 setLocked/resetOtherFields 호출)은 태그 위젯(renderChips 등)까지
-    // 다 준비된 뒤로 미룸 — 그 전에 부르면 아직 선언되기 전(TDZ)인 tagInput/chipsEl을 참조해서 에러
+    // 소분류 초기값 반영(과 그에 딸린 resetOtherFields 호출)은 태그 위젯(renderChips 등)까지 다 준비된
+    // 뒤로 미룸 — 그 전에 부르면 아직 선언되기 전(TDZ)인 tagInput/chipsEl을 참조해서 에러.
+    // applyFieldVisibility()는 tagFieldEl(단순 DOM 참조)만 써서 TDZ 위험 없이 먼저 불러도 안전
     renderCatDisplay();
-    applyAssetNoVisibility();
+    applyFieldVisibility();
 
     // 태그 입력 위젯 — 마스터 목록(window.DATA.tags)에서 검색해 선택만 가능(즉석 생성 없음). 새 태그는 [태그 관리]에서만 추가
     const tagWrap = back.querySelector("#areg-tagwrap");
@@ -509,7 +499,6 @@
     renderChips();
     checkValid();
     if (preselectValue) selectCat(preselectValue);
-    else setLocked(true);
 
     back.querySelector("#areg-tag-manage").onclick = () => {
       closeMenu();
