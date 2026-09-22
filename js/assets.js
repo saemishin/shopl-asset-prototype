@@ -331,7 +331,7 @@
   }
 
   function view_product_quantity(list) {
-    const head = `<tr><th>품목명</th><th>분류</th><th class="num">전체 보유 수량</th><th class="num">현재 보유 수량</th><th class="num">잔여 수량</th><th class="num">보유 대상</th><th>유효기한</th></tr>`;
+    const head = `<tr><th>품목명</th><th>분류</th><th class="num">전체 수량</th><th class="num">보유 수량</th><th class="num">잔여 수량</th><th class="num">보유 대상</th><th>유효기한</th></tr>`;
     const groups = groupByProduct(list.filter(a => a.type === "quantity"));
     const sorted = sortList(groups);
     const paged = pageSlice(sorted);

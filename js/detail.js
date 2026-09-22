@@ -1074,10 +1074,11 @@
     const statusBadge = isIndiv && statusItems.length
       ? `<button class="badge ${STATUS_LABEL[a.status][1]} clickable" data-statuschange>${STATUS_LABEL[a.status][0]} <span class="bchev">▾</span></button>`
       : `<span class="badge ${STATUS_LABEL[a.status][1]}">${STATUS_LABEL[a.status][0]}</span>`;
+    const heldQty = !isIndiv ? (a.stocks || []).reduce((s, x) => s + x.qty, 0) : 0;
     const subMeta = `<div>${statusBadge}</div>${
       isIndiv && a.assetNo ? `<div style="margin-top:5px">고유관리번호 <b>${a.assetNo}</b></div>` : ""
     }${
-      !isIndiv ? `<div style="margin-top:5px">총 <b>${a.totalQty}개</b></div>` : ""
+      !isIndiv ? `<div style="margin-top:5px">전체 <b>${a.totalQty}개</b> · 보유 <b>${heldQty}개</b> · 잔여 <b>${a.totalQty - heldQty}개</b></div>` : ""
     }`;
 
     const QR_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM19 14h2v2h-2zM14 19h2v2h-2zM19 19h2v2h-2z"/></svg>`;
