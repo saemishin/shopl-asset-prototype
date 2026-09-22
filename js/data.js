@@ -156,6 +156,34 @@ window.DATA = (function () {
     { id: "A105", type: "quantity", assetNo: "", product: "무선 마우스", group: "전자기기류", sub: "케이블·액세서리",
       status: "stock", totalQty: 20, serial: "", createdAt: "2026-08-01", purchaseDate: "2026-07-30", price: 25000, expiry: "",
       labels: [], stocks: [] },
+    // 보유 대상 21건(20개 페이지네이션 확인용 — 근무지 3곳+기존 구성원 12명만으론 15건뿐이라 부족해서
+    // 신규 구성원 6명 추가. 다만 이번엔 데모 전용이라 MEMBERS/MEMBER_INFO/EMP_GROUP엔 등록 안 함(그 목록들에
+    // 없어도 assignIdentity()가 "—"로 무해하게 처리) — "보유 대상 추가" 후보 목록엔 안 뜨는 점 참고
+    { id: "A106", type: "quantity", assetNo: "", product: "네임펜 세트", group: "소모품", sub: "문구류",
+      status: "held", totalQty: 70, serial: "", createdAt: "2026-03-02", purchaseDate: "2026-03-01", price: 3500, expiry: "",
+      labels: [], stocks: [
+        { worksite: "강남점", employee: null, qty: 8 },
+        { worksite: "판교점", employee: null, qty: 6 },
+        { worksite: "본사", employee: null, qty: 10 },
+        { worksite: null, employee: "김민수", qty: 2 },
+        { worksite: null, employee: "이서연", qty: 3 },
+        { worksite: null, employee: "박지훈", qty: 1 },
+        { worksite: null, employee: "정우성", qty: 4 },
+        { worksite: null, employee: "김철수", qty: 0 },
+        { worksite: null, employee: "최유진", qty: 2 },
+        { worksite: null, employee: "한소희", qty: 3 },
+        { worksite: null, employee: "장민호", qty: 1 },
+        { worksite: null, employee: "오세훈", qty: 5 },
+        { worksite: null, employee: "배수지", qty: 2 },
+        { worksite: null, employee: "윤재현", qty: 3 },
+        { worksite: null, employee: "임하늘", qty: 1 },
+        { worksite: null, employee: "신동욱", qty: 2 },
+        { worksite: null, employee: "구자영", qty: 1 },
+        { worksite: null, employee: "황민재", qty: 3 },
+        { worksite: null, employee: "서지우", qty: 2 },
+        { worksite: null, employee: "권태호", qty: 4 },
+        { worksite: null, employee: "나윤아", qty: 1 },
+      ] },
   ];
 
   // 태그 마스터 목록 — 기존 자산들에 찍힌 distinct 라벨로 초기 시드(태그 관리 모달 도입 이후로는 이 배열이 기준이 됨)
