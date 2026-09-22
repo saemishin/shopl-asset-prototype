@@ -3,11 +3,14 @@
   const TODAY = new Date("2026-09-04");
   const { assets } = window.DATA;
 
+  // held(보유 중)는 수량형 전용 — 개별형의 배정중처럼 "활성 상태"라 배지 색은 assigned를 그대로 재사용(구조설계안
+  // 3.4: status는 개별형·수량형 둘 다 필수, 값 범위만 다름 — 수량형은 stock·held 2종만)
   const STATUS_LABEL = {
     stock: ["재고", "stock"], assigned: ["배정 중", "assigned"], repair: ["수리 중", "repair"],
-    lost: ["분실", "lost"], disposed: ["폐기", "disposed"],
+    lost: ["분실", "lost"], disposed: ["폐기", "disposed"], held: ["보유 중", "assigned"],
   };
-  const STATUS_ORDER = ["stock", "assigned", "repair", "lost", "disposed"];
+  // 개별형 상태값들(기존 순서 유지) → 수량형(보유중) → 공통(재고). 재고가 맨 위였던 걸 맨 아래로 내림(사용자 피드백)
+  const STATUS_ORDER = ["assigned", "repair", "lost", "disposed", "held", "stock"];
   const TYPE_LABEL = { individual: "개별 자산", quantity: "수량 자산" };
   const EXP_LABEL = { valid: "유효", soon: "만료 예정", over: "만료", none: "미설정" };
   // 근무지 코드는 구조설계안에 없는 필드 — 근무지가 "기존 재사용" 엔티티라 여기선 프로토타입 데모용 샘플값만 매핑(detail.js의 WS_CODE와 동일)
@@ -111,9 +114,10 @@
       if (sorted.length === 1) return targets.join(" ");              // 단일 배정(복합이면 둘 다 표시)
       return `${targets[0]} <span class="muted">+${targets.length - 1}</span>`;  // 공동 배정: 첫 대상 + N
     }
-    // 수량 자산도 개별 자산과 동일한 패턴(보유처 이름, 총 개수 미표기)으로 통일
+    // 수량 자산도 개별 자산과 동일한 패턴(보유처 이름, 총 개수 미표기)으로 통일 — "상태" 컬럼에
+    // 이미 재고/보유중 뱃지가 있어서 여기선 중복 표기하지 않음(개별 자산과 동일 원칙)
     const stocks = a.stocks || [];
-    if (!stocks.length) return '<span class="muted">재고</span>';
+    if (!stocks.length) return '<span class="muted">—</span>';
     // 상세 페이지 보유 현황 카드와 동일하게 이름 가나다순
     const sorted = [...stocks].sort((p, q) => (p.employee || p.worksite).localeCompare(q.employee || q.worksite, "ko"));
     const targets = sorted.map(x => x.employee ? `${IC_EMP}${x.employee}` : `${IC_WS}${x.worksite}`);
@@ -196,10 +200,9 @@
       // 분류 필터 항목은 "대분류"(부모 체크 시 자체로도 들어감) 또는 "대분류/소분류"(leaf) 둘 다 올 수 있음
       if (f.category.length && !f.category.some(c => c === a.group || c === `${a.group}/${a.sub}`)) return false;
       if (f.type.length && !f.type.includes(a.type)) return false;
-      if (f.status.length) {
-        if (a.type !== "individual") return false;
-        if (!f.status.includes(a.status)) return false;
-      }
+      // 수량형도 이제 실제 status(stock·held)를 가지므로 개별형 전용 가드는 제거 — 값 자체가
+      // 타입별로 겹치지 않아(held는 수량형만, assigned/repair/lost/disposed는 개별형만) 자연히 분리됨
+      if (f.status.length && !f.status.includes(a.status)) return false;
       if (f.expiry.length && !f.expiry.includes(expiryKey(a.expiry))) return false;
       if (f.note.length && !f.note.includes(a.note ? "has" : "none")) return false;
       if (f.labels.length) {
@@ -266,9 +269,7 @@
       ${thFilter("자산 유형", "type")}<th>분류</th>${thFilter("상태", "status")}
       <th>배정·보유 현황</th>${thFilter("유효기한", "expiry")}<th>태그</th>${thFilter("메모", "note", "c")}<th>등록일</th></tr>`;
     const rows = pageSlice(sortList(list)).map(a => {
-      const st = a.type === "quantity"
-        ? '<span class="muted">—</span>'
-        : `<span class="badge ${STATUS_LABEL[a.status][1]}">${STATUS_LABEL[a.status][0]}</span>`;
+      const st = `<span class="badge ${STATUS_LABEL[a.status][1]}">${STATUS_LABEL[a.status][0]}</span>`;
       return `<tr class="clickable" data-id="${a.id}">
         <td>${a.assetNo || '<span class="muted">—</span>'}</td>
         <td>${prodCell(a)}</td>
@@ -783,7 +784,7 @@
       "품목명": a.product,
       "분류": `${a.group} › ${a.sub}`,
       "자산 유형": TYPE_LABEL[a.type],
-      "상태": a.type === "quantity" ? "" : STATUS_LABEL[a.status][0],
+      "상태": STATUS_LABEL[a.status][0],
       "배정·보유 현황": holderPlainText(a),
       "유효기한": a.expiry ? `${window.fmtDate(a.expiry)} (${EXP_LABEL[expiryKey(a.expiry)]})` : "",
       "태그": (a.labels || []).join(", "),
