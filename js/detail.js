@@ -274,6 +274,10 @@
     return `<div class="dtimeline">${entries.map(historyCardHtml).join("")}</div>`;
   }
   // 보유 현황 — 배정 현황과 동일한 카드 UI(assignIdentity 재사용) + 검색(구성원/근무지 카테고리 선택)
+  // 보유 대상 수는 상한이 없어(구조설계안 2.1) 목록이 길어질 수 있음 — 20개 단위 페이지네이션(QR 다운로드
+  // 모달과 동일한 고정 20 방식). 검색/카테고리 전환 시 1페이지로 리셋(render() 안에서 처리)
+  const STOCK_PAGE_SIZE = 20;
+  let stockPage = 1;
   // 수량형 상태 파생 — 레코드 존재 여부가 아니라 배분합계(모든 보유자 quantity의 합) 기준(구조설계안 3.4).
   // 배분합계가 0이면 quantity 0인 레코드가 남아있어도 재고(그 경우 total_qty 전체가 잔여 수량)
   function deriveQtyStatus(a) {
@@ -303,7 +307,16 @@
     if (!rows.length) return q
       ? '<p class="muted" style="padding:6px 0">일치하는 보유 대상이 없습니다</p>'
       : '<p class="muted" style="padding:6px 0">보유 대상이 없습니다.</p>';
-    return `<div class="acard-list">${rows.map(({ x, idx }) => `
+    const totalPages = Math.max(1, Math.ceil(rows.length / STOCK_PAGE_SIZE));
+    if (stockPage > totalPages) stockPage = totalPages;
+    const pageRows = rows.slice((stockPage - 1) * STOCK_PAGE_SIZE, stockPage * STOCK_PAGE_SIZE);
+    const pagerHtml = totalPages > 1 ? `
+      <div class="pager">
+        <button data-spage="prev" ${stockPage === 1 ? "disabled" : ""}>‹</button>
+        <span style="padding:0 6px;font-size:12.5px;color:var(--text-sub)">${stockPage} / ${totalPages}</span>
+        <button data-spage="next" ${stockPage === totalPages ? "disabled" : ""}>›</button>
+      </div>` : "";
+    return `<div class="acard-list">${pageRows.map(({ x, idx }) => `
       <div class="acard" data-idx="${idx}">
         ${typeBadge(x)}
         <div class="acard-id">${assignIdentity(x)}</div>
@@ -314,7 +327,7 @@
             <button class="btn sm" data-release>보유 해제</button>
           </div>
         </div>
-      </div>`).join("")}</div>`;
+      </div>`).join("")}</div>${pagerHtml}`;
   }
   // 수량 변경 팝오버 — 스테퍼(0 미만 불가, total_qty 잔여 수량 초과 불가) + 직접입력(포커스 시 기존값 지우고
   // 새로 입력, 미입력 시 저장 비활성). 0은 구조설계안 2.1 "quantity 0 포함해서 직접 증감" 명시대로 허용
@@ -1224,11 +1237,17 @@
       const refreshStock = () => {
         sbody.innerHTML = stockCards(a, stockQ.value, stockCat.value);
         wireStockCards(sbody, a);
+        sbody.querySelectorAll("[data-spage]").forEach(b => b.onclick = () => {
+          stockPage += b.dataset.spage === "prev" ? -1 : 1;
+          refreshStock();
+        });
       };
-      stockCat.onchange = () => { stockQ.placeholder = CAT_PLACEHOLDER[stockCat.value]; refreshStock(); };
-      stockQ.oninput = refreshStock;
+      stockCat.onchange = () => { stockQ.placeholder = CAT_PLACEHOLDER[stockCat.value]; stockPage = 1; refreshStock(); };
+      stockQ.oninput = () => { stockPage = 1; refreshStock(); };
       historyQ.oninput = () => { sbody.innerHTML = timelineHtml(a, historyQ.value); };
-      wireStockCards(sbody, a);
+      // 최초 렌더(위 템플릿의 stock-body)엔 페이저 버튼 이벤트가 아직 안 걸려있으니 refreshStock()으로
+      // 다시 그려서 wireStockCards + 페이저 바인딩을 한 번에 맞춤(검색어·카테고리는 기본값과 동일해 결과는 같음)
+      refreshStock();
       // bindActs(c)가 위에서 이미 이 버튼도 잡아 스텁 토스트로 바인딩했으므로, 실제 핸들러로 덮어씀
       const saddBtn = sactions.querySelector("[data-act]");
       if (saddBtn) saddBtn.onclick = () => openHoldAddModal(a);
