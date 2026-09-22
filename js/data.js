@@ -120,8 +120,9 @@ window.DATA = (function () {
       status: "assigned", serial: "CN-0KL-79", createdAt: "2021-11-16", purchaseDate: "2021-11-15", price: 690000, expiry: "",
       labels: ["본사"], assignments: [{ employee: null, worksite: "본사", since: "2022-03-01" }] },
 
+    // total_qty 120, 배분합계 115 — 잔여 5개(미배분) 시연용 샘플
     { id: "A101", type: "quantity", assetNo: "", product: "2026 하복 유니폼", group: "소모품", sub: "유니폼",
-      status: "held", serial: "", createdAt: "2026-04-02", purchaseDate: "2026-04-01", price: 18000, manufactured: "2026-03-15",
+      status: "held", totalQty: 120, serial: "", createdAt: "2026-04-02", purchaseDate: "2026-04-01", price: 18000, manufactured: "2026-03-15",
       expiry: "2027-04-01", note: "L/XL 사이즈 위주 소진 빠름", photo: "#e67e22", photoCount: 10,
       labels: ["하복"], stocks: [
         { worksite: "강남점", employee: null, qty: 60 },
@@ -130,27 +131,28 @@ window.DATA = (function () {
         { worksite: null, employee: "오세훈", qty: 3 },
       ] },
     { id: "A102", type: "quantity", assetNo: "", product: "USB-C 케이블 2m", group: "전자기기류", sub: "케이블·액세서리",
-      status: "held", serial: "", createdAt: "2025-09-11", purchaseDate: "2025-09-10", price: 9000, expiry: "",
+      status: "held", totalQty: 47, serial: "", createdAt: "2025-09-11", purchaseDate: "2025-09-10", price: 9000, expiry: "",
       labels: [], stocks: [
         { worksite: "본사", employee: null, qty: 34 },
         { worksite: "강남점", employee: null, qty: 8 },
         { worksite: null, employee: "오세훈", qty: 5 },
       ] },
     { id: "A103", type: "quantity", assetNo: "", product: "A4 복사용지", group: "소모품", sub: "문구류",
-      status: "held", serial: "", createdAt: "2026-06-02", purchaseDate: "2026-06-01", price: 4200, expiry: "2028-06-01",
+      status: "held", totalQty: 10, serial: "", createdAt: "2026-06-02", purchaseDate: "2026-06-01", price: 4200, expiry: "2028-06-01",
       labels: ["소모"], stocks: [
         { worksite: "본사", employee: null, qty: 0 },
         { worksite: null, employee: "오세훈", qty: 10 },
       ] },
     { id: "A104", type: "quantity", assetNo: "", product: "2025 동복 유니폼", group: "소모품", sub: "유니폼",
-      status: "held", serial: "", createdAt: "2025-10-02", purchaseDate: "2025-10-01", price: 24000, expiry: "2026-09-08",
+      status: "held", totalQty: 33, serial: "", createdAt: "2025-10-02", purchaseDate: "2025-10-01", price: 24000, expiry: "2026-09-08",
       labels: ["동복"], stocks: [
         { worksite: "판교점", employee: null, qty: 25 },
         { worksite: "본사", employee: null, qty: 8 },
       ] },
-    // 보유 대상 0건(완전 미보유) 샘플 — 상세 페이지 보유 현황 빈 상태 문구 + 전체 탭 "재고" 상태 확인용
+    // 보유 대상 0건(전액 미배분) 샘플 — 상세 페이지 보유 현황 빈 상태 문구 + 전체 탭 "재고" 상태 확인용.
+    // total_qty는 있는데(20개 구매) 아직 아무에게도 배분 안 한 상태 — 배분합계 0 → 재고
     { id: "A105", type: "quantity", assetNo: "", product: "무선 마우스", group: "전자기기류", sub: "케이블·액세서리",
-      status: "stock", serial: "", createdAt: "2026-08-01", purchaseDate: "2026-07-30", price: 25000, expiry: "",
+      status: "stock", totalQty: 20, serial: "", createdAt: "2026-08-01", purchaseDate: "2026-07-30", price: 25000, expiry: "",
       labels: [], stocks: [] },
   ];
 

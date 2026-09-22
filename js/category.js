@@ -175,7 +175,9 @@
     return `
       <tr class="clickable" data-asset="${a.id}">
         <td>${prodCell(a, a.product)}</td>
+        <td class="num">${a.totalQty}</td>
         <td class="num">${qty}</td>
+        <td class="num">${a.totalQty - qty}</td>
         <td class="num">${targets}</td>
         <td>${a.expiry ? window.fmtDate(a.expiry) : '<span class="muted">—</span>'}</td>
       </tr>`;
@@ -242,7 +244,7 @@
       ${list.length ? `
         <div class="table-wrap">
           <table class="cat-asset-table">
-            <thead><tr><th>품목명</th><th class="num">보유 수량</th><th class="num">보유 대상</th><th>유효기한</th></tr></thead>
+            <thead><tr><th>품목명</th><th class="num">전체 보유 수량</th><th class="num">현재 보유 수량</th><th class="num">잔여 수량</th><th class="num">보유 대상</th><th>유효기한</th></tr></thead>
             <tbody>${list.map(stockRowHtml).join("")}</tbody>
           </table>
         </div>

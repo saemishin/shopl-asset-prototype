@@ -274,6 +274,12 @@
     return `<div class="dtimeline">${entries.map(historyCardHtml).join("")}</div>`;
   }
   // 보유 현황 — 배정 현황과 동일한 카드 UI(assignIdentity 재사용) + 검색(구성원/근무지 카테고리 선택)
+  // 수량형 상태 파생 — 레코드 존재 여부가 아니라 배분합계(모든 보유자 quantity의 합) 기준(구조설계안 3.4).
+  // 배분합계가 0이면 quantity 0인 레코드가 남아있어도 재고(그 경우 total_qty 전체가 잔여 수량)
+  function deriveQtyStatus(a) {
+    const sum = (a.stocks || []).reduce((s, x) => s + x.qty, 0);
+    a.status = sum > 0 ? "held" : "stock";
+  }
   // 정렬: 이름 가나다순(배정일처럼 시간 기준으로 정렬할 값이 없어서 — 최근 변경은 이력 탭 검색으로 확인)
   function stockCards(a, query, cat) {
     const stocks = a.stocks || [];
@@ -311,10 +317,14 @@
         </div>
       </div>`).join("")}</div>`;
   }
-  // 수량 변경 팝오버 — 스테퍼(1 미만 불가) + 직접입력(포커스 시 기존값 지우고 새로 입력, 미입력 시 저장 비활성)
+  // 수량 변경 팝오버 — 스테퍼(0 미만 불가, total_qty 잔여 수량 초과 불가) + 직접입력(포커스 시 기존값 지우고
+  // 새로 입력, 미입력 시 저장 비활성). 0은 구조설계안 2.1 "quantity 0 포함해서 직접 증감" 명시대로 허용
   function openQtyPopover(anchor, a, idx) {
     document.querySelectorAll(".qty-popover").forEach(m => m.remove());
     const cur = a.stocks[idx].qty;
+    // 이 보유자를 제외한 나머지 보유자들의 합 — 이 값 + 새 입력값이 total_qty를 못 넘음(잔여 수량 상한)
+    const otherSum = a.stocks.reduce((s, x, i) => i === idx ? s : s + x.qty, 0);
+    const max = a.totalQty - otherSum;
     const pop = document.createElement("div");
     pop.className = "qty-popover";
     pop.innerHTML = `
@@ -338,22 +348,24 @@
     const val = () => { const n = parseInt(input.value, 10); return Number.isFinite(n) ? n : null; };
     const sync = () => {
       const v = val();
-      minus.disabled = v === null || v <= 1;
-      save.disabled = v === null || v < 1;
+      minus.disabled = v === null || v <= 0;
+      plus.disabled = v === null || v >= max;
+      save.disabled = v === null || v < 0 || v > max;
     };
     input.addEventListener("input", () => {
       input.value = input.value.replace(/[^0-9]/g, "");
       sync();
     });
-    minus.onclick = () => { const v = val(); if (v !== null && v > 1) { input.value = v - 1; sync(); } };
-    plus.onclick = () => { const v = val() ?? 0; input.value = v + 1; sync(); };
+    minus.onclick = () => { const v = val(); if (v !== null && v > 0) { input.value = v - 1; sync(); } };
+    plus.onclick = () => { const v = val() ?? 0; if (v < max) { input.value = v + 1; sync(); } };
     save.onclick = () => {
       const v = val();
-      if (v === null || v < 1) return;
+      if (v === null || v < 0 || v > max) return;
       const x = a.stocks[idx];
       pop.remove();
       confirmModal("수량을 변경하시겠습니까?", () => {
         a.stocks[idx].qty = v;
+        deriveQtyStatus(a);
         logActivity(a, { script: "보유 수량 변경", target: x, before: `${cur}개`, after: `${v}개` });
         toast("수량이 변경되었습니다.");
         render();
@@ -376,6 +388,7 @@
       confirmModal(`${name}을(를) 보유 대상에서 해제하시겠습니까?<br><span class="muted" style="font-size:12px">보유 기록이 삭제되며, 이후 이 자산의 보유 대상 목록에 나타나지 않습니다. (수량만 바꾸려면 취소 후 수량 변경을 이용하세요)</span>`, () => {
         const qty = x.qty;
         a.stocks.splice(idx, 1);
+        deriveQtyStatus(a);
         logActivity(a, { script: "보유 대상 해제", target: x, before: `${qty}개`, after: "" });
         toast("보유 대상에서 해제되었습니다.");
         render();
@@ -707,12 +720,121 @@
     };
   }
 
+  // 보유 대상 추가 — 배정 추가와 같은 대상 선택 UI(라디오+피커+상태보존)를 재사용하되, 날짜 대신 수량
+  // 입력(최소 1, 잔여 수량 초과 불가 — 구조설계안 2.3). 이미 보유 중인 대상 전체(구성원·근무지 구분 없이)를
+  // 후보에서 제외(수량만 바꾸고 싶으면 보유 변경을 쓰면 되므로 역할이 안 겹치게 — 배정 추가/재배정과 동일 원칙)
+  function openHoldAddModal(a) {
+    let picked = null; // "employee" | "worksite"
+    const draftTarget = { employee: null, worksite: null };
+    let qtyText = "";
+    const heldNames = (a.stocks || []).map(x => x.employee || x.worksite);
+    const remaining = a.totalQty - (a.stocks || []).reduce((s, x) => s + x.qty, 0);
+    if (remaining <= 0) { toast("잔여 수량이 없습니다."); return; }
+
+    const back = document.createElement("div");
+    back.className = "modal-back";
+    back.innerHTML = `
+      <div class="modal" style="width:400px">
+        <h3>보유 대상 추가</h3>
+        <div class="body" data-body></div>
+        <div class="foot">
+          <button class="btn" data-close>취소</button>
+          <button class="btn primary" data-save disabled>저장</button>
+        </div>
+      </div>`;
+    document.body.appendChild(back);
+    const body = back.querySelector("[data-body]");
+    const saveBtn = back.querySelector("[data-save]");
+
+    function targetSummaryHtml(k) {
+      const val = draftTarget[k];
+      if (!val) return `<button type="button" class="perm-target-btn" data-target-open><span class="muted">선택</span><span class="chev">›</span></button>`;
+      const avatar = k === "employee" ? `<span class="picker-avatar sm" style="background:${avatarColor(val)}">${val[0]}</span>` : "";
+      return `
+        <div class="aa-target-selected" data-target-open>
+          ${avatar}<span class="perm-chip">${val}</span>
+          <button type="button" class="aa-target-x" data-target-clear aria-label="선택 해제">${CLOSE_ICON}</button>
+        </div>`;
+    }
+
+    function qtyVal() { const n = parseInt(qtyText, 10); return Number.isFinite(n) ? n : null; }
+    function updateSaveState() {
+      const v = qtyVal();
+      saveBtn.disabled = !(picked && draftTarget[picked] && v !== null && v >= 1 && v <= remaining);
+    }
+
+    function draw() {
+      body.innerHTML = `
+        <div class="field">
+          <label>보유 대상</label>
+          <label class="radio-row"><input type="radio" name="ha-kind" value="employee"${picked === "employee" ? " checked" : ""}><span>구성원</span></label>
+          ${picked === "employee" ? `<div class="perm-target-wrap">${targetSummaryHtml("employee")}</div>` : ""}
+          <label class="radio-row"><input type="radio" name="ha-kind" value="worksite"${picked === "worksite" ? " checked" : ""}><span>근무지</span></label>
+          ${picked === "worksite" ? `<div class="perm-target-wrap">${targetSummaryHtml("worksite")}</div>` : ""}
+        </div>
+        <div class="field">
+          <label>보유 수량</label>
+          <div class="qty-stepper">
+            <button type="button" class="qty-step" data-qminus aria-label="수량 감소">－</button>
+            <input type="text" inputmode="numeric" data-qinput placeholder="입력" value="">
+            <button type="button" class="qty-step" data-qplus aria-label="수량 증가">＋</button>
+          </div>
+          <div class="acard-sub" style="margin-top:5px">잔여 수량 <b>${remaining}개</b></div>
+        </div>`;
+      const qinput = body.querySelector("[data-qinput]");
+      if (qtyText) qinput.value = qtyText;
+
+      body.querySelectorAll('input[name="ha-kind"]').forEach(r => r.onchange = () => { picked = r.value; draw(); });
+      const openBtn = body.querySelector("[data-target-open]");
+      if (openBtn) openBtn.onclick = () => {
+        if (picked === "employee") openAssignMemberPicker(draftTarget.employee, v => { draftTarget.employee = v; draw(); }, heldNames);
+        else openAssignWorksitePicker(draftTarget.worksite, v => { draftTarget.worksite = v; draw(); }, heldNames);
+      };
+      const clearBtn = body.querySelector("[data-target-clear]");
+      if (clearBtn) clearBtn.onclick = e => { e.stopPropagation(); draftTarget[picked] = null; draw(); };
+
+      const minus = body.querySelector("[data-qminus]");
+      const plus = body.querySelector("[data-qplus]");
+      const val = () => { const n = parseInt(qinput.value, 10); return Number.isFinite(n) ? n : null; };
+      const syncQty = () => {
+        const v = val();
+        minus.disabled = v === null || v <= 1;
+        plus.disabled = v === null || v >= remaining;
+        updateSaveState();
+      };
+      qinput.addEventListener("input", () => { qinput.value = qinput.value.replace(/[^0-9]/g, ""); qtyText = qinput.value; syncQty(); });
+      minus.onclick = () => { const v = val(); if (v !== null && v > 1) { qinput.value = v - 1; qtyText = qinput.value; syncQty(); } };
+      plus.onclick = () => { const v = val() ?? 0; if (v < remaining) { qinput.value = v + 1; qtyText = qinput.value; syncQty(); } };
+      syncQty();
+    }
+    draw();
+
+    back.addEventListener("click", e => { if (e.target === back) back.remove(); });
+    back.querySelector("[data-close]").onclick = () => back.remove();
+    saveBtn.onclick = () => {
+      if (saveBtn.disabled) return;
+      const v = qtyVal();
+      const record = picked === "employee"
+        ? { employee: draftTarget.employee, worksite: null, qty: v }
+        : { employee: null, worksite: draftTarget.worksite, qty: v };
+      confirmModal("보유 대상을 추가하시겠습니까?", () => {
+        back.remove();
+        (a.stocks || (a.stocks = [])).push(record);
+        deriveQtyStatus(a);
+        logActivity(a, { script: "보유 대상 추가", target: record, before: "", after: `${v}개` });
+        toast("추가되었습니다.");
+        render();
+      });
+    };
+  }
+
   // 구성원 선택 — 단일 선택(라디오), 검색(이름/사번/휴대폰번호)+목록. category.js의 openMemberPicker(다중선택)와
   // 달리 배정 대상은 정확히 1명이라 더 가벼운 단일 리스트로 구성. 2차 모달이라 .modal.sm(뒤 모달 가장자리가
   // 보이게 해서 겹쳐 떠 있음을 인지시킴). 검색창은 고정, 목록만 스크롤(footer가 항상 보이게)
   function openAssignMemberPicker(initial, onApply, exclude) {
     let picked = initial;
     let query = "";
+    const excludeNames = [].concat(exclude || []).filter(Boolean);
     const p = document.createElement("div");
     p.className = "modal-back";
     p.style.zIndex = 340;
@@ -732,7 +854,7 @@
     const list = p.querySelector("[data-list]");
     function renderList() {
       const q = query.trim().toLowerCase();
-      const filtered = MEMBERS.filter(m => m.name !== exclude && (!q || m.name.includes(q) || m.empNo.includes(q) || m.phone.includes(q)));
+      const filtered = MEMBERS.filter(m => !excludeNames.includes(m.name) && (!q || m.name.includes(q) || m.empNo.includes(q) || m.phone.includes(q)));
       list.innerHTML = filtered.length ? filtered.map(m => `
         <label class="picker-member-row">
           <input type="radio" name="aa-member" value="${m.name}"${picked === m.name ? " checked" : ""}>
@@ -753,6 +875,7 @@
   function openAssignWorksitePicker(initial, onApply, exclude) {
     let picked = initial;
     let query = "";
+    const excludeNames = [].concat(exclude || []).filter(Boolean);
     const p = document.createElement("div");
     p.className = "modal-back";
     p.style.zIndex = 340;
@@ -772,7 +895,7 @@
     const list = p.querySelector("[data-list]");
     function renderList() {
       const q = query.trim().toLowerCase();
-      const filtered = Object.keys(WS_CODE).filter(name => name !== exclude && (!q || name.toLowerCase().includes(q) || WS_CODE[name].toLowerCase().includes(q)));
+      const filtered = Object.keys(WS_CODE).filter(name => !excludeNames.includes(name) && (!q || name.toLowerCase().includes(q) || WS_CODE[name].toLowerCase().includes(q)));
       list.innerHTML = filtered.length ? filtered.map(name => `
         <label class="picker-member-row">
           <input type="radio" name="aa-worksite" value="${name}"${picked === name ? " checked" : ""}>
@@ -951,7 +1074,11 @@
     const statusBadge = isIndiv && statusItems.length
       ? `<button class="badge ${STATUS_LABEL[a.status][1]} clickable" data-statuschange>${STATUS_LABEL[a.status][0]} <span class="bchev">▾</span></button>`
       : `<span class="badge ${STATUS_LABEL[a.status][1]}">${STATUS_LABEL[a.status][0]}</span>`;
-    const subMeta = `<div>${statusBadge}</div>${isIndiv && a.assetNo ? `<div style="margin-top:5px">고유관리번호 <b>${a.assetNo}</b></div>` : ""}`;
+    const subMeta = `<div>${statusBadge}</div>${
+      isIndiv && a.assetNo ? `<div style="margin-top:5px">고유관리번호 <b>${a.assetNo}</b></div>` : ""
+    }${
+      !isIndiv ? `<div style="margin-top:5px">총 <b>${a.totalQty}개</b></div>` : ""
+    }`;
 
     const QR_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM19 14h2v2h-2zM14 19h2v2h-2zM19 19h2v2h-2z"/></svg>`;
     const qrBtn = `<button class="btn sm icon-only" data-qr aria-label="QR 라벨" title="QR 라벨">${QR_ICON}</button>`;
@@ -999,12 +1126,11 @@
         </section>`;
     } else {
       const stocks = a.stocks || [];
-      const total = stocks.reduce((s, x) => s + x.qty, 0);
       holdCard = `
         <section class="dcard" id="stock-card">
           <div class="dsection-head">
             <div class="dtabs">
-              <button data-stab="current" class="active">보유 현황 <span class="chip">총 ${total}개</span></button>
+              <button data-stab="current" class="active">보유 현황</button>
               <button data-stab="history">이력</button>
             </div>
             <div class="hactions" id="stock-actions">${btn("보유 대상 추가")}</div>
@@ -1103,6 +1229,9 @@
       stockQ.oninput = refreshStock;
       historyQ.oninput = () => { sbody.innerHTML = timelineHtml(a, historyQ.value); };
       wireStockCards(sbody, a);
+      // bindActs(c)가 위에서 이미 이 버튼도 잡아 스텁 토스트로 바인딩했으므로, 실제 핸들러로 덮어씀
+      const saddBtn = sactions.querySelector("[data-act]");
+      if (saddBtn) saddBtn.onclick = () => openHoldAddModal(a);
 
       scard.querySelectorAll("[data-stab]").forEach(t => t.onclick = () => {
         scard.querySelectorAll("[data-stab]").forEach(x => x.classList.toggle("active", x === t));

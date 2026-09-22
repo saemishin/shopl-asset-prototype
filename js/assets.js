@@ -331,7 +331,7 @@
   }
 
   function view_product_quantity(list) {
-    const head = `<tr><th>품목명</th><th>분류</th><th class="num">보유 수량</th><th class="num">보유 대상</th><th>유효기한</th></tr>`;
+    const head = `<tr><th>품목명</th><th>분류</th><th class="num">전체 보유 수량</th><th class="num">현재 보유 수량</th><th class="num">잔여 수량</th><th class="num">보유 대상</th><th>유효기한</th></tr>`;
     const groups = groupByProduct(list.filter(a => a.type === "quantity"));
     const sorted = sortList(groups);
     const paged = pageSlice(sorted);
@@ -344,7 +344,9 @@
       return `<tr class="clickable" data-pkey="${g.sub}|${g.product}">
         <td><div class="prodcell">${thumb(a)}<span class="pname">${g.product}</span></div></td>
         <td>${g.group} <span class="muted">›</span> ${g.sub}</td>
+        <td class="num">${a.totalQty}</td>
         <td class="num">${qty}</td>
+        <td class="num">${a.totalQty - qty}</td>
         <td class="num">${targets}</td>
         <td>${a.expiry ? window.fmtDate(a.expiry) : '<span class="muted">—</span>'}</td>
       </tr>`;
@@ -706,10 +708,11 @@
       });
 
     c.querySelectorAll(".statcol.click").forEach(el => el.onclick = () => {
-      const p = JSON.parse(el.dataset.filter);
-      const isOn = arrEq(state.filters[p.k], p.v);
+      const p = JSON.parse(el.dataset.filter);   // {필드명: 값배열, ...} — 필드 여러 개 동시 지정 가능
+      const keys = Object.keys(p);
+      const isOn = keys.every(k => arrEq(state.filters[k], p[k]));
       const base = { ...emptyFilters(), category: state.filters.category };
-      state.filters = isOn ? base : { ...base, [p.k]: p.v };
+      state.filters = isOn ? base : { ...base, ...p };
       state.page = 1;
       render();
     });
@@ -809,6 +812,7 @@
     const indiv = list.filter(a => a.type === "individual");
     const qty = list.filter(a => a.type === "quantity");
     const cnt = k => indiv.filter(a => a.status === k).length;
+    const qtyCnt = k => qty.filter(a => a.status === k).length;
     const expOver = list.filter(a => a.expiry && expiryKey(a.expiry) === "over").length;
     const expSoon = list.filter(a => a.expiry && expiryKey(a.expiry) === "soon").length;
     const assignable = indiv.length - cnt("disposed");
@@ -818,9 +822,14 @@
       lost: cnt("lost"), disposed: cnt("disposed"), assignable,
       expOver, expSoon,
       rate: assignable ? Math.round(cnt("assigned") / assignable * 100) : 0,
+      // 수량형은 폐기 개념이 없어 제외 없이 전체 대비 비율(개별형 배정률과 동일 원리, 4.3 "보유 대상 없음" 참조)
+      qtyHeld: qtyCnt("held"), qtyStock: qtyCnt("stock"),
+      qtyRate: qty.length ? Math.round(qtyCnt("held") / qty.length * 100) : 0,
     };
   }
   function arrEq(a, b) { a = a || []; b = b || []; return a.length === b.length && a.every(x => b.includes(x)); }
+  // filter는 {필드명: 값배열, ...} 형태 — 여러 필드를 동시에 지정 가능(예: 재고처럼 개별·수량형이 값을
+  // 공유하는 상태는 type도 같이 지정해야 그 카드가 대표하는 자산 유형으로만 정확히 필터링됨)
   function statCol({ k, v, sub, cls = "", filter, extra = "" }) {
     const attr = filter ? ` class="statcol click ${cls}" data-filter='${JSON.stringify(filter)}'` : ` class="statcol ${cls}"`;
     return `<div${attr}>${extra}<div><div class="statcol-k">${k}</div><div class="statcol-v">${v}${sub ? ` <small>${sub}</small>` : ""}</div></div></div>`;
@@ -832,23 +841,30 @@
     const s = computeStats();
     const row1 = `<div class="statrow2">
       ${statCard("자산 유형", [
-        statCol({ k: "개별 자산", v: s.indivN, sub: "개", filter: { k: "type", v: ["individual"] } }),
-        statCol({ k: "수량 자산", v: s.qtyN, sub: "종류", filter: { k: "type", v: ["quantity"] } }),
+        statCol({ k: "개별 자산", v: s.indivN, sub: "개", filter: { type: ["individual"] } }),
+        statCol({ k: "수량 자산", v: s.qtyN, sub: "종류", filter: { type: ["quantity"] } }),
       ])}
       ${statCard("유효기간", [
-        statCol({ k: "만료 예정", v: s.expSoon, cls: "warn", filter: { k: "expiry", v: ["soon"] } }),
-        statCol({ k: "만료", v: s.expOver, cls: "alert", filter: { k: "expiry", v: ["over"] } }),
+        statCol({ k: "만료 예정", v: s.expSoon, cls: "warn", filter: { expiry: ["soon"] } }),
+        statCol({ k: "만료", v: s.expOver, cls: "alert", filter: { expiry: ["over"] } }),
       ])}
     </div>`;
     const row2 = `<div class="statrow2">
       ${statCard("개별 자산 요약", [
         statCol({
-          k: "배정 중", v: `${s.rate}%`, sub: `${s.assigned}/${s.assignable}`, filter: { k: "status", v: ["assigned"] },
+          k: "배정 중", v: `${s.rate}%`, sub: `${s.assigned}/${s.assignable}`, filter: { status: ["assigned"] },
           extra: `<div class="donut" style="--pct:${s.rate}"><div class="donut-hole"></div></div>`,
         }),
-        statCol({ k: "재고", v: s.stock, filter: { k: "status", v: ["stock"] } }),
-        statCol({ k: "분실", v: s.lost, cls: "alert", filter: { k: "status", v: ["lost"] } }),
-        statCol({ k: "수리 중", v: s.repair, cls: "warn", filter: { k: "status", v: ["repair"] } }),
+        statCol({ k: "재고", v: s.stock, filter: { type: ["individual"], status: ["stock"] } }),
+        statCol({ k: "분실", v: s.lost, cls: "alert", filter: { status: ["lost"] } }),
+        statCol({ k: "수리 중", v: s.repair, cls: "warn", filter: { status: ["repair"] } }),
+      ])}
+      ${statCard("수량 자산 요약", [
+        statCol({
+          k: "보유 중", v: `${s.qtyRate}%`, sub: `${s.qtyHeld}/${s.qtyN}`, filter: { status: ["held"] },
+          extra: `<div class="donut" style="--pct:${s.qtyRate}"><div class="donut-hole"></div></div>`,
+        }),
+        statCol({ k: "재고", v: s.qtyStock, filter: { type: ["quantity"], status: ["stock"] } }),
       ])}
     </div>`;
     return `<div class="statwrap">${row1}${row2}</div>`;

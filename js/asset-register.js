@@ -247,6 +247,7 @@
           <div class="field" id="areg-assetno"><label>고유관리번호 <span class="req">*</span></label><input type="text" id="areg-assetno-input" placeholder="입력" maxlength="30">
             <p class="field-err" data-assetno-err hidden>동일한 명칭이 존재합니다.</p>
           </div>
+          <div class="field" id="areg-totalqty-field"><label>총 수량 <span class="req">*</span></label><input type="text" inputmode="numeric" id="areg-totalqty-input" placeholder="입력" maxlength="6"></div>
           <div class="field" id="areg-expiry-field"><label>유효기한</label>${dateFieldHtml()}</div>
           <div class="field">
             <div class="field-label-row">
@@ -274,6 +275,8 @@
     const assetNoField = back.querySelector("#areg-assetno");
     const assetNoInput = back.querySelector("#areg-assetno-input");
     const assetNoErr = back.querySelector("[data-assetno-err]");
+    const totalQtyField = back.querySelector("#areg-totalqty-field");
+    const totalQtyInput = back.querySelector("#areg-totalqty-input");
     const expiryField = back.querySelector("#areg-expiry-field");
     const dtext = back.querySelector("[data-dtext]");
     const dnative = back.querySelector("[data-dnative]");
@@ -291,7 +294,8 @@
       assetNoErr.hidden = !dup;
       assetNoInput.classList.toggle("has-err", dup);
       const noOk = type === "quantity" ? true : (noVal.length > 0 && !dup);
-      saveBtn.disabled = !(catValue && nameOk && noOk);
+      const totalQtyOk = type === "quantity" ? /^[1-9][0-9]*$/.test(totalQtyInput.value.trim()) : true;
+      saveBtn.disabled = !(catValue && nameOk && noOk && totalQtyOk);
     }
     // 품목명 자동완성 — "소분류+품목명" 조합이 품목 단위라, 같은 소분류에 이미 등록된 품목명을 제안해서
     // 띄어쓰기·표기 차이로 같은 품목이 여러 이름으로 쪼개지는 걸 막음. 태그와 달리 목록에 없는 새 이름도 항상 입력 가능(강제 선택 아님)
@@ -365,6 +369,10 @@
       }
       checkValid();
     });
+    totalQtyInput.addEventListener("input", () => {
+      totalQtyInput.value = totalQtyInput.value.replace(/[^0-9]/g, "");
+      checkValid();
+    });
 
     // 소분류 — 검색 + 대분류/소분류 트리 모달(openCategoryPickModal)에서 단일 선택.
     // 기본은 비워둔 상태(자동 첫 항목 선택 없음) — 미선택 상태에선 고유관리번호 등 유형별 필드를 모두 노출.
@@ -375,6 +383,9 @@
     function catLabel(v) { const c = findCat(v); return c ? `${c.group} › ${c.sub}` : ""; }
     function applyAssetNoVisibility() {
       assetNoField.style.display = (catValue && type === "quantity") ? "none" : "";
+      // 총 수량은 개별형엔 없는 개념(실물 1개=Asset 1건이라 총 수량이 항상 1, 구조설계안 3.4) — 고유관리번호와
+      // 반대로 개별형일 때만 숨김(미선택 상태에선 다른 유형별 필드와 동일하게 노출)
+      totalQtyField.style.display = (catValue && type === "individual") ? "none" : "";
     }
     function renderCatDisplay() {
       if (catValue) { catDisplay.textContent = catLabel(catValue); catDisplay.style.color = "var(--text)"; }
@@ -386,6 +397,7 @@
       assetNoInput.value = "";
       assetNoErr.hidden = true;
       assetNoInput.classList.remove("has-err");
+      totalQtyInput.value = "";
       dtext.value = "";
       dnative.value = "";
       tags.length = 0;
@@ -395,8 +407,8 @@
     // hover 시 이유를 안내(data-tip). [태그 관리]는 이 자산과 무관한 전역 기능이라 잠그지 않음
     const LOCK_TIP = "소분류를 먼저 선택해주세요.";
     function setLocked(locked) {
-      [nameInput, assetNoInput, dtext, dnative, tagInput].forEach(el => { el.disabled = locked; });
-      [nameField, assetNoField, expiryField].forEach(el => {
+      [nameInput, assetNoInput, totalQtyInput, dtext, dnative, tagInput].forEach(el => { el.disabled = locked; });
+      [nameField, assetNoField, totalQtyField, expiryField].forEach(el => {
         el.classList.toggle("lock-hint", locked);
         if (locked) el.setAttribute("data-tip", LOCK_TIP); else el.removeAttribute("data-tip");
       });
