@@ -514,6 +514,15 @@ button.usebullet { background: var(--panel); font: inherit; cursor: pointer; }
   border-radius: 50%; border: 1px solid var(--text-mut); color: var(--text-mut); font-size: 10px; font-weight: 700; vertical-align: middle;
 }
 .help-icon:hover { border-color: var(--primary); color: var(--primary); }
+/* 통계 카드의 소진/미보유대상처럼 문장 단위 설명이 필요한 곳 — 기존 data-tip은 대부분 짧은 라벨이라
+   nowrap이었는데, 여기는 문장이라 줄바꿈 허용 + 너비 제한 */
+.stat-help { cursor: default; }
+.stat-help[data-tip] { position: relative; }
+.stat-help[data-tip]:hover::after {
+  content: attr(data-tip); position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%);
+  margin-bottom: 6px; background: #1b1d1f; color: #fff; font-size: 11px; line-height: 1.4; padding: 6px 9px;
+  border-radius: 6px; white-space: normal; width: 200px; z-index: 20;
+}
 .help-modal { width: 420px; }
 .help-modal-head { display: flex; align-items: center; justify-content: space-between; padding: 18px 20px; border-bottom: 1px solid var(--line); }
 .help-modal .help-modal-head h3 { padding: 0; border: 0; font-size: 17px; font-weight: 700; }

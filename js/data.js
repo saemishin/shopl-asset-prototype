@@ -120,7 +120,8 @@ window.DATA = (function () {
       status: "assigned", serial: "CN-0KL-79", createdAt: "2021-11-16", purchaseDate: "2021-11-15", price: 690000, expiry: "",
       labels: ["본사"], assignments: [{ employee: null, worksite: "본사", since: "2022-03-01" }] },
 
-    // total_qty 120, 배분합계 115 — 잔여 5개(미배분) 시연용 샘플
+    // total_qty 120, 배분합계 115 — 잔여 5개(미배분, 소진 아님) 시연용. 한소희는 0개 보유(소진이 아닌
+    // 품목에 속한 0개짜리 보유 대상이라 "미보유대상" 통계에 실제로 잡히는 유일한 샘플)
     { id: "A101", type: "quantity", assetNo: "", product: "2026 하복 유니폼", group: "소모품", sub: "유니폼",
       status: "held", totalQty: 120, serial: "", createdAt: "2026-04-02", purchaseDate: "2026-04-01", price: 18000, manufactured: "2026-03-15",
       expiry: "2027-04-01", note: "L/XL 사이즈 위주 소진 빠름", photo: "#e67e22", photoCount: 10,
@@ -129,6 +130,7 @@ window.DATA = (function () {
         { worksite: "판교점", employee: null, qty: 40 },
         { worksite: null, employee: "김철수", qty: 12 },
         { worksite: null, employee: "오세훈", qty: 3 },
+        { worksite: null, employee: "한소희", qty: 0 },
       ] },
     { id: "A102", type: "quantity", assetNo: "", product: "USB-C 케이블 2m", group: "전자기기류", sub: "케이블·액세서리",
       status: "held", totalQty: 47, serial: "", createdAt: "2025-09-11", purchaseDate: "2025-09-10", price: 9000, expiry: "",
