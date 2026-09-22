@@ -98,6 +98,11 @@
   }
   const IC_EMP = `<svg class="hi" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5.5 20c0-4 3-6.5 6.5-6.5s6.5 2.5 6.5 6.5"/></svg>`;
   const IC_WS = `<svg class="hi" viewBox="0 0 24 24"><path d="M4 20V9.5L12 4l8 5.5V20"/><path d="M9.5 20v-5h5v5"/></svg>`;
+  // 소진 — 수량형 전용, 잔여 수량(total_qty - 배분합계)이 0인 상태(구조설계안 2.1). 상태값(재고/보유중)과는
+  // 별개의 파생 조건이라 STATUS_LABEL이 아니라 이 헬퍼로 별도 계산
+  function isDepleted(a) {
+    return a.type === "quantity" && a.totalQty - (a.stocks || []).reduce((s, x) => s + x.qty, 0) === 0;
+  }
   function holderText(a) {
     if (a.type === "individual") {
       const as = a.assignments || [];
@@ -121,8 +126,10 @@
     // 상세 페이지 보유 현황 카드와 동일하게 이름 가나다순
     const sorted = [...stocks].sort((p, q) => (p.employee || p.worksite).localeCompare(q.employee || q.worksite, "ko"));
     const targets = sorted.map(x => x.employee ? `${IC_EMP}${x.employee}` : `${IC_WS}${x.worksite}`);
-    if (sorted.length === 1) return targets.join(" ");
-    return `${targets[0]} <span class="muted">+${targets.length - 1}</span>`;
+    // 소진(잔여 0)은 상태 컬럼에 드러나지 않아서, 필터 결과가 왜 걸렸는지 알 수 있도록 여기 작게 표시
+    const depletedTag = isDepleted(a) ? ' <span class="muted">· 소진</span>' : "";
+    if (sorted.length === 1) return targets.join(" ") + depletedTag;
+    return `${targets[0]} <span class="muted">+${targets.length - 1}</span>${depletedTag}`;
   }
   function thumb(a) {
     const ph = window.assetPhotos(a);            // 대표 사진 (상세와 공유)
@@ -166,7 +173,7 @@
     page: 1,
     pageSize: 20,
     sort: { key: "updatedAt", dir: "desc" },
-    filters: { category: [], type: [], status: [], expiry: [], labels: [], note: [] },
+    filters: { category: [], type: [], status: [], expiry: [], labels: [], note: [], depleted: [] },
     // 품목별 탭 전용 — 개별 자산/수량 자산은 컬럼 구성·클릭 동작이 아예 달라서 한 테이블에 섞지 않고 토글로 구분
     productType: "individual",
   };
@@ -190,7 +197,9 @@
     });
   }
   function emptyFilters() {
-    return { category: [], type: [], status: [], expiry: [], labels: [], note: [] };
+    // depleted(소진)는 상태값이 아니라 파생 조건이라 상태 필터 모달·헤더 필터엔 없음 — 전체 탭 통계
+    // "수량 자산 요약" 카드의 "소진" 클릭으로만 켜고 끔
+    return { category: [], type: [], status: [], expiry: [], labels: [], note: [], depleted: [] };
   }
 
   function getFiltered() {
@@ -204,6 +213,7 @@
       // 타입별로 겹치지 않아(held는 수량형만, assigned/repair/lost/disposed는 개별형만) 자연히 분리됨
       if (f.status.length && !f.status.includes(a.status)) return false;
       if (f.expiry.length && !f.expiry.includes(expiryKey(a.expiry))) return false;
+      if (f.depleted.length && !isDepleted(a)) return false;
       if (f.note.length && !f.note.includes(a.note ? "has" : "none")) return false;
       if (f.labels.length) {
         const has = f.labels.filter(l => (a.labels || []).includes(l));
@@ -218,7 +228,7 @@
   }
   function activeFilterCount() {
     const f = state.filters;
-    return f.category.length + f.type.length + f.status.length + f.expiry.length + f.labels.length + f.note.length;
+    return f.category.length + f.type.length + f.status.length + f.expiry.length + f.labels.length + f.note.length + f.depleted.length;
   }
   function pageSlice(arr) {
     const totalPages = Math.max(1, Math.ceil(arr.length / state.pageSize));
@@ -577,6 +587,7 @@
     f.type.forEach(t => push("type", TYPE_LABEL[t], t));
     f.status.forEach(s => push("status", STATUS_LABEL[s][0], s));
     f.expiry.forEach(e => push("expiry", EXP_LABEL[e], e));
+    f.depleted.forEach(() => push("depleted", "소진", "yes"));
     f.note.forEach(n => push("note", n === "has" ? "있음" : "없음", n));
     f.labels.forEach(l => push("labels", l, l));
     if (!chips.length) return "";
@@ -587,7 +598,7 @@
     // 필터·검색 조건 때문에 0건인 것과 애초에 등록된 자산 자체가 없는 것을 구분
     const filtering = activeFilterCount() > 0 || !!state.search.trim();
     const emptyMsg = filtering ? "결과가 없습니다." : "등록된 자산이 없습니다.";
-    const colspan = state.view === "product" ? (state.productType === "quantity" ? 5 : 8)
+    const colspan = state.view === "product" ? (state.productType === "quantity" ? 7 : 8)
       : state.view === "employee" ? 4 : state.view === "worksite" ? 3 : 10;
     const empty = `<tr><td colspan="${colspan}" style="text-align:center;color:var(--text-mut);padding:32px">${emptyMsg}</td></tr>`;
     const cls = state.view === "product" ? `tbl-product tbl-product-${state.productType}` : `tbl-${state.view}`;
@@ -776,7 +787,8 @@
     const stocks = a.stocks || [];
     if (!stocks.length) return "";
     const sorted = [...stocks].sort((p, q) => (p.employee || p.worksite).localeCompare(q.employee || q.worksite, "ko"));
-    return sorted.map(x => `${x.employee || x.worksite}(${x.qty}개)`).join(", ");
+    const list = sorted.map(x => `${x.employee || x.worksite}(${x.qty}개)`).join(", ");
+    return isDepleted(a) ? `${list} (소진)` : list;
   }
   // 현황 "다운로드" — 지금 적용된 필터·검색 전체 범위(페이지네이션 무관)를 실제 엑셀로 즉시 생성해 다운로드.
   // 컬럼 구성은 테이블에 보이는 컬럼을 그대로 옮긴 1차안(구조설계안 7장 TODO — 정식 컬럼 정의 필요)
@@ -825,6 +837,7 @@
       // 수량형은 폐기 개념이 없어 제외 없이 전체 대비 비율(개별형 배정률과 동일 원리, 4.3 "보유 대상 없음" 참조)
       qtyHeld: qtyCnt("held"), qtyStock: qtyCnt("stock"),
       qtyRate: qty.length ? Math.round(qtyCnt("held") / qty.length * 100) : 0,
+      qtyDepleted: qty.filter(isDepleted).length,
     };
   }
   function arrEq(a, b) { a = a || []; b = b || []; return a.length === b.length && a.every(x => b.includes(x)); }
@@ -865,6 +878,7 @@
           extra: `<div class="donut" style="--pct:${s.qtyRate}"><div class="donut-hole"></div></div>`,
         }),
         statCol({ k: "재고", v: s.qtyStock, filter: { type: ["quantity"], status: ["stock"] } }),
+        statCol({ k: "소진", v: s.qtyDepleted, cls: "warn", filter: { depleted: ["yes"] } }),
       ])}
     </div>`;
     return `<div class="statwrap">${row1}${row2}</div>`;
