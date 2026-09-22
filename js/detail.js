@@ -293,7 +293,10 @@
         const np = p.x.employee || p.x.worksite, nq = q2.x.employee || q2.x.worksite;
         return np.localeCompare(nq, "ko");
       });
-    if (!rows.length) return '<p class="muted" style="padding:6px 0">일치하는 보유 대상이 없습니다</p>';
+    // 검색 중 결과 없음과 완전 미보유(레코드 자체가 0건)는 다른 상황이라 문구도 구분
+    if (!rows.length) return q
+      ? '<p class="muted" style="padding:6px 0">일치하는 보유 대상이 없습니다</p>'
+      : '<p class="muted" style="padding:6px 0">보유 대상이 없습니다.</p>';
     return `<div class="acard-list">${rows.map(({ x, idx }) => `
       <div class="acard" data-idx="${idx}">
         ${typeBadge(x)}
@@ -385,7 +388,7 @@
   // 정렬: 배정일 내림차순(최신 배정이 위로)
   function assignCurrentHtml(a) {
     const asg = a.assignments || [];
-    if (!asg.length) return '<p class="muted" style="padding:6px 0">배정 없음 (재고 상태)</p>';
+    if (!asg.length) return '<p class="muted" style="padding:6px 0">배정 대상이 없습니다.</p>';
     const rows = asg.map((x, idx) => ({ x, idx }))
       .sort((p, q) => p.x.since === q.x.since ? 0 : (p.x.since < q.x.since ? 1 : -1));
     return `<div class="acard-list">${rows.map(({ x, idx }) => `

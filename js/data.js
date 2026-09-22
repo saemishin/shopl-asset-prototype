@@ -148,6 +148,10 @@ window.DATA = (function () {
         { worksite: "판교점", employee: null, qty: 25 },
         { worksite: "본사", employee: null, qty: 8 },
       ] },
+    // 보유 대상 0건(완전 미보유) 샘플 — 상세 페이지 보유 현황 빈 상태 문구 확인용
+    { id: "A105", type: "quantity", assetNo: "", product: "무선 마우스", group: "전자기기류", sub: "케이블·액세서리",
+      status: null, serial: "", createdAt: "2026-08-01", purchaseDate: "2026-07-30", price: 25000, expiry: "",
+      labels: [], stocks: [] },
   ];
 
   // 태그 마스터 목록 — 기존 자산들에 찍힌 distinct 라벨로 초기 시드(태그 관리 모달 도입 이후로는 이 배열이 기준이 됨)
