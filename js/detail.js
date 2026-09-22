@@ -581,10 +581,11 @@
     };
   }
 
-  // 재배정 — 구조설계안 2.3 "별도 액션이 아니라 반납 후 신규 배정을 이어서 실행하는 조합". 배정 추가와
-  // 거의 같은 UI(대상 라디오+피커+날짜)를 세로로 이어붙이되: (1) 위에 현재 배정을 읽기전용 카드로 보여주고,
-  // (2) 새 대상 후보에서 현재 대상은 제외(같은 대상으로 날짜만 바꾸고 싶으면 배정일 수정을 쓰면 되므로 역할이
-  // 안 겹치게), (3) 무슨 일이 일어나는지 모달 상단에 상시 안내(확인 팝업까지 가기 전에 알 수 있어야 함)
+  // 재배정 — 구조설계안 2.3 "반납·신규배정과 구분되는 독립 액션. 기존 활성 레코드의 배정 대상을 새 대상으로
+  // 교체(레코드가 종료되지 않고 유지됨, 반납 상태를 거치지 않음)". 배정 추가와 거의 같은 UI(대상 라디오+피커
+  // +날짜)를 세로로 이어붙이되: (1) 위에 현재 배정을 읽기전용 카드로 보여주고, (2) 새 대상 후보에서 현재
+  // 대상은 제외(같은 대상으로 날짜만 바꾸고 싶으면 배정일 수정을 쓰면 되므로 역할이 안 겹치게), (3) 무슨
+  // 일이 일어나는지 모달 상단에 상시 안내(확인 팝업까지 가기 전에 알 수 있어야 함)
   function openReassignModal(a, idx) {
     const old = a.assignments[idx];
     let picked = null; // "employee" | "worksite"
@@ -621,7 +622,7 @@
     function draw() {
       body.innerHTML = `
         <div class="ra-current">
-          <div class="perm-info-note">${INFO_ICON}<span>기존 배정은 반납 처리되고, 새 배정이 추가됩니다.</span></div>
+          <div class="perm-info-note">${INFO_ICON}<span>기존 배정이 새 대상으로 교체됩니다.</span></div>
           <div class="acard">
             ${typeBadge(old)}
             <div class="acard-id">${assignIdentity(old)}</div>
@@ -669,9 +670,14 @@
         : { employee: null, worksite: draftTarget.worksite, since: d };
       confirmModal("재배정하시겠습니까?", () => {
         back.remove();
-        a.assignments.splice(idx, 1, record); // 반납(기존 레코드 제거) + 신규 배정(같은 자리에 교체)을 한 번에
-        logActivity(a, { script: "반납", target: old, before: window.fmtDate(old.since), after: "" });
-        logActivity(a, { script: "신규 배정", target: record, before: "", after: window.fmtDate(d) });
+        // 반납+신규배정 조합이 아니라 기존 활성 레코드의 대상 자체를 그 자리에서 교체(레코드는 종료되지 않음,
+        // 구조설계안 2.3 — 재배정은 반납·신규배정과 구분되는 독립 액션). target을 특정 한쪽으로 고정할 수
+        // 없어(대상 자체가 바뀌는 게 요지) 상태 변경류 로그(수리 접수 등)와 동일하게 target 없이 before/after
+        // 텍스트로 표현
+        const beforeLabel = `${old.employee || old.worksite} · ${window.fmtDate(old.since)}`;
+        const afterLabel = `${record.employee || record.worksite} · ${window.fmtDate(d)}`;
+        a.assignments[idx] = record;
+        logActivity(a, { script: "재배정", before: beforeLabel, after: afterLabel });
         toast("재배정되었습니다.");
         render();
       });
