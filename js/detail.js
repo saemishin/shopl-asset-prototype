@@ -487,6 +487,25 @@
       const row = b.closest(".acard");
       openReassignModal(a, +row.dataset.idx);
     });
+    scope.querySelectorAll('[data-act="반납"]').forEach(b => b.onclick = () => {
+      const row = b.closest(".acard");
+      returnAssignment(a, +row.dataset.idx);
+    });
+  }
+
+  // 반납 — 입력할 값이 없는 액션(구조설계안엔 "배정일 수정"만 있고 "반납일 수정"은 없음, returned_at은
+  // 실제 조작 시점으로 자동 기록). 확인 모달만으로 처리
+  function returnAssignment(a, idx) {
+    const old = a.assignments[idx];
+    confirmModal("반납 처리하시겠습니까?", () => {
+      a.assignments.splice(idx, 1);
+      // 재고⟷배정중만 배정/반납으로 자동 파생 — 남은 활성 레코드가 없을 때만 재고로 전환(공동배정 중 일부만
+      // 반납이면 나머지 활성 레코드가 있으므로 유지)
+      if (a.assignments.length === 0 && a.status === "assigned") a.status = "stock";
+      logActivity(a, { script: "반납", target: old, before: window.fmtDate(old.since), after: "" });
+      toast("반납되었습니다.");
+      render();
+    });
   }
 
   // 배정 추가 — 대상(구성원/근무지 중 1개, 구조설계안 2.1 "정확히 1개 필수") + 배정일.
