@@ -1319,6 +1319,7 @@
       isIndiv ? { k: "IMEI", field: "imei", v: a.imei || '<span class="muted">—</span>' } : null,
       { k: "제조연월일", field: "manufactured", v: a.manufactured ? window.fmtDate(a.manufactured) : '<span class="muted">—</span>' },
       { k: "구매일", field: "purchaseDate", v: a.purchaseDate ? window.fmtDate(a.purchaseDate) : "—" },
+      // "원" 고정 — 다국가 통화 지원은 구조설계안 7장 "다국가 통화 지원" 참조(현재는 프로토타입이라 KRW 고정)
       { k: isIndiv ? "구매가격" : "구매가격 (품목 단가)", field: "purchasePrice", v: a.price ? a.price.toLocaleString() + "원" : "—" },
       { k: "자산 등록일", v: window.fmtDate(a.createdAt) },
       { k: "QR 라벨", v: qrBtn },

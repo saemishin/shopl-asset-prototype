@@ -706,6 +706,7 @@
         if (manufactured !== null) setIf("제조연월일 변경", "manufactured", manufactured || undefined, dateFmt);
         const purchaseDate = getPurchaseDate();
         if (purchaseDate !== null) setIf("구매일 변경", "purchaseDate", purchaseDate || undefined, dateFmt);
+        // "원" 고정 — 다국가 통화 지원은 구조설계안 7장 "다국가 통화 지원" 참조(현재는 프로토타입이라 KRW 고정)
         const priceDigits = purchasePriceInput.value.replace(/[^0-9]/g, "");
         setIf("구매가격 변경", "price", priceDigits ? parseInt(priceDigits, 10) : undefined, v => (v != null ? `${v.toLocaleString()}원` : ""));
         setIf("메모 수정", "note", noteInput.value.trim() || undefined);

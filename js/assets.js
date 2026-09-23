@@ -849,6 +849,7 @@
       a.type === "individual" ? (a.imei || "") : "",
       a.manufactured ? window.fmtDate(a.manufactured) : "",
       a.purchaseDate ? window.fmtDate(a.purchaseDate) : "",
+      // "원" 고정 — 다국가 통화 지원은 구조설계안 7장 "다국가 통화 지원" 참조(현재는 프로토타입이라 KRW 고정)
       a.price != null ? `${a.price.toLocaleString()}원` : "",
       a.note || "",
       window.fmtDate(a.createdAt),
