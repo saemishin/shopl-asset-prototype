@@ -226,6 +226,25 @@ window.DATA = (function () {
   window.fmtDateTime = s => { if (!s) return "—"; const d = parse(s); return `${window.fmtDate(s)} ${p(d.getHours())}:${p(d.getMinutes())}`; };
 })();
 
+/* 구매가격 통화 표기 — 자산마다 다른 게 아니라 클라이언트(회사) 단위로 하나만 설정되는 전역 값(구조설계안 3.4).
+   통화 코드마다 기호 위치(접두/접미)가 달라서 표시 로직을 한 곳에 모아둠 — CLIENT_CURRENCY만 바꾸면
+   화면·엑셀 전체의 구매가격 표기가 같이 바뀜. 지금은 회사 설정 화면이 없어 상수로 고정(기본값 KRW) */
+(function () {
+  const CURRENCY_FORMATS = {
+    KRW: { symbol: "원", position: "suffix" },
+    USD: { symbol: "$", position: "prefix" },
+    JPY: { symbol: "円", position: "suffix" },
+    EUR: { symbol: "€", position: "prefix" },
+  };
+  window.CLIENT_CURRENCY = "KRW";
+  window.formatPrice = function (amount) {
+    if (amount == null) return "";
+    const fmt = CURRENCY_FORMATS[window.CLIENT_CURRENCY] || CURRENCY_FORMATS.KRW;
+    const n = amount.toLocaleString();
+    return fmt.position === "prefix" ? `${fmt.symbol}${n}` : `${n}${fmt.symbol}`;
+  };
+})();
+
 /* 공통 사진 헬퍼 — 목록·상세가 같은 대표 사진을 쓰도록 공유 */
 window.tintHex = function (hex, amt) {
   const n = parseInt(hex.slice(1), 16);
