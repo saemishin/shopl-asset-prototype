@@ -31,21 +31,28 @@
     "최유진": "개발팀", "한소희": "디자인팀", "오세훈": "운영팀",
   };
   const WS_CODE = { "강남점": "GN-01", "판교점": "PG-01", "본사": "HQ-01" };
+  // 근무지별 엑셀 다운로드(아이데이션 중)용 주소 — 실 서비스 DB엔 근무지마다 이미 주소값이 있어서 프로토타입엔 더미로만 시드(assets.js의 WS_ADDRESS와 동일)
+  const WS_ADDRESS = {
+    "강남점": "서울특별시 강남구 테헤란로 129",
+    "판교점": "경기도 성남시 분당구 판교역로 235",
+    "본사": "서울특별시 중구 을지로 100",
+  };
   // 배정 추가 시 대상 후보 목록 — category.js의 MEMBERS와 동일 값(전사 인원 12명, 프로토타입 데모용)
-  // empNo·phone은 assets.js의 MEMBER_INFO와 동일 값(8명), 나머지 4명은 같은 형식으로 새로 시드
+  // empNo·phone은 assets.js의 MEMBER_INFO와 동일 값(8명), 나머지 4명은 같은 형식으로 새로 시드.
+  // grade(등급)는 구성원별 엑셀 다운로드(아이데이션 중)용 — 실 서비스엔 구성원마다 저장돼있는 값, 프로토타입엔 더미로만 시드
   const MEMBERS = [
-    { name: "김민수", team: "개발팀", empNo: "2021001", phone: "010-2001-1234" },
-    { name: "이서연", team: "디자인팀", empNo: "2021015", phone: "010-3412-5678" },
-    { name: "박지훈", team: "영업팀", empNo: "2020032", phone: "010-8823-9910" },
-    { name: "정우성", team: "CS팀", empNo: "2022041", phone: "010-5567-2231" },
-    { name: "김철수", team: "운영팀", empNo: "2019008", phone: "010-9012-4456" },
-    { name: "최유진", team: "개발팀", empNo: "2023019", phone: "010-6634-8821" },
-    { name: "한소희", team: "디자인팀", empNo: "2022055", phone: "010-4478-2093" },
-    { name: "장민호", team: "국내영업", empNo: "2020018", phone: "010-2345-6712" },
-    { name: "오세훈", team: "운영팀", empNo: "2018014", phone: "010-7712-3345" },
-    { name: "배수지", team: "CS팀", empNo: "2021028", phone: "010-3356-7789" },
-    { name: "윤재현", team: "해외영업", empNo: "2019033", phone: "010-4467-8890" },
-    { name: "임하늘", team: "개발팀", empNo: "2022009", phone: "010-5578-9901" },
+    { name: "김민수", team: "개발팀", empNo: "2021001", phone: "010-2001-1234", grade: "Lv.3" },
+    { name: "이서연", team: "디자인팀", empNo: "2021015", phone: "010-3412-5678", grade: "Lv.2" },
+    { name: "박지훈", team: "영업팀", empNo: "2020032", phone: "010-8823-9910", grade: "Lv.4" },
+    { name: "정우성", team: "CS팀", empNo: "2022041", phone: "010-5567-2231", grade: "Lv.1" },
+    { name: "김철수", team: "운영팀", empNo: "2019008", phone: "010-9012-4456", grade: "Lv.5" },
+    { name: "최유진", team: "개발팀", empNo: "2023019", phone: "010-6634-8821", grade: "Lv.1" },
+    { name: "한소희", team: "디자인팀", empNo: "2022055", phone: "010-4478-2093", grade: "Lv.2" },
+    { name: "장민호", team: "국내영업", empNo: "2020018", phone: "010-2345-6712", grade: "Lv.3" },
+    { name: "오세훈", team: "운영팀", empNo: "2018014", phone: "010-7712-3345", grade: "Lv.4" },
+    { name: "배수지", team: "CS팀", empNo: "2021028", phone: "010-3356-7789", grade: "Lv.2" },
+    { name: "윤재현", team: "해외영업", empNo: "2019033", phone: "010-4467-8890", grade: "Lv.5" },
+    { name: "임하늘", team: "개발팀", empNo: "2022009", phone: "010-5578-9901", grade: "Lv.1" },
   ];
   const CLOSE_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg>`;
   const AVATAR_COLORS = ["#5b8def", "#8f6ef0", "#eb7f8b", "#3fb37f", "#e0a63c", "#4dabf7"];
@@ -1351,7 +1358,7 @@
             <span class="stock-count">전체 <b>${stocks.length}</b></span>
             <div class="stock-search">
               <button type="button" class="stock-cat-btn" id="stock-cat-btn" data-cat="employee">구성원<span class="bchev">▾</span></button>
-              <input type="text" id="stock-q" placeholder="이름·사번·휴대폰번호로 검색">
+              <input type="text" id="stock-q" placeholder="이름/사번/휴대폰번호">
             </div>
           </div>
           <div class="stock-toolbar" id="history-toolbar" hidden>
@@ -1430,7 +1437,7 @@
       const stockCatBtn = scard.querySelector("#stock-cat-btn");
       let stockCat = "employee";
       const stockQ = scard.querySelector("#stock-q");
-      const CAT_PLACEHOLDER = { employee: "이름·사번·휴대폰번호로 검색", worksite: "근무지명·코드로 검색" };
+      const CAT_PLACEHOLDER = { employee: "이름/사번/휴대폰번호", worksite: "근무지명/코드" };
       const CAT_LABEL = { employee: "구성원", worksite: "근무지" };
       const refreshStock = () => {
         sbody.innerHTML = stockCards(a, stockQ.value, stockCat);
