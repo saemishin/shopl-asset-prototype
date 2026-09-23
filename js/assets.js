@@ -793,7 +793,7 @@
     }
     // 엑셀 다운로드 — 4개 뷰 전부 실제 동작(Asset_List_All/By_Item/By_Member/By_Location)
     document.getElementById("btn-list-dl").onclick = {
-      all: downloadListAll, product: downloadListByItem, employee: downloadListByMember, worksite: downloadListByLocation,
+      all: downloadListAll, product: downloadListByItem, employee: downloadListByMember, worksite: downloadListByWorkplace,
     }[state.view];
   }
 
@@ -953,7 +953,7 @@
 
   // "근무지별" 다운로드 — 화면과 동일한 집계(근무지명·코드·주소·배정된 자산), 검색어까지 반영. 배정된 자산
   // 나열 방식은 구성원별과 동일한 이유(상한 없음)로 한 셀 쉼표 나열 + 카운트 컬럼
-  function downloadListByLocation() {
+  function downloadListByWorkplace() {
     const list = getFiltered();
     const map = new Map();
     list.forEach(a => {
@@ -985,7 +985,7 @@
     const ws = titledSheet(["근무지별 자산 목록", `추출 시점 / ${xlsxNowLabel()}`], header, rows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "근무지별 자산 목록");
-    XLSX.writeFile(wb, `Asset_List_By_Location_${xlsxTs()}.xlsx`);
+    XLSX.writeFile(wb, `Asset_List_By_Workplace_${xlsxTs()}.xlsx`);
   }
 
   /* ---------- stats (분류 필터까지만 반영) ---------- */
