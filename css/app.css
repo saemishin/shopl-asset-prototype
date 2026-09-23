@@ -605,6 +605,10 @@ button.usebullet { background: var(--panel); font: inherit; cursor: pointer; }
 .picker-modal { width: 560px; display: flex; flex-direction: column; max-height: 88vh; }
 .picker-modal .body { flex: 1; overflow-y: auto; min-height: 0; }
 
+/* 필드가 많아 세로로 길어지는 폼 모달(자산 추가/수정 등) — 헤더·푸터는 고정, 본문만 스크롤 */
+.modal.scroll-body { display: flex; flex-direction: column; max-height: 88vh; }
+.modal.scroll-body .body { flex: 1; overflow-y: auto; min-height: 0; }
+
 /* 소분류 이동 모달 — 분류 관리 모달과 같은 대분류/소분류 트리를 라디오 단일선택으로 재구성 */
 .submove-group { margin-bottom: 16px; }
 .submove-group:last-child { margin-bottom: 0; }

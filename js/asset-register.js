@@ -312,7 +312,7 @@
     const back = document.createElement("div");
     back.className = "modal-back";
     back.innerHTML = `
-      <div class="modal">
+      <div class="modal scroll-body">
         <h3>${opts.asset ? "자산 수정" : "자산 추가"}</h3>
         <div class="body">
           <div class="field"><label>소분류 <span class="req">*</span></label>
@@ -341,6 +341,7 @@
           <div class="field" id="areg-manufactured-field"><label>제조연월일</label>${dateFieldHtml()}</div>
           <div class="field" id="areg-purchasedate-field"><label>구매일</label>${dateFieldHtml()}</div>
           <div class="field" id="areg-purchaseprice-field"><label>구매가격</label><input type="text" inputmode="numeric" id="areg-purchaseprice-input" placeholder="입력" maxlength="12"></div>
+          <div class="field" id="areg-note-field"><label>메모</label><textarea id="areg-note-input" placeholder="입력" maxlength="500"></textarea></div>
         </div>
         <div class="foot">
           <button type="button" class="btn" data-close>취소</button>
@@ -368,6 +369,8 @@
     const purchaseDateField = back.querySelector("#areg-purchasedate-field");
     const purchasePriceField = back.querySelector("#areg-purchaseprice-field");
     const purchasePriceInput = back.querySelector("#areg-purchaseprice-input");
+    const noteField = back.querySelector("#areg-note-field");
+    const noteInput = back.querySelector("#areg-note-input");
     const saveBtn = back.querySelector("#areg-save");
 
     const getExpiry = wireDateField(expiryField);
@@ -466,8 +469,10 @@
       totalQtyInput.value = totalQtyInput.value.replace(/[^0-9]/g, "");
       checkValid();
     });
+    // 구매가격은 숫자 전용이라 천단위 콤마를 붙여 표시(저장 시엔 콤마를 떼고 숫자로 파싱)
     purchasePriceInput.addEventListener("input", () => {
-      purchasePriceInput.value = purchasePriceInput.value.replace(/[^0-9]/g, "");
+      const digits = purchasePriceInput.value.replace(/[^0-9]/g, "");
+      purchasePriceInput.value = digits ? Number(digits).toLocaleString() : "";
     });
 
     // 소분류 — 검색 + 대분류/소분류 트리 모달(openCategoryPickModal)에서 단일 선택.
@@ -483,7 +488,8 @@
       const show = !!catValue;
       const cat = findCat(catValue);
       const hiddenFields = (cat && cat.hiddenFields) || [];
-      [nameField, tagFieldEl].forEach(el => { el.style.display = show ? "" : "none"; });
+      // 메모는 구조설계안 3.4상 소분류 필드 노출 설정과 무관하게 항상 노출되는 필드라 hiddenFields 체크 없음
+      [nameField, tagFieldEl, noteField].forEach(el => { el.style.display = show ? "" : "none"; });
       assetNoField.style.display = show && type !== "quantity" ? "" : "none";
       // 총 수량은 개별형엔 없는 개념(실물 1개=Asset 1건이라 총 수량이 항상 1, 구조설계안 3.4)
       totalQtyField.style.display = show && type !== "individual" ? "" : "none";
@@ -516,6 +522,7 @@
       serialInput.value = "";
       imeiInput.value = "";
       purchasePriceInput.value = "";
+      noteInput.value = "";
     }
     function selectCat(v) {
       const changed = v !== catValue;
@@ -550,7 +557,8 @@
       }
       setDateInputs(manufacturedField, asset.manufactured);
       setDateInputs(purchaseDateField, asset.purchaseDate);
-      purchasePriceInput.value = asset.price != null ? String(asset.price) : "";
+      purchasePriceInput.value = asset.price != null ? asset.price.toLocaleString() : "";
+      noteInput.value = asset.note || "";
       checkValid();
     }
     catWrap.addEventListener("click", () => {
@@ -685,7 +693,9 @@
         if (manufactured !== null) setIf("manufactured", manufactured || undefined);
         const purchaseDate = getPurchaseDate();
         if (purchaseDate !== null) setIf("purchaseDate", purchaseDate || undefined);
-        setIf("price", purchasePriceInput.value ? parseInt(purchasePriceInput.value, 10) : undefined);
+        const priceDigits = purchasePriceInput.value.replace(/[^0-9]/g, "");
+        setIf("price", priceDigits ? parseInt(priceDigits, 10) : undefined);
+        setIf("note", noteInput.value.trim() || undefined);
         if (infoChanged && opts.logActivity) opts.logActivity({ script: "자산 정보 수정" });
         back.remove();
         toast("저장되었습니다.");
