@@ -973,11 +973,13 @@ button.dthumb:hover { filter: brightness(0.94); }
 .stock-count { font-size: 12.5px; font-weight: 600; }
 .stock-count b { color: var(--primary); }
 .stock-search { margin-left: auto; display: flex; }
-.stock-search select {
+/* 네이티브 select 대신 앱 공용 dropdown-menu(openStockCatMenu)를 여는 트리거 버튼 — 겉보기는 기존 select와 동일하게 유지 */
+.stock-search .stock-cat-btn {
   height: 30px; border: 1px solid var(--line-strong); border-right: none;
-  border-radius: var(--radius) 0 0 var(--radius); padding: 0 6px; font-size: 12px;
-  background: #fafbfc; color: var(--text-sub);
+  border-radius: var(--radius) 0 0 var(--radius); padding: 0 8px; font-size: 12px;
+  background: #fafbfc; color: var(--text-sub); display: inline-flex; align-items: center; gap: 4px;
 }
+.stock-search .stock-cat-btn .bchev { font-size: 9px; opacity: .6; }
 .stock-search input {
   height: 30px; width: 200px; border: 1px solid var(--line-strong);
   border-radius: 0 var(--radius) var(--radius) 0; padding: 0 10px; font-size: 12.5px;

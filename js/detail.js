@@ -195,6 +195,22 @@
       document.addEventListener("click", close);
     });
   }
+  // 보유 현황 검색의 구성원/근무지 카테고리 선택 — 네이티브 select 대신 앱 공용 dropdown-menu UI로
+  function openStockCatMenu(anchor, current, onSelect) {
+    document.querySelectorAll(".dropdown-menu").forEach(m => m.remove());
+    const items = [["employee", "구성원"], ["worksite", "근무지"]];
+    const menu = document.createElement("div");
+    menu.className = "dropdown-menu";
+    menu.innerHTML = items.map(([v, label]) => `<button data-v="${v}" class="${v === current ? "active" : ""}">${label}</button>`).join("");
+    const r = anchor.getBoundingClientRect();
+    menu.style.cssText = `position:fixed;top:${r.bottom + 4}px;left:${r.left}px;min-width:${r.width}px`;
+    document.body.appendChild(menu);
+    menu.querySelectorAll("button").forEach(b => b.onclick = () => { menu.remove(); onSelect(b.dataset.v); });
+    setTimeout(() => {
+      const close = e => { if (!menu.contains(e.target) && e.target !== anchor) { menu.remove(); document.removeEventListener("click", close); } };
+      document.addEventListener("click", close);
+    });
+  }
   function confirmModal(msg, onOk) {
     const cb = document.createElement("div");
     cb.className = "modal-back";
@@ -1331,10 +1347,7 @@
           <div class="stock-toolbar" id="stock-toolbar">
             <span class="stock-count">전체 <b>${stocks.length}</b></span>
             <div class="stock-search">
-              <select id="stock-cat">
-                <option value="employee">구성원</option>
-                <option value="worksite">근무지</option>
-              </select>
+              <button type="button" class="stock-cat-btn" id="stock-cat-btn" data-cat="employee">구성원<span class="bchev">▾</span></button>
               <input type="text" id="stock-q" placeholder="이름·휴대폰번호·사번으로 검색">
             </div>
           </div>
@@ -1411,18 +1424,26 @@
       const stoolbar = scard.querySelector("#stock-toolbar");
       const htoolbar = scard.querySelector("#history-toolbar");
       const historyQ = scard.querySelector("#history-q");
-      const stockCat = scard.querySelector("#stock-cat");
+      const stockCatBtn = scard.querySelector("#stock-cat-btn");
+      let stockCat = "employee";
       const stockQ = scard.querySelector("#stock-q");
       const CAT_PLACEHOLDER = { employee: "이름·휴대폰번호·사번으로 검색", worksite: "근무지명·코드·주소로 검색" };
+      const CAT_LABEL = { employee: "구성원", worksite: "근무지" };
       const refreshStock = () => {
-        sbody.innerHTML = stockCards(a, stockQ.value, stockCat.value);
+        sbody.innerHTML = stockCards(a, stockQ.value, stockCat);
         wireStockCards(sbody, a);
         sbody.querySelectorAll("[data-spage]").forEach(b => b.onclick = () => {
           stockPage += b.dataset.spage === "prev" ? -1 : 1;
           refreshStock();
         });
       };
-      stockCat.onchange = () => { stockQ.placeholder = CAT_PLACEHOLDER[stockCat.value]; stockPage = 1; refreshStock(); };
+      stockCatBtn.onclick = () => openStockCatMenu(stockCatBtn, stockCat, v => {
+        stockCat = v;
+        stockCatBtn.innerHTML = `${CAT_LABEL[v]}<span class="bchev">▾</span>`;
+        stockQ.placeholder = CAT_PLACEHOLDER[v];
+        stockPage = 1;
+        refreshStock();
+      });
       stockQ.oninput = () => { stockPage = 1; refreshStock(); };
       historyQ.oninput = () => { sbody.innerHTML = timelineHtml(a, historyQ.value); };
       // 최초 렌더(위 템플릿의 stock-body)엔 페이저 버튼 이벤트가 아직 안 걸려있으니 refreshStock()으로
