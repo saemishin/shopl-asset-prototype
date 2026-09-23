@@ -79,15 +79,114 @@
     t.style.cssText = "position:fixed;left:50%;bottom:32px;transform:translateX(-50%);background:#1b1d1f;color:#fff;padding:10px 16px;border-radius:8px;font-size:12.5px;z-index:300";
     document.body.appendChild(t); setTimeout(() => t.remove(), 1800);
   }
-  function dropdown(anchor, items) {
+  // 되돌릴 수 있는 상태 전이(수리 접수/분실 신고/수리 완료/분실 회수) 공용 확인 모달 — 재배정 모달과 같은
+  // 회색 안내 박스(perm-info-note)로 뭐가 바뀌는지 미리 알려줌. 입력값 없음(반납과 동일한 이유 — 구조설계안에
+  // 상태 변경 자체에 별도 입력 필드가 정의돼 있지 않음)
+  function openStatusConfirmModal(title, note, onConfirm) {
+    const cb = document.createElement("div");
+    cb.className = "modal-back";
+    cb.style.zIndex = 340;
+    cb.innerHTML = `
+      <div class="modal" style="width:380px">
+        <h3>${title}</h3>
+        <div class="body"><div class="perm-info-note">${INFO_ICON}<span>${note}</span></div></div>
+        <div class="foot">
+          <button class="btn" data-cclose>취소</button>
+          <button class="btn primary" data-cok>저장</button>
+        </div>
+      </div>`;
+    cb.addEventListener("click", e => { if (e.target === cb) cb.remove(); });
+    cb.querySelector("[data-cclose]").onclick = () => cb.remove();
+    cb.querySelector("[data-cok]").onclick = () => { cb.remove(); onConfirm(); };
+    document.body.appendChild(cb);
+  }
+  function applyStatusChange(a, script, newStatus) {
+    const before = STATUS_LABEL[a.status][0];
+    a.status = newStatus;
+    logActivity(a, { script, before, after: STATUS_LABEL[a.status][0] });
+    toast(`${script}되었습니다.`);
+    render();
+  }
+  // 수리 완료·분실 회수는 고정 목적지가 없음 — 반납과 동일한 파생 규칙(활성 배정 유무)으로 배정중/재고 복귀
+  const deriveReturnStatus = a => ((a.assignments || []).length > 0 ? "assigned" : "stock");
+  function handleRepairStart(a) {
+    openStatusConfirmModal("수리 접수하시겠습니까?", "수리 접수 시 기존 배정은 유지된 채 상태만 수리 중으로 변경됩니다.",
+      () => applyStatusChange(a, "수리 접수", "repair"));
+  }
+  function handleLostReport(a) {
+    openStatusConfirmModal("분실 신고하시겠습니까?", "분실 신고 시 기존 배정은 유지된 채 상태만 분실로 변경됩니다.",
+      () => applyStatusChange(a, "분실 신고", "lost"));
+  }
+  function handleRepairDone(a) {
+    openStatusConfirmModal("수리 완료 처리하시겠습니까?", "수리 완료 시 배정 여부에 따라 배정 중 또는 재고 상태로 돌아갑니다.",
+      () => applyStatusChange(a, "수리 완료", deriveReturnStatus(a)));
+  }
+  function handleLostRecover(a) {
+    openStatusConfirmModal("분실 회수 처리하시겠습니까?", "분실 회수 시 배정 여부에 따라 배정 중 또는 재고 상태로 돌아갑니다.",
+      () => applyStatusChange(a, "분실 회수", deriveReturnStatus(a)));
+  }
+  // 폐기 처리 — 되돌릴 수 없는 최종 상태라 자산 삭제와 동일한 DELETE 입력 확인 패턴 재사용.
+  // 활성 배정은 자동 종료(구조설계안 3.4) — 반납처럼 레코드별로 따로 로그를 남기지 않고 "폐기 처리" 한
+  // 건으로 묶어서 기록(자산 정보 수정이 여러 필드 변경을 한 건으로 묶는 것과 같은 이유)
+  function openDisposeModal(a) {
+    const cb = document.createElement("div");
+    cb.className = "modal-back";
+    cb.style.zIndex = 340;
+    cb.innerHTML = `
+      <div class="modal" style="width:380px">
+        <h3>폐기 처리하시겠습니까?</h3>
+        <div class="body">
+          <div class="danger-note">${WARN_ICON}<span>폐기 처리하면 되돌릴 수 없습니다. 기존 배정은 자동으로 종료되며, 이후 배정 추가·자산 수정이 제한됩니다.</span></div>
+          <div class="field" style="margin-top:14px;margin-bottom:0">
+            <input type="text" data-del-input placeholder="입력">
+          </div>
+          <p class="muted" style="margin-top:6px">박스에 DELETE를 입력하면 [저장] 버튼이 활성화됩니다.</p>
+        </div>
+        <div class="foot">
+          <button class="btn" data-cclose>취소</button>
+          <button class="btn danger" data-cok disabled>저장</button>
+        </div>
+      </div>`;
+    cb.addEventListener("click", e => { if (e.target === cb) cb.remove(); });
+    cb.querySelector("[data-cclose]").onclick = () => cb.remove();
+    const input = cb.querySelector("[data-del-input]");
+    const okBtn = cb.querySelector("[data-cok]");
+    const confirmed = () => input.value.trim().toUpperCase() === "DELETE";
+    input.addEventListener("input", () => { okBtn.disabled = !confirmed(); });
+    okBtn.onclick = () => {
+      if (!confirmed()) return;
+      const before = STATUS_LABEL[a.status][0];
+      a.status = "disposed";
+      a.assignments = [];
+      logActivity(a, { script: "폐기 처리", before, after: STATUS_LABEL[a.status][0] });
+      cb.remove();
+      toast("폐기 처리되었습니다.");
+      render();
+    };
+    document.body.appendChild(cb);
+    input.focus();
+  }
+  const STATUS_ACTION_HANDLERS = {
+    "수리 접수": handleRepairStart,
+    "분실 신고": handleLostReport,
+    "수리 완료": handleRepairDone,
+    "분실 회수": handleLostRecover,
+    "폐기 처리": openDisposeModal,
+  };
+  // 상태 변경(상태 뱃지) 전용 드롭다운 — "···" 메뉴의 moreDropdown()과 같은 이유로 공용 dropdown() 대신 분리
+  function statusDropdown(anchor, items, a) {
     document.querySelectorAll(".dropdown-menu").forEach(m => m.remove());
     const menu = document.createElement("div");
     menu.className = "dropdown-menu";
-    menu.innerHTML = items.map((x, i) => `<button data-i="${i}">${x}</button>`).join("");
+    menu.innerHTML = items.map((x, i) => `<button data-i="${i}"${x === "폐기 처리" ? ' class="danger"' : ""}>${x}</button>`).join("");
     const r = anchor.getBoundingClientRect();
     menu.style.cssText = `position:fixed;top:${r.bottom + 4}px;left:${Math.max(8, r.right - 180)}px;min-width:180px`;
     document.body.appendChild(menu);
-    menu.querySelectorAll("button").forEach(b => b.onclick = () => { menu.remove(); toast(`"${items[+b.dataset.i]}" — 이후 단계에서 정의`); });
+    menu.querySelectorAll("button").forEach(b => b.onclick = () => {
+      menu.remove();
+      const label = items[+b.dataset.i];
+      (STATUS_ACTION_HANDLERS[label] || (() => toast(`"${label}" — 이후 단계에서 정의`)))(a);
+    });
     setTimeout(() => {
       const close = e => { if (!menu.contains(e.target)) { menu.remove(); document.removeEventListener("click", close); } };
       document.addEventListener("click", close);
@@ -1169,7 +1268,8 @@
     // 자산 수정 폼 안의 소분류 필드로 흡수됨(별도 메뉴 항목이었으나 병합).
     const MORE_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg>`;
     const mgrBtn = `<button class="btn sm icon-only corner" data-more aria-label="자산관리" title="자산관리">${MORE_ICON}</button>`;
-    const moreItems = ["자산 수정", "자산 삭제"];
+    // 폐기 동결(구조설계안 3.4: "폐기는 완전 동결 — 필드 수정 불가") — 자산 수정만 메뉴에서 빠짐, 삭제는 예외적으로 계속 허용
+    const moreItems = a.status === "disposed" ? ["자산 삭제"] : ["자산 수정", "자산 삭제"];
 
     // 필수값(분류) 먼저, 선택값이 뒤따름. 유효기한·태그는 분류 바로 다음(전체 탭 테이블 컬럼 순서와 통일).
     // 제조연월일이 구매일보다 앞(제조가 구매보다 먼저 일어나는 시점).
@@ -1206,7 +1306,7 @@
               <button data-atab="current" class="active">배정 현황</button>
               <button data-atab="history">이력</button>
             </div>
-            <div class="hactions" id="assign-actions">${btn("배정 추가")}</div>
+            <div class="hactions" id="assign-actions">${a.status === "disposed" ? "" : btn("배정 추가")}</div>
           </div>
           <div id="assign-body">${assignCurrentHtml(a)}</div>
         </section>`;
@@ -1276,7 +1376,7 @@
     c.querySelector("[data-qr]").onclick = e => openQrPopover(a, e.currentTarget);
     c.querySelector("[data-more]").onclick = e => moreDropdown(e.currentTarget, moreItems, a);
     const sc = c.querySelector("[data-statuschange]");
-    if (sc) sc.onclick = e => dropdown(e.currentTarget, statusItems);
+    if (sc) sc.onclick = e => statusDropdown(e.currentTarget, statusItems, a);
     const tb = c.querySelector("[data-viewer]");
     if (tb) tb.onclick = () => openViewer(a, a._primary || 0);
 
