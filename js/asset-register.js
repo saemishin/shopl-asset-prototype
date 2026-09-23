@@ -664,39 +664,51 @@
     };
 
     // 자산 수정(opts.asset)은 실제로 자산 객체를 갱신 + 활동 이력을 남김. 자산 추가는 아직 러프한 목업이라
-    // 기존과 동일하게 토스트만(실제 데이터 반영 없음) — 이번 스코프는 "수정"만, 신규 등록 저장은 별도 과제
+    // 기존과 동일하게 토스트만(실제 데이터 반영 없음) — 이번 스코프는 "수정"만, 신규 등록 저장은 별도 과제.
+    // 바뀐 필드마다 "자산 정보 수정: OOO" 형식으로 각각 따로 기록(뭉뚱그린 한 건이 아니라 배정/보유 관리만큼
+    // 촘촘하게 — 필드별로 실제 값이 바뀐 것만 기록되고, 아무것도 안 바꾸고 저장하면 아무 것도 안 남음)
     saveBtn.addEventListener("click", () => {
       closeMenu();
       if (opts.asset) {
         const asset = opts.asset;
+        const logChange = (script, before, after) => {
+          if (opts.logActivity) opts.logActivity({ script: `자산 정보 수정: ${script}`, before, after });
+        };
         const cat = findCat(catValue);
         if (cat && (cat.group !== asset.group || cat.sub !== asset.sub)) {
           const before = `${asset.group} › ${asset.sub}`, after = `${cat.group} › ${cat.sub}`;
           asset.group = cat.group;
           asset.sub = cat.sub;
-          if (opts.logActivity) opts.logActivity({ script: "소분류 이동", before, after });
+          logChange("소분류 이동", before, after);
         }
-        let infoChanged = false;
-        const setIf = (key, val) => { if (asset[key] !== val) { asset[key] = val; infoChanged = true; } };
-        setIf("product", nameInput.value.trim());
-        if (type !== "quantity") setIf("assetNo", assetNoInput.value.trim());
-        if (type !== "individual") setIf("totalQty", parseInt(totalQtyInput.value, 10) || 0);
+        const dateFmt = d => d ? window.fmtDate(d) : "";
+        const setIf = (script, key, val, format) => {
+          if (asset[key] === val) return;
+          const fmt = format || (v => v || "");
+          logChange(script, fmt(asset[key]), fmt(val));
+          asset[key] = val;
+        };
+        setIf("품목명 수정", "product", nameInput.value.trim());
+        if (type !== "quantity") setIf("고유관리번호 수정", "assetNo", assetNoInput.value.trim());
+        if (type !== "individual") setIf("총 수량 변경", "totalQty", parseInt(totalQtyInput.value, 10) || 0, v => v ? `${v}개` : "");
         const newTags = [...tags];
-        if (JSON.stringify(newTags) !== JSON.stringify(asset.labels || [])) { asset.labels = newTags; infoChanged = true; }
+        if (JSON.stringify(newTags) !== JSON.stringify(asset.labels || [])) {
+          logChange("태그 수정", (asset.labels || []).join(", "), newTags.join(", "));
+          asset.labels = newTags;
+        }
         const expiry = getExpiry();
-        if (expiry !== null) setIf("expiry", expiry || undefined);
+        if (expiry !== null) setIf("유효기한 변경", "expiry", expiry || undefined, dateFmt);
         if (type === "individual") {
-          setIf("serial", serialInput.value.trim() || undefined);
-          setIf("imei", imeiInput.value.trim() || undefined);
+          setIf("S/N 수정", "serial", serialInput.value.trim() || undefined);
+          setIf("IMEI 수정", "imei", imeiInput.value.trim() || undefined);
         }
         const manufactured = getManufactured();
-        if (manufactured !== null) setIf("manufactured", manufactured || undefined);
+        if (manufactured !== null) setIf("제조연월일 변경", "manufactured", manufactured || undefined, dateFmt);
         const purchaseDate = getPurchaseDate();
-        if (purchaseDate !== null) setIf("purchaseDate", purchaseDate || undefined);
+        if (purchaseDate !== null) setIf("구매일 변경", "purchaseDate", purchaseDate || undefined, dateFmt);
         const priceDigits = purchasePriceInput.value.replace(/[^0-9]/g, "");
-        setIf("price", priceDigits ? parseInt(priceDigits, 10) : undefined);
-        setIf("note", noteInput.value.trim() || undefined);
-        if (infoChanged && opts.logActivity) opts.logActivity({ script: "자산 정보 수정" });
+        setIf("구매가격 변경", "price", priceDigits ? parseInt(priceDigits, 10) : undefined, v => (v != null ? `${v.toLocaleString()}원` : ""));
+        setIf("메모 수정", "note", noteInput.value.trim() || undefined);
         back.remove();
         toast("저장되었습니다.");
         if (opts.onSaved) opts.onSaved();

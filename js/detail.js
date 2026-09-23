@@ -100,34 +100,37 @@
     cb.querySelector("[data-cok]").onclick = () => { cb.remove(); onConfirm(); };
     document.body.appendChild(cb);
   }
+  // script는 활동 이력용 "그룹: 세부" 전체 이름("상태 변경: 수리 접수" 등) — 토스트는 그룹 접두어 없이
+  // 세부 동작명만 써야 자연스러워서 ": " 뒤쪽만 잘라 씀
   function applyStatusChange(a, script, newStatus) {
     const before = STATUS_LABEL[a.status][0];
     a.status = newStatus;
     logActivity(a, { script, before, after: STATUS_LABEL[a.status][0] });
-    toast(`${script}되었습니다.`);
+    toast(`${script.split(": ").pop()}되었습니다.`);
     render();
   }
   // 수리 완료·분실 회수는 고정 목적지가 없음 — 반납과 동일한 파생 규칙(활성 배정 유무)으로 배정중/재고 복귀
   const deriveReturnStatus = a => ((a.assignments || []).length > 0 ? "assigned" : "stock");
   function handleRepairStart(a) {
     openStatusConfirmModal("수리 접수하시겠습니까?", "수리 접수 시 기존 배정은 유지된 채 상태만 수리 중으로 변경됩니다.",
-      () => applyStatusChange(a, "수리 접수", "repair"));
+      () => applyStatusChange(a, "상태 변경: 수리 접수", "repair"));
   }
   function handleLostReport(a) {
     openStatusConfirmModal("분실 신고하시겠습니까?", "분실 신고 시 기존 배정은 유지된 채 상태만 분실로 변경됩니다.",
-      () => applyStatusChange(a, "분실 신고", "lost"));
+      () => applyStatusChange(a, "상태 변경: 분실 신고", "lost"));
   }
   function handleRepairDone(a) {
     openStatusConfirmModal("수리 완료 처리하시겠습니까?", "수리 완료 시 배정 여부에 따라 배정 중 또는 재고 상태로 돌아갑니다.",
-      () => applyStatusChange(a, "수리 완료", deriveReturnStatus(a)));
+      () => applyStatusChange(a, "상태 변경: 수리 완료", deriveReturnStatus(a)));
   }
   function handleLostRecover(a) {
     openStatusConfirmModal("분실 회수 처리하시겠습니까?", "분실 회수 시 배정 여부에 따라 배정 중 또는 재고 상태로 돌아갑니다.",
-      () => applyStatusChange(a, "분실 회수", deriveReturnStatus(a)));
+      () => applyStatusChange(a, "상태 변경: 분실 회수", deriveReturnStatus(a)));
   }
   // 폐기 처리 — 되돌릴 수 없는 최종 상태라 자산 삭제와 동일한 DELETE 입력 확인 패턴 재사용.
-  // 활성 배정은 자동 종료(구조설계안 3.4) — 반납처럼 레코드별로 따로 로그를 남기지 않고 "폐기 처리" 한
-  // 건으로 묶어서 기록(자산 정보 수정이 여러 필드 변경을 한 건으로 묶는 것과 같은 이유)
+  // 활성 배정은 자동 종료(구조설계안 3.4)하되, 반납처럼 레코드별로 따로 로그를 남기지 않고 "폐기 처리"
+  // 한 건으로 묶어서 기록 — 배정 종료가 이 액션의 부수효과일 뿐 별도로 시작된 사용자 행동이 아니기 때문
+  // (자산 정보 수정처럼 사용자가 각각 입력한 필드들과는 성격이 다름 — 그쪽은 필드별로 각각 기록함)
   function openDisposeModal(a) {
     const cb = document.createElement("div");
     cb.className = "modal-back";
@@ -158,7 +161,7 @@
       const before = STATUS_LABEL[a.status][0];
       a.status = "disposed";
       a.assignments = [];
-      logActivity(a, { script: "폐기 처리", before, after: STATUS_LABEL[a.status][0] });
+      logActivity(a, { script: "상태 변경: 폐기 처리", before, after: STATUS_LABEL[a.status][0] });
       cb.remove();
       toast("폐기 처리되었습니다.");
       render();
@@ -368,20 +371,21 @@
   /* ---------- 활동 로그 ----------
    * 엔트리 스키마: { d(수정한 일시), script(스크립트), target?(수정 대상 — 구성원/근무지 객체, 없으면 자산 자체),
    *                 before?/after?(기존값/변경값 — 두 키가 아예 없으면 값 블록 자체를 생략, "" 이면 "없음"으로 표시), who(수정한 사람) }
-   * 유형별 스크립트 정의는 구조설계안 5.5 참조. 아직 트리거할 UI가 없는 유형(소분류 이동·자산정보 수정·사진)은 그 기능을 만들 때 추가. */
+   * 유형별 스크립트 정의는 구조설계안 5.5 참조. "그룹: 세부" 형식으로 그룹핑(예: "상태 변경: 분실 신고")
+   * — 아직 트리거할 UI가 없는 유형(사진)만 그 기능을 만들 때 추가. */
   // 초기 스냅샷(합성 데이터) — 세션 시작 시 자산의 현재 상태로부터 한 번만 만들어지는 베이스라인
   function activityOf(a) {
     const ev = [{ d: `${a.createdAt || a.purchaseDate || "2024-01-01"} 09:00`, script: "자산 등록", who: "dana" }];
     (a.assignments || []).forEach(x => ev.push({
-      d: `${x.since} 09:00`, script: "신규 배정", target: x, before: "", after: window.fmtDate(x.since), who: "dana",
+      d: `${x.since} 09:00`, script: "배정 관리: 신규 배정", target: x, before: "", after: window.fmtDate(x.since), who: "dana",
     }));
     (a.stocks || []).forEach(x => ev.push({
-      d: `${a.purchaseDate || "2025-01-01"} 09:00`, script: "보유 대상 추가", target: x, before: "", after: `${x.qty}개`, who: "dana",
+      d: `${a.purchaseDate || "2025-01-01"} 09:00`, script: "보유 관리: 보유 대상 추가", target: x, before: "", after: `${x.qty}개`, who: "dana",
     }));
-    if (a.status === "repair") ev.push({ d: "2026-08-14 09:00", script: "수리 접수", before: "배정 중", after: "수리 중", who: "dana" });
-    if (a.status === "lost") ev.push({ d: "2026-07-21 09:00", script: "분실 신고", before: "배정 중", after: "분실", who: "정우성" });
-    if (a.status === "disposed") ev.push({ d: "2025-12-30 09:00", script: "폐기 처리", before: "배정 중", after: "폐기", who: "dana" });
-    if (a.note) ev.push({ d: "2026-06-02 09:00", script: "메모 수정", who: "dana" });
+    if (a.status === "repair") ev.push({ d: "2026-08-14 09:00", script: "상태 변경: 수리 접수", before: "배정 중", after: "수리 중", who: "dana" });
+    if (a.status === "lost") ev.push({ d: "2026-07-21 09:00", script: "상태 변경: 분실 신고", before: "배정 중", after: "분실", who: "정우성" });
+    if (a.status === "disposed") ev.push({ d: "2025-12-30 09:00", script: "상태 변경: 폐기 처리", before: "배정 중", after: "폐기", who: "dana" });
+    if (a.note) ev.push({ d: "2026-06-02 09:00", script: "자산 정보 수정: 메모 수정", who: "dana" });
     return ev.sort((x, y) => (x.d < y.d ? 1 : -1));
   }
   // 실제 이력 로그 — activityOf()의 베이스라인을 세션당 한 번만 시드하고, 이후 실사용자 조작(수량 변경·보유 해제 등)은
@@ -548,7 +552,7 @@
       confirmModal("수량을 변경하시겠습니까?", () => {
         a.stocks[idx].qty = v;
         deriveQtyStatus(a);
-        logActivity(a, { script: "보유 수량 변경", target: x, before: `${cur}개`, after: `${v}개` });
+        logActivity(a, { script: "보유 관리: 보유 수량 변경", target: x, before: `${cur}개`, after: `${v}개` });
         toast("수량이 변경되었습니다.");
         render();
       });
@@ -571,7 +575,7 @@
         const qty = x.qty;
         a.stocks.splice(idx, 1);
         deriveQtyStatus(a);
-        logActivity(a, { script: "보유 대상 해제", target: x, before: `${qty}개`, after: "" });
+        logActivity(a, { script: "보유 관리: 보유 대상 해제", target: x, before: `${qty}개`, after: "" });
         toast("보유 대상에서 해제되었습니다.");
         render();
       });
@@ -663,7 +667,7 @@
       pop.remove();
       confirmModal("배정일을 수정하시겠습니까?", () => {
         x.since = v;
-        logActivity(a, { script: "배정일 변경", target: x, before: window.fmtDate(cur), after: window.fmtDate(v) });
+        logActivity(a, { script: "배정 관리: 배정일 변경", target: x, before: window.fmtDate(cur), after: window.fmtDate(v) });
         toast("배정일이 수정되었습니다.");
         render();
       });
@@ -701,7 +705,7 @@
       // 재고⟷배정중만 배정/반납으로 자동 파생 — 남은 활성 레코드가 없을 때만 재고로 전환(공동배정 중 일부만
       // 반납이면 나머지 활성 레코드가 있으므로 유지)
       if (a.assignments.length === 0 && a.status === "assigned") a.status = "stock";
-      logActivity(a, { script: "반납", target: old, before: window.fmtDate(old.since), after: "" });
+      logActivity(a, { script: "배정 관리: 반납", target: old, before: window.fmtDate(old.since), after: "" });
       toast("반납되었습니다.");
       render();
     });
@@ -792,7 +796,7 @@
         (a.assignments || (a.assignments = [])).push(record);
         // 재고⟷배정중만 배정/반납으로 자동 파생(수리중·분실·폐기는 배정 여부와 무관하게 별도 관리 — 상태 변경 드롭다운 참조)
         if (a.status === "stock") a.status = "assigned";
-        logActivity(a, { script: "신규 배정", target: record, before: "", after: window.fmtDate(d) });
+        logActivity(a, { script: "배정 관리: 신규 배정", target: record, before: "", after: window.fmtDate(d) });
         toast("추가되었습니다.");
         render();
       });
@@ -895,7 +899,7 @@
         const beforeLabel = `${old.employee || old.worksite} · ${window.fmtDate(old.since)}`;
         const afterLabel = `${record.employee || record.worksite} · ${window.fmtDate(d)}`;
         a.assignments[idx] = record;
-        logActivity(a, { script: "재배정", before: beforeLabel, after: afterLabel });
+        logActivity(a, { script: "배정 관리: 재배정", before: beforeLabel, after: afterLabel });
         toast("재배정되었습니다.");
         render();
       });
@@ -1005,7 +1009,7 @@
         back.remove();
         (a.stocks || (a.stocks = [])).push(record);
         deriveQtyStatus(a);
-        logActivity(a, { script: "보유 대상 추가", target: record, before: "", after: `${v}개` });
+        logActivity(a, { script: "보유 관리: 보유 대상 추가", target: record, before: "", after: `${v}개` });
         toast("추가되었습니다.");
         render();
       });
