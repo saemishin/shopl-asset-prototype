@@ -335,7 +335,7 @@
   }
 
   function view_product_individual(list) {
-    const head = `<tr><th>품목명</th><th>분류</th><th class="num">자산 수</th>
+    const head = `<tr><th>분류</th><th>품목명</th><th class="num">자산 수</th>
       <th class="num">배정 중</th><th class="num">재고</th><th class="num">수리 중</th><th class="num">분실</th><th class="num">폐기</th></tr>`;
     const groups = groupByProduct(list.filter(a => a.type === "individual"));
     const sorted = sortList(groups);
@@ -345,8 +345,8 @@
       const counts = { assigned: 0, stock: 0, repair: 0, lost: 0, disposed: 0 };
       g.list.forEach(a => { counts[a.status] = (counts[a.status] || 0) + 1; });
       return `<tr class="clickable" data-pkey="${g.sub}|${g.product}">
-        <td><div class="prodcell">${thumb(g.list[0])}<span class="pname">${g.product}</span></div></td>
         <td>${g.group} <span class="muted">›</span> ${g.sub}</td>
+        <td><div class="prodcell">${thumb(g.list[0])}<span class="pname">${g.product}</span></div></td>
         <td class="num">${g.list.length}</td>
         <td class="num">${counts.assigned}</td>
         <td class="num">${counts.stock}</td>
@@ -359,7 +359,7 @@
   }
 
   function view_product_quantity(list) {
-    const head = `<tr><th>품목명</th><th>분류</th><th class="num">전체 수량</th><th class="num">보유 수량</th><th class="num">잔여 수량</th><th class="num">보유 대상</th><th>유효기한</th></tr>`;
+    const head = `<tr><th>분류</th><th>품목명</th><th class="num">전체 수량</th><th class="num">보유 수량</th><th class="num">잔여 수량</th><th class="num">보유 대상</th><th>유효기한</th></tr>`;
     const groups = groupByProduct(list.filter(a => a.type === "quantity"));
     const sorted = sortList(groups);
     const paged = pageSlice(sorted);
@@ -370,8 +370,8 @@
       const qty = (a.stocks || []).reduce((s, x) => s + x.qty, 0);
       const targets = (a.stocks || []).length;
       return `<tr class="clickable" data-pkey="${g.sub}|${g.product}">
-        <td><div class="prodcell">${thumb(a)}<span class="pname">${g.product}</span></div></td>
         <td>${g.group} <span class="muted">›</span> ${g.sub}</td>
+        <td><div class="prodcell">${thumb(a)}<span class="pname">${g.product}</span></div></td>
         <td class="num">${a.totalQty}</td>
         <td class="num">${qty}</td>
         <td class="num">${a.totalQty - qty}</td>
@@ -877,29 +877,29 @@
 
     let summaryHeader, summaryRows, detailHeader, detailRows = [];
     if (isIndiv) {
-      summaryHeader = ["No.", "품목명", "분류", "자산 수", "배정 중", "재고", "수리 중", "분실", "폐기"];
+      summaryHeader = ["No.", "분류", "품목명", "자산 수", "배정 중", "재고", "수리 중", "분실", "폐기"];
       summaryRows = groups.map((g, i) => {
         const counts = { assigned: 0, stock: 0, repair: 0, lost: 0, disposed: 0 };
         g.list.forEach(a => { counts[a.status] = (counts[a.status] || 0) + 1; });
-        return [i + 1, g.product, `${g.group} › ${g.sub}`, g.list.length, counts.assigned, counts.stock, counts.repair, counts.lost, counts.disposed];
+        return [i + 1, `${g.group} › ${g.sub}`, g.product, g.list.length, counts.assigned, counts.stock, counts.repair, counts.lost, counts.disposed];
       });
-      detailHeader = ["No.", "품목명", "분류", "고유관리번호", "상태", "배정 대상", "유효기한"];
+      detailHeader = ["No.", "분류", "품목명", "고유관리번호", "상태", "배정 대상", "유효기한"];
       groups.forEach(g => g.list.forEach(a => {
-        detailRows.push([detailRows.length + 1, a.product, `${a.group} › ${a.sub}`, a.assetNo || "", STATUS_LABEL[a.status][0], holderPlainText(a), a.expiry ? window.fmtDate(a.expiry) : ""]);
+        detailRows.push([detailRows.length + 1, `${a.group} › ${a.sub}`, a.product, a.assetNo || "", STATUS_LABEL[a.status][0], holderPlainText(a), a.expiry ? window.fmtDate(a.expiry) : ""]);
       }));
     } else {
-      summaryHeader = ["No.", "품목명", "분류", "전체 수량", "보유 수량", "잔여 수량", "보유 대상", "유효기한"];
+      summaryHeader = ["No.", "분류", "품목명", "전체 수량", "보유 수량", "잔여 수량", "보유 대상", "유효기한"];
       summaryRows = groups.map((g, i) => {
         const a = g.list[0];
         const qty = (a.stocks || []).reduce((s, x) => s + x.qty, 0);
         const targets = (a.stocks || []).length;
-        return [i + 1, g.product, `${g.group} › ${g.sub}`, a.totalQty, qty, a.totalQty - qty, targets, a.expiry ? window.fmtDate(a.expiry) : ""];
+        return [i + 1, `${g.group} › ${g.sub}`, g.product, a.totalQty, qty, a.totalQty - qty, targets, a.expiry ? window.fmtDate(a.expiry) : ""];
       });
-      detailHeader = ["No.", "품목명", "분류", "보유 대상", "보유 수량"];
+      detailHeader = ["No.", "분류", "품목명", "보유 대상", "보유 수량"];
       groups.forEach(g => {
         const a = g.list[0];
         (a.stocks || []).forEach(x => {
-          detailRows.push([detailRows.length + 1, a.product, `${a.group} › ${a.sub}`, x.employee || x.worksite, `${x.qty}개`]);
+          detailRows.push([detailRows.length + 1, `${a.group} › ${a.sub}`, a.product, x.employee || x.worksite, `${x.qty}개`]);
         });
       });
     }

@@ -300,8 +300,8 @@ table { width: 100%; border-collapse: collapse; font-size: 12.5px; min-width: 88
 /* 자산 수 등 숫자 컬럼은 폭이 넓어서 우측 정렬하면 옆 칸과 붙어 보임 — 왼쪽 정렬이 더 보기 편함(분류 화면의 품목 테이블과 동일한 이유) */
 .tbl-product .num { text-align: left; }
 /* 개별 자산: 품목명·분류·자산 수·배정중·재고·수리중·분실·폐기 (8컬럼) — 분류 화면 품목 목록 표와 동일 컬럼 구성 + 분류 컬럼만 추가 */
-.tbl-product-individual th:nth-child(1), .tbl-product-individual td:nth-child(1) { width: 24%; }
-.tbl-product-individual th:nth-child(2), .tbl-product-individual td:nth-child(2) { width: 18%; }
+.tbl-product-individual th:nth-child(1), .tbl-product-individual td:nth-child(1) { width: 18%; }
+.tbl-product-individual th:nth-child(2), .tbl-product-individual td:nth-child(2) { width: 24%; }
 .tbl-product-individual th:nth-child(3), .tbl-product-individual td:nth-child(3) { width: 9%; }
 .tbl-product-individual th:nth-child(4), .tbl-product-individual td:nth-child(4) { width: 10%; }
 .tbl-product-individual th:nth-child(5), .tbl-product-individual td:nth-child(5) { width: 10%; }
@@ -309,8 +309,8 @@ table { width: 100%; border-collapse: collapse; font-size: 12.5px; min-width: 88
 .tbl-product-individual th:nth-child(7), .tbl-product-individual td:nth-child(7) { width: 10%; }
 .tbl-product-individual th:nth-child(8), .tbl-product-individual td:nth-child(8) { width: 9%; }
 /* 수량 자산: 품목명·분류·보유 수량·보유 대상·유효기한 (5컬럼) — 분류 화면 품목 목록 표와 동일 컬럼 구성 + 분류 컬럼만 추가 */
-.tbl-product-quantity th:nth-child(1), .tbl-product-quantity td:nth-child(1) { width: 26%; }
-.tbl-product-quantity th:nth-child(2), .tbl-product-quantity td:nth-child(2) { width: 20%; }
+.tbl-product-quantity th:nth-child(1), .tbl-product-quantity td:nth-child(1) { width: 20%; }
+.tbl-product-quantity th:nth-child(2), .tbl-product-quantity td:nth-child(2) { width: 26%; }
 .tbl-product-quantity th:nth-child(3), .tbl-product-quantity td:nth-child(3) { width: 14%; }
 .tbl-product-quantity th:nth-child(4), .tbl-product-quantity td:nth-child(4) { width: 14%; }
 .tbl-product-quantity th:nth-child(5), .tbl-product-quantity td:nth-child(5) { width: 26%; }
