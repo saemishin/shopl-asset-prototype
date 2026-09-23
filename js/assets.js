@@ -23,16 +23,17 @@
   };
   // 구성원도 근무지와 동일하게 "기존 재사용" 엔티티라 프로토타입 데모용 샘플만 매핑 — 팀은 category.js의 MEMBERS와 동일 값으로 통일,
   // 사번·휴대폰번호는 검색 placeholder(아래)가 이미 약속해놓고 실제 필드가 없던 걸 이번에 시드.
-  // grade(등급)는 구성원별 엑셀 다운로드(아이데이션 중)용 — 실 서비스엔 구성원마다 저장돼있는 값, 프로토타입엔 더미로만 시드
+  // grade(등급)·jobTitle(직무·직급, category.js의 JOB_TITLES 값 재사용)은 구성원별 엑셀 다운로드용 —
+  // 실 서비스엔 구성원마다 저장돼있는 값, 프로토타입엔 더미로만 시드
   const MEMBER_INFO = {
-    "김민수": { team: "개발팀", empNo: "2021001", phone: "010-2001-1234", grade: "Lv.3" },
-    "이서연": { team: "디자인팀", empNo: "2021015", phone: "010-3412-5678", grade: "Lv.2" },
-    "박지훈": { team: "영업팀", empNo: "2020032", phone: "010-8823-9910", grade: "Lv.4" },
-    "정우성": { team: "CS팀", empNo: "2022041", phone: "010-5567-2231", grade: "Lv.1" },
-    "김철수": { team: "운영팀", empNo: "2019008", phone: "010-9012-4456", grade: "Lv.5" },
-    "최유진": { team: "개발팀", empNo: "2023019", phone: "010-6634-8821", grade: "Lv.1" },
-    "한소희": { team: "디자인팀", empNo: "2022055", phone: "010-4478-2093", grade: "Lv.2" },
-    "오세훈": { team: "운영팀", empNo: "2018014", phone: "010-7712-3345", grade: "Lv.4" },
+    "김민수": { team: "개발팀", empNo: "2021001", phone: "010-2001-1234", grade: "Lv.3", jobTitle: "매니저" },
+    "이서연": { team: "디자인팀", empNo: "2021015", phone: "010-3412-5678", grade: "Lv.2", jobTitle: "주임" },
+    "박지훈": { team: "영업팀", empNo: "2020032", phone: "010-8823-9910", grade: "Lv.4", jobTitle: "팀장" },
+    "정우성": { team: "CS팀", empNo: "2022041", phone: "010-5567-2231", grade: "Lv.1", jobTitle: "사원" },
+    "김철수": { team: "운영팀", empNo: "2019008", phone: "010-9012-4456", grade: "Lv.5", jobTitle: "팀장" },
+    "최유진": { team: "개발팀", empNo: "2023019", phone: "010-6634-8821", grade: "Lv.1", jobTitle: "사원" },
+    "한소희": { team: "디자인팀", empNo: "2022055", phone: "010-4478-2093", grade: "Lv.2", jobTitle: "주임" },
+    "오세훈": { team: "운영팀", empNo: "2018014", phone: "010-7712-3345", grade: "Lv.4", jobTitle: "매니저" },
   };
   const AVATAR_COLORS = ["#5b8def", "#8f6ef0", "#eb7f8b", "#3fb37f", "#e0a63c", "#4dabf7"];
   function avatarColor(name) {
@@ -791,11 +792,10 @@
         { label: "일괄 배정·보유 변경", fn: () => location.href = "batch-assign.html" },
       ]);
     }
-    // 엑셀 다운로드는 4개 뷰 전부 버튼은 노출 — 전체 탭은 실제 동작, 나머지는 뷰별 컬럼 양식이
-    // 아직 정의되지 않아 전체 탭 컬럼을 그대로 내보내면 화면과 다른 게 다운로드되므로 자리만 잡아둠
-    document.getElementById("btn-list-dl").onclick = state.view === "all"
-      ? downloadAssetList
-      : () => toast(`"다운로드" — 이후 단계에서 정의`);
+    // 엑셀 다운로드 — 4개 뷰 전부 실제 동작(Asset_List_All/By_Item/By_Member/By_Location)
+    document.getElementById("btn-list-dl").onclick = {
+      all: downloadListAll, product: downloadListByItem, employee: downloadListByMember, worksite: downloadListByLocation,
+    }[state.view];
   }
 
   // 배정·보유 현황을 엑셀용 순수 텍스트로 — holderText()와 동일한 정렬 기준(개별=배정일 최신순, 수량=이름 가나다순)
@@ -811,28 +811,172 @@
     const sorted = [...stocks].sort((p, q) => (p.employee || p.worksite).localeCompare(q.employee || q.worksite, "ko"));
     return sorted.map(x => `${x.employee || x.worksite}(${x.qty}개)`).join(", ");
   }
-  // 현황 "다운로드" — 지금 적용된 필터·검색 전체 범위(페이지네이션 무관)를 실제 엑셀로 즉시 생성해 다운로드.
-  // 컬럼 구성은 테이블에 보이는 컬럼을 그대로 옮긴 1차안(구조설계안 7장 TODO — 정식 컬럼 정의 필요)
-  function downloadAssetList() {
+  /* ---------- 엑셀 다운로드 공용 ---------- */
+  function xlsxTs() {
+    const d = new Date(), p2 = n => String(n).padStart(2, "0");
+    return `${d.getFullYear()}${p2(d.getMonth() + 1)}${p2(d.getDate())}${p2(d.getHours())}${p2(d.getMinutes())}${p2(d.getSeconds())}`;
+  }
+  function xlsxNowLabel() {
+    const d = new Date(), p2 = n => String(n).padStart(2, "0");
+    const DAYS = ["일", "월", "화", "수", "목", "금", "토"];
+    return `${d.getFullYear()}.${p2(d.getMonth() + 1)}.${p2(d.getDate())}(${DAYS[d.getDay()]}) ${p2(d.getHours())}:${p2(d.getMinutes())}`;
+  }
+  // 상단 타이틀 영역(각 줄 A~C 병합) + 빈 줄 + 헤더 + 데이터로 구성된 시트.
+  // 셀 배경색·굵기 등 서식은 지금 쓰는 SheetJS Community 빌드(xlsx.full.min.js)가 못 씀(Pro 전용 기능) — 구조·값만 반영
+  function titledSheet(titleLines, headerRow, dataRows) {
+    const aoa = [...titleLines.map(t => [t]), [], headerRow, ...dataRows];
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws["!merges"] = titleLines.map((_, i) => ({ s: { r: i, c: 0 }, e: { r: i, c: 2 } }));
+    return ws;
+  }
+
+  // "전체" 다운로드 — 지금 적용된 필터·검색 전체 범위(페이지네이션 무관). 컬럼은 화면 순서 그대로 +
+  // 상세 전용 필드(S/N·IMEI·제조연월일·구매일·구매가격)까지 포함 — 소분류 필드 노출 설정으로 꺼져 있어도
+  // 엑셀엔 전부 넣고 값만 빈칸 처리(한 시트에 여러 소분류가 섞여서 컬럼 자체를 없앨 수 없음)
+  function downloadListAll() {
     const list = getFiltered();
-    const rows = list.map(a => ({
-      "고유관리번호": a.assetNo || "",
-      "품목명": a.product,
-      "분류": `${a.group} › ${a.sub}`,
-      "자산 유형": TYPE_LABEL[a.type],
-      "상태": STATUS_LABEL[a.status][0],
-      "배정·보유 현황": holderPlainText(a),
-      "유효기한": a.expiry ? `${window.fmtDate(a.expiry)} (${EXP_LABEL[expiryKey(a.expiry)]})` : "",
-      "태그": (a.labels || []).join(", "),
-      "메모": a.note || "",
-      "등록일": window.fmtDate(a.createdAt),
-    }));
-    const ws = XLSX.utils.json_to_sheet(rows);
+    const header = ["No.", "고유관리번호", "품목명", "상태", "자산 유형", "분류", "배정·보유 현황", "유효기한", "태그", "S/N", "IMEI", "제조연월일", "구매일", "구매가격", "메모", "자산 등록일", "최근변경일시"];
+    const rows = list.map((a, i) => [
+      i + 1,
+      a.assetNo || "",
+      a.product,
+      STATUS_LABEL[a.status][0],
+      TYPE_LABEL[a.type],
+      `${a.group} › ${a.sub}`,
+      holderPlainText(a),
+      a.expiry ? `${window.fmtDate(a.expiry)} (${EXP_LABEL[expiryKey(a.expiry)]})` : "",
+      (a.labels || []).join(", "),
+      a.type === "individual" ? (a.serial || "") : "",
+      a.type === "individual" ? (a.imei || "") : "",
+      a.manufactured ? window.fmtDate(a.manufactured) : "",
+      a.purchaseDate ? window.fmtDate(a.purchaseDate) : "",
+      a.price != null ? `${a.price.toLocaleString()}원` : "",
+      a.note || "",
+      window.fmtDate(a.createdAt),
+      a.updatedAt ? window.fmtDate(a.updatedAt) : "",
+    ]);
+    const ws = titledSheet(["자산 목록", `추출 시점 / ${xlsxNowLabel()}`], header, rows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "자산 목록");
-    const d = new Date(), p2 = n => String(n).padStart(2, "0");
-    const ts = `${d.getFullYear()}${p2(d.getMonth() + 1)}${p2(d.getDate())}${p2(d.getHours())}${p2(d.getMinutes())}${p2(d.getSeconds())}`;
-    XLSX.writeFile(wb, `Asset_List_${ts}.xlsx`);
+    XLSX.writeFile(wb, `Asset_List_All_${xlsxTs()}.xlsx`);
+  }
+
+  // "품목별" 다운로드 — 현재 토글된 자산 유형(개별/수량)만 대상. 1번 시트는 화면과 동일한 품목 요약,
+  // 2번 시트는 그 품목들의 유닛/보유 대상 단위 상세(품목 모달에서 보던 정보를 엑셀에서도 확인 가능하게)
+  function downloadListByItem() {
+    const isIndiv = state.productType !== "quantity";
+    const list = getFiltered().filter(a => a.type === (isIndiv ? "individual" : "quantity"));
+    const groups = groupByProduct(list);
+
+    let summaryHeader, summaryRows, detailHeader, detailRows = [];
+    if (isIndiv) {
+      summaryHeader = ["No.", "품목명", "분류", "자산 수", "배정 중", "재고", "수리 중", "분실", "폐기"];
+      summaryRows = groups.map((g, i) => {
+        const counts = { assigned: 0, stock: 0, repair: 0, lost: 0, disposed: 0 };
+        g.list.forEach(a => { counts[a.status] = (counts[a.status] || 0) + 1; });
+        return [i + 1, g.product, `${g.group} › ${g.sub}`, g.list.length, counts.assigned, counts.stock, counts.repair, counts.lost, counts.disposed];
+      });
+      detailHeader = ["No.", "품목명", "분류", "고유관리번호", "상태", "배정 대상", "유효기한"];
+      groups.forEach(g => g.list.forEach(a => {
+        detailRows.push([detailRows.length + 1, a.product, `${a.group} › ${a.sub}`, a.assetNo || "", STATUS_LABEL[a.status][0], holderPlainText(a), a.expiry ? window.fmtDate(a.expiry) : ""]);
+      }));
+    } else {
+      summaryHeader = ["No.", "품목명", "분류", "전체 수량", "보유 수량", "잔여 수량", "보유 대상", "유효기한"];
+      summaryRows = groups.map((g, i) => {
+        const a = g.list[0];
+        const qty = (a.stocks || []).reduce((s, x) => s + x.qty, 0);
+        const targets = (a.stocks || []).length;
+        return [i + 1, g.product, `${g.group} › ${g.sub}`, a.totalQty, qty, a.totalQty - qty, targets, a.expiry ? window.fmtDate(a.expiry) : ""];
+      });
+      detailHeader = ["No.", "품목명", "분류", "보유 대상", "보유 수량"];
+      groups.forEach(g => {
+        const a = g.list[0];
+        (a.stocks || []).forEach(x => {
+          detailRows.push([detailRows.length + 1, a.product, `${a.group} › ${a.sub}`, x.employee || x.worksite, `${x.qty}개`]);
+        });
+      });
+    }
+
+    const titleLines = ["품목별 자산 목록", `자산 유형 / ${isIndiv ? "개별 자산" : "수량 자산"}`, `추출 시점 / ${xlsxNowLabel()}`];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, titledSheet(titleLines, summaryHeader, summaryRows), "품목 목록");
+    XLSX.utils.book_append_sheet(wb, titledSheet(titleLines, detailHeader, detailRows), "품목별 상세");
+    XLSX.writeFile(wb, `Asset_List_By_Item_${xlsxTs()}.xlsx`);
+  }
+
+  // "구성원별" 다운로드 — 화면과 동일한 집계(이름·사번·휴대폰번호·그룹·직무직급·등급·배정된 자산), 검색어까지 반영.
+  // 배정된 자산은 개수 상한이 없어(개별형 배정 인원수 제한 없음, 보유 대상도 무제한) 컬럼을 나누는 대신
+  // 한 셀에 쉼표로 나열 + "배정 자산 수" 카운트 컬럼을 별도로 둠
+  function downloadListByMember() {
+    const list = getFiltered();
+    const map = new Map();
+    list.forEach(a => {
+      if (a.type === "individual") {
+        (a.assignments || []).forEach(x => {
+          if (!x.employee) return;
+          if (!map.has(x.employee)) map.set(x.employee, { name: x.employee, items: [] });
+          map.get(x.employee).items.push({ qty: 1, asset: a });
+        });
+      } else {
+        (a.stocks || []).forEach(x => {
+          if (!x.employee) return;
+          if (!map.has(x.employee)) map.set(x.employee, { name: x.employee, items: [] });
+          map.get(x.employee).items.push({ qty: x.qty, asset: a });
+        });
+      }
+    });
+    const q = state.search.trim().toLowerCase();
+    const rowsArr = [...map.values()].filter(r => {
+      if (!q) return true;
+      const info = MEMBER_INFO[r.name] || {};
+      return r.name.toLowerCase().includes(q) || (info.empNo || "").toLowerCase().includes(q) || (info.phone || "").includes(q);
+    });
+    const header = ["No.", "이름", "사번", "휴대폰번호", "그룹", "직무·직급", "등급", "배정 자산 수", "배정된 자산"];
+    const rows = rowsArr.map((r, i) => {
+      const info = MEMBER_INFO[r.name] || {};
+      const assetList = r.items.map(x => x.asset.type === "individual" ? `${x.asset.product}(${x.asset.assetNo || "—"})` : `${x.asset.product}(${x.qty}개)`).join(", ");
+      return [i + 1, r.name, info.empNo || "", info.phone || "", info.team || "", info.jobTitle || "", info.grade || "", r.items.length, assetList];
+    });
+    const ws = titledSheet(["구성원별 자산 목록", `추출 시점 / ${xlsxNowLabel()}`], header, rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "구성원별 자산 목록");
+    XLSX.writeFile(wb, `Asset_List_By_Member_${xlsxTs()}.xlsx`);
+  }
+
+  // "근무지별" 다운로드 — 화면과 동일한 집계(근무지명·코드·주소·배정된 자산), 검색어까지 반영. 배정된 자산
+  // 나열 방식은 구성원별과 동일한 이유(상한 없음)로 한 셀 쉼표 나열 + 카운트 컬럼
+  function downloadListByLocation() {
+    const list = getFiltered();
+    const map = new Map();
+    list.forEach(a => {
+      if (a.type === "individual") {
+        (a.assignments || []).forEach(x => {
+          if (!x.worksite) return;
+          if (!map.has(x.worksite)) map.set(x.worksite, { name: x.worksite, items: [] });
+          map.get(x.worksite).items.push({ qty: 1, asset: a });
+        });
+      } else {
+        (a.stocks || []).forEach(x => {
+          if (!x.worksite) return;
+          if (!map.has(x.worksite)) map.set(x.worksite, { name: x.worksite, items: [] });
+          map.get(x.worksite).items.push({ qty: x.qty, asset: a });
+        });
+      }
+    });
+    const q = state.search.trim().toLowerCase();
+    const rowsArr = [...map.values()].filter(r => {
+      if (!q) return true;
+      return r.name.toLowerCase().includes(q) || (WS_CODE[r.name] || "").toLowerCase().includes(q);
+    });
+    const header = ["No.", "근무지명", "근무지 코드", "주소", "배정 자산 수", "배정된 자산"];
+    const rows = rowsArr.map((r, i) => {
+      const assetList = r.items.map(x => x.asset.type === "individual" ? `${x.asset.product}(${x.asset.assetNo || "—"})` : `${x.asset.product}(${x.qty}개)`).join(", ");
+      return [i + 1, r.name, WS_CODE[r.name] || "", WS_ADDRESS[r.name] || "", r.items.length, assetList];
+    });
+    const ws = titledSheet(["근무지별 자산 목록", `추출 시점 / ${xlsxNowLabel()}`], header, rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "근무지별 자산 목록");
+    XLSX.writeFile(wb, `Asset_List_By_Location_${xlsxTs()}.xlsx`);
   }
 
   /* ---------- stats (분류 필터까지만 반영) ---------- */
