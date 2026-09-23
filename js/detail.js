@@ -488,7 +488,10 @@
           return x.worksite.toLowerCase().includes(q) || code.includes(q);
         }
         if (!x.employee) return false;
-        return x.employee.toLowerCase().includes(q);
+        if (x.employee.toLowerCase().includes(q)) return true;
+        // 사번·휴대폰번호는 카드엔 안 보이지만(레코드에 표시할 필요 없음) 검색만 가능하게 MEMBERS에서 조회
+        const info = MEMBERS.find(m => m.name === x.employee);
+        return !!info && ((info.empNo || "").toLowerCase().includes(q) || (info.phone || "").includes(q));
       })
       // 보유 수량 오름차순(적은/소진된 대상이 위로) — 개별형이 배정일(눈에 보이는 값)로 정렬하는 것과
       // 같은 원칙으로 이름 대신 수량으로 변경. 이름순이면 소진(0개)된 대상을 찾기 어렵다는 피드백 반영
@@ -1348,7 +1351,7 @@
             <span class="stock-count">전체 <b>${stocks.length}</b></span>
             <div class="stock-search">
               <button type="button" class="stock-cat-btn" id="stock-cat-btn" data-cat="employee">구성원<span class="bchev">▾</span></button>
-              <input type="text" id="stock-q" placeholder="이름·휴대폰번호·사번으로 검색">
+              <input type="text" id="stock-q" placeholder="이름·사번·휴대폰번호로 검색">
             </div>
           </div>
           <div class="stock-toolbar" id="history-toolbar" hidden>
@@ -1427,7 +1430,7 @@
       const stockCatBtn = scard.querySelector("#stock-cat-btn");
       let stockCat = "employee";
       const stockQ = scard.querySelector("#stock-q");
-      const CAT_PLACEHOLDER = { employee: "이름·휴대폰번호·사번으로 검색", worksite: "근무지명·코드·주소로 검색" };
+      const CAT_PLACEHOLDER = { employee: "이름·사번·휴대폰번호로 검색", worksite: "근무지명·코드로 검색" };
       const CAT_LABEL = { employee: "구성원", worksite: "근무지" };
       const refreshStock = () => {
         sbody.innerHTML = stockCards(a, stockQ.value, stockCat);
