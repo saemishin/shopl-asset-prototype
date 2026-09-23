@@ -149,80 +149,10 @@
     document.body.appendChild(cb);
     input.focus();
   }
-  // 소분류 이동 — 분류 관리 모달과 같은 대분류/소분류 트리 구조를 라디오 단일선택으로 재구성.
-  // 구조설계안 6장: 동일 자산 유형의 소분류로만 이동 가능 → 다른 유형은 비활성화+툴팁(선택 불가 이유를 알 수 있어야 함).
-  // 현재 소속 소분류도 같은 방식으로 비활성화(선택해도 이동이 아니므로).
-  // 실제로는 조회 권한 밖 소분류는 아예 노출되지 않아야 하지만(4.2 소분류 노출 기준, 자산관리 권한자는 예외),
-  // 프로토타입엔 로그인 사용자·권한 개념이 없어 구현 대상에서 제외 — 전체 소분류를 노출함
-  function openMoveSubModal(a) {
-    const origGroup = a.group, origSub = a.sub;
-    let picked = null;
-
-    const groupMap = {}, order = [];
-    (window.DATA.categories || []).forEach(c => {
-      if (!groupMap[c.group]) { groupMap[c.group] = []; order.push(c.group); }
-      groupMap[c.group].push(c);
-    });
-    const groups = order.map(group => ({ group, subs: groupMap[group] }));
-
-    const back = document.createElement("div");
-    back.className = "modal-back";
-    back.innerHTML = `
-      <div class="modal picker-modal">
-        <h3>소분류 이동</h3>
-        <div class="body" data-body></div>
-        <div class="foot">
-          <button class="btn" data-close>취소</button>
-          <button class="btn primary" data-save disabled>저장</button>
-        </div>
-      </div>`;
-    document.body.appendChild(back);
-    const body = back.querySelector("[data-body]");
-    const saveBtn = back.querySelector("[data-save]");
-
-    function draw() {
-      body.innerHTML = groups.map(g => `
-        <div class="submove-group">
-          <div class="submove-group-name">${g.group}</div>
-          ${g.subs.map(c => {
-            const isCurrent = c.group === origGroup && c.sub === origSub;
-            const isOtherType = c.type !== a.type;
-            const disabled = isCurrent || isOtherType;
-            // 현재 소분류는 재배정 모달이 현재 배정 대상을 후보에서 그냥 빼는 것과 같은 이유로 설명 없이 비활성화만
-            // — "지금 있는 곳으로는 못 옮긴다"는 이 액션의 성격상 자명함. 다른 유형 제약은 그 자체로 비즈니스
-            // 규칙이라 설명이 필요해서 툴팁 유지
-            const tip = !isCurrent && isOtherType ? "다른 자산 유형으로는 이동할 수 없습니다." : "";
-            const checked = picked && picked.group === g.group && picked.sub === c.sub;
-            return `
-            <label class="radio-row${disabled ? " is-disabled" : ""}"${tip ? ` data-tip="${tip}"` : ""}>
-              <input type="radio" name="submove" data-group="${g.group}" data-sub="${c.sub}"${disabled ? " disabled" : ""}${checked ? " checked" : ""}>
-              <span>${c.sub}</span>
-            </label>`;
-          }).join("")}
-        </div>`).join("");
-      body.querySelectorAll('input[name="submove"]').forEach(r => r.onchange = () => {
-        picked = { group: r.dataset.group, sub: r.dataset.sub };
-        saveBtn.disabled = false;
-      });
-    }
-    draw();
-
-    back.addEventListener("click", e => { if (e.target === back) back.remove(); });
-    back.querySelector("[data-close]").onclick = () => back.remove();
-    saveBtn.onclick = () => {
-      if (!picked) return;
-      const beforeLabel = `${origGroup} › ${origSub}`;
-      const afterLabel = `${picked.group} › ${picked.sub}`;
-      a.group = picked.group;
-      a.sub = picked.sub;
-      logActivity(a, { script: "소분류 이동", before: beforeLabel, after: afterLabel });
-      back.remove();
-      toast("소분류가 이동되었습니다.");
-      render();
-    };
-  }
   // "···" 자산관리 메뉴 전용 드롭다운 — 상태 변경 드롭다운(dropdown())과 공용 함수를 쓰면 항목별 분기가 안 돼서
-  // 분리. "자산 삭제"·"소분류 이동"만 실제 동작, 나머지("자산 수정")는 기존과 동일한 스텁 토스트
+  // 분리. "자산 삭제"·"자산 수정"만 실제 동작. 소분류 이동은 별도 액션이 아니라 자산 수정 폼 안의 소분류
+  // 필드로 흡수됨(재배정이 배정과 다른 별도 액션인 것과 달리, 소분류는 전역 자산관리 권한만 있으면 다른 필드
+  // 수정과 다를 게 없는 값이라 굳이 나눌 이유가 없다고 재검토 후 병합)
   function moreDropdown(anchor, items, a) {
     document.querySelectorAll(".dropdown-menu").forEach(m => m.remove());
     const menu = document.createElement("div");
@@ -235,8 +165,13 @@
       menu.remove();
       const label = items[+b.dataset.i];
       if (label === "자산 삭제") openDeleteAssetModal(a);
-      else if (label === "소분류 이동") openMoveSubModal(a);
-      else toast(`"${label}" — 이후 단계에서 정의`);
+      else if (label === "자산 수정") {
+        window.openAssetAddModal({
+          asset: a,
+          logActivity: entry => logActivity(a, entry),
+          onSaved: () => render(),
+        });
+      } else toast(`"${label}" — 이후 단계에서 정의`);
     });
     setTimeout(() => {
       const close = e => { if (!menu.contains(e.target)) { menu.remove(); document.removeEventListener("click", close); } };
@@ -1230,10 +1165,11 @@
 
     const QR_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM19 14h2v2h-2zM14 19h2v2h-2zM19 19h2v2h-2z"/></svg>`;
     const qrBtn = `<button class="btn sm icon-only" data-qr aria-label="QR 라벨" title="QR 라벨">${QR_ICON}</button>`;
-    // 자산관리(소분류 이동·자산 수정·자산 삭제)만 남음. 재배정은 배정 행으로, 상태 변경은 상태 뱃지로 이동.
+    // 자산관리(자산 수정·자산 삭제)만 남음. 재배정은 배정 행으로, 상태 변경은 상태 뱃지로, 소분류 이동은
+    // 자산 수정 폼 안의 소분류 필드로 흡수됨(별도 메뉴 항목이었으나 병합).
     const MORE_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg>`;
     const mgrBtn = `<button class="btn sm icon-only corner" data-more aria-label="자산관리" title="자산관리">${MORE_ICON}</button>`;
-    const moreItems = ["소분류 이동", "자산 수정", "자산 삭제"];
+    const moreItems = ["자산 수정", "자산 삭제"];
 
     // 필수값(분류) 먼저, 선택값이 뒤따름. 태그·유효기한은 분류 바로 다음. 제조연월일이 구매일보다 앞(제조가 구매보다 먼저 일어나는 시점).
     // 선택 필드(field 태그가 있는 행)는 소분류 필드 노출 설정(hiddenFields)에서 off면 행 자체를 숨김.
@@ -1246,6 +1182,7 @@
       { k: "태그", v: chips(a.labels) },
       { k: "유효기한", field: "expiry", v: expiryBadge(a.expiry) },
       isIndiv ? { k: "S/N", field: "serial", v: a.serial || '<span class="muted">—</span>' } : null,
+      isIndiv ? { k: "IMEI", field: "imei", v: a.imei || '<span class="muted">—</span>' } : null,
       { k: "제조연월일", field: "manufactured", v: a.manufactured ? window.fmtDate(a.manufactured) : '<span class="muted">—</span>' },
       { k: "구매일", field: "purchaseDate", v: a.purchaseDate ? window.fmtDate(a.purchaseDate) : "—" },
       { k: isIndiv ? "구매가격" : "구매가격 (품목 단가)", field: "purchasePrice", v: a.price ? a.price.toLocaleString() + "원" : "—" },

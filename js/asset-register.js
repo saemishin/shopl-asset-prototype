@@ -204,6 +204,70 @@
     return back;
   }
 
+  // 자산 수정(prefill) 시 유효기한 외 구매일·제조연월일 등의 "미래 아님" 검증 기준으로 씀 — 이 앱 전체가 쓰는
+  // 고정 데모 날짜(2026-09-04)와 동일하게 맞춤(detail.js의 TODAY/todayStr과 동일 값)
+  const TODAY = new Date("2026-09-04");
+  function todayStr() {
+    const p = n => String(n).padStart(2, "0");
+    return `${TODAY.getFullYear()}-${p(TODAY.getMonth() + 1)}-${p(TODAY.getDate())}`;
+  }
+
+  // 소분류 이동 트리 — 자산 수정에서 소분류를 바꿀 때 사용(자산 삭제와 마찬가지로 detail.js의 "···" 메뉴에
+  // 있던 "소분류 이동"을 여기 자산 수정 폼으로 흡수). 현재 소분류는 설명 없이 비활성화만(재배정 모달이 현재
+  // 대상을 그냥 빼는 것과 같은 원칙), 다른 자산 유형의 소분류는 구조설계안 6장 제약이라 비활성화+툴팁으로 안내
+  function openCategoryMoveModal(categories, currentGroup, currentSub, currentType, onApply) {
+    let picked = null;
+    const groupMap = {}, order = [];
+    categories.forEach(c => {
+      if (!groupMap[c.group]) { groupMap[c.group] = []; order.push(c.group); }
+      groupMap[c.group].push(c);
+    });
+    const groups = order.map(group => ({ group, subs: groupMap[group] }));
+
+    const back = document.createElement("div");
+    back.className = "modal-back";
+    back.innerHTML = `
+      <div class="modal picker-modal">
+        <h3>소분류</h3>
+        <div class="body" data-body></div>
+        <div class="foot">
+          <button type="button" class="btn" data-cancel>취소</button>
+          <button type="button" class="btn primary" data-apply disabled>적용</button>
+        </div>
+      </div>`;
+    document.body.appendChild(back);
+    const body = back.querySelector("[data-body]");
+    const applyBtn = back.querySelector("[data-apply]");
+
+    function draw() {
+      body.innerHTML = groups.map(g => `
+        <div class="submove-group">
+          <div class="submove-group-name">${g.group}</div>
+          ${g.subs.map(c => {
+            const isCurrent = c.group === currentGroup && c.sub === currentSub;
+            const isOtherType = c.type !== currentType;
+            const disabled = isCurrent || isOtherType;
+            const tip = !isCurrent && isOtherType ? "다른 자산 유형으로는 이동할 수 없습니다." : "";
+            const checked = picked && picked.group === g.group && picked.sub === c.sub;
+            return `
+            <label class="radio-row${disabled ? " is-disabled" : ""}"${tip ? ` data-tip="${tip}"` : ""}>
+              <input type="radio" name="catmove" data-group="${g.group}" data-sub="${c.sub}"${disabled ? " disabled" : ""}${checked ? " checked" : ""}>
+              <span>${c.sub}</span>
+            </label>`;
+          }).join("")}
+        </div>`).join("");
+      body.querySelectorAll('input[name="catmove"]').forEach(r => r.onchange = () => {
+        picked = { group: r.dataset.group, sub: r.dataset.sub };
+        applyBtn.disabled = false;
+      });
+    }
+    draw();
+
+    back.addEventListener("click", e => { if (e.target === back) back.remove(); });
+    back.querySelector("[data-cancel]").onclick = () => back.remove();
+    applyBtn.onclick = () => { if (!picked) return; back.remove(); onApply(picked); };
+  }
+
   window.openAssetAddModal = function (opts) {
     opts = opts || {};
     const categories = (window.DATA && window.DATA.categories) || [];
@@ -220,14 +284,27 @@
           <span class="dfield-pick">${IC_CAL}<input type="date" data-dnative tabindex="-1"></span>
         </div>`;
     }
-    function wireDateField(scope) {
+    // maxIso가 있으면(구매일·제조연월일) 미래 날짜 불가, 없으면(유효기한) 만료일 성격상 미래 날짜도 허용.
+    // getValue()는 8자리를 다 채운 유효한 날짜면 ISO, 완전히 비어있으면 "", 불완전/범위밖이면 null을 돌려줌
+    function wireDateField(scope, maxIso) {
       const text = scope.querySelector("[data-dtext]");
       const native = scope.querySelector("[data-dnative]");
+      if (maxIso) native.max = maxIso;
       const digitsOf = v => v.replace(/\D/g, "").slice(0, 8);
       const format = d => d.length > 6 ? `${d.slice(0, 4)}.${d.slice(4, 6)}.${d.slice(6)}`
                          : d.length > 4 ? `${d.slice(0, 4)}.${d.slice(4)}` : d;
+      const getValue = () => {
+        const d = digitsOf(text.value);
+        if (!d.length) return "";
+        if (d.length !== 8) return null;
+        const y = d.slice(0, 4), m = d.slice(4, 6), dd = d.slice(6, 8);
+        if (+m < 1 || +m > 12 || +dd < 1 || +dd > 31) return null;
+        const iso = `${y}-${m}-${dd}`;
+        return maxIso && iso > maxIso ? null : iso;
+      };
       text.addEventListener("input", () => { text.value = format(digitsOf(text.value)); });
       native.addEventListener("change", () => { if (native.value) text.value = native.value.replace(/-/g, "."); });
+      return getValue;
     }
 
     const tags = [];
@@ -236,7 +313,7 @@
     back.className = "modal-back";
     back.innerHTML = `
       <div class="modal">
-        <h3>자산 추가</h3>
+        <h3>${opts.asset ? "자산 수정" : "자산 추가"}</h3>
         <div class="body">
           <div class="field"><label>소분류 <span class="req">*</span></label>
             <div class="tag-input-wrap" id="areg-catwrap" style="cursor:pointer">
@@ -248,7 +325,6 @@
             <p class="field-err" data-assetno-err hidden>동일한 명칭이 존재합니다.</p>
           </div>
           <div class="field" id="areg-totalqty-field"><label>총 수량 <span class="req">*</span></label><input type="text" inputmode="numeric" id="areg-totalqty-input" placeholder="입력" maxlength="6"></div>
-          <div class="field" id="areg-expiry-field"><label>유효기한</label>${dateFieldHtml()}</div>
           <div class="field" id="areg-tag-field">
             <div class="field-label-row">
               <label>태그</label>
@@ -259,16 +335,21 @@
               <input type="text" data-taginput placeholder="검색" autocomplete="off">
             </div>
           </div>
+          <div class="field" id="areg-expiry-field"><label>유효기한</label>${dateFieldHtml()}</div>
+          <div class="field" id="areg-serial-field"><label>S/N</label><input type="text" id="areg-serial-input" placeholder="입력" maxlength="40"></div>
+          <div class="field" id="areg-imei-field"><label>IMEI</label><input type="text" id="areg-imei-input" placeholder="입력" maxlength="40"></div>
+          <div class="field" id="areg-manufactured-field"><label>제조연월일</label>${dateFieldHtml()}</div>
+          <div class="field" id="areg-purchasedate-field"><label>구매일</label>${dateFieldHtml()}</div>
+          <div class="field" id="areg-purchaseprice-field"><label>구매가격</label><input type="text" inputmode="numeric" id="areg-purchaseprice-input" placeholder="입력" maxlength="12"></div>
         </div>
         <div class="foot">
-          <button class="btn" data-close>취소</button>
-          <button class="btn primary" data-close id="areg-save" disabled>저장</button>
+          <button type="button" class="btn" data-close>취소</button>
+          <button type="button" class="btn primary" id="areg-save" disabled>저장</button>
         </div>
       </div>`;
     back.addEventListener("click", e => { if (e.target === back) back.remove(); });
     back.querySelectorAll("[data-close]").forEach(b => b.onclick = () => { if (!b.disabled) back.remove(); });
     document.body.appendChild(back);
-    wireDateField(back.querySelector(".dfield"));
 
     const nameField = back.querySelector("#areg-name-field");
     const nameInput = back.querySelector("#areg-name");
@@ -277,16 +358,27 @@
     const assetNoErr = back.querySelector("[data-assetno-err]");
     const totalQtyField = back.querySelector("#areg-totalqty-field");
     const totalQtyInput = back.querySelector("#areg-totalqty-input");
-    const expiryField = back.querySelector("#areg-expiry-field");
     const tagFieldEl = back.querySelector("#areg-tag-field");
-    const dtext = back.querySelector("[data-dtext]");
-    const dnative = back.querySelector("[data-dnative]");
+    const expiryField = back.querySelector("#areg-expiry-field");
+    const serialField = back.querySelector("#areg-serial-field");
+    const serialInput = back.querySelector("#areg-serial-input");
+    const imeiField = back.querySelector("#areg-imei-field");
+    const imeiInput = back.querySelector("#areg-imei-input");
+    const manufacturedField = back.querySelector("#areg-manufactured-field");
+    const purchaseDateField = back.querySelector("#areg-purchasedate-field");
+    const purchasePriceField = back.querySelector("#areg-purchaseprice-field");
+    const purchasePriceInput = back.querySelector("#areg-purchaseprice-input");
     const saveBtn = back.querySelector("#areg-save");
 
-    // 고유관리번호는 QR 라벨 파일명의 식별키로 그대로 쓰여서, 파일명에 부적합한 문자가 섞이지 않도록 영문·숫자·하이픈·언더스코어만 허용
+    const getExpiry = wireDateField(expiryField);
+    const getManufactured = wireDateField(manufacturedField, todayStr());
+    const getPurchaseDate = wireDateField(purchaseDateField, todayStr());
+
+    // 고유관리번호는 QR 라벨 파일명의 식별키로 그대로 쓰여서, 파일명에 부적합한 문자가 섞이지 않도록 영문·숫자·하이픈·언더스코어만 허용.
+    // 수정 모드에선 자기 자신은 중복 검사에서 제외(안 그러면 기존 값 그대로 저장하려 해도 항상 "중복"으로 걸림)
     function assetNoDup(v) {
       if (!v) return false;
-      return (window.DATA.assets || []).some(a => a.assetNo && a.assetNo === v);
+      return (window.DATA.assets || []).some(a => a !== opts.asset && a.assetNo && a.assetNo === v);
     }
     function checkValid() {
       const nameOk = nameInput.value.trim().length > 0;
@@ -374,6 +466,9 @@
       totalQtyInput.value = totalQtyInput.value.replace(/[^0-9]/g, "");
       checkValid();
     });
+    purchasePriceInput.addEventListener("input", () => {
+      purchasePriceInput.value = purchasePriceInput.value.replace(/[^0-9]/g, "");
+    });
 
     // 소분류 — 검색 + 대분류/소분류 트리 모달(openCategoryPickModal)에서 단일 선택.
     // 기본은 비워둔 상태(자동 첫 항목 선택 없음) — 미선택 상태에선 소분류 필드만 보이고 나머지는 아예 숨김
@@ -383,28 +478,44 @@
     let catValue = null;
 
     function catLabel(v) { const c = findCat(v); return c ? `${c.group} › ${c.sub}` : ""; }
+    // 소분류별 필드 노출 설정(구조설계안 3.3 hiddenFields) 반영 — S/N·IMEI는 개별형 전용이라 유형 조건과 같이 봄
     function applyFieldVisibility() {
       const show = !!catValue;
-      [nameField, expiryField, tagFieldEl].forEach(el => { el.style.display = show ? "" : "none"; });
+      const cat = findCat(catValue);
+      const hiddenFields = (cat && cat.hiddenFields) || [];
+      [nameField, tagFieldEl].forEach(el => { el.style.display = show ? "" : "none"; });
       assetNoField.style.display = show && type !== "quantity" ? "" : "none";
       // 총 수량은 개별형엔 없는 개념(실물 1개=Asset 1건이라 총 수량이 항상 1, 구조설계안 3.4)
       totalQtyField.style.display = show && type !== "individual" ? "" : "none";
+      expiryField.style.display = show && !hiddenFields.includes("expiry") ? "" : "none";
+      serialField.style.display = show && type === "individual" && !hiddenFields.includes("serial") ? "" : "none";
+      imeiField.style.display = show && type === "individual" && !hiddenFields.includes("imei") ? "" : "none";
+      manufacturedField.style.display = show && !hiddenFields.includes("manufactured") ? "" : "none";
+      purchaseDateField.style.display = show && !hiddenFields.includes("purchaseDate") ? "" : "none";
+      purchasePriceField.style.display = show && !hiddenFields.includes("purchasePrice") ? "" : "none";
     }
     function renderCatDisplay() {
       if (catValue) { catDisplay.textContent = catLabel(catValue); catDisplay.style.color = "var(--text)"; }
       else { catDisplay.textContent = "선택"; catDisplay.style.color = "var(--text-mut)"; }
     }
-    // 소분류를 바꿀 때마다(선택 해제 포함) 이미 입력해둔 값은 전부 초기화 — 다른 소분류의 값이 뒤섞여 남아있지 않도록
+    // 소분류를 바꿀 때마다(선택 해제 포함) 이미 입력해둔 값은 전부 초기화 — 다른 소분류의 값이 뒤섞여 남아있지 않도록.
+    // 자산 수정(opts.asset)에서는 selectCat에서 이 함수 호출 자체를 건너뜀(아래) — 소분류만 바꿨는데 이미 채워진
+    // 기존 값(S/N·구매가격 등)이 날아가면 안 되기 때문. 신규 등록은 잃을 값이 없어 초기화가 안전하고 자연스러움
     function resetOtherFields() {
       nameInput.value = "";
       assetNoInput.value = "";
       assetNoErr.hidden = true;
       assetNoInput.classList.remove("has-err");
       totalQtyInput.value = "";
-      dtext.value = "";
-      dnative.value = "";
       tags.length = 0;
       renderChips();
+      [expiryField, manufacturedField, purchaseDateField].forEach(f => {
+        f.querySelector("[data-dtext]").value = "";
+        f.querySelector("[data-dnative]").value = "";
+      });
+      serialInput.value = "";
+      imeiInput.value = "";
+      purchasePriceInput.value = "";
     }
     function selectCat(v) {
       const changed = v !== catValue;
@@ -413,11 +524,41 @@
       type = (cat && cat.type) || "individual";
       renderCatDisplay();
       applyFieldVisibility();
-      if (changed) resetOtherFields();
+      if (changed && !opts.asset) resetOtherFields();
+      checkValid();
+    }
+    function setDateInputs(fieldEl, iso) {
+      fieldEl.querySelector("[data-dtext]").value = iso ? iso.replace(/-/g, ".") : "";
+      fieldEl.querySelector("[data-dnative]").value = iso || "";
+    }
+    // 자산 수정 진입 시 기존 값 전체를 채움 — selectCat을 거치지 않아(resetOtherFields 우회) 안전
+    function prefillFromAsset(asset) {
+      catValue = `${asset.group}|${asset.sub}`;
+      type = asset.type;
+      renderCatDisplay();
+      applyFieldVisibility();
+      nameInput.value = asset.product || "";
+      if (type !== "quantity") assetNoInput.value = asset.assetNo || "";
+      if (type !== "individual") totalQtyInput.value = asset.totalQty != null ? String(asset.totalQty) : "";
+      tags.length = 0;
+      (asset.labels || []).forEach(l => tags.push(l));
+      renderChips();
+      setDateInputs(expiryField, asset.expiry);
+      if (type === "individual") {
+        serialInput.value = asset.serial || "";
+        imeiInput.value = asset.imei || "";
+      }
+      setDateInputs(manufacturedField, asset.manufactured);
+      setDateInputs(purchaseDateField, asset.purchaseDate);
+      purchasePriceInput.value = asset.price != null ? String(asset.price) : "";
       checkValid();
     }
     catWrap.addEventListener("click", () => {
-      openCategoryPickModal(categories, catValue, v => selectCat(v));
+      if (opts.asset) {
+        openCategoryMoveModal(categories, opts.asset.group, opts.asset.sub, opts.asset.type, v => selectCat(`${v.group}|${v.sub}`));
+      } else {
+        openCategoryPickModal(categories, catValue, v => selectCat(v));
+      }
     });
 
     // 소분류 초기값 반영(과 그에 딸린 resetOtherFields 호출)은 태그 위젯(renderChips 등)까지 다 준비된
@@ -498,7 +639,8 @@
     });
     renderChips();
     checkValid();
-    if (preselectValue) selectCat(preselectValue);
+    if (opts.asset) prefillFromAsset(opts.asset);
+    else if (preselectValue) selectCat(preselectValue);
 
     back.querySelector("#areg-tag-manage").onclick = () => {
       closeMenu();
@@ -513,7 +655,46 @@
       });
     };
 
-    saveBtn.addEventListener("click", () => { closeMenu(); toast("저장되었습니다. (프로토타입 — 반영 없음)"); });
+    // 자산 수정(opts.asset)은 실제로 자산 객체를 갱신 + 활동 이력을 남김. 자산 추가는 아직 러프한 목업이라
+    // 기존과 동일하게 토스트만(실제 데이터 반영 없음) — 이번 스코프는 "수정"만, 신규 등록 저장은 별도 과제
+    saveBtn.addEventListener("click", () => {
+      closeMenu();
+      if (opts.asset) {
+        const asset = opts.asset;
+        const cat = findCat(catValue);
+        if (cat && (cat.group !== asset.group || cat.sub !== asset.sub)) {
+          const before = `${asset.group} › ${asset.sub}`, after = `${cat.group} › ${cat.sub}`;
+          asset.group = cat.group;
+          asset.sub = cat.sub;
+          if (opts.logActivity) opts.logActivity({ script: "소분류 이동", before, after });
+        }
+        let infoChanged = false;
+        const setIf = (key, val) => { if (asset[key] !== val) { asset[key] = val; infoChanged = true; } };
+        setIf("product", nameInput.value.trim());
+        if (type !== "quantity") setIf("assetNo", assetNoInput.value.trim());
+        if (type !== "individual") setIf("totalQty", parseInt(totalQtyInput.value, 10) || 0);
+        const newTags = [...tags];
+        if (JSON.stringify(newTags) !== JSON.stringify(asset.labels || [])) { asset.labels = newTags; infoChanged = true; }
+        const expiry = getExpiry();
+        if (expiry !== null) setIf("expiry", expiry || undefined);
+        if (type === "individual") {
+          setIf("serial", serialInput.value.trim() || undefined);
+          setIf("imei", imeiInput.value.trim() || undefined);
+        }
+        const manufactured = getManufactured();
+        if (manufactured !== null) setIf("manufactured", manufactured || undefined);
+        const purchaseDate = getPurchaseDate();
+        if (purchaseDate !== null) setIf("purchaseDate", purchaseDate || undefined);
+        setIf("price", purchasePriceInput.value ? parseInt(purchasePriceInput.value, 10) : undefined);
+        if (infoChanged && opts.logActivity) opts.logActivity({ script: "자산 정보 수정" });
+        back.remove();
+        toast("저장되었습니다.");
+        if (opts.onSaved) opts.onSaved();
+      } else {
+        back.remove();
+        toast("저장되었습니다. (프로토타입 — 반영 없음)");
+      }
+    });
 
     return back;
   };
