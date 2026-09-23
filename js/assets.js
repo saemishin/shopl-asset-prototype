@@ -833,7 +833,10 @@
   // 상세 전용 필드(S/N·IMEI·제조연월일·구매일·구매가격)까지 포함 — 소분류 필드 노출 설정으로 꺼져 있어도
   // 엑셀엔 전부 넣고 값만 빈칸 처리(한 시트에 여러 소분류가 섞여서 컬럼 자체를 없앨 수 없음)
   function downloadListAll() {
-    const list = getFiltered();
+    // 정렬은 화면의 현재 정렬 기준(최근 변경일시 등 변동 가능한 값)을 안 따르고 품목명 가나다순으로 고정 —
+    // 실제 다운로드 생성이 비동기 큐(요청 시점 조건 저장 → 워커가 나중에 조회)라 "처리 시점" 데이터가
+    // 반영되는 구조라, 자주 바뀌는 값 기준 정렬은 큐가 밀리는 동안 파일 내 행 순서가 흔들릴 수 있음
+    const list = [...getFiltered()].sort((a, b) => a.product.localeCompare(b.product, "ko"));
     const header = ["No.", "자산 유형", "분류", "품목명", "고유관리번호", "상태", "배정·보유 현황", "유효기한", "태그", "S/N", "IMEI", "제조연월일", "구매일", "구매가격", "메모", "자산 등록일", "최근변경일시"];
     const rows = list.map((a, i) => [
       i + 1,
@@ -866,7 +869,8 @@
   function downloadListByItem() {
     const isIndiv = state.productType !== "quantity";
     const list = getFiltered().filter(a => a.type === (isIndiv ? "individual" : "quantity"));
-    const groups = groupByProduct(list);
+    // 정렬 기준은 downloadListAll과 동일한 이유로 품목명 가나다순 고정(화면 정렬 안 따름)
+    const groups = groupByProduct(list).sort((a, b) => a.product.localeCompare(b.product, "ko"));
 
     let summaryHeader, summaryRows, detailHeader, detailRows = [];
     if (isIndiv) {
@@ -926,11 +930,12 @@
       }
     });
     const q = state.search.trim().toLowerCase();
+    // 정렬 기준은 downloadListAll과 동일한 이유로 이름 가나다순 고정(화면 정렬 안 따름)
     const rowsArr = [...map.values()].filter(r => {
       if (!q) return true;
       const info = MEMBER_INFO[r.name] || {};
       return r.name.toLowerCase().includes(q) || (info.empNo || "").toLowerCase().includes(q) || (info.phone || "").includes(q);
-    });
+    }).sort((a, b) => a.name.localeCompare(b.name, "ko"));
     const header = ["No.", "이름", "사번", "휴대폰번호", "그룹", "직무·직급", "등급", "배정 자산 수", "배정된 자산"];
     const rows = rowsArr.map((r, i) => {
       const info = MEMBER_INFO[r.name] || {};
@@ -964,10 +969,11 @@
       }
     });
     const q = state.search.trim().toLowerCase();
+    // 정렬 기준은 downloadListAll과 동일한 이유로 근무지명 가나다순 고정(화면 정렬 안 따름)
     const rowsArr = [...map.values()].filter(r => {
       if (!q) return true;
       return r.name.toLowerCase().includes(q) || (WS_CODE[r.name] || "").toLowerCase().includes(q);
-    });
+    }).sort((a, b) => a.name.localeCompare(b.name, "ko"));
     const header = ["No.", "근무지명", "근무지 코드", "주소", "배정 자산 수", "배정된 자산"];
     const rows = rowsArr.map((r, i) => {
       const assetList = r.items.map(x => x.asset.type === "individual" ? `${x.asset.product}(${x.asset.assetNo || "—"})` : `${x.asset.product}(${x.qty}개)`).join(", ");
