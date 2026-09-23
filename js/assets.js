@@ -359,7 +359,7 @@
   }
 
   function view_product_quantity(list) {
-    const head = `<tr><th>분류</th><th>품목명</th><th class="num">전체 수량</th><th class="num">보유 수량</th><th class="num">잔여 수량</th><th class="num">보유 대상</th><th>유효기한</th></tr>`;
+    const head = `<tr><th>분류</th><th>품목명</th><th class="num">전체 수량</th><th class="num">보유 수량</th><th class="num">보유 대상 수</th><th class="num">잔여 수량</th><th>유효기한</th></tr>`;
     const groups = groupByProduct(list.filter(a => a.type === "quantity"));
     const sorted = sortList(groups);
     const paged = pageSlice(sorted);
@@ -374,8 +374,8 @@
         <td><div class="prodcell">${thumb(a)}<span class="pname">${g.product}</span></div></td>
         <td class="num">${a.totalQty}</td>
         <td class="num">${qty}</td>
-        <td class="num">${a.totalQty - qty}</td>
         <td class="num">${targets}</td>
+        <td class="num">${a.totalQty - qty}</td>
         <td>${a.expiry ? window.fmtDate(a.expiry) : '<span class="muted">—</span>'}</td>
       </tr>`;
     }).join("");
@@ -417,7 +417,7 @@
       const a = x.asset;
       if (a.type === "individual") {
         return `<a class="assign-row" href="asset-detail.html?id=${a.id}" target="_blank" rel="noopener">
-          <span>${a.assetNo || "—"}</span>
+          <span>${a.product}<span class="muted"> · ${a.assetNo || "—"}</span></span>
           <span class="badge ${STATUS_LABEL[a.status][1]}">${STATUS_LABEL[a.status][0]}</span>
         </a>`;
       }
@@ -443,7 +443,7 @@
     const back = modal(`
       <div class="modal help-modal">
         <div class="help-modal-head">
-          <h3>배정된 자산</h3>
+          <h3>배정·보유 자산</h3>
           <button type="button" class="btn icon-only sm" data-close aria-label="닫기">${CLOSE_ICON}</button>
         </div>
         <div class="body">
@@ -476,7 +476,7 @@
         });
       }
     });
-    const head = `<tr><th>이름</th><th>사번</th><th>휴대폰번호</th><th>배정된 자산</th></tr>`;
+    const head = `<tr><th>이름</th><th>사번</th><th>휴대폰번호</th><th class="num">배정·보유 자산 수</th><th>배정·보유 자산</th></tr>`;
     const q = state.search.trim().toLowerCase();
     const rowsArr = [...map.values()].filter(r => {
       if (!q) return true;
@@ -492,6 +492,7 @@
         <td><div class="acard-id">${memberIdentity(r.name)}</div></td>
         <td>${info.empNo || '<span class="muted">—</span>'}</td>
         <td>${info.phone || '<span class="muted">—</span>'}</td>
+        <td class="num">${r.items.length}</td>
         <td>${assetsSummaryCell(r.items)}</td>
       </tr>`;
     }).join("");
@@ -516,7 +517,7 @@
         });
       }
     });
-    const head = `<tr><th>근무지명</th><th>근무지 코드</th><th>배정된 자산</th></tr>`;
+    const head = `<tr><th>근무지명</th><th>근무지 코드</th><th class="num">배정·보유 자산 수</th><th>배정·보유 자산</th></tr>`;
     const q = state.search.trim().toLowerCase();
     const rowsArr = [...map.values()].filter(r => {
       if (!q) return true;
@@ -528,6 +529,7 @@
     const rows = paged.map(r => `<tr class="clickable" data-wkey="${r.name}">
       <td>${r.name}</td>
       <td>${r.code || '<span class="muted">—</span>'}</td>
+      <td class="num">${r.items.length}</td>
       <td>${assetsSummaryCell(r.items)}</td>
     </tr>`).join("");
     return { head, rows, count: rowsArr.length };
@@ -893,12 +895,12 @@
         detailRows.push([detailRows.length + 1, `${a.group} › ${a.sub}`, a.product, a.assetNo || "", STATUS_LABEL[a.status][0], holderPlainText(a), a.expiry ? window.fmtDate(a.expiry) : ""]);
       }));
     } else {
-      summaryHeader = ["No.", "분류", "품목명", "전체 수량", "보유 수량", "잔여 수량", "보유 대상", "유효기한"];
+      summaryHeader = ["No.", "분류", "품목명", "전체 수량", "보유 수량", "보유 대상 수", "잔여 수량", "유효기한"];
       summaryRows = groups.map((g, i) => {
         const a = g.list[0];
         const qty = (a.stocks || []).reduce((s, x) => s + x.qty, 0);
         const targets = (a.stocks || []).length;
-        return [i + 1, `${g.group} › ${g.sub}`, g.product, a.totalQty, qty, a.totalQty - qty, targets, a.expiry ? window.fmtDate(a.expiry) : ""];
+        return [i + 1, `${g.group} › ${g.sub}`, g.product, a.totalQty, qty, targets, a.totalQty - qty, a.expiry ? window.fmtDate(a.expiry) : ""];
       });
       detailHeader = ["No.", "분류", "품목명", "보유 대상", "보유 수량"];
       groups.forEach(g => {

@@ -596,8 +596,7 @@
       const row = b.closest(".acard");
       const idx = +row.dataset.idx;
       const x = a.stocks[idx];
-      const name = x.employee || x.worksite;
-      confirmModal(`${name}을(를) 보유 대상에서 해제하시겠습니까?<br><span class="muted" style="font-size:12px">보유 기록이 삭제되며, 이후 이 자산의 보유 대상 목록에 나타나지 않습니다. (수량만 바꾸려면 취소 후 수량 변경을 이용하세요)</span>`, () => {
+      confirmModal(`보유 대상에서 해제하시겠습니까?<br><span class="muted" style="font-size:12px">해제 시 이 자산의 보유 현황 목록에 나타나지 않습니다.</span>`, () => {
         const qty = x.qty;
         a.stocks.splice(idx, 1);
         deriveQtyStatus(a);
