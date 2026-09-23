@@ -294,17 +294,16 @@
   /* ---------- views ---------- */
   function view_all(list) {
     const head = `<tr>
-      <th>고유관리번호</th><th>품목명</th>${thFilter("상태", "status")}
-      ${thFilter("자산 유형", "type")}<th>분류</th>
+      ${thFilter("자산 유형", "type")}<th>분류</th><th>품목명</th><th>고유관리번호</th>${thFilter("상태", "status")}
       <th>배정·보유 현황</th>${thFilter("유효기한", "expiry")}<th>태그</th>${thFilter("메모", "note", "c")}<th>등록일</th></tr>`;
     const rows = pageSlice(sortList(list)).map(a => {
       const st = `<span class="badge ${STATUS_LABEL[a.status][1]}">${STATUS_LABEL[a.status][0]}</span>`;
       return `<tr class="clickable" data-id="${a.id}">
-        <td>${a.assetNo || '<span class="muted">—</span>'}</td>
-        <td>${prodCell(a)}</td>
-        <td>${st}</td>
         <td><span class="type-pill">${TYPE_LABEL[a.type]}</span></td>
         <td>${a.group} <span class="muted">›</span> ${a.sub}</td>
+        <td>${prodCell(a)}</td>
+        <td>${a.assetNo || '<span class="muted">—</span>'}</td>
+        <td>${st}</td>
         <td>${holderText(a)}</td>
         <td>${expiryCell(a.expiry)}</td>
         <td>${labelsCell(a.labels)}</td>
@@ -835,14 +834,14 @@
   // 엑셀엔 전부 넣고 값만 빈칸 처리(한 시트에 여러 소분류가 섞여서 컬럼 자체를 없앨 수 없음)
   function downloadListAll() {
     const list = getFiltered();
-    const header = ["No.", "고유관리번호", "품목명", "상태", "자산 유형", "분류", "배정·보유 현황", "유효기한", "태그", "S/N", "IMEI", "제조연월일", "구매일", "구매가격", "메모", "자산 등록일", "최근변경일시"];
+    const header = ["No.", "자산 유형", "분류", "품목명", "고유관리번호", "상태", "배정·보유 현황", "유효기한", "태그", "S/N", "IMEI", "제조연월일", "구매일", "구매가격", "메모", "자산 등록일", "최근변경일시"];
     const rows = list.map((a, i) => [
       i + 1,
-      a.assetNo || "",
-      a.product,
-      STATUS_LABEL[a.status][0],
       TYPE_LABEL[a.type],
       `${a.group} › ${a.sub}`,
+      a.product,
+      a.assetNo || "",
+      STATUS_LABEL[a.status][0],
       holderPlainText(a),
       a.expiry ? `${window.fmtDate(a.expiry)} (${EXP_LABEL[expiryKey(a.expiry)]})` : "",
       (a.labels || []).join(", "),

@@ -280,17 +280,17 @@ input { font: inherit; }
 .table-wrap { border: 1px solid var(--line); border-radius: var(--radius); overflow-x: auto; background: var(--panel); }
 table { width: 100%; border-collapse: collapse; font-size: 12.5px; min-width: 880px; }
 /* 전체 탭 테이블(10컬럼)은 필터링으로 행이 바뀌어도 컬럼 폭이 안 흔들리도록 폭 고정.
-   nth-child는 순서 그대로라 컬럼 순서를 바꿀 때마다(고유관리번호-품목명-상태-자산 유형-분류-배정·보유
+   nth-child는 순서 그대로라 컬럼 순서를 바꿀 때마다(자산 유형-분류-품목명-고유관리번호-상태-배정·보유
    현황-유효기한-태그-메모-등록일) 이 폭 지정도 같이 옮겨줘야 함 — 안 그러면 폭이 엉뚱한 컬럼에 붙어서
    "분류"처럼 긴 텍스트가 좁은 폭에 끼여 줄바꿈되는 문제가 생김(실제로 한 번 겪음) */
 .tbl-all {
   table-layout: fixed;
 }
-.tbl-all th:nth-child(1), .tbl-all td:nth-child(1) { width: 10%; }
-.tbl-all th:nth-child(2), .tbl-all td:nth-child(2) { width: 15%; }
-.tbl-all th:nth-child(3), .tbl-all td:nth-child(3) { width: 7%; }
-.tbl-all th:nth-child(4), .tbl-all td:nth-child(4) { width: 8%; }
-.tbl-all th:nth-child(5), .tbl-all td:nth-child(5) { width: 13%; white-space: nowrap; }
+.tbl-all th:nth-child(1), .tbl-all td:nth-child(1) { width: 8%; }
+.tbl-all th:nth-child(2), .tbl-all td:nth-child(2) { width: 13%; white-space: nowrap; }
+.tbl-all th:nth-child(3), .tbl-all td:nth-child(3) { width: 15%; }
+.tbl-all th:nth-child(4), .tbl-all td:nth-child(4) { width: 10%; }
+.tbl-all th:nth-child(5), .tbl-all td:nth-child(5) { width: 7%; }
 .tbl-all th:nth-child(6), .tbl-all td:nth-child(6) { width: 11%; }
 .tbl-all th:nth-child(7), .tbl-all td:nth-child(7) { width: 12%; }
 .tbl-all th:nth-child(8), .tbl-all td:nth-child(8) { width: 11%; }
