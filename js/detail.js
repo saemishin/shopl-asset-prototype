@@ -188,7 +188,10 @@
             const isCurrent = c.group === origGroup && c.sub === origSub;
             const isOtherType = c.type !== a.type;
             const disabled = isCurrent || isOtherType;
-            const tip = isCurrent ? "현재 소분류" : (isOtherType ? "다른 자산 유형으로는 이동할 수 없습니다." : "");
+            // 현재 소분류는 재배정 모달이 현재 배정 대상을 후보에서 그냥 빼는 것과 같은 이유로 설명 없이 비활성화만
+            // — "지금 있는 곳으로는 못 옮긴다"는 이 액션의 성격상 자명함. 다른 유형 제약은 그 자체로 비즈니스
+            // 규칙이라 설명이 필요해서 툴팁 유지
+            const tip = !isCurrent && isOtherType ? "다른 자산 유형으로는 이동할 수 없습니다." : "";
             const checked = picked && picked.group === g.group && picked.sub === c.sub;
             return `
             <label class="radio-row${disabled ? " is-disabled" : ""}"${tip ? ` data-tip="${tip}"` : ""}>

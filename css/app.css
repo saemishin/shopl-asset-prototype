@@ -535,7 +535,10 @@ button.usebullet { background: var(--panel); font: inherit; cursor: pointer; }
 /* .field label{display:block}이 .radio-row(라디오도 <label>)보다 명시도가 높아서(0-1-1 > 0-1-0) .field 안에
    놓이면 flex가 깨지고 간격도 사라졌음(배정 추가 모달에서 처음 발견) — .field 안에서도 이기도록 결합 선택자로 덮음 */
 .field .radio-row { display: flex; }
-.radio-row.is-disabled { opacity: .4; cursor: not-allowed; }
+/* opacity를 .radio-row 자체가 아니라 내부 요소에만 줌 — 행 전체에 opacity를 주면 hover 툴팁(::after)도
+   같은 렌더링 그룹으로 묶여 함께 흐려져서(투명해 보이는 원인) 비활성 상태에서 툴팁을 읽기 어려워짐 */
+.radio-row.is-disabled { cursor: not-allowed; }
+.radio-row.is-disabled input, .radio-row.is-disabled span { opacity: .4; }
 .radio-row input { width: 16px; height: 16px; accent-color: var(--primary); flex-shrink: 0; }
 .cat-manage-fieldlist { display: flex; flex-direction: column; }
 .cat-manage-fieldrow { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 12.5px; }
@@ -647,15 +650,25 @@ button.usebullet { background: var(--panel); font: inherit; cursor: pointer; }
 .picker-selected-remove:hover { background: #eef0f2; color: var(--text); }
 .picker-member-row { display: flex; align-items: center; gap: 10px; padding: 8px 4px; border-radius: 8px; cursor: pointer; }
 .picker-member-row:hover { background: #f7f8f9; }
-/* 배정/보유 변경 권한 대상이 조회 권한 범위 밖일 때 선택 자체를 막고 사유를 보여줌 */
-.picker-check.is-disabled, .picker-member-row.is-disabled { opacity: .4; cursor: not-allowed; }
+/* 배정/보유 변경 권한 대상이 조회 권한 범위 밖일 때 선택 자체를 막고 사유를 보여줌.
+   opacity는 행 전체가 아니라 내부 요소에만 줌(라디오 소분류 이동 트리와 동일한 이유 — 행 전체에 주면
+   hover 툴팁도 같은 렌더링 그룹으로 묶여 흐려짐) */
+.picker-check.is-disabled, .picker-member-row.is-disabled { cursor: not-allowed; }
+.picker-check.is-disabled > *, .picker-member-row.is-disabled > * { opacity: .4; }
 .picker-member-row.is-disabled:hover { background: none; }
-.picker-check[data-tip], .picker-member-row[data-tip], .radio-row[data-tip] { position: relative; }
-.picker-check[data-tip]:hover::after, .picker-member-row[data-tip]:hover::after, .radio-row[data-tip]:hover::after {
+.picker-check[data-tip], .picker-member-row[data-tip] { position: relative; }
+.picker-check[data-tip]:hover::after, .picker-member-row[data-tip]:hover::after {
   content: attr(data-tip);
   position: absolute; top: 100%; left: 0; margin-top: 4px;
   background: #1b1d1f; color: #fff; font-size: 11px; padding: 6px 10px;
   border-radius: 6px; white-space: normal; width: 200px; line-height: 1.4; z-index: 30;
+}
+.radio-row[data-tip] { position: relative; }
+.radio-row[data-tip]:hover::after {
+  content: attr(data-tip);
+  position: absolute; top: 100%; left: 0; margin-top: 4px;
+  background: #1b1d1f; color: #fff; font-size: 11px; padding: 6px 10px;
+  border-radius: 6px; white-space: nowrap; width: max-content; line-height: 1.4; z-index: 30;
 }
 .picker-member-info { display: flex; flex-direction: column; gap: 2px; font-size: 12.5px; }
 .picker-member-info span { font-size: 11.5px; color: var(--text-mut); }
