@@ -413,7 +413,10 @@
           ? `<span class="hval-avatar" style="background:${avatarColor(e.target.employee)}">${e.target.employee[0]}</span>`
           : IC_WS)
       : "";
-    const withTarget = v => targetName ? `${targetMark}${targetName} · ${val(v)}` : val(v);
+    // 값이 "없음"인 쪽엔 대상 이름을 안 붙임 — 신규 배정의 "기존"처럼 그 시점엔 아직 이 대상과 실제
+    // 관계(레코드)가 없었던 경우까지 이름을 붙이면 "이미 있었는데 비어있었다"로 오독됨. 값이 있는 쪽에만
+    // "이름 · 값"으로 표기(반납의 "변경"·보유 대상 추가의 "기존" 등 반대 방향도 동일 규칙)
+    const withTarget = v => (targetName && v) ? `${targetMark}${targetName} · ${val(v)}` : val(v);
     return `
       <div class="hcard">
         <div class="hcard-head">
