@@ -601,6 +601,11 @@ button.usebullet { background: var(--panel); font: inherit; cursor: pointer; }
 /* 그룹/직무·직급 선택, 구성원 선택 모달 */
 .picker-modal { width: 560px; display: flex; flex-direction: column; max-height: 88vh; }
 .picker-modal .body { flex: 1; overflow-y: auto; min-height: 0; }
+
+/* 소분류 이동 모달 — 분류 관리 모달과 같은 대분류/소분류 트리를 라디오 단일선택으로 재구성 */
+.submove-group { margin-bottom: 16px; }
+.submove-group:last-child { margin-bottom: 0; }
+.submove-group-name { font-size: 12px; color: var(--text-sub); font-weight: 600; margin-bottom: 2px; }
 .picker-head { display: flex; align-items: center; justify-content: space-between; padding: 18px 20px; border-bottom: 1px solid var(--line); flex-shrink: 0; }
 .picker-head h3 { padding: 0; border: 0; font-size: 15px; }
 .picker-reset { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--primary); }
@@ -645,8 +650,8 @@ button.usebullet { background: var(--panel); font: inherit; cursor: pointer; }
 /* 배정/보유 변경 권한 대상이 조회 권한 범위 밖일 때 선택 자체를 막고 사유를 보여줌 */
 .picker-check.is-disabled, .picker-member-row.is-disabled { opacity: .4; cursor: not-allowed; }
 .picker-member-row.is-disabled:hover { background: none; }
-.picker-check[data-tip], .picker-member-row[data-tip] { position: relative; }
-.picker-check[data-tip]:hover::after, .picker-member-row[data-tip]:hover::after {
+.picker-check[data-tip], .picker-member-row[data-tip], .radio-row[data-tip] { position: relative; }
+.picker-check[data-tip]:hover::after, .picker-member-row[data-tip]:hover::after, .radio-row[data-tip]:hover::after {
   content: attr(data-tip);
   position: absolute; top: 100%; left: 0; margin-top: 4px;
   background: #1b1d1f; color: #fff; font-size: 11px; padding: 6px 10px;

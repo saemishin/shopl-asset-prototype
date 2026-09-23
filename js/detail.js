@@ -149,8 +149,77 @@
     document.body.appendChild(cb);
     input.focus();
   }
+  // 소분류 이동 — 분류 관리 모달과 같은 대분류/소분류 트리 구조를 라디오 단일선택으로 재구성.
+  // 구조설계안 6장: 동일 자산 유형의 소분류로만 이동 가능 → 다른 유형은 비활성화+툴팁(선택 불가 이유를 알 수 있어야 함).
+  // 현재 소속 소분류도 같은 방식으로 비활성화(선택해도 이동이 아니므로).
+  // 실제로는 조회 권한 밖 소분류는 아예 노출되지 않아야 하지만(4.2 소분류 노출 기준, 자산관리 권한자는 예외),
+  // 프로토타입엔 로그인 사용자·권한 개념이 없어 구현 대상에서 제외 — 전체 소분류를 노출함
+  function openMoveSubModal(a) {
+    const origGroup = a.group, origSub = a.sub;
+    let picked = null;
+
+    const groupMap = {}, order = [];
+    (window.DATA.categories || []).forEach(c => {
+      if (!groupMap[c.group]) { groupMap[c.group] = []; order.push(c.group); }
+      groupMap[c.group].push(c);
+    });
+    const groups = order.map(group => ({ group, subs: groupMap[group] }));
+
+    const back = document.createElement("div");
+    back.className = "modal-back";
+    back.innerHTML = `
+      <div class="modal picker-modal">
+        <h3>소분류 이동</h3>
+        <div class="body" data-body></div>
+        <div class="foot">
+          <button class="btn" data-close>취소</button>
+          <button class="btn primary" data-save disabled>저장</button>
+        </div>
+      </div>`;
+    document.body.appendChild(back);
+    const body = back.querySelector("[data-body]");
+    const saveBtn = back.querySelector("[data-save]");
+
+    function draw() {
+      body.innerHTML = groups.map(g => `
+        <div class="submove-group">
+          <div class="submove-group-name">${g.group}</div>
+          ${g.subs.map(c => {
+            const isCurrent = c.group === origGroup && c.sub === origSub;
+            const isOtherType = c.type !== a.type;
+            const disabled = isCurrent || isOtherType;
+            const tip = isCurrent ? "현재 소분류" : (isOtherType ? "다른 자산 유형으로는 이동할 수 없습니다." : "");
+            const checked = picked && picked.group === g.group && picked.sub === c.sub;
+            return `
+            <label class="radio-row${disabled ? " is-disabled" : ""}"${tip ? ` data-tip="${tip}"` : ""}>
+              <input type="radio" name="submove" data-group="${g.group}" data-sub="${c.sub}"${disabled ? " disabled" : ""}${checked ? " checked" : ""}>
+              <span>${c.sub}</span>
+            </label>`;
+          }).join("")}
+        </div>`).join("");
+      body.querySelectorAll('input[name="submove"]').forEach(r => r.onchange = () => {
+        picked = { group: r.dataset.group, sub: r.dataset.sub };
+        saveBtn.disabled = false;
+      });
+    }
+    draw();
+
+    back.addEventListener("click", e => { if (e.target === back) back.remove(); });
+    back.querySelector("[data-close]").onclick = () => back.remove();
+    saveBtn.onclick = () => {
+      if (!picked) return;
+      const beforeLabel = `${origGroup} › ${origSub}`;
+      const afterLabel = `${picked.group} › ${picked.sub}`;
+      a.group = picked.group;
+      a.sub = picked.sub;
+      logActivity(a, { script: "소분류 이동", before: beforeLabel, after: afterLabel });
+      back.remove();
+      toast("소분류가 이동되었습니다.");
+      render();
+    };
+  }
   // "···" 자산관리 메뉴 전용 드롭다운 — 상태 변경 드롭다운(dropdown())과 공용 함수를 쓰면 항목별 분기가 안 돼서
-  // 분리. "자산 삭제"만 실제 동작(danger 스타일 + 삭제 모달), 나머지는 기존과 동일한 스텁 토스트
+  // 분리. "자산 삭제"·"소분류 이동"만 실제 동작, 나머지("자산 수정")는 기존과 동일한 스텁 토스트
   function moreDropdown(anchor, items, a) {
     document.querySelectorAll(".dropdown-menu").forEach(m => m.remove());
     const menu = document.createElement("div");
@@ -163,6 +232,7 @@
       menu.remove();
       const label = items[+b.dataset.i];
       if (label === "자산 삭제") openDeleteAssetModal(a);
+      else if (label === "소분류 이동") openMoveSubModal(a);
       else toast(`"${label}" — 이후 단계에서 정의`);
     });
     setTimeout(() => {
