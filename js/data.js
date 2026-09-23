@@ -202,6 +202,18 @@ window.DATA = (function () {
     a.updatedAt = dates.reduce((max, d) => (d > max ? d : max));
   });
 
+  // 자산 삭제는 상세 → 목록으로 실제 페이지 이동(location.href)이 뒤따르는데, 이 앱은 인메모리 전용이라
+  // 이동한 페이지에서 이 스크립트가 처음부터 다시 실행되며 방금 한 splice가 무효화됨 — 그래서 삭제 직전에
+  // sessionStorage에 남겨둔 id를 여기서 한 번 더 적용해 페이지가 바뀌어도 삭제가 유지되게 함
+  try {
+    const delId = sessionStorage.getItem("justDeletedAssetId");
+    if (delId) {
+      sessionStorage.removeItem("justDeletedAssetId");
+      const idx = assets.findIndex(a => a.id === delId);
+      if (idx > -1) assets.splice(idx, 1);
+    }
+  } catch (e) { /* sessionStorage 접근 불가 환경 대비 */ }
+
   return { categories, assets, emptyGroups, tags };
 })();
 

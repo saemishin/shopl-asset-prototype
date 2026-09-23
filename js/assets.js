@@ -628,6 +628,9 @@
   }
 
   function render() {
+    // 다른 화면(자산 삭제 등)에서 이동해온 직후 띄울 토스트 — sessionStorage에 있으면 최초 1회만 소비
+    const pendingToast = sessionStorage.getItem("pendingToast");
+    if (pendingToast) { sessionStorage.removeItem("pendingToast"); toast(pendingToast); }
     const c = document.getElementById("content");
     const v = currentView();
     // 품목별은 필터 범위가 분류 하나뿐(자산 유형은 헤더 필터로 별도 제공)이라 뱃지 카운트도 그 하나만 봄

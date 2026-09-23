@@ -135,12 +135,15 @@
     cb.querySelector("[data-cclose]").onclick = () => cb.remove();
     const input = cb.querySelector("[data-del-input]");
     const okBtn = cb.querySelector("[data-cok]");
-    input.addEventListener("input", () => { okBtn.disabled = input.value !== "DELETE"; });
+    const confirmed = () => input.value.trim().toUpperCase() === "DELETE";
+    input.addEventListener("input", () => { okBtn.disabled = !confirmed(); });
     okBtn.onclick = () => {
-      if (input.value !== "DELETE") return;
+      if (!confirmed()) return;
       assets.splice(assets.indexOf(a), 1);
-      cb.remove();
-      toast("삭제되었습니다.");
+      // 상세 → 목록 이동이 즉시 일어나서 이 페이지에서 토스트를 띄우면 거의 안 보임 — 목록 페이지 첫 렌더에서 대신 띄움.
+      // 이동한 페이지에서 data.js가 처음부터 재실행되며 위 splice가 무효화되는 것도 같은 이유로 justDeletedAssetId로 별도 전달(data.js 참조)
+      sessionStorage.setItem("justDeletedAssetId", a.id);
+      sessionStorage.setItem("pendingToast", "삭제되었습니다.");
       location.href = "assets.html";
     };
     document.body.appendChild(cb);
