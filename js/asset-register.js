@@ -325,6 +325,7 @@
             <p class="field-err" data-assetno-err hidden>동일한 명칭이 존재합니다.</p>
           </div>
           <div class="field" id="areg-totalqty-field"><label>총 수량 <span class="req">*</span></label><input type="text" inputmode="numeric" id="areg-totalqty-input" placeholder="입력" maxlength="6"></div>
+          <div class="field" id="areg-expiry-field"><label>유효기한</label>${dateFieldHtml()}</div>
           <div class="field" id="areg-tag-field">
             <div class="field-label-row">
               <label>태그</label>
@@ -335,7 +336,6 @@
               <input type="text" data-taginput placeholder="검색" autocomplete="off">
             </div>
           </div>
-          <div class="field" id="areg-expiry-field"><label>유효기한</label>${dateFieldHtml()}</div>
           <div class="field" id="areg-serial-field"><label>S/N</label><input type="text" id="areg-serial-input" placeholder="입력" maxlength="40"></div>
           <div class="field" id="areg-imei-field"><label>IMEI</label><input type="text" id="areg-imei-input" placeholder="입력" maxlength="40"></div>
           <div class="field" id="areg-manufactured-field"><label>제조연월일</label>${dateFieldHtml()}</div>

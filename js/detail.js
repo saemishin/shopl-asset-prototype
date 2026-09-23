@@ -1171,7 +1171,8 @@
     const mgrBtn = `<button class="btn sm icon-only corner" data-more aria-label="자산관리" title="자산관리">${MORE_ICON}</button>`;
     const moreItems = ["자산 수정", "자산 삭제"];
 
-    // 필수값(분류) 먼저, 선택값이 뒤따름. 태그·유효기한은 분류 바로 다음. 제조연월일이 구매일보다 앞(제조가 구매보다 먼저 일어나는 시점).
+    // 필수값(분류) 먼저, 선택값이 뒤따름. 유효기한·태그는 분류 바로 다음(전체 탭 테이블 컬럼 순서와 통일).
+    // 제조연월일이 구매일보다 앞(제조가 구매보다 먼저 일어나는 시점).
     // 선택 필드(field 태그가 있는 행)는 소분류 필드 노출 설정(hiddenFields)에서 off면 행 자체를 숨김.
     // 구매일·구매가격을 붙여서 "취득 정보" 세트로 묶고, 그 뒤로 사용자 입력이 아니라 시스템이 자동 기록하는 필드(등록일·QR 라벨)를 배치.
     // 메모는 마지막(최대 500자, 길어질 수 있음) — 자유 입력값이지만 길이가 가변적이라 다른 고정형 필드들 뒤에 둠.
@@ -1179,8 +1180,8 @@
     const hidden = cat.hiddenFields || [];
     const kv = [
       { k: "분류", v: `<div><span class="type-pill">${isIndiv ? "개별 자산" : "수량 자산"}</span></div><div style="margin-top:5px">${a.group} › ${a.sub}</div>` },
-      { k: "태그", v: chips(a.labels) },
       { k: "유효기한", field: "expiry", v: expiryBadge(a.expiry) },
+      { k: "태그", v: chips(a.labels) },
       isIndiv ? { k: "S/N", field: "serial", v: a.serial || '<span class="muted">—</span>' } : null,
       isIndiv ? { k: "IMEI", field: "imei", v: a.imei || '<span class="muted">—</span>' } : null,
       { k: "제조연월일", field: "manufactured", v: a.manufactured ? window.fmtDate(a.manufactured) : '<span class="muted">—</span>' },
