@@ -405,12 +405,16 @@
     const CLOSE_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg>`;
     const bySub = new Map();
     items.forEach(x => { if (!bySub.has(x.sub)) bySub.set(x.sub, []); bySub.get(x.sub).push(x); });
-    // 요약 칩과 동일하게 분류 화면에 저장된 소분류 순서(subOrder)로 섹션을 배치해 컬럼-모달 간 일관성 유지
+    // 요약 칩과 동일하게 분류 화면에 저장된 소분류 순서(subOrder)로 섹션을 배치해 컬럼-모달 간 일관성 유지.
+    // 그룹 내부는 품목명 우선(같은 품목끼리 묶여 보이도록) + 동점 시 개별형=고유관리번호, 수량형=보유 수량
+    // 오름차순(자산 상세 페이지의 보유 현황 정렬과는 반대 — 여기는 "적은 걸 찾는" 화면이 아니라 그냥 나열이라
+    // 오름차순 기본값 유지)
     const groups = [...bySub.entries()].sort((a, b) => subOrder(a[0]) - subOrder(b[0]));
     groups.forEach(([, list]) => list.sort((p, q) => {
-      const pk = p.asset.type === "individual" ? (p.asset.assetNo || "") : p.asset.product;
-      const qk = q.asset.type === "individual" ? (q.asset.assetNo || "") : q.asset.product;
-      return pk.localeCompare(qk, "ko");
+      const byProduct = p.asset.product.localeCompare(q.asset.product, "ko");
+      if (byProduct) return byProduct;
+      if (p.asset.type === "individual") return (p.asset.assetNo || "").localeCompare(q.asset.assetNo || "", "ko");
+      return p.qty - q.qty;
     }));
 
     function rowHtml(x) {

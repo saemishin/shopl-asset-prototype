@@ -37,6 +37,10 @@
   // 보고 있는 관리자 세션 기준의 전역 그룹 목록(파라미터 없는 API)이라, 이 프로토타입도 근무지 상세와
   // 동일한 더미 그룹 목록을 그대로 재사용(구성원마다 달라지지 않음)
   const WORK_GROUPS = ["개발팀", "디자인팀", "영업팀", "운영팀", "CS팀"];
+  // assets.js의 subOrder()와 동일 — 소분류 섹션 순서를 가나다순이 아니라 분류 관리 화면에 저장된
+  // 등장 순서로 배치(배정·보유 자산 모달과 동일 기준으로 맞춤, 2026-09-24)
+  const CATEGORY_ORDER = new Map(window.DATA.categories.map((c, i) => [c.sub, i]));
+  function subOrder(sub) { return CATEGORY_ORDER.has(sub) ? CATEGORY_ORDER.get(sub) : 999; }
 
   // 이 구성원에게 배정(개별형)·보유(수량형)된 자산 전부 수집 — assets.js view_employee()와 동일한 집계 로직을
   // 특정 구성원 1명으로 좁힌 버전
@@ -72,11 +76,14 @@
     if (!items.length) return `<div class="mdetail-empty">배정·보유 중인 자산이 없습니다.</div>`;
     const bySub = new Map();
     items.forEach(x => { if (!bySub.has(x.sub)) bySub.set(x.sub, []); bySub.get(x.sub).push(x); });
-    const groups = [...bySub.entries()].sort((a, b) => a[0].localeCompare(b[0], "ko"));
+    // 배정·보유 자산 모달(assets.js openAssignedAssetsModal)과 동일한 기준: 소분류는 subOrder(),
+    // 그룹 내부는 품목명 우선 + 동점 시 개별형=고유관리번호, 수량형=보유 수량 오름차순
+    const groups = [...bySub.entries()].sort((a, b) => subOrder(a[0]) - subOrder(b[0]));
     groups.forEach(([, list]) => list.sort((p, q) => {
-      const pk = p.asset.type === "individual" ? (p.asset.assetNo || "") : p.asset.product;
-      const qk = q.asset.type === "individual" ? (q.asset.assetNo || "") : q.asset.product;
-      return pk.localeCompare(qk, "ko");
+      const byProduct = p.asset.product.localeCompare(q.asset.product, "ko");
+      if (byProduct) return byProduct;
+      if (p.asset.type === "individual") return (p.asset.assetNo || "").localeCompare(q.asset.assetNo || "", "ko");
+      return p.qty - q.qty;
     }));
     const groupsHtml = groups.map(([sub, list]) => `
       <div class="mdetail-group-head">${list[0].asset.group} <span class="muted">›</span> ${sub} <span class="muted">${list.length}</span></div>

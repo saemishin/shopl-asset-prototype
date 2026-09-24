@@ -500,9 +500,9 @@
         const info = MEMBERS.find(m => m.name === x.employee);
         return !!info && ((info.empNo || "").toLowerCase().includes(q) || (info.phone || "").includes(q));
       })
-      // 보유 수량 오름차순(적은/소진된 대상이 위로) — 개별형이 배정일(눈에 보이는 값)로 정렬하는 것과
-      // 같은 원칙으로 이름 대신 수량으로 변경. 이름순이면 소진(0개)된 대상을 찾기 어렵다는 피드백 반영
-      .sort((p, q2) => p.x.qty - q2.x.qty);
+      // 보유 수량 내림차순(많은 대상이 위로) — 개별형이 배정일(눈에 보이는 값)로 정렬하는 것과
+      // 같은 원칙으로 이름 대신 수량으로 정렬(2026-09-24, 오름차순에서 방향 변경)
+      .sort((p, q2) => q2.x.qty - p.x.qty);
     // 검색 중 결과 없음과 완전 미보유(레코드 자체가 0건)는 다른 상황이라 문구도 구분
     if (!rows.length) return q
       ? '<p class="muted" style="padding:6px 0">일치하는 보유 대상이 없습니다</p>'
