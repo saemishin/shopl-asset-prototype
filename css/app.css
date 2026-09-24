@@ -627,6 +627,30 @@ button.usebullet { background: var(--panel); font: inherit; cursor: pointer; }
 .modal.scroll-body { display: flex; flex-direction: column; max-height: 88vh; }
 .modal.scroll-body .body { flex: 1; overflow-y: auto; min-height: 0; }
 
+/* 자산 추가/수정 — 소분류 선택 전엔 좁은 1단(왼쪽 컬럼만), 선택 후 오른쪽 컬럼이 붙으며 모달이 넓어짐.
+   너비만 transition을 걸어 그 확장이 애니메이션되게 함(참고 이미지: 필수 필드=왼쪽 고정, 나머지=오른쪽) */
+.modal.areg { width: 460px; transition: width .22s ease; }
+.modal.areg.wide { width: 760px; }
+.modal.areg .body { display: flex; gap: 28px; align-items: flex-start; }
+.areg-col-left { flex: 0 0 220px; display: flex; flex-direction: column; gap: 16px; }
+.areg-col-right { flex: 1; min-width: 0; display: none; flex-direction: column; gap: 16px; }
+/* 사진 — 실 업로드 없이 색상 타일로 시뮬레이션. 타일 클릭=대표 지정, 호버 시 우상단 ×=삭제 */
+.areg-photo-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.areg-photo-tile { position: relative; width: 52px; height: 52px; border-radius: 8px; border: none; flex-shrink: 0; padding: 0; }
+.areg-photo-tile.primary { outline: 2px solid var(--primary); outline-offset: 2px; }
+.areg-photo-star { position: absolute; top: 3px; left: 4px; font-size: 11px; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.5); }
+.areg-photo-del {
+  position: absolute; top: -6px; right: -6px; width: 18px; height: 18px; border-radius: 50%;
+  background: #1b1d1f; color: #fff; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity .12s;
+}
+.areg-photo-tile:hover .areg-photo-del { opacity: 1; }
+.areg-photo-del svg { width: 10px; height: 10px; }
+.areg-photo-add {
+  width: 52px; height: 52px; border-radius: 8px; border: 1px dashed var(--line-strong); background: none;
+  color: var(--text-mut); font-size: 20px; flex-shrink: 0; line-height: 1;
+}
+.areg-photo-add:hover { background: #f7f8f9; color: var(--text); }
+
 /* 소분류 이동 모달 — 분류 관리 모달과 같은 대분류/소분류 트리를 라디오 단일선택으로 재구성 */
 .submove-group { margin-bottom: 16px; }
 .submove-group:last-child { margin-bottom: 0; }

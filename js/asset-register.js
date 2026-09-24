@@ -308,40 +308,53 @@
     }
 
     const tags = [];
+    // 사진 — 실 파일 업로드 없이 색상 스와치로 시뮬레이션(구조설계안 5.4: 자산당 최대 10장, 항상 1장 대표).
+    // detail.js의 photosOf(){color,at,by} 형태와 동일해서 저장 시 asset._photos에 그대로 대입 가능
+    const PHOTO_COLORS = ["#5b8def", "#8f6ef0", "#eb7f8b", "#3fb37f", "#e0a63c", "#4dabf7", "#c2554e", "#3f9ba0", "#9a6bd6", "#5aa06a"];
+    let photos = [];
+    let primaryIdx = 0;
 
     const back = document.createElement("div");
     back.className = "modal-back";
     back.innerHTML = `
-      <div class="modal scroll-body">
+      <div class="modal scroll-body areg">
         <h3>${opts.asset ? "자산 수정" : "자산 추가"}</h3>
         <div class="body">
-          <div class="field"><label>소분류 <span class="req">*</span></label>
-            <div class="tag-input-wrap" id="areg-catwrap" style="cursor:pointer">
-              <span id="areg-cat-display" style="flex:1;font-size:12.5px">선택</span>
+          <div class="areg-col-left">
+            <div class="field"><label>소분류 <span class="req">*</span></label>
+              <div class="tag-input-wrap" id="areg-catwrap" style="cursor:pointer">
+                <span id="areg-cat-display" style="flex:1;font-size:12.5px">선택</span>
+              </div>
             </div>
+            <div class="field" id="areg-name-field"><label>품목명 <span class="req">*</span></label><input type="text" id="areg-name" placeholder="입력" maxlength="50" autocomplete="off"></div>
           </div>
-          <div class="field" id="areg-name-field"><label>품목명 <span class="req">*</span></label><input type="text" id="areg-name" placeholder="입력" maxlength="50" autocomplete="off"></div>
-          <div class="field" id="areg-assetno"><label>고유관리번호 <span class="req">*</span></label><input type="text" id="areg-assetno-input" placeholder="입력" maxlength="30">
-            <p class="field-err" data-assetno-err hidden>동일한 명칭이 존재합니다.</p>
-          </div>
-          <div class="field" id="areg-totalqty-field"><label>총 수량 <span class="req">*</span></label><input type="text" inputmode="numeric" id="areg-totalqty-input" placeholder="입력" maxlength="6"></div>
-          <div class="field" id="areg-expiry-field"><label>유효기한</label>${dateFieldHtml()}</div>
-          <div class="field" id="areg-tag-field">
-            <div class="field-label-row">
-              <label>태그</label>
-              <button type="button" class="btn sm" id="areg-tag-manage">태그 관리</button>
+          <div class="areg-col-right" id="areg-col-right">
+            <div class="field" id="areg-photo-field">
+              <label>사진</label>
+              <div class="areg-photo-row" id="areg-photo-row"></div>
             </div>
-            <div class="tag-input-wrap" id="areg-tagwrap">
-              <div class="tag-chips" data-chips></div>
-              <input type="text" data-taginput placeholder="검색" autocomplete="off">
+            <div class="field" id="areg-assetno"><label>고유관리번호 <span class="req">*</span></label><input type="text" id="areg-assetno-input" placeholder="입력" maxlength="30">
+              <p class="field-err" data-assetno-err hidden>동일한 명칭이 존재합니다.</p>
             </div>
+            <div class="field" id="areg-totalqty-field"><label>총 수량 <span class="req">*</span></label><input type="text" inputmode="numeric" id="areg-totalqty-input" placeholder="입력" maxlength="6"></div>
+            <div class="field" id="areg-expiry-field"><label>유효기한</label>${dateFieldHtml()}</div>
+            <div class="field" id="areg-tag-field">
+              <div class="field-label-row">
+                <label>태그</label>
+                <button type="button" class="btn sm" id="areg-tag-manage">태그 관리</button>
+              </div>
+              <div class="tag-input-wrap" id="areg-tagwrap">
+                <div class="tag-chips" data-chips></div>
+                <input type="text" data-taginput placeholder="검색" autocomplete="off">
+              </div>
+            </div>
+            <div class="field" id="areg-serial-field"><label>S/N</label><input type="text" id="areg-serial-input" placeholder="입력" maxlength="40"></div>
+            <div class="field" id="areg-imei-field"><label>IMEI</label><input type="text" id="areg-imei-input" placeholder="입력" maxlength="40"></div>
+            <div class="field" id="areg-manufactured-field"><label>제조연월일</label>${dateFieldHtml()}</div>
+            <div class="field" id="areg-purchasedate-field"><label>구매일</label>${dateFieldHtml()}</div>
+            <div class="field" id="areg-purchaseprice-field"><label>구매가격</label><input type="text" inputmode="numeric" id="areg-purchaseprice-input" placeholder="입력" maxlength="12"></div>
+            <div class="field" id="areg-note-field"><label>메모</label><textarea id="areg-note-input" placeholder="입력" maxlength="500"></textarea></div>
           </div>
-          <div class="field" id="areg-serial-field"><label>S/N</label><input type="text" id="areg-serial-input" placeholder="입력" maxlength="40"></div>
-          <div class="field" id="areg-imei-field"><label>IMEI</label><input type="text" id="areg-imei-input" placeholder="입력" maxlength="40"></div>
-          <div class="field" id="areg-manufactured-field"><label>제조연월일</label>${dateFieldHtml()}</div>
-          <div class="field" id="areg-purchasedate-field"><label>구매일</label>${dateFieldHtml()}</div>
-          <div class="field" id="areg-purchaseprice-field"><label>구매가격</label><input type="text" inputmode="numeric" id="areg-purchaseprice-input" placeholder="입력" maxlength="12"></div>
-          <div class="field" id="areg-note-field"><label>메모</label><textarea id="areg-note-input" placeholder="입력" maxlength="500"></textarea></div>
         </div>
         <div class="foot">
           <button type="button" class="btn" data-close>취소</button>
@@ -352,8 +365,11 @@
     back.querySelectorAll("[data-close]").forEach(b => b.onclick = () => { if (!b.disabled) back.remove(); });
     document.body.appendChild(back);
 
+    const modalEl = back.querySelector(".modal");
+    const rightCol = back.querySelector("#areg-col-right");
     const nameField = back.querySelector("#areg-name-field");
     const nameInput = back.querySelector("#areg-name");
+    const photoRow = back.querySelector("#areg-photo-row");
     const assetNoField = back.querySelector("#areg-assetno");
     const assetNoInput = back.querySelector("#areg-assetno-input");
     const assetNoErr = back.querySelector("[data-assetno-err]");
@@ -483,13 +499,16 @@
     let catValue = null;
 
     function catLabel(v) { const c = findCat(v); return c ? `${c.group} › ${c.sub}` : ""; }
-    // 소분류별 필드 노출 설정(구조설계안 3.3 hiddenFields) 반영 — S/N·IMEI는 개별형 전용이라 유형 조건과 같이 봄
+    // 소분류별 필드 노출 설정(구조설계안 3.3 hiddenFields) 반영 — S/N·IMEI는 개별형 전용이라 유형 조건과 같이 봄.
+    // 소분류·품목명은 왼쪽 컬럼에 항상 노출(둘 다 필수라 처음부터 입력 가능), 오른쪽 컬럼 전체가 소분류
+    // 선택 여부로 나타났다 사라지며 모달 너비도 같이 확장(.areg.wide, CSS transition)
     function applyFieldVisibility() {
       const show = !!catValue;
       const cat = findCat(catValue);
       const hiddenFields = (cat && cat.hiddenFields) || [];
-      // 메모는 구조설계안 3.4상 소분류 필드 노출 설정과 무관하게 항상 노출되는 필드라 hiddenFields 체크 없음
-      [nameField, tagFieldEl, noteField].forEach(el => { el.style.display = show ? "" : "none"; });
+      rightCol.style.display = show ? "flex" : "none";
+      modalEl.classList.toggle("wide", show);
+      // 사진·태그·메모는 구조설계안상 소분류 필드 노출 설정과 무관하게 항상 노출되는 필드라 hiddenFields 체크 없음
       assetNoField.style.display = show && type !== "quantity" ? "" : "none";
       // 총 수량은 개별형엔 없는 개념(실물 1개=Asset 1건이라 총 수량이 항상 1, 구조설계안 3.4)
       totalQtyField.style.display = show && type !== "individual" ? "" : "none";
@@ -515,6 +534,9 @@
       totalQtyInput.value = "";
       tags.length = 0;
       renderChips();
+      photos.length = 0;
+      primaryIdx = 0;
+      renderPhotos();
       [expiryField, manufacturedField, purchaseDateField].forEach(f => {
         f.querySelector("[data-dtext]").value = "";
         f.querySelector("[data-dnative]").value = "";
@@ -550,6 +572,10 @@
       tags.length = 0;
       (asset.labels || []).forEach(l => tags.push(l));
       renderChips();
+      photos.length = 0;
+      window.assetPhotos(asset).forEach(p => photos.push({ ...p }));
+      primaryIdx = asset._primary || 0;
+      renderPhotos();
       setDateInputs(expiryField, asset.expiry);
       if (type === "individual") {
         serialInput.value = asset.serial || "";
@@ -645,6 +671,40 @@
     document.addEventListener("click", e => {
       if (menu && !menu.contains(e.target) && e.target !== tagInput) closeMenu();
     });
+    // 사진 — 타일 클릭 시 대표 지정(뷰어처럼 별도 메뉴를 띄우지 않고 폼 안에서 가볍게), 각 타일 우상단
+    // 호버 시 삭제(×), 마지막에 "+" 추가 타일(10장 도달 시 자동으로 사라짐)
+    function renderPhotos() {
+      const tiles = photos.map((p, i) => `
+        <button type="button" class="areg-photo-tile${i === primaryIdx ? " primary" : ""}" data-photo-i="${i}" style="background:${p.color}" aria-label="사진 ${i + 1}${i === primaryIdx ? " (대표)" : ""}">
+          ${i === primaryIdx ? '<span class="areg-photo-star">★</span>' : ""}
+          <span class="areg-photo-del" data-photo-del="${i}" aria-label="삭제">${CLOSE_ICON_SM}</span>
+        </button>`).join("");
+      const addTile = photos.length < 10
+        ? `<button type="button" class="areg-photo-add" id="areg-photo-add-btn" aria-label="사진 추가">+</button>` : "";
+      photoRow.innerHTML = tiles + addTile;
+      photoRow.querySelectorAll("[data-photo-i]").forEach(b => b.onclick = e => {
+        if (e.target.closest("[data-photo-del]")) return;
+        primaryIdx = +b.dataset.photoI;
+        renderPhotos();
+      });
+      photoRow.querySelectorAll("[data-photo-del]").forEach(b => b.onclick = e => {
+        e.stopPropagation();
+        const i = +b.dataset.photoDel;
+        photos.splice(i, 1);
+        if (!photos.length) primaryIdx = 0;
+        else if (primaryIdx >= photos.length) primaryIdx = photos.length - 1;
+        else if (primaryIdx > i) primaryIdx -= 1;
+        renderPhotos();
+      });
+      const addBtn = photoRow.querySelector("#areg-photo-add-btn");
+      if (addBtn) addBtn.onclick = () => {
+        photos.push({ color: PHOTO_COLORS[photos.length % PHOTO_COLORS.length], at: `${todayStr()} 00:00`, by: "dana" });
+        if (photos.length === 1) primaryIdx = 0;
+        renderPhotos();
+      };
+    }
+    renderPhotos();
+
     renderChips();
     checkValid();
     if (opts.asset) prefillFromAsset(opts.asset);
@@ -710,6 +770,9 @@
         const priceDigits = purchasePriceInput.value.replace(/[^0-9]/g, "");
         setIf("구매가격 변경", "price", priceDigits ? parseInt(priceDigits, 10) : undefined, v => (v != null ? window.formatPrice(v) : ""));
         setIf("메모 수정", "note", noteInput.value.trim() || undefined);
+        // 사진은 detail.js의 뷰어 액션(추가·삭제·대표 지정)도 활동 이력을 안 남기는 것과 동일하게 로그 없이 반영
+        asset._photos = photos;
+        asset._primary = primaryIdx;
         back.remove();
         toast("저장되었습니다.");
         if (opts.onSaved) opts.onSaved();
