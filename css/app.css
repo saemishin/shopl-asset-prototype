@@ -632,7 +632,9 @@ button.usebullet { background: var(--panel); font: inherit; cursor: pointer; }
 .modal.areg { width: 460px; transition: width .22s ease; }
 .modal.areg.wide { width: 760px; }
 .modal.areg .body { display: flex; gap: 28px; align-items: flex-start; }
-.areg-col-left { flex: 0 0 220px; display: flex; flex-direction: column; gap: 16px; }
+/* 양쪽 다 flex:1 — 오른쪽이 나타나면 정확히 반반, 소분류 미선택으로 오른쪽이 숨겨지면(display:none) 왼쪽
+   혼자 남아 모달 너비를 꽉 채움(1단일 때 필드가 어중간하게 좁아 보이지 않게) */
+.areg-col-left { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 16px; }
 .areg-col-right { flex: 1; min-width: 0; display: none; flex-direction: column; gap: 16px; }
 /* 사진 — 실 업로드 없이 색상 타일로 시뮬레이션. 타일 클릭=대표 지정, 호버 시 우상단 ×=삭제 */
 .areg-photo-row { display: flex; flex-wrap: wrap; gap: 8px; }

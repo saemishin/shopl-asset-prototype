@@ -525,9 +525,9 @@
     }
     // 소분류를 바꿀 때마다(선택 해제 포함) 이미 입력해둔 값은 전부 초기화 — 다른 소분류의 값이 뒤섞여 남아있지 않도록.
     // 자산 수정(opts.asset)에서는 selectCat에서 이 함수 호출 자체를 건너뜀(아래) — 소분류만 바꿨는데 이미 채워진
-    // 기존 값(S/N·구매가격 등)이 날아가면 안 되기 때문. 신규 등록은 잃을 값이 없어 초기화가 안전하고 자연스러움
+    // 기존 값(S/N·구매가격 등)이 날아가면 안 되기 때문. 신규 등록은 잃을 값이 없어 초기화가 안전하고 자연스러움.
+    // 품목명은 예외 — 왼쪽 컬럼(소분류와 독립)에 있고 소분류와 무관하게 항상 유효한 값이라 초기화 대상에서 제외
     function resetOtherFields() {
-      nameInput.value = "";
       assetNoInput.value = "";
       assetNoErr.hidden = true;
       assetNoInput.classList.remove("has-err");
