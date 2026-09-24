@@ -13,6 +13,17 @@
   const STATUS_ORDER = ["assigned", "repair", "lost", "disposed", "held", "stock"];
   const TYPE_LABEL = { individual: "개별 자산", quantity: "수량 자산" };
   const EXP_LABEL = { valid: "유효", soon: "만료 예정", over: "만료", none: "미설정" };
+  // 엑셀 다운로드 버튼 → 양식 정의가 완료된 구글시트 링크(2026-09-24, 사용자가 준 5개 URL 매핑).
+  // By_Item만 개별/수량 유형별로 파일이 2개로 나뉨(토글 상태에 따라 분기)
+  const DOWNLOAD_SHEET_LINKS = {
+    all: "https://docs.google.com/spreadsheets/d/1UYRvac6KC84vSu5cfjATV2Wb11cAY0_LtjqNHD4YhSk/edit?usp=drive_link",
+    product: {
+      individual: "https://docs.google.com/spreadsheets/d/1JgWLKfL1mQoEH02LDDxufezknWSjKrh6QthCO6SptXk/edit?usp=drive_link",
+      quantity: "https://docs.google.com/spreadsheets/d/16mhOZWYQBUW4LkjGRcYlqdoXzyPnr3-If7eBaeb-flQ/edit?usp=drive_link",
+    },
+    employee: "https://docs.google.com/spreadsheets/d/1pj6N07JExX6p1AqFCahJ9DvxMVcKzgdhS3-J6asFSWE/edit?usp=drive_link",
+    worksite: "https://docs.google.com/spreadsheets/d/10rbRIp_DL3FS-VrtHjV2HXU7VjeQtJilBbHiUFNQkos/edit?usp=drive_link",
+  };
   // 근무지 코드는 구조설계안에 없는 필드 — 근무지가 "기존 재사용" 엔티티라 여기선 프로토타입 데모용 샘플값만 매핑(detail.js의 WS_CODE와 동일)
   const WS_CODE = { "강남점": "GN-01", "판교점": "PG-01", "본사": "HQ-01" };
   // 근무지별 엑셀 다운로드(아이데이션 중)용 주소 — 실 서비스 DB엔 근무지마다 이미 주소값이 있어서 프로토타입엔 더미로만 시드(detail.js의 WS_ADDRESS와 동일)
@@ -796,209 +807,13 @@
         { label: "일괄 배정·보유 변경", fn: () => location.href = "batch-assign.html" },
       ]);
     }
-    // 엑셀 다운로드 — 4개 뷰 전부 실제 동작(Asset_List_All/By_Item/By_Member/By_Location)
-    document.getElementById("btn-list-dl").onclick = {
-      all: downloadListAll, product: downloadListByItem, employee: downloadListByMember, worksite: downloadListByWorkplace,
-    }[state.view];
-  }
-
-  // 배정·보유 현황을 엑셀용 순수 텍스트로 — holderText()와 동일한 정렬 기준(개별=배정일 최신순, 수량=이름 가나다순)
-  function holderPlainText(a) {
-    if (a.type === "individual") {
-      const as = a.assignments || [];
-      if (!as.length) return "";
-      const sorted = [...as].sort((p, q) => p.since === q.since ? 0 : (p.since < q.since ? 1 : -1));
-      return sorted.map(x => x.employee || x.worksite).join(", ");
-    }
-    const stocks = a.stocks || [];
-    if (!stocks.length) return "";
-    const sorted = [...stocks].sort((p, q) => (p.employee || p.worksite).localeCompare(q.employee || q.worksite, "ko"));
-    return sorted.map(x => `${x.employee || x.worksite}(${x.qty}개)`).join(", ");
-  }
-  /* ---------- 엑셀 다운로드 공용 ---------- */
-  function xlsxTs() {
-    const d = new Date(), p2 = n => String(n).padStart(2, "0");
-    return `${d.getFullYear()}${p2(d.getMonth() + 1)}${p2(d.getDate())}${p2(d.getHours())}${p2(d.getMinutes())}${p2(d.getSeconds())}`;
-  }
-  function xlsxNowLabel() {
-    const d = new Date(), p2 = n => String(n).padStart(2, "0");
-    const DAYS = ["일", "월", "화", "수", "목", "금", "토"];
-    return `${d.getFullYear()}.${p2(d.getMonth() + 1)}.${p2(d.getDate())}(${DAYS[d.getDay()]}) ${p2(d.getHours())}:${p2(d.getMinutes())}`;
-  }
-  // 상단 타이틀 영역(각 줄 A~C 병합) + 빈 줄 + 헤더 + 데이터로 구성된 시트.
-  // 셀 배경색·굵기 등 서식은 지금 쓰는 SheetJS Community 빌드(xlsx.full.min.js)가 못 씀(Pro 전용 기능) — 구조·값만 반영
-  function titledSheet(titleLines, headerRow, dataRows) {
-    const aoa = [...titleLines.map(t => [t]), [], headerRow, ...dataRows];
-    const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws["!merges"] = titleLines.map((_, i) => ({ s: { r: i, c: 0 }, e: { r: i, c: 2 } }));
-    return ws;
-  }
-
-  // "전체" 다운로드 — 지금 적용된 필터·검색 전체 범위(페이지네이션 무관). 컬럼은 화면 순서 그대로 +
-  // 상세 전용 필드(S/N·IMEI·제조연월일·구매일·구매가격)까지 포함 — 소분류 필드 노출 설정으로 꺼져 있어도
-  // 엑셀엔 전부 넣고 값만 빈칸 처리(한 시트에 여러 소분류가 섞여서 컬럼 자체를 없앨 수 없음)
-  function downloadListAll() {
-    // 정렬은 화면의 현재 정렬 기준(최근 변경일시 등 변동 가능한 값)을 안 따르고, 파일만 봐도 한눈에 파악되게
-    // 분류(subOrder)→품목명→고유관리번호 순으로 고정(동점일 때 다음 단계로 내려가며 비교) — 대분류/소분류는
-    // 가나다순이 아니라 배정·보유 자산 모달·구성원 상세와 동일하게 분류 관리 화면에 저장된 순서(subOrder)로
-    // 통일(2026-09-24, 화면과 파일 간 일관성). 실제 다운로드 생성이 비동기 큐(요청 시점 조건 저장 → 워커가
-    // 나중에 조회)라 "처리 시점" 데이터가 반영되는 구조라, 자주 바뀌는 값 기준 정렬은 큐가 밀리는 동안 파일
-    // 내 행 순서가 흔들릴 수 있음 — subOrder도 분류 구조 자체는 자주 안 바뀌는 값이라 이 원칙에 부합
-    const list = [...getFiltered()].sort((a, b) =>
-      (subOrder(a.sub) - subOrder(b.sub)) ||
-      a.product.localeCompare(b.product, "ko") ||
-      (a.assetNo || "").localeCompare(b.assetNo || "", "ko"));
-    const header = ["No.", "자산 유형", "분류", "품목명", "고유관리번호", "상태", "배정·보유 현황", "유효기한", "태그", "S/N", "IMEI", "제조연월일", "구매일", "구매가격", "메모", "자산 등록일", "최근변경일시"];
-    const rows = list.map((a, i) => [
-      i + 1,
-      TYPE_LABEL[a.type],
-      `${a.group} › ${a.sub}`,
-      a.product,
-      a.assetNo || "",
-      STATUS_LABEL[a.status][0],
-      holderPlainText(a),
-      a.expiry ? `${window.fmtDate(a.expiry)} (${EXP_LABEL[expiryKey(a.expiry)]})` : "",
-      (a.labels || []).join(", "),
-      a.type === "individual" ? (a.serial || "") : "",
-      a.type === "individual" ? (a.imei || "") : "",
-      a.manufactured ? window.fmtDate(a.manufactured) : "",
-      a.purchaseDate ? window.fmtDate(a.purchaseDate) : "",
-      // 통화 표기는 클라이언트 단위 전역 설정 — window.formatPrice 참조(구조설계안 3.4, data.js)
-      a.price != null ? window.formatPrice(a.price) : "",
-      a.note || "",
-      window.fmtDate(a.createdAt),
-      a.updatedAt ? window.fmtDate(a.updatedAt) : "",
-    ]);
-    const ws = titledSheet(["자산 목록", `추출 시점 / ${xlsxNowLabel()}`], header, rows);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "자산 목록");
-    XLSX.writeFile(wb, `Asset_List_All_${xlsxTs()}.xlsx`);
-  }
-
-  // "품목별" 다운로드 — 현재 토글된 자산 유형(개별/수량)만 대상. 1번 시트는 화면과 동일한 품목 요약,
-  // 2번 시트는 그 품목들의 유닛/보유 대상 단위 상세(품목 모달에서 보던 정보를 엑셀에서도 확인 가능하게)
-  function downloadListByItem() {
-    const isIndiv = state.productType !== "quantity";
-    const list = getFiltered().filter(a => a.type === (isIndiv ? "individual" : "quantity"));
-    // 정렬 기준은 downloadListAll과 동일한 이유로 분류(subOrder)→품목명 고정(화면 정렬 안 따름) —
-    // 그룹 단위(품목 요약) 행이라 고유관리번호 단계는 여기선 해당 없음(상세 시트에서 별도 적용)
-    const groups = groupByProduct(list).sort((a, b) =>
-      (subOrder(a.sub) - subOrder(b.sub)) || a.product.localeCompare(b.product, "ko"));
-
-    let summaryHeader, summaryRows, detailHeader, detailRows = [];
-    if (isIndiv) {
-      summaryHeader = ["No.", "분류", "품목명", "자산 수", "배정 중", "재고", "수리 중", "분실", "폐기"];
-      summaryRows = groups.map((g, i) => {
-        const counts = { assigned: 0, stock: 0, repair: 0, lost: 0, disposed: 0 };
-        g.list.forEach(a => { counts[a.status] = (counts[a.status] || 0) + 1; });
-        return [i + 1, `${g.group} › ${g.sub}`, g.product, g.list.length, counts.assigned, counts.stock, counts.repair, counts.lost, counts.disposed];
-      });
-      detailHeader = ["No.", "분류", "품목명", "고유관리번호", "상태", "배정 대상", "유효기한"];
-      // 그룹(=소분류+품목명) 안에서는 고유관리번호 가나다순으로 4단계 정렬 완성
-      groups.forEach(g => [...g.list].sort((a, b) => (a.assetNo || "").localeCompare(b.assetNo || "", "ko")).forEach(a => {
-        detailRows.push([detailRows.length + 1, `${a.group} › ${a.sub}`, a.product, a.assetNo || "", STATUS_LABEL[a.status][0], holderPlainText(a), a.expiry ? window.fmtDate(a.expiry) : ""]);
-      }));
-    } else {
-      summaryHeader = ["No.", "분류", "품목명", "전체 수량", "보유 수량", "보유 대상 수", "잔여 수량", "유효기한"];
-      summaryRows = groups.map((g, i) => {
-        const a = g.list[0];
-        const qty = (a.stocks || []).reduce((s, x) => s + x.qty, 0);
-        const targets = (a.stocks || []).length;
-        return [i + 1, `${g.group} › ${g.sub}`, g.product, a.totalQty, qty, targets, a.totalQty - qty, a.expiry ? window.fmtDate(a.expiry) : ""];
-      });
-      detailHeader = ["No.", "분류", "품목명", "보유 대상", "보유 수량"];
-      // 같은 품목 안에서는 보유 수량 내림차순으로 동점 처리 완성(모달·구성원 상세와 동일 기준) — 기존엔
-      // 정렬 기준이 없어 보유 대상 등록 순서 그대로 나열되던 상태였음
-      groups.forEach(g => {
-        const a = g.list[0];
-        [...(a.stocks || [])].sort((p, q) => q.qty - p.qty).forEach(x => {
-          detailRows.push([detailRows.length + 1, `${a.group} › ${a.sub}`, a.product, x.employee || x.worksite, `${x.qty}개`]);
-        });
-      });
-    }
-
-    const titleLines = ["품목별 자산 목록", `자산 유형 / ${isIndiv ? "개별 자산" : "수량 자산"}`, `추출 시점 / ${xlsxNowLabel()}`];
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, titledSheet(titleLines, summaryHeader, summaryRows), "품목 목록");
-    XLSX.utils.book_append_sheet(wb, titledSheet(titleLines, detailHeader, detailRows), "품목별 상세");
-    XLSX.writeFile(wb, `Asset_List_By_Item_${xlsxTs()}.xlsx`);
-  }
-
-  // "구성원별" 다운로드 — 화면과 동일한 집계(이름·사번·휴대폰번호·그룹·직무직급·등급·배정된 자산), 검색어까지 반영.
-  // 배정된 자산은 개수 상한이 없어(개별형 배정 인원수 제한 없음, 보유 대상도 무제한) 컬럼을 나누는 대신
-  // 한 셀에 쉼표로 나열 + "배정 자산 수" 카운트 컬럼을 별도로 둠
-  function downloadListByMember() {
-    const list = getFiltered();
-    const map = new Map();
-    list.forEach(a => {
-      if (a.type === "individual") {
-        (a.assignments || []).forEach(x => {
-          if (!x.employee) return;
-          if (!map.has(x.employee)) map.set(x.employee, { name: x.employee, items: [] });
-          map.get(x.employee).items.push({ qty: 1, asset: a });
-        });
-      } else {
-        (a.stocks || []).forEach(x => {
-          if (!x.employee) return;
-          if (!map.has(x.employee)) map.set(x.employee, { name: x.employee, items: [] });
-          map.get(x.employee).items.push({ qty: x.qty, asset: a });
-        });
-      }
-    });
-    const q = state.search.trim().toLowerCase();
-    // 정렬 기준은 downloadListAll과 동일한 이유로 이름 가나다순 고정(화면 정렬 안 따름)
-    const rowsArr = [...map.values()].filter(r => {
-      if (!q) return true;
-      const info = MEMBER_INFO[r.name] || {};
-      return r.name.toLowerCase().includes(q) || (info.empNo || "").toLowerCase().includes(q) || (info.phone || "").includes(q);
-    }).sort((a, b) => a.name.localeCompare(b.name, "ko"));
-    const header = ["No.", "이름", "사번", "휴대폰번호", "그룹", "직무·직급", "등급", "배정 자산 수", "배정된 자산"];
-    const rows = rowsArr.map((r, i) => {
-      const info = MEMBER_INFO[r.name] || {};
-      const assetList = r.items.map(x => x.asset.type === "individual" ? `${x.asset.product}(${x.asset.assetNo || "—"})` : `${x.asset.product}(${x.qty}개)`).join(", ");
-      return [i + 1, r.name, info.empNo || "", info.phone || "", info.team || "", info.jobTitle || "", info.grade || "", r.items.length, assetList];
-    });
-    const ws = titledSheet(["구성원별 자산 목록", `추출 시점 / ${xlsxNowLabel()}`], header, rows);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "구성원별 자산 목록");
-    XLSX.writeFile(wb, `Asset_List_By_Member_${xlsxTs()}.xlsx`);
-  }
-
-  // "근무지별" 다운로드 — 화면과 동일한 집계(근무지명·코드·주소·배정된 자산), 검색어까지 반영. 배정된 자산
-  // 나열 방식은 구성원별과 동일한 이유(상한 없음)로 한 셀 쉼표 나열 + 카운트 컬럼
-  function downloadListByWorkplace() {
-    const list = getFiltered();
-    const map = new Map();
-    list.forEach(a => {
-      if (a.type === "individual") {
-        (a.assignments || []).forEach(x => {
-          if (!x.worksite) return;
-          if (!map.has(x.worksite)) map.set(x.worksite, { name: x.worksite, items: [] });
-          map.get(x.worksite).items.push({ qty: 1, asset: a });
-        });
-      } else {
-        (a.stocks || []).forEach(x => {
-          if (!x.worksite) return;
-          if (!map.has(x.worksite)) map.set(x.worksite, { name: x.worksite, items: [] });
-          map.get(x.worksite).items.push({ qty: x.qty, asset: a });
-        });
-      }
-    });
-    const q = state.search.trim().toLowerCase();
-    // 정렬 기준은 downloadListAll과 동일한 이유로 근무지명 가나다순 고정(화면 정렬 안 따름)
-    const rowsArr = [...map.values()].filter(r => {
-      if (!q) return true;
-      return r.name.toLowerCase().includes(q) || (WS_CODE[r.name] || "").toLowerCase().includes(q);
-    }).sort((a, b) => a.name.localeCompare(b.name, "ko"));
-    const header = ["No.", "근무지명", "근무지 코드", "주소", "배정 자산 수", "배정된 자산"];
-    const rows = rowsArr.map((r, i) => {
-      const assetList = r.items.map(x => x.asset.type === "individual" ? `${x.asset.product}(${x.asset.assetNo || "—"})` : `${x.asset.product}(${x.qty}개)`).join(", ");
-      return [i + 1, r.name, WS_CODE[r.name] || "", WS_ADDRESS[r.name] || "", r.items.length, assetList];
-    });
-    const ws = titledSheet(["근무지별 자산 목록", `추출 시점 / ${xlsxNowLabel()}`], header, rows);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "근무지별 자산 목록");
-    XLSX.writeFile(wb, `Asset_List_By_Workplace_${xlsxTs()}.xlsx`);
+    // 엑셀 다운로드 — 실제 파일 생성 대신 양식 정의가 완료된 구글시트로 연결(2026-09-24). 프로토타입 목적상
+    // "실제 파일 다운로드"를 흉내낼 필요가 없어지고, 양식은 사용자가 구글시트에서 직접 계속 다듬는 게 더
+    // 정확한 최신 상태라 생성 코드보다 그쪽이 소스 오브 트루스
+    document.getElementById("btn-list-dl").onclick = () => {
+      const url = state.view === "product" ? DOWNLOAD_SHEET_LINKS.product[state.productType] : DOWNLOAD_SHEET_LINKS[state.view];
+      window.open(url, "_blank", "noopener");
+    };
   }
 
   /* ---------- stats (분류 필터까지만 반영) ---------- */
