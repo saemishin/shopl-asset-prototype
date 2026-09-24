@@ -77,13 +77,13 @@
     const bySub = new Map();
     items.forEach(x => { if (!bySub.has(x.sub)) bySub.set(x.sub, []); bySub.get(x.sub).push(x); });
     // 배정·보유 자산 모달(assets.js openAssignedAssetsModal)과 동일한 기준: 소분류는 subOrder(),
-    // 그룹 내부는 품목명 우선 + 동점 시 개별형=고유관리번호, 수량형=보유 수량 오름차순
+    // 그룹 내부는 품목명 우선 + 동점 시 개별형=고유관리번호, 수량형=보유 수량 내림차순
     const groups = [...bySub.entries()].sort((a, b) => subOrder(a[0]) - subOrder(b[0]));
     groups.forEach(([, list]) => list.sort((p, q) => {
       const byProduct = p.asset.product.localeCompare(q.asset.product, "ko");
       if (byProduct) return byProduct;
       if (p.asset.type === "individual") return (p.asset.assetNo || "").localeCompare(q.asset.assetNo || "", "ko");
-      return p.qty - q.qty;
+      return q.qty - p.qty;
     }));
     const groupsHtml = groups.map(([sub, list]) => `
       <div class="mdetail-group-head">${list[0].asset.group} <span class="muted">›</span> ${sub} <span class="muted">${list.length}</span></div>
