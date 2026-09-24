@@ -1109,3 +1109,31 @@ button.dthumb:hover { filter: brightness(0.94); }
 .dropdown-menu button.danger { color: var(--danger); }
 
 .notice { background: #fff8e6; border: 1px solid #f2e2b6; color: #8a6d1d; padding: 8px 12px; border-radius: var(--radius); font-size: 12px; margin-bottom: 14px; }
+
+/* 구성원 상세 / 근무지 상세 — 실 대시보드 화면 구조 재현(프로필 헤더 + 탭바). "업무 > 자산"만 실제 동작하고
+   나머지는 정적 목업이라 톤을 낮춘 placeholder 스타일만 둠 */
+.mdetail-head { display: flex; align-items: center; gap: 14px; margin-bottom: 22px; }
+.mdetail-avatar {
+  width: 56px; height: 56px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; color: #fff; font-size: 22px; font-weight: 700;
+}
+.mdetail-head h1 { font-size: 20px; font-weight: 700; }
+.mdetail-sub { font-size: 13px; color: var(--text-sub); margin-top: 3px; }
+.mdetail-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 14px; }
+.mdetail-tab {
+  padding: 10px 4px; margin-right: 22px; font-size: 14px; color: var(--text-sub); font-weight: 600;
+  border-bottom: 2px solid transparent; margin-bottom: -1px;
+}
+.mdetail-tab.active { color: var(--text); border-bottom-color: var(--primary); }
+.mdetail-subtabs { display: flex; gap: 18px; margin-bottom: 18px; }
+.mdetail-subtab { font-size: 13px; color: var(--text-sub); padding: 4px 0; }
+.mdetail-subtab.active { color: var(--primary); font-weight: 700; }
+.mdetail-subtab .bchev { font-size: 9px; margin-left: 1px; }
+.mdetail-body { max-width: 640px; }
+.mdetail-placeholder {
+  border: 1px dashed var(--line); border-radius: var(--radius); padding: 40px 20px;
+  text-align: center; color: var(--text-mut); font-size: 13px;
+}
+.mdetail-empty { color: var(--text-mut); font-size: 13px; padding: 20px 0; }
+.mdetail-count { font-size: 12.5px; color: var(--text-sub); margin-bottom: 12px; }
+.mdetail-count b { color: var(--text); }

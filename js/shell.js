@@ -1,4 +1,4 @@
-/* Shared app shell: left LNB + topbar. Only the 자산 menu is live. */
+/* Shared app shell: left LNB + topbar. Only 자산·구성원 menus are live (others are static placeholders). */
 (function () {
   const NAV = [
     { items: [
@@ -21,7 +21,7 @@
       { ic: "☑", label: "승인" },
     ]},
     { cap: "관리", items: [
-      { ic: "◍", label: "구성원" },
+      { ic: "◍", label: "구성원", href: "member-detail.html", key: "member" },
       { ic: "⚑", label: "근무지" },
       { ic: "◫", label: "그룹" },
       { ic: "□", label: "자산", href: "assets.html", key: "assets" },
