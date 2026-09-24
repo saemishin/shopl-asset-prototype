@@ -21,7 +21,7 @@
       <div class="modal" style="width:380px">
         <div class="body" style="padding-top:20px">
           <p style="font-size:14px;font-weight:700;margin-bottom:6px">${title}</p>
-          <p class="hint" style="margin-top:0">${body}</p>
+          ${body ? `<p class="hint" style="margin-top:0">${body}</p>` : ""}
         </div>
         <div class="foot">
           <button class="btn" data-cclose>취소</button>
@@ -31,6 +31,27 @@
     cb.addEventListener("click", e => { if (e.target === cb) cb.remove(); });
     cb.querySelector("[data-cclose]").onclick = () => cb.remove();
     cb.querySelector("[data-cok]").onclick = () => { cb.remove(); onOk(); };
+    document.body.appendChild(cb);
+  }
+  // 사용함 전환 직후 안내 — 확인 버튼 하나뿐이고 "설정하러 가기" 텍스트 링크로 자산 설정 화면 이동(참고 이미지)
+  function openTurnOnInfoModal() {
+    const cb = document.createElement("div");
+    cb.className = "modal-back";
+    cb.style.zIndex = 340;
+    cb.innerHTML = `
+      <div class="modal" style="width:420px">
+        <div class="body" style="padding-top:20px">
+          <p style="font-size:16px;font-weight:700;margin-bottom:14px">사용함으로 설정되었습니다.</p>
+          <p class="hint" style="margin-top:0">설정 페이지로 이동하여 우리 회사에 꼭 맞는 환경을 만들어보세요.</p>
+          <button type="button" class="ufs-goto-link" data-goto-settings>설정하러 가기</button>
+        </div>
+        <div class="foot">
+          <button class="btn primary" data-cok>확인</button>
+        </div>
+      </div>`;
+    cb.addEventListener("click", e => { if (e.target === cb) cb.remove(); });
+    cb.querySelector("[data-cok]").onclick = () => cb.remove();
+    cb.querySelector("[data-goto-settings]").onclick = () => { location.href = "settings.html"; };
     document.body.appendChild(cb);
   }
   const HELP_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 0 1 4.6-1.4c.6.9.3 1.7-.4 2.3-.7.6-1.2 1-1.2 2.1"/><path d="M12 17h.01"/></svg>`;
@@ -98,7 +119,7 @@
       if (state.tab === "mgmt") {
         const on = assetMgmtOn();
         return cardHtml({
-          icon: "📦", color: "#eaf1ff", title: "자산 관리", help: true, detail: true,
+          icon: "📦", color: "#eaf1ff", title: "자산 관리", help: false, detail: true,
           desc: [
             "회사가 보유한 자산을 등록하고 배정·보유 현황을 관리하는 기능입니다.",
             "자산 유형별로 분류하고, 구성원·근무지에 배정하거나 보유 수량을 관리할 수 있습니다.",
@@ -124,15 +145,24 @@
       if (assetRow) {
         assetRow.querySelector("[data-toggle]").onclick = () => {
           const on = assetMgmtOn();
-          const title = on ? "자산 관리 기능을 끄시겠습니까?" : "자산 관리 기능을 켜시겠습니까?";
-          const body = on
-            ? "기능을 끄면 왼쪽 메뉴에서 자산 메뉴가 사라지고 구성원이 자산 화면에 접근할 수 없게 됩니다. 등록된 자산 데이터는 삭제되지 않고 그대로 보존되며, 다시 켜면 이어서 이용할 수 있습니다."
-            : "기능을 켜면 왼쪽 메뉴에 자산 메뉴가 다시 표시되고 구성원이 자산 화면에 접근할 수 있습니다.";
-          confirmModal(title, body, () => {
-            setAssetMgmtOn(!on);
-            toast("저장되었습니다.");
-            draw();
-          });
+          if (on) {
+            confirmModal(
+              "사용 안 함으로 설정하시겠습니까?",
+              "사용 안 함으로 설정할 경우 '자산' 메뉴가 비노출 되며, 직원들이 앱에서 더 이상 자산을 관리할 수 없게 됩니다.",
+              () => {
+                setAssetMgmtOn(false);
+                toast("상태가 변경되었습니다.");
+                draw();
+              }
+            );
+          } else {
+            confirmModal("사용함으로 설정하시겠습니까?", "", () => {
+              setAssetMgmtOn(true);
+              toast("상태가 변경되었습니다.");
+              draw();
+              openTurnOnInfoModal();
+            });
+          }
         };
         assetRow.querySelector("[data-detail]").onclick = () => { location.href = "settings.html"; };
       }
