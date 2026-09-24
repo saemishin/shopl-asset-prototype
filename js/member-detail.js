@@ -27,6 +27,16 @@
     for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) % 997;
     return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length];
   }
+  function toast(msg) {
+    const t = document.createElement("div");
+    t.textContent = msg;
+    t.style.cssText = "position:fixed;left:50%;bottom:32px;transform:translateX(-50%);background:#1b1d1f;color:#fff;padding:10px 16px;border-radius:8px;font-size:12.5px;z-index:300";
+    document.body.appendChild(t); setTimeout(() => t.remove(), 1800);
+  }
+  // 보고서·게시판 그룹 선택 드롭다운 — 실 서비스 조사 결과 이 근무지/구성원으로 좁혀진 목록이 아니라
+  // 보고 있는 관리자 세션 기준의 전역 그룹 목록(파라미터 없는 API)이라, 이 프로토타입도 근무지 상세와
+  // 동일한 더미 그룹 목록을 그대로 재사용(구성원마다 달라지지 않음)
+  const WORK_GROUPS = ["개발팀", "디자인팀", "영업팀", "운영팀", "CS팀"];
 
   // 이 구성원에게 배정(개별형)·보유(수량형)된 자산 전부 수집 — assets.js view_employee()와 동일한 집계 로직을
   // 특정 구성원 1명으로 좁힌 버전
@@ -84,13 +94,13 @@
 
     const TABS = [{ key: "info", label: "정보" }, { key: "attendance", label: "근태" }, { key: "work", label: "업무" }];
     const WORK_SUBTABS = [
+      { key: "asset", label: "자산" },
       { key: "todo", label: "할 일" },
       { key: "report", label: "보고서", dropdown: true },
       { key: "board", label: "게시판", dropdown: true },
-      { key: "asset", label: "자산" },
     ];
     // 업무 > 자산을 바로 보여주는 게 이 페이지를 만든 목적이라 기본 진입 상태로 설정
-    const state = { tab: "work", subtab: "asset" };
+    const state = { tab: "work", subtab: "asset", openDropdown: null };
 
     function bodyHtml() {
       if (state.tab !== "work") {
@@ -116,17 +126,36 @@
           ${TABS.map(t => `<button class="mdetail-tab ${state.tab === t.key ? "active" : ""}" data-tab="${t.key}">${t.label}</button>`).join("")}
         </div>
         ${state.tab === "work" ? `<div class="mdetail-subtabs">
-          ${WORK_SUBTABS.map(t => `<button class="mdetail-subtab ${state.subtab === t.key ? "active" : ""}" data-subtab="${t.key}">${t.label}${t.dropdown ? ' <span class="bchev">▾</span>' : ""}</button>`).join("")}
+          ${WORK_SUBTABS.map(t => t.dropdown ? `<span class="mdetail-subtab-wrap">
+              <button class="mdetail-subtab" data-dropdown="${t.key}">${t.label} <span class="bchev">▾</span></button>
+              ${state.openDropdown === t.key ? `<div class="mdetail-group-dropdown">
+                ${WORK_GROUPS.map(g => `<button class="mdetail-group-item" data-group="${g}">${g}</button>`).join("")}
+              </div>` : ""}
+            </span>` : `<button class="mdetail-subtab ${state.subtab === t.key ? "active" : ""}" data-subtab="${t.key}">${t.label}</button>`).join("")}
         </div>` : ""}
         <div class="mdetail-body">${bodyHtml()}</div>`;
 
       c.querySelectorAll("[data-tab]").forEach(b => b.onclick = () => {
         state.tab = b.dataset.tab;
         if (state.tab === "work" && !state.subtab) state.subtab = "asset";
+        state.openDropdown = null;
         draw();
       });
-      c.querySelectorAll("[data-subtab]").forEach(b => b.onclick = () => { state.subtab = b.dataset.subtab; draw(); });
+      c.querySelectorAll("[data-subtab]").forEach(b => b.onclick = () => { state.subtab = b.dataset.subtab; state.openDropdown = null; draw(); });
+      // 보고서·게시판 — 실제 페이지 이동 없이 그룹 선택 드롭다운까지만 구현(사용자 확정 스코프)
+      c.querySelectorAll("[data-dropdown]").forEach(b => b.onclick = (e) => {
+        e.stopPropagation();
+        state.openDropdown = state.openDropdown === b.dataset.dropdown ? null : b.dataset.dropdown;
+        draw();
+      });
+      c.querySelectorAll("[data-group]").forEach(b => b.onclick = (e) => {
+        e.stopPropagation();
+        toast(`"${b.dataset.group}" 그룹 선택 — 실제 이동은 이 프로토타입 범위 밖입니다`);
+        state.openDropdown = null;
+        draw();
+      });
     }
+    document.addEventListener("click", () => { if (state.openDropdown) { state.openDropdown = null; draw(); } });
     draw();
   }
 

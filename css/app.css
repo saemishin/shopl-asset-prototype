@@ -1137,3 +1137,13 @@ button.dthumb:hover { filter: brightness(0.94); }
 .mdetail-empty { color: var(--text-mut); font-size: 13px; padding: 20px 0; }
 .mdetail-count { font-size: 12.5px; color: var(--text-sub); margin-bottom: 12px; }
 .mdetail-count b { color: var(--text); }
+/* 보고서·게시판 그룹 선택 드롭다운 — 실 서비스 조사 결과 근무지/구성원별로 좁혀지지 않는 전역 그룹 목록이라
+   더미 데이터도 동일한 목록 하나만 사용 */
+.mdetail-subtab-wrap { position: relative; }
+.mdetail-group-dropdown {
+  position: absolute; top: 100%; left: 0; margin-top: 6px; z-index: 20;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(0,0,0,.1); min-width: 140px; padding: 6px;
+}
+.mdetail-group-item { display: block; width: 100%; text-align: left; padding: 7px 10px; font-size: 13px; border-radius: 6px; }
+.mdetail-group-item:hover { background: #f2f3f5; }
