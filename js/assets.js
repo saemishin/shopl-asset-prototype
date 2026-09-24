@@ -417,7 +417,7 @@
       const a = x.asset;
       if (a.type === "individual") {
         return `<a class="assign-row" href="asset-detail.html?id=${a.id}" target="_blank" rel="noopener">
-          <span>${a.product}<span class="muted"> · ${a.assetNo || "—"}</span></span>
+          <div><div>${a.product}</div><div class="acard-sub">${a.assetNo || "—"}</div></div>
           <span class="badge ${STATUS_LABEL[a.status][1]}">${STATUS_LABEL[a.status][0]}</span>
         </a>`;
       }

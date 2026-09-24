@@ -317,6 +317,8 @@ table { width: 100%; border-collapse: collapse; font-size: 12.5px; min-width: 88
 .tbl-product-quantity th:nth-child(6), .tbl-product-quantity td:nth-child(6) { width: 11%; }
 .tbl-product-quantity th:nth-child(7), .tbl-product-quantity td:nth-child(7) { width: 16%; }
 /* 구성원별: 이름·사번·휴대폰번호는 짧은 고정값이라 좁게, 배정·보유 자산 수는 숫자라 더 좁게, 배정·보유 자산은 소분류별 개수 목록이 길어질 수 있어 넉넉하게 */
+/* 배정·보유 자산 수는 컬럼 폭이 넓어서 우측 정렬하면 옆 칸(배정·보유 자산)과 붙어 보임 — 왼쪽 정렬이 더 보기 편함(.tbl-product .num과 동일한 이유) */
+.tbl-employee .num, .tbl-worksite .num { text-align: left; }
 .tbl-employee { table-layout: fixed; }
 .tbl-employee th:nth-child(1), .tbl-employee td:nth-child(1) { width: 20%; }
 .tbl-employee th:nth-child(2), .tbl-employee td:nth-child(2) { width: 13%; }
