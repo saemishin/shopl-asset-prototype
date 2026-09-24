@@ -1339,7 +1339,12 @@
               <button data-atab="current" class="active">배정 현황</button>
               <button data-atab="history">이력</button>
             </div>
-            <div class="hactions" id="assign-actions">${a.status === "disposed" ? "" : btn("배정 추가")}</div>
+            <div class="hactions" id="assign-actions">${
+              a.status === "disposed" ? "" :
+              // 자산 하나당 활성 배정 최대 5건(구조설계안 2.1·6, 근무지·구성원 합산) — 도달 시 배정 추가 비활성
+              asg.length >= 5 ? `<button class="btn sm" disabled data-tip="자산 하나당 활성 배정은 최대 5건까지 가능합니다.">배정 추가</button>` :
+              btn("배정 추가")
+            }</div>
           </div>
           <div id="assign-body">${assignCurrentHtml(a)}</div>
         </section>`;

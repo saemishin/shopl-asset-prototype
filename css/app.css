@@ -127,6 +127,16 @@ input { font: inherit; }
 .btn.danger { background: var(--danger); border-color: var(--danger); color: #fff; }
 .btn.danger:hover { background: #d23b40; }
 .btn.danger:disabled { background: #f3c6c8; border-color: #f3c6c8; color: #fff; cursor: not-allowed; }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.btn:disabled:hover { background: var(--panel); }
+/* 비활성 사유 툴팁 — cat-manage-icon 등과 동일한 data-tip 컨벤션(네이티브 title 신뢰 불가) */
+.btn[data-tip] { position: relative; }
+.btn[data-tip]:hover::after {
+  content: attr(data-tip);
+  position: absolute; top: 100%; left: 0; margin-top: 6px;
+  background: #1b1d1f; color: #fff; font-size: 11px; padding: 6px 10px;
+  border-radius: 6px; white-space: normal; width: 200px; line-height: 1.4; z-index: 20;
+}
 .btn.sm { height: 28px; padding: 0 9px; font-size: 12px; }
 .btn.icon-only { width: 32px; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
 .btn.icon-only svg { width: 15px; height: 15px; }
