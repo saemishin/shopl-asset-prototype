@@ -839,12 +839,13 @@
   // 엑셀엔 전부 넣고 값만 빈칸 처리(한 시트에 여러 소분류가 섞여서 컬럼 자체를 없앨 수 없음)
   function downloadListAll() {
     // 정렬은 화면의 현재 정렬 기준(최근 변경일시 등 변동 가능한 값)을 안 따르고, 파일만 봐도 한눈에 파악되게
-    // 대분류→소분류→품목명→고유관리번호 4단계 가나다순으로 고정(동점일 때 다음 단계로 내려가며 비교) —
-    // 실제 다운로드 생성이 비동기 큐(요청 시점 조건 저장 → 워커가 나중에 조회)라 "처리 시점" 데이터가
-    // 반영되는 구조라, 자주 바뀌는 값 기준 정렬은 큐가 밀리는 동안 파일 내 행 순서가 흔들릴 수 있음
+    // 분류(subOrder)→품목명→고유관리번호 순으로 고정(동점일 때 다음 단계로 내려가며 비교) — 대분류/소분류는
+    // 가나다순이 아니라 배정·보유 자산 모달·구성원 상세와 동일하게 분류 관리 화면에 저장된 순서(subOrder)로
+    // 통일(2026-09-24, 화면과 파일 간 일관성). 실제 다운로드 생성이 비동기 큐(요청 시점 조건 저장 → 워커가
+    // 나중에 조회)라 "처리 시점" 데이터가 반영되는 구조라, 자주 바뀌는 값 기준 정렬은 큐가 밀리는 동안 파일
+    // 내 행 순서가 흔들릴 수 있음 — subOrder도 분류 구조 자체는 자주 안 바뀌는 값이라 이 원칙에 부합
     const list = [...getFiltered()].sort((a, b) =>
-      a.group.localeCompare(b.group, "ko") ||
-      a.sub.localeCompare(b.sub, "ko") ||
+      (subOrder(a.sub) - subOrder(b.sub)) ||
       a.product.localeCompare(b.product, "ko") ||
       (a.assetNo || "").localeCompare(b.assetNo || "", "ko"));
     const header = ["No.", "자산 유형", "분류", "품목명", "고유관리번호", "상태", "배정·보유 현황", "유효기한", "태그", "S/N", "IMEI", "제조연월일", "구매일", "구매가격", "메모", "자산 등록일", "최근변경일시"];
@@ -879,10 +880,10 @@
   function downloadListByItem() {
     const isIndiv = state.productType !== "quantity";
     const list = getFiltered().filter(a => a.type === (isIndiv ? "individual" : "quantity"));
-    // 정렬 기준은 downloadListAll과 동일한 이유로 대분류→소분류→품목명 가나다순 고정(화면 정렬 안 따름) —
+    // 정렬 기준은 downloadListAll과 동일한 이유로 분류(subOrder)→품목명 고정(화면 정렬 안 따름) —
     // 그룹 단위(품목 요약) 행이라 고유관리번호 단계는 여기선 해당 없음(상세 시트에서 별도 적용)
     const groups = groupByProduct(list).sort((a, b) =>
-      a.group.localeCompare(b.group, "ko") || a.sub.localeCompare(b.sub, "ko") || a.product.localeCompare(b.product, "ko"));
+      (subOrder(a.sub) - subOrder(b.sub)) || a.product.localeCompare(b.product, "ko"));
 
     let summaryHeader, summaryRows, detailHeader, detailRows = [];
     if (isIndiv) {
@@ -906,9 +907,11 @@
         return [i + 1, `${g.group} › ${g.sub}`, g.product, a.totalQty, qty, targets, a.totalQty - qty, a.expiry ? window.fmtDate(a.expiry) : ""];
       });
       detailHeader = ["No.", "분류", "품목명", "보유 대상", "보유 수량"];
+      // 같은 품목 안에서는 보유 수량 내림차순으로 동점 처리 완성(모달·구성원 상세와 동일 기준) — 기존엔
+      // 정렬 기준이 없어 보유 대상 등록 순서 그대로 나열되던 상태였음
       groups.forEach(g => {
         const a = g.list[0];
-        (a.stocks || []).forEach(x => {
+        [...(a.stocks || [])].sort((p, q) => q.qty - p.qty).forEach(x => {
           detailRows.push([detailRows.length + 1, `${a.group} › ${a.sub}`, a.product, x.employee || x.worksite, `${x.qty}개`]);
         });
       });
