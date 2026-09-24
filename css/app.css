@@ -1117,6 +1117,9 @@ button.dthumb:hover { filter: brightness(0.94); }
   width: 56px; height: 56px; border-radius: 50%; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center; color: #fff; font-size: 22px; font-weight: 700;
 }
+/* 근무지 상세 — .acard-avatar.ws와 동일한 무채색 아이콘 톤(구성원의 색상 이니셜 원과 구분) */
+.mdetail-avatar.ws { background: #eef0f2; color: var(--text-sub); }
+.mdetail-avatar.ws svg { width: 26px; height: 26px; }
 .mdetail-head h1 { font-size: 20px; font-weight: 700; }
 .mdetail-sub { font-size: 13px; color: var(--text-sub); margin-top: 3px; }
 .mdetail-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 14px; }
