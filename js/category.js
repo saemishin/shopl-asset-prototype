@@ -123,7 +123,8 @@
     return head + body;
   }
 
-  // 개별형 자산 목록을 품목(품목명) 단위로 집계 — 품목 식별키는 구조안 3.1과 동일하게 "소분류+품목명"
+  // 개별형 자산 목록을 품목(품목명) 단위로 집계 — 품목 식별키는 구조안 3.1과 동일하게 "소분류+품목명".
+  // 이미 소분류 하나로 좁혀진 목록이라 정렬은 품목명순만 적용(현황 화면 정렬 정책의 2단계와 동일)
   function productsOf(group, sub) {
     const list = assetsOf(group, sub);
     const order = [];
@@ -132,6 +133,7 @@
       if (!map[a.product]) { map[a.product] = []; order.push(a.product); }
       map[a.product].push(a);
     });
+    order.sort((a, b) => a.localeCompare(b, "ko"));
     return order.map(product => {
       const items = map[product];
       const assigned = items.filter(a => a.status === "assigned").length;
@@ -232,7 +234,8 @@
           </div>
           <p class="muted" data-search-empty hidden style="padding:12px 0">결과가 없습니다.</p>` : assetEmptyHtml()}`;
     }
-    const list = assetsOf(cat.group, cat.sub);
+    // 이미 소분류 하나로 좁혀진 목록이라 정렬은 품목명순만 적용(개별형 productsOf()와 동일 원칙)
+    const list = [...assetsOf(cat.group, cat.sub)].sort((a, b) => a.product.localeCompare(b.product, "ko"));
     return `
       <div class="cat-asset-head">
         <h4>품목 목록</h4>
