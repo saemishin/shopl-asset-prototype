@@ -52,15 +52,17 @@
     return items;
   }
 
+  // 정보 > 추가 정보 탭 스타일 참고(흰 박스 안에 풀너비 행 + 구분선) — 개별 카드가 아니라 한 박스 안의
+  // 나열형 리스트라, 자산 상세의 .acard(개별 박스+간격)와는 다른 톤으로 새로 정의(.mdetail-asset-row)
   function rowHtml(x) {
     const a = x.asset;
     if (a.type === "individual") {
-      return `<a class="assign-row" href="asset-detail.html?id=${a.id}" target="_blank" rel="noopener">
+      return `<a class="mdetail-asset-row" href="asset-detail.html?id=${a.id}" target="_blank" rel="noopener">
         <div><div>${a.product}</div><div class="acard-sub">${a.assetNo || "—"}</div></div>
         <span class="badge ${STATUS_LABEL[a.status][1]}">${STATUS_LABEL[a.status][0]}</span>
       </a>`;
     }
-    return `<a class="assign-row" href="asset-detail.html?id=${a.id}" target="_blank" rel="noopener">
+    return `<a class="mdetail-asset-row" href="asset-detail.html?id=${a.id}" target="_blank" rel="noopener">
       <span>${a.product}</span>
       <span class="badge stock">${x.qty}개</span>
     </a>`;
@@ -77,12 +79,8 @@
       return pk.localeCompare(qk, "ko");
     }));
     const groupsHtml = groups.map(([sub, list]) => `
-      <div class="assign-group">
-        <div class="assign-group-label" style="cursor:default">
-          <span>${list[0].asset.group} <span class="muted">›</span> ${sub}</span> <span class="muted">${list.length}</span>
-        </div>
-        <div class="assign-group-body">${list.map(rowHtml).join("")}</div>
-      </div>`).join("");
+      <div class="mdetail-group-head">${list[0].asset.group} <span class="muted">›</span> ${sub} <span class="muted">${list.length}</span></div>
+      ${list.map(rowHtml).join("")}`).join("");
     return `<div class="mdetail-count">전체 <b>${items.length}</b></div>${groupsHtml}`;
   }
 
@@ -125,15 +123,17 @@
         <div class="mdetail-tabs">
           ${TABS.map(t => `<button class="mdetail-tab ${state.tab === t.key ? "active" : ""}" data-tab="${t.key}">${t.label}</button>`).join("")}
         </div>
-        ${state.tab === "work" ? `<div class="mdetail-subtabs">
-          ${WORK_SUBTABS.map(t => t.dropdown ? `<span class="mdetail-subtab-wrap">
-              <button class="mdetail-subtab" data-dropdown="${t.key}">${t.label} <span class="bchev">▾</span></button>
-              ${state.openDropdown === t.key ? `<div class="mdetail-group-dropdown">
-                ${WORK_GROUPS.map(g => `<button class="mdetail-group-item" data-group="${g}">${g}</button>`).join("")}
-              </div>` : ""}
-            </span>` : `<button class="mdetail-subtab ${state.subtab === t.key ? "active" : ""}" data-subtab="${t.key}">${t.label}</button>`).join("")}
-        </div>` : ""}
-        <div class="mdetail-body">${bodyHtml()}</div>`;
+        ${state.tab === "work" ? `<div class="mdetail-panel">
+          <div class="mdetail-subtabs">
+            ${WORK_SUBTABS.map(t => t.dropdown ? `<span class="mdetail-subtab-wrap">
+                <button class="mdetail-subtab" data-dropdown="${t.key}">${t.label} <span class="bchev">▾</span></button>
+                ${state.openDropdown === t.key ? `<div class="mdetail-group-dropdown">
+                  ${WORK_GROUPS.map(g => `<button class="mdetail-group-item" data-group="${g}">${g}</button>`).join("")}
+                </div>` : ""}
+              </span>` : `<button class="mdetail-subtab ${state.subtab === t.key ? "active" : ""}" data-subtab="${t.key}">${t.label}</button>`).join("")}
+          </div>
+          <div class="mdetail-body">${bodyHtml()}</div>
+        </div>` : `<div class="mdetail-body">${bodyHtml()}</div>`}`;
 
       c.querySelectorAll("[data-tab]").forEach(b => b.onclick = () => {
         state.tab = b.dataset.tab;
