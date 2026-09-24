@@ -58,20 +58,23 @@
 
   // 정보 > 추가 정보 탭 스타일 참고(흰 박스 안에 풀너비 행 + 구분선) — 개별 카드가 아니라 한 박스 안의
   // 나열형 리스트라, 자산 상세의 .acard(개별 박스+간격)와는 다른 톤으로 새로 정의(.mdetail-asset-row)
-  function rowHtml(x) {
+  function rowHtml(x, sub) {
     const a = x.asset;
     if (a.type === "individual") {
-      return `<a class="mdetail-asset-row" href="asset-detail.html?id=${a.id}" target="_blank" rel="noopener">
+      return `<a class="mdetail-asset-row" data-sub="${sub}" href="asset-detail.html?id=${a.id}" target="_blank" rel="noopener">
         <div><div>${a.product}</div><div class="acard-sub">${a.assetNo || "—"}</div></div>
         <span class="badge ${STATUS_LABEL[a.status][1]}">${STATUS_LABEL[a.status][0]}</span>
       </a>`;
     }
-    return `<a class="mdetail-asset-row" href="asset-detail.html?id=${a.id}" target="_blank" rel="noopener">
+    return `<a class="mdetail-asset-row" data-sub="${sub}" href="asset-detail.html?id=${a.id}" target="_blank" rel="noopener">
       <span>${a.product}</span>
       <span class="badge stock">${x.qty}개</span>
     </a>`;
   }
 
+  // 품목 수가 소분류·근무지 조합에 따라 얼마든지 늘어날 수 있어(개별형 자산당 5건 상한은 "자산 하나를
+  // 몇 명이 같이 쓰는지"에 대한 제약이지 "이 사람이 몇 개를 갖고 있는지"는 무제한) 이력 탭과 동일한 이유로
+  // 검색 추가(품목명/고유관리번호, 단순 텍스트 매칭)
   function assetSectionHtml(items) {
     if (!items.length) return `<div class="mdetail-empty">배정·보유 중인 자산이 없습니다.</div>`;
     const bySub = new Map();
@@ -86,9 +89,46 @@
       return q.qty - p.qty;
     }));
     const groupsHtml = groups.map(([sub, list]) => `
-      <div class="mdetail-group-head">${list[0].asset.group} <span class="muted">›</span> ${sub} <span class="muted">${list.length}</span></div>
-      ${list.map(rowHtml).join("")}`).join("");
-    return `<div class="mdetail-count">전체 <b>${items.length}</b></div>${groupsHtml}`;
+      <div class="mdetail-group-head" data-sub="${sub}">${list[0].asset.group} <span class="muted">›</span> ${sub} <span class="muted">${list.length}</span></div>
+      ${list.map(x => rowHtml(x, sub)).join("")}`).join("");
+    return `
+      <div class="mdetail-count-row">
+        <span class="mdetail-count">전체 <b>${items.length}</b></span>
+        <div class="searchbox">
+          <input class="search" type="text" data-asset-search placeholder="품목명/고유관리번호">
+          <button class="search-clear" type="button" data-asset-search-clear aria-label="검색어 지우기">✕</button>
+        </div>
+      </div>
+      ${groupsHtml}
+      <p class="muted" data-asset-search-empty hidden style="padding:12px 0">결과가 없습니다.</p>`;
+  }
+
+  // category.js의 품목 검색과 동일한 패턴(행 hidden 토글, input 재렌더 없음 — 한글 IME 조합 깨짐 방지)
+  function wireAssetSearch(c) {
+    const input = c.querySelector("[data-asset-search]");
+    if (!input) return;
+    const sbox = input.closest(".searchbox");
+    const clearBtn = c.querySelector("[data-asset-search-clear]");
+    const rows = [...c.querySelectorAll(".mdetail-asset-row")];
+    const heads = [...c.querySelectorAll(".mdetail-group-head")];
+    const emptyMsg = c.querySelector("[data-asset-search-empty]");
+    const applyFilter = () => {
+      const q = input.value.trim().toLowerCase();
+      let anyVisible = false;
+      rows.forEach(row => {
+        const match = !q || row.textContent.toLowerCase().includes(q);
+        row.hidden = !match;
+        if (match) anyVisible = true;
+      });
+      heads.forEach(head => {
+        const sub = head.dataset.sub;
+        head.hidden = !rows.some(r => r.dataset.sub === sub && !r.hidden);
+      });
+      if (emptyMsg) emptyMsg.hidden = anyVisible;
+      sbox.classList.toggle("has-term", !!input.value);
+    };
+    input.addEventListener("input", applyFilter);
+    clearBtn.onclick = () => { input.value = ""; applyFilter(); input.focus(); };
   }
 
   function render() {
@@ -161,6 +201,7 @@
         state.openDropdown = null;
         draw();
       });
+      wireAssetSearch(c);
     }
     document.addEventListener("click", () => { if (state.openDropdown) { state.openDropdown = null; draw(); } });
     draw();

@@ -69,7 +69,7 @@
   ];
   const MEMBER_JOB_TITLES = ["직무/직급 없음", "팀장", "매니저", "주임", "사원"];
   const SEARCH_PLACEHOLDER = {
-    all: "고유관리번호 / 품목명", product: "품목명", employee: "이름/사번/휴대폰번호", worksite: "근무지명/코드",
+    all: "품목명 / 고유관리번호", product: "품목명", employee: "이름/사번/휴대폰번호", worksite: "근무지명/코드",
   };
   const RESET_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 1 2.64 6.36"/><path d="M3 20v-6h6"/></svg>`;
   const SORT_ASC_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 18V6M5 6l-3 3M5 6l3 3"/><path d="M11 7h4M11 12h7M11 17h10"/></svg>`;
