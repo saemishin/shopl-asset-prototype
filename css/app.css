@@ -1204,3 +1204,31 @@ button.dthumb:hover { filter: brightness(0.94); }
 }
 .mdetail-group-item { display: block; width: 100%; text-align: left; padding: 7px 10px; font-size: 13px; border-radius: 6px; }
 .mdetail-group-item:hover { background: #f2f3f5; }
+
+/* 기능 설정 — 실 대시보드의 UsageFeatureSettingRow 카드 패턴(일러스트+제목+설명+상세설정+토글) 재현 */
+.ufs-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 20px; }
+.ufs-tab {
+  padding: 10px 4px; margin-right: 26px; font-size: 14px; color: var(--text-sub); font-weight: 600;
+  border-bottom: 2px solid transparent; margin-bottom: -1px;
+}
+.ufs-tab.active { color: var(--text); border-bottom-color: var(--primary); }
+.ufs-panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; max-width: 780px; }
+.ufs-row { display: flex; align-items: center; gap: 20px; padding: 20px; border-bottom: 1px solid var(--line); }
+.ufs-row:last-child { border-bottom: none; }
+.ufs-illust {
+  width: 84px; height: 64px; border-radius: 10px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; font-size: 26px;
+}
+.ufs-body { flex: 1; min-width: 0; }
+.ufs-title-row { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+.ufs-title { font-size: 14px; font-weight: 700; }
+.ufs-help { width: 18px; height: 18px; color: var(--text-mut); flex-shrink: 0; }
+.ufs-help svg { width: 15px; height: 15px; display: block; }
+.ufs-detail {
+  margin-left: 4px; font-size: 11.5px; color: var(--text-sub); border: 1px solid var(--line-strong);
+  border-radius: 6px; padding: 3px 8px;
+}
+.ufs-detail:hover { background: #f7f8f9; color: var(--text); }
+.ufs-desc { font-size: 12.5px; color: var(--text-sub); line-height: 1.6; padding-left: 16px; }
+.ufs-desc li { list-style: disc; }
+.ufs-switch { flex-shrink: 0; }
