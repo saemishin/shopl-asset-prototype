@@ -1348,7 +1348,6 @@ button.dthumb:hover { filter: brightness(0.94); }
 .mapp-detail-cat { font-size: 12.5px; color: var(--text-sub); text-align: center; margin-top: 4px; }
 .mapp-detail-row { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 10px; }
 .mapp-detail-assetno { font-size: 12.5px; color: var(--text-mut); }
-.mapp-detail-note { font-size: 12.5px; color: var(--text-mut); text-align: center; margin-top: 16px; padding: 12px; background: #f7f8f9; border-radius: 10px; }
 .mapp-action-list { margin-top: 22px; }
 .mapp-action-row {
   width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 14px 2px;

@@ -548,10 +548,8 @@
     const statusBadge = a.type === "individual"
       ? `<span class="badge ${STATUS_LABEL[a.status][1]}">${STATUS_LABEL[a.status][0]}</span>`
       : `<span class="badge stock">${rec ? rec.qty : 0}개</span>`;
+    // 권한 없음/폐기 안내 문구는 따로 두지 않음 — 수행 가능한 액션 버튼만 노출되는 것으로 충분(2026-09-26)
     const acts = detailActions(a, target);
-    const noPermNote = !hasAssignPermission(a) && a.status !== "disposed"
-      ? `<p class="mapp-detail-note">배정/보유 변경 권한이 없어 관리 기능을 사용할 수 없습니다.</p>` : "";
-    const disposedNote = a.status === "disposed" ? `<p class="mapp-detail-note">폐기된 자산은 관리할 수 없습니다.</p>` : "";
     return `
       <div class="mapp-topbar">
         <button type="button" class="mapp-back" data-mapp-back aria-label="뒤로">←</button>
@@ -565,7 +563,6 @@
           ${a.type === "individual" ? `<span class="mapp-detail-assetno">${a.assetNo || "—"}</span>` : ""}
           ${statusBadge}
         </div>
-        ${noPermNote}${disposedNote}
         ${acts.length ? `<div class="mapp-action-list">${acts.map(x => `<button type="button" class="mapp-action-row${x.danger ? " danger" : ""}" data-detail-action="${x.key}">${x.label}<span class="mapp-menu-chev">›</span></button>`).join("")}</div>` : ""}
       </div>`;
   }
