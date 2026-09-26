@@ -1,7 +1,7 @@
 /* 앱 직원모드 — 화면 중앙에 폰 프레임으로 띄우는 목업. 메뉴 화면(관리 섹션 마지막에 자산 추가) + 자산 화면
-   (내 자산·근무지 자산 탭 둘 다 구현). 근무지 카드의 "전체보기"(그 근무지 전체 목록)와 자산 상세는 다음
-   라운드로 보류. 실 앱 화면(근무지 목록/보고서/게시판/근무지 상세 정보탭의 "더보기" 카드 패턴)을 참고해
-   리스트 화면 공통 요소(검색·전체 카운트·카드 리스트·최대 N개+더보기)를 재현. */
+   (내 자산·근무지 자산 탭) + 근무지 카드 "전체보기"의 목적지인 근무지별 전체 자산 목록 화면까지 구현.
+   자산 상세는 다음 라운드로 보류. 실 앱 화면(근무지 목록/보고서/게시판/근무지 상세 정보탭의 "더보기" 카드
+   패턴)을 참고해 리스트 화면 공통 요소(검색·전체 카운트·카드 리스트·최대 N개+더보기)를 재현. */
 (function () {
   const { assets } = window.DATA;
   function toast(msg) {
@@ -62,6 +62,19 @@
       return q.qty - p.qty;
     });
   }
+  // 특정 근무지에 배정(개별형)·보유(수량형)된 자산 전체(정렬 적용) — 근무지 카드의 미리보기(최대 5개)와
+  // "전체보기" 상세 화면이 이 함수를 공유해 동일한 목록/정렬을 보장
+  function itemsForWorksite(ws) {
+    const items = [];
+    assets.forEach(a => {
+      if (a.type === "individual") {
+        (a.assignments || []).forEach(x => { if (x.worksite === ws) items.push({ qty: 1, asset: a }); });
+      } else {
+        (a.stocks || []).forEach(x => { if (x.worksite === ws) items.push({ qty: x.qty, asset: a }); });
+      }
+    });
+    return sortItems(items);
+  }
   // 근무지 자산 — 이 구성원의 고정+담당 근무지 각각에 배정(개별형)·보유(수량형)된 자산을 모음.
   // 카드 정렬: 고정 근무지가 항상 최상단, 담당 근무지는 근무지명 가나다순(member-detail.js collectItems와
   // 동일한 자산 수집 로직을 근무지 기준으로 적용)
@@ -69,17 +82,7 @@
     const { fixed, assigned } = myWorksites(name);
     const assignedSorted = [...assigned].sort((a, b) => a.localeCompare(b, "ko"));
     const worksites = [{ ws: fixed, label: "fixed" }, ...assignedSorted.map(ws => ({ ws, label: "assigned" }))];
-    return worksites.map(({ ws, label }) => {
-      const items = [];
-      assets.forEach(a => {
-        if (a.type === "individual") {
-          (a.assignments || []).forEach(x => { if (x.worksite === ws) items.push({ qty: 1, asset: a }); });
-        } else {
-          (a.stocks || []).forEach(x => { if (x.worksite === ws) items.push({ qty: x.qty, asset: a }); });
-        }
-      });
-      return { worksite: ws, label, items: sortItems(items) };
-    });
+    return worksites.map(({ ws, label }) => ({ worksite: ws, label, items: itemsForWorksite(ws) }));
   }
 
   const THUMB_EMPTY = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 15 5-4 4 3 4-4 5 4"/></svg>`;
@@ -186,6 +189,30 @@
         <div class="mapp-ws-list" data-mapp-ws-list>${groups.map(worksiteCardHtml).join("")}</div>
       </div>`;
   }
+  // 근무지 카드 "전체보기"의 목적지 — 그 근무지의 전체 자산 목록. 타이틀 텍스트 없이 뒤로가기 버튼만
+  // (근무지명은 바로 아래 헤더에 이미 나오므로 상단바에 중복 표기 안 함), 근무지명/코드/주소를 각각
+  // 줄바꿔 표시, 그 아래는 내 자산 탭과 동일한 구성(검색+카운트+카드 리스트, 정렬도 동일)
+  function worksiteDetailScreenHtml(ws, items) {
+    return `
+      <div class="mapp-topbar">
+        <button type="button" class="mapp-back" data-mapp-back aria-label="뒤로">←</button>
+      </div>
+      <div class="mapp-wsdetail-head">
+        <div class="mapp-wsdetail-name">${ws}</div>
+        <div class="mapp-wsdetail-code">${WS_CODE[ws] || ""}</div>
+        <div class="mapp-wsdetail-address">${WS_ADDRESS[ws] || ""}</div>
+      </div>
+      <div class="mapp-body">
+        <div class="mapp-search">
+          <input type="text" data-mapp-search placeholder="품목명/고유관리번호">
+        </div>
+        <div class="mapp-count">전체 <b>${items.length}</b></div>
+        ${items.length ? `
+          <div class="mapp-card-list" data-mapp-card-list>${items.map(x => assetCardHtml(x)).join("")}</div>
+          <p class="mapp-empty" data-mapp-empty hidden>결과가 없습니다.</p>
+        ` : `<p class="mapp-empty">배정·보유 중인 자산이 없습니다.</p>`}
+      </div>`;
+  }
 
   // 메뉴 화면 — 실 앱 스크린샷 그대로(관리 섹션 마지막에 "자산" 신규 추가, 화살표 없이 바로 이동)
   const MENU_ICON_ASSET = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10" r="1.6"/><path d="m21 16-5-5-9 8"/></svg>`;
@@ -232,8 +259,8 @@
 
     function draw() {
       const showTabBar = state.screen === "menu";
-      const screenHtml = state.screen === "menu"
-        ? menuScreenHtml()
+      const screenHtml = state.screen === "menu" ? menuScreenHtml()
+        : state.screen === "worksite-detail" ? worksiteDetailScreenHtml(state.wsDetail, itemsForWorksite(state.wsDetail))
         : state.assetTab === "mine" ? myAssetsScreenHtml(items) : worksiteAssetsScreenHtml(worksiteGroups);
 
       root.innerHTML = `
@@ -246,7 +273,12 @@
         </div>`;
 
       const back = root.querySelector("[data-mapp-back]");
-      if (back) back.onclick = () => { state.screen = "menu"; draw(); };
+      if (back) back.onclick = () => {
+        // 전체보기 화면은 메뉴가 아니라 근무지 자산 탭으로 돌아가야 함(그 화면에서 드릴다운했으므로)
+        if (state.screen === "worksite-detail") { state.screen = "assets"; state.assetTab = "worksite"; }
+        else { state.screen = "menu"; }
+        draw();
+      };
       const gotoAssets = root.querySelector('[data-mapp-goto="assets"]');
       if (gotoAssets) gotoAssets.onclick = () => { state.screen = "assets"; state.assetTab = "mine"; draw(); };
       root.querySelectorAll("[data-mapp-asset-tab]").forEach(b => b.onclick = () => {
@@ -272,7 +304,7 @@
           if (emptyMsg) emptyMsg.hidden = anyVisible;
         });
       }
-      // 근무지 자산 — 근무지명/코드/주소 검색(카드 단위 hidden 토글), "전체보기"는 다음 라운드 구현 예정이라 안내만
+      // 근무지 자산 — 근무지명/코드/주소 검색(카드 단위 hidden 토글)
       const wsSearchInput = root.querySelector("[data-mapp-ws-search]");
       if (wsSearchInput) {
         const wsCards = [...root.querySelectorAll("[data-ws-card]")];
@@ -285,7 +317,9 @@
         });
       }
       root.querySelectorAll("[data-ws-viewall]").forEach(b => b.onclick = () => {
-        toast(`"${b.dataset.wsViewall}" 전체 목록 — 다음 라운드에서 구현 예정`);
+        state.screen = "worksite-detail";
+        state.wsDetail = b.dataset.wsViewall;
+        draw();
       });
       // 근무지 카드 접기/펼치기 — 기본 펼침, 자산 목록+전체보기 버튼이 접히는 범위
       root.querySelectorAll("[data-ws-collapse]").forEach(b => b.onclick = () => {
