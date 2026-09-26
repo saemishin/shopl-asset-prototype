@@ -1331,12 +1331,17 @@ button.dthumb:hover { filter: brightness(0.94); }
 .mapp-cat-sep { color: var(--text-mut); font-weight: 400; }
 
 /* 근무지 카드에서 소분류를 눌렀을 때의 목적지 — 근무지명/코드/주소를 각각 줄바꿔 표시하는 헤더(상단바엔
-   뒤로가기만) + 지금 보는 소분류 */
+   뒤로가기만) + 지금 보는 분류(대분류 › 소분류). 분류 영역은 근무지 정보와 구분되는 별도 레벨임을
+   드러내려고 pill 배경을 줘서 강조(2026-09-27)*/
 .mapp-wsdetail-head { padding: 0 16px 16px; flex-shrink: 0; }
 .mapp-wsdetail-name { font-size: 19px; font-weight: 700; }
 .mapp-wsdetail-code { font-size: 13px; color: var(--text-sub); margin-top: 4px; }
 .mapp-wsdetail-address { font-size: 12.5px; color: var(--text-mut); margin-top: 2px; }
-.mapp-wsdetail-sub { font-size: 12.5px; color: var(--text); font-weight: 600; margin-top: 8px; }
+.mapp-wsdetail-sub {
+  display: inline-block; font-size: 13px; color: var(--text); font-weight: 700; margin-top: 10px;
+  background: var(--primary-weak); color: var(--primary-press); padding: 5px 12px; border-radius: 8px;
+}
+.mapp-wsdetail-sub .mapp-cat-sep { color: var(--primary-press); opacity: .55; }
 
 /* 내 자산 — 대분류 섹션(접기/펼치기 가능, 근무지 카드와 동일한 접기 패턴) */
 .mapp-cat-section[hidden] { display: none; }
@@ -1357,6 +1362,22 @@ button.dthumb:hover { filter: brightness(0.94); }
 .mapp-more { margin-left: auto; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; color: var(--text); }
 .mapp-more svg { width: 20px; height: 20px; }
 .dhead-thumb-btn { padding: 0; border: none; background: none; line-height: 0; }
+/* 공동 배정/보유 대상 — 정보로만 노출(액션 없음), 최대 5개+초과 시 전체보기(근무지 카드와 동일 패턴) */
+.mapp-party-head { font-size: 13px; font-weight: 700; margin-bottom: 10px; }
+.mapp-party-count { color: var(--text-mut); font-weight: 600; margin-left: 4px; }
+.mapp-party-list { display: flex; flex-direction: column; }
+.mapp-party-row {
+  display: flex; align-items: center; justify-content: space-between; padding: 10px 0;
+  border-bottom: 1px solid #f2f3f5;
+}
+.mapp-party-list .mapp-party-row:last-child { border-bottom: none; }
+.mapp-party-name { font-size: 13.5px; font-weight: 600; }
+.mapp-party-kind { font-size: 11.5px; color: var(--text-mut); margin-top: 2px; }
+.mapp-party-date { font-size: 12px; color: var(--text-sub); }
+.mapp-party-viewall {
+  display: block; width: 100%; text-align: center; font-size: 12.5px; font-weight: 600;
+  color: var(--text-sub); padding-top: 10px; margin-top: 4px; border-top: 1px solid var(--line);
+}
 /* 자산 사진 뷰어 — 전체화면, 넘기기+닫기만(줌·정보패널·수정메뉴 없음) */
 .mapp-viewer-back { position: fixed; inset: 0; background: #000; z-index: 250; display: flex; flex-direction: column; }
 .mapp-viewer-bar { display: flex; align-items: center; justify-content: space-between; padding: 16px; color: #fff; flex-shrink: 0; }

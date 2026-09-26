@@ -71,6 +71,13 @@
       default: return false; // 모든 관리자 및 리더 / 관리자만
     }
   }
+  // 프로토타입 데모용 오버라이드(2026-09-27) — 판정 로직(hasAssignPermission)은 그대로 두되, 화면에서는
+  // 항상 권한이 있다고 가정하고 액션을 노출. 실제 판정값은 그대로 계산돼 코드·디스크립션엔 남아있으므로,
+  // 실 서비스에선 이 상수만 지우면 됨(true로 두면 데모 편의, false로 두면 실제 판정 그대로 동작)
+  const DEMO_ASSUME_PERMISSION = true;
+  function canManage(a) { return DEMO_ASSUME_PERMISSION || hasAssignPermission(a); }
+  // detail.js와 동일한 편집 아이콘(이 파일도 자기 완결적이라 중복 정의)
+  const IC_EDIT = `<svg viewBox="0 0 24 24"><path d="M4 20l1-4L16 5l3 3L8 19l-4 1z"/><path d="M13.5 6.5l4 4"/></svg>`;
   const IC_PERSON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="8" r="3.5"/><path d="M5.5 20c0-4 3-6.5 6.5-6.5s6.5 2.5 6.5 6.5"/></svg>`;
   const IC_WORKSITE = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 20V9.5L12 4l8 5.5V20"/><path d="M9.5 20v-5h5v5"/></svg>`;
 
@@ -176,6 +183,22 @@
     return { list, idx };
   }
   function categoryPath(a) { return `${a.group} › ${a.sub}`; }
+  // 공동 배정/보유 대상 — target 본인을 뺀 나머지(개별형은 자산당 최대 5건 상한이라 항상 4건 이하, 수량형은
+  // 보유 대상 수 제한이 없어 무제한일 수 있음). 정보로만 보여주고 각 행에 재배정/반납 같은 액션은 없음 —
+  // 이 화면은 "이 target의 레코드"에만 액션을 주는 원칙을 유지, 공동 대상은 조회 전용(2026-09-27)
+  function otherParties(a, target) {
+    const list = a.type === "individual" ? (a.assignments || []) : (a.stocks || []);
+    return list.filter(x => !(target.type === "employee" ? x.employee === target.value : x.worksite === target.value));
+  }
+  function partyRowHtml(x, isIndiv) {
+    const name = x.employee || x.worksite;
+    const kind = x.employee ? "구성원" : "근무지";
+    return `
+      <div class="mapp-party-row">
+        <div><div class="mapp-party-name">${name}</div><div class="mapp-party-kind">${kind}</div></div>
+        ${isIndiv ? `<span class="mapp-party-date">${window.fmtDate(x.since)}</span>` : `<span class="badge stock">${x.qty}개</span>`}
+      </div>`;
+  }
   // 재고⟷배정중/보유중⟷재고는 배정·보유 레코드 존재 여부로 자동 파생(구조설계안 3.3) — 분실 회수·수리
   // 완료 시 되돌아갈 상태, 보유 변경·해제 후 상태 재계산에 공용으로 씀
   function derivedActiveStatus(a) { return (a.assignments || []).length > 0 ? "assigned" : "stock"; }
@@ -274,6 +297,7 @@
   // 뒤로가기 버튼만(근무지명은 바로 아래 헤더에 표기), 근무지명/코드/주소를 각각 줄바꿔 표시하고 지금 보는
   // 소분류를 그 아래에 덧붙임, 그 아래는 내 자산 탭과 동일한 구성(검색+카운트+카드 리스트, 정렬도 동일)
   function worksiteDetailScreenHtml(ws, sub, items) {
+    const group = (window.DATA.categories.find(c => c.sub === sub) || {}).group || "";
     return `
       <div class="mapp-topbar">
         <button type="button" class="mapp-back" data-mapp-back aria-label="뒤로">←</button>
@@ -282,7 +306,7 @@
         <div class="mapp-wsdetail-name">${ws}</div>
         <div class="mapp-wsdetail-code">${WS_CODE[ws] || ""}</div>
         <div class="mapp-wsdetail-address">${WS_ADDRESS[ws] || ""}</div>
-        <div class="mapp-wsdetail-sub">${sub}</div>
+        <div class="mapp-wsdetail-sub">${group} <span class="mapp-cat-sep">›</span> ${sub}</div>
       </div>
       <div class="mapp-body">
         <div class="mapp-search">
@@ -623,18 +647,15 @@
     disposed: [],
   };
   function statusActions(a) {
-    if (a.type !== "individual" || !hasAssignPermission(a)) return [];
+    if (a.type !== "individual" || !canManage(a)) return [];
     return STATUS_TRANSITIONS[a.status].map(([key, label]) => ({ key, label, danger: key === "dispose" }));
   }
   // 배정/보유 관리 액션(상단바 "더보기" → 바텀시트) — 상태 변경류를 제외한 나머지: 재배정·배정 추가·반납
-  // (개별형), 수량 변경·보유 대상 추가/해제(수량형), 사진 관리·메모 수정(공통). 폐기되지 않았고 배정/보유
-  // 변경 권한이 있는 자산에 한해서만 노출.
-  // 메모는 원래 구조설계안 5.5상 "자산 정보 수정"(자산관리 권한 소관, 자산 수정 폼)으로 다른 필드들과 묶여
-  // 있었는데, 이 화면(직원모드)에서는 예외적으로 배정/보유 변경 권한 소관으로 재분류(2026-09-26, 사용자
-  // 확인) — 지급 이력처럼 배정·보유 흐름과 직접 엮이는 메모가 많아 자산 정보 수정(품목명·구매가 등)과는
-  // 성격이 다르다고 판단. 나머지 필드(품목명·구매가격 등)는 여전히 자산관리 권한 소관으로 이 화면 스코프 밖
+  // (개별형), 수량 변경·보유 대상 추가/해제(수량형), 사진 관리(공통). 폐기되지 않았고 배정/보유 변경 권한이
+  // 있는 자산에 한해서만 노출. 메모 수정은 더보기가 아니라 메모 값 옆 편집 아이콘으로 별도 제공(2026-09-27,
+  // assetDetailScreenHtml 참조) — 대시보드 detail.js와 동일한 구조
   function manageActions(a, target) {
-    if (a.status === "disposed" || !hasAssignPermission(a)) return [];
+    if (a.status === "disposed" || !canManage(a)) return [];
     const acts = [];
     if (a.type === "individual") {
       const { idx } = findRecord(a, target);
@@ -653,7 +674,6 @@
       }
       if (remaining > 0) acts.push({ key: "hold-add", label: "보유 대상 추가" });
     }
-    acts.push({ key: "memo-edit", label: "메모 수정" });
     acts.push({ key: "photos", label: "사진 관리" });
     return acts;
   }
@@ -707,7 +727,10 @@
       { k: "구매일", field: "purchaseDate", v: a.purchaseDate ? window.fmtDate(a.purchaseDate) : "—" },
       { k: isIndiv ? "구매가격" : "구매가격 (품목 단가)", field: "purchasePrice", v: a.price ? window.formatPrice(a.price) : "—" },
       { k: "자산 등록일", v: window.fmtDate(a.createdAt) },
-      { k: "메모", v: memoHtml(a.note) },
+      // 메모만 값 옆에 편집 아이콘을 붙여 별도 액션(더보기 메뉴가 아니라 바로 수정) — 대시보드 detail.js와
+      // 동일한 구조·아이콘(.icon-edit는 전역 css/app.css 공용 클래스)
+      canManage(a) ? { k: "메모", v: `${memoHtml(a.note)}<button type="button" class="icon-edit" data-memoedit aria-label="메모 수정" title="메모 수정">${IC_EDIT}</button>` }
+        : { k: "메모", v: memoHtml(a.note) },
     ].filter(Boolean)
      .filter(row => !row.field || !hiddenFields.includes(row.field))
      .map(({ k, v }) => `<div><div class="k">${k}</div><div class="v">${v}</div></div>`).join("");
@@ -716,6 +739,15 @@
     const heroHtml = photos.length
       ? `<button type="button" class="dhead-thumb-btn" data-hero-viewer aria-label="사진 보기">${cardThumb(a)}</button>`
       : cardThumb(a);
+    // 공동 배정/보유 대상 — target 본인을 뺀 나머지를 정보로만 노출(액션 없음). 최대 5개까지 보여주고
+    // 초과하면 "전체보기"로 전용 목록 화면(partiesScreenHtml) 이동(근무지 카드의 최대 5개+전체보기와 동일 패턴)
+    const others = otherParties(a, target);
+    const partyHtml = others.length ? `
+      <div class="dsection">
+        <div class="mapp-party-head">${isIndiv ? "공동 배정 대상" : "공동 보유 대상"} <span class="mapp-party-count">${others.length}</span></div>
+        <div class="mapp-party-list">${others.slice(0, 5).map(x => partyRowHtml(x, isIndiv)).join("")}</div>
+        ${others.length > 5 ? `<button type="button" class="mapp-party-viewall" data-parties-viewall>전체보기</button>` : ""}
+      </div>` : "";
     return `
       <div class="mapp-topbar">
         <button type="button" class="mapp-back" data-mapp-back aria-label="뒤로">←</button>
@@ -732,6 +764,21 @@
         <div class="dsection">
           <div class="kv2">${kv}</div>
         </div>
+        ${partyHtml}
+      </div>`;
+  }
+  // 공동 배정/보유 대상 "전체보기" 목적지 — target 본인을 뺀 전체 목록(조회 전용, 액션 없음)
+  function partiesScreenHtml(a, target) {
+    const isIndiv = a.type === "individual";
+    const others = otherParties(a, target);
+    return `
+      <div class="mapp-topbar">
+        <button type="button" class="mapp-back" data-mapp-back aria-label="뒤로">←</button>
+        <span class="mapp-topbar-title">${isIndiv ? "공동 배정 대상" : "공동 보유 대상"}</span>
+      </div>
+      <div class="mapp-body">
+        <div class="mapp-count">전체 <b>${others.length}</b></div>
+        <div class="mapp-party-list">${others.map(x => partyRowHtml(x, isIndiv)).join("")}</div>
       </div>`;
   }
 
@@ -785,6 +832,7 @@
       const screenHtml = state.screen === "menu" ? menuScreenHtml()
         : state.screen === "worksite-detail" ? worksiteDetailScreenHtml(state.wsDetail, state.wsDetailSub, itemsForWorksite(state.wsDetail, state.wsDetailSub))
         : state.screen === "asset-detail" ? assetDetailScreenHtml(assets.find(x => x.id === state.detailAssetId), state.detailTarget)
+        : state.screen === "asset-parties" ? partiesScreenHtml(assets.find(x => x.id === state.detailAssetId), state.detailTarget)
         : state.assetTab === "mine" ? myAssetsScreenHtml(items) : worksiteAssetsScreenHtml(worksiteGroups);
 
       root.innerHTML = `
@@ -798,9 +846,10 @@
 
       const back = root.querySelector("[data-mapp-back]");
       if (back) back.onclick = () => {
-        // 자산 상세는 진입 직전 화면(내 자산/근무지 자산/전체보기)으로, 전체보기는 근무지 자산 탭으로,
-        // 그 외엔 메뉴로 복귀
-        if (state.screen === "asset-detail" && state.detailFrom) { Object.assign(state, state.detailFrom); delete state.detailFrom; }
+        // 공동 배정/보유 대상 전체보기는 자산 상세로, 자산 상세는 진입 직전 화면(내 자산/근무지 자산/
+        // 전체보기)으로, 전체보기는 근무지 자산 탭으로, 그 외엔 메뉴로 복귀
+        if (state.screen === "asset-parties") { state.screen = "asset-detail"; }
+        else if (state.screen === "asset-detail" && state.detailFrom) { Object.assign(state, state.detailFrom); delete state.detailFrom; }
         else if (state.screen === "worksite-detail") { state.screen = "assets"; state.assetTab = "worksite"; }
         else { state.screen = "menu"; }
         draw();
@@ -839,7 +888,6 @@
           else if (key === "hold-add") openHoldAddModal(a, afterMutate);
           else if (key === "qty-change") openQtyChangeModal(a, idx, afterMutate);
           else if (key === "hold-release") openHoldReleaseConfirm(a, idx, afterMutate);
-          else if (key === "memo-edit") openMemoEditModal(a, afterMutate);
           else if (key === "photos") openPhotoManageModal(a, afterMutate);
         }
         // 상태 뱃지 → 상태 변경 바텀시트, 상단바 "더보기" → 배정/보유 관리 바텀시트(대시보드의 뱃지
@@ -851,6 +899,12 @@
         // 대표 이미지 클릭 → 사진 뷰어(조회 전용, 권한과 무관)
         const heroBtn = root.querySelector("[data-hero-viewer]");
         if (heroBtn) heroBtn.onclick = () => openPhotoViewer(a);
+        // 메모 옆 편집 아이콘 → 바로 메모 수정(더보기 메뉴 거치지 않음, 대시보드와 동일 구조)
+        const memoEdit = root.querySelector("[data-memoedit]");
+        if (memoEdit) memoEdit.onclick = () => openMemoEditModal(a, afterMutate);
+        // 공동 배정/보유 대상 "전체보기" → 전용 목록 화면
+        const partiesViewall = root.querySelector("[data-parties-viewall]");
+        if (partiesViewall) partiesViewall.onclick = () => { state.screen = "asset-parties"; draw(); };
       }
       const gotoAssets = root.querySelector('[data-mapp-goto="assets"]');
       if (gotoAssets) gotoAssets.onclick = () => { state.screen = "assets"; state.assetTab = "mine"; draw(); };
