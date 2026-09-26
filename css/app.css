@@ -1274,9 +1274,15 @@ button.dthumb:hover { filter: brightness(0.94); }
 .mapp-topbar { flex-shrink: 0; display: flex; align-items: center; gap: 10px; padding: 14px 16px; }
 .mapp-back { font-size: 19px; color: var(--text); }
 .mapp-topbar-title { font-size: 17px; font-weight: 700; }
-.mapp-asset-tabs { flex-shrink: 0; display: flex; gap: 22px; padding: 0 16px 12px; border-bottom: 1px solid var(--line); margin-bottom: 14px; }
-.mapp-asset-tab { font-size: 14px; color: var(--text-sub); font-weight: 600; padding-bottom: 10px; margin-bottom: -13px; border-bottom: 2px solid transparent; }
-.mapp-asset-tab.active { color: var(--text); border-bottom-color: var(--primary); }
+/* 상단 탭 — 선택된 쪽은 라벨이 있는 넓은 필, 비선택 쪽은 아이콘만 있는 작은 정사각형(실 서비스 패턴) */
+.mapp-seg-tabs { flex-shrink: 0; display: flex; gap: 8px; padding: 0 16px 16px; }
+.mapp-seg-tab {
+  height: 44px; border-radius: 22px; font-size: 14px; font-weight: 700; display: flex;
+  align-items: center; justify-content: center; transition: flex-grow .15s;
+}
+.mapp-seg-tab.active { flex: 1; background: #26282b; color: #fff; }
+.mapp-seg-tab.icon-only { width: 44px; flex-shrink: 0; background: #f2f3f5; color: var(--text-sub); }
+.mapp-seg-tab.icon-only svg { width: 19px; height: 19px; }
 .mapp-search { margin-bottom: 12px; }
 .mapp-search input {
   width: 100%; height: 40px; border-radius: 20px; border: 1px solid var(--line-strong);
@@ -1296,3 +1302,26 @@ button.dthumb:hover { filter: brightness(0.94); }
 .mapp-card-title { font-size: 14px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mapp-card-sub { font-size: 12px; color: var(--text-mut); margin-top: 2px; }
 .mapp-empty { text-align: center; color: var(--text-mut); font-size: 13px; padding: 30px 0; }
+
+/* 근무지 자산 — 근무지별 카드 안에 자산을 최대 5개까지 나열, 실 서비스의 "카드 안 미리보기 + 더보기"
+   패턴(근무지 상세 정보 탭의 파일 카드) 참고 */
+.mapp-ws-list { display: flex; flex-direction: column; gap: 12px; }
+.mapp-ws-card { border: 1px solid var(--line); border-radius: 14px; padding: 14px; }
+.mapp-ws-card[hidden] { display: none; }
+.mapp-ws-head { margin-bottom: 10px; }
+.mapp-ws-label { font-size: 11.5px; color: var(--text-sub); }
+.mapp-ws-name { font-size: 15px; font-weight: 700; margin-top: 2px; }
+.mapp-ws-code { font-size: 12px; font-weight: 500; color: var(--text-mut); }
+.mapp-ws-assets { display: flex; flex-direction: column; }
+.mapp-ws-empty { font-size: 12.5px; color: var(--text-mut); padding: 6px 0 2px; }
+.mapp-ws-viewall {
+  display: block; width: 100%; text-align: right; font-size: 12.5px; font-weight: 600;
+  color: var(--text-sub); padding-top: 10px; margin-top: 4px; border-top: 1px solid var(--line);
+}
+/* 근무지 카드 안에 중첩되는 축약 자산 행 — 개별 카드 테두리 없이 구분선으로만 나열(mdetail-asset-row와 동일 발상) */
+.mapp-card-compact {
+  border: none; border-radius: 0; padding: 10px 0; border-bottom: 1px solid #f2f3f5;
+}
+.mapp-ws-assets .mapp-card-compact:last-child { border-bottom: none; padding-bottom: 0; }
+.mapp-card-compact .mapp-thumb { width: 36px; height: 36px; }
+.mapp-card-compact .mapp-card-title { font-size: 13px; }
