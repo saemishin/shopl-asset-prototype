@@ -657,8 +657,8 @@
   }
   // 배정/보유 관리 액션(상단바 "더보기" → 바텀시트) — 상태 변경류를 제외한 나머지: 재배정·배정 추가·반납
   // (개별형), 수량 변경·보유 대상 추가/해제(수량형), 사진 관리(공통). 폐기되지 않았고 배정/보유 변경 권한이
-  // 있는 자산에 한해서만 노출. 메모 수정은 더보기가 아니라 메모 값 옆 편집 아이콘으로 별도 제공(2026-09-27,
-  // assetDetailScreenHtml 참조) — 대시보드 detail.js와 동일한 구조
+  // 있는 자산에 한해서만 노출. 메모 수정·사진 관리는 더보기가 아니라 각각 메모 값 옆 편집 아이콘/대표 이미지
+  // 위 편집 아이콘으로 별도 제공(2026-09-27, assetDetailScreenHtml 참조) — 대시보드 detail.js와 동일한 구조
   function manageActions(a, target) {
     if (a.status === "disposed" || !canManage(a)) return [];
     const acts = [];
@@ -679,24 +679,23 @@
       }
       if (remaining > 0) acts.push({ key: "hold-add", label: "보유 대상 추가" });
     }
-    acts.push({ key: "photos", label: "사진 관리" });
     return acts;
   }
-  // 바텀시트 — 상태 뱃지·상단바 "더보기"가 공유하는 실 앱 액션시트 패턴(하단에서 올라오는 목록 + 취소).
-  // 대시보드는 이 자리에 앵커 드롭다운(statusDropdown/moreDropdown)을 쓰지만, 폰 프레임 목업이라
-  // 모바일다운 바텀시트로 재해석
-  function openActionSheet(items, onPick) {
-    const back = document.createElement("div");
-    back.className = "mapp-sheet-back";
-    back.innerHTML = `
-      <div class="mapp-sheet">
-        ${items.map(x => `<button type="button" class="mapp-sheet-row${x.danger ? " danger" : ""}" data-sheet-key="${x.key}">${x.label}</button>`).join("")}
-        <button type="button" class="mapp-sheet-cancel" data-sheet-cancel>취소</button>
-      </div>`;
-    back.addEventListener("click", e => { if (e.target === back) back.remove(); });
-    back.querySelector("[data-sheet-cancel]").onclick = () => back.remove();
-    back.querySelectorAll("[data-sheet-key]").forEach(b => b.onclick = () => { back.remove(); onPick(b.dataset.sheetKey); });
-    document.body.appendChild(back);
+  // 앵커 드롭다운 — 상태 뱃지·상단바 "더보기"가 공유. 대시보드 detail.js의 statusDropdown/moreDropdown과
+  // 동일한 패턴(버튼 바로 아래 고정 위치, 바깥 클릭 시 닫힘)으로 통일(2026-09-27, 이전엔 바텀시트였음)
+  function openDropdownMenu(anchor, items, onPick) {
+    document.querySelectorAll(".dropdown-menu").forEach(m => m.remove());
+    const menu = document.createElement("div");
+    menu.className = "dropdown-menu";
+    menu.innerHTML = items.map(x => `<button type="button" data-key="${x.key}"${x.danger ? ' class="danger"' : ""}>${x.label}</button>`).join("");
+    const r = anchor.getBoundingClientRect();
+    menu.style.cssText = `position:fixed;top:${r.bottom + 4}px;left:${Math.max(8, r.right - 180)}px;min-width:180px`;
+    document.body.appendChild(menu);
+    menu.querySelectorAll("button").forEach(b => b.onclick = () => { menu.remove(); onPick(b.dataset.key); });
+    setTimeout(() => {
+      const close = e => { if (!menu.contains(e.target)) { menu.remove(); document.removeEventListener("click", close); } };
+      document.addEventListener("click", close);
+    });
   }
   const MORE_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg>`;
   // 정보 섹션 — 대시보드 자산 상세 왼쪽 카드(dhead-id/dhead-sub/kv2)와 동일한 마크업·CSS 클래스를 그대로
@@ -739,11 +738,14 @@
     ].filter(Boolean)
      .filter(row => !row.field || !hiddenFields.includes(row.field))
      .map(({ k, v }) => `<div><div class="k">${k}</div><div class="v">${v}</div></div>`).join("");
-    // 대표 이미지 — 사진이 있으면 눌러서 뷰어로 볼 수 있게(조회는 권한과 무관하게 항상 가능), 없으면 그냥 표시만
+    // 대표 이미지 — 사진 영역을 누르면 뷰어(조회는 권한과 무관하게 항상 가능, 사진 없으면 비활성), 이미지
+    // 위 모서리에 겹치는 편집 아이콘을 누르면 사진 관리(더보기 메뉴가 아니라 여기로 이동, 2026-09-27)
     const photos = window.assetPhotos(a);
-    const heroHtml = photos.length
-      ? `<button type="button" class="dhead-thumb-btn" data-hero-viewer aria-label="사진 보기">${cardThumb(a)}</button>`
-      : cardThumb(a);
+    const heroHtml = `
+      <div class="mapp-hero-wrap">
+        <button type="button" class="mapp-hero-img" data-hero-viewer aria-label="사진 보기"${photos.length ? "" : " disabled"}>${cardThumb(a)}</button>
+        ${canManage(a) ? `<button type="button" class="mapp-hero-edit" data-hero-edit aria-label="사진 관리" title="사진 관리">${IC_EDIT}</button>` : ""}
+      </div>`;
     // 공동 배정/보유 대상 — target 본인을 뺀 나머지를 정보로만 노출(액션 없음). 최대 5개까지 보여주고
     // 초과하면 "전체보기"로 전용 목록 화면(partiesScreenHtml) 이동(근무지 카드의 최대 5개+전체보기와 동일 패턴)
     const others = otherParties(a, target);
@@ -898,12 +900,15 @@
         // 상태 뱃지 → 상태 변경 바텀시트, 상단바 "더보기" → 배정/보유 관리 바텀시트(대시보드의 뱃지
         // 드롭다운/···메뉴와 같은 진입점, 폰 프레임이라 바텀시트로 재해석)
         const statusOpen = root.querySelector("[data-status-open]");
-        if (statusOpen) statusOpen.onclick = () => openActionSheet(statusActions(a), dispatchAction);
+        if (statusOpen) statusOpen.onclick = () => openDropdownMenu(statusOpen, statusActions(a), dispatchAction);
         const moreOpen = root.querySelector("[data-more-open]");
-        if (moreOpen) moreOpen.onclick = () => openActionSheet(manageActions(a, target), dispatchAction);
-        // 대표 이미지 클릭 → 사진 뷰어(조회 전용, 권한과 무관)
+        if (moreOpen) moreOpen.onclick = () => openDropdownMenu(moreOpen, manageActions(a, target), dispatchAction);
+        // 대표 이미지 클릭 → 사진 뷰어(조회 전용, 권한과 무관, 사진 없으면 disabled라 클릭 안 먹음)
         const heroBtn = root.querySelector("[data-hero-viewer]");
         if (heroBtn) heroBtn.onclick = () => openPhotoViewer(a);
+        // 이미지 모서리 편집 아이콘 → 사진 관리(더보기 메뉴 거치지 않음)
+        const heroEdit = root.querySelector("[data-hero-edit]");
+        if (heroEdit) heroEdit.onclick = e => { e.stopPropagation(); openPhotoManageModal(a, afterMutate); };
         // 메모 옆 편집 아이콘 → 바로 메모 수정(더보기 메뉴 거치지 않음, 대시보드와 동일 구조)
         const memoEdit = root.querySelector("[data-memoedit]");
         if (memoEdit) memoEdit.onclick = () => openMemoEditModal(a, afterMutate);
