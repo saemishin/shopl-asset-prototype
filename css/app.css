@@ -1293,9 +1293,10 @@ button.dthumb:hover { filter: brightness(0.94); }
 .mapp-card-list { display: flex; flex-direction: column; gap: 10px; }
 .mapp-card {
   display: flex; align-items: center; gap: 12px; padding: 12px; border: 1px solid var(--line); border-radius: 14px;
+  cursor: pointer;
 }
 .mapp-card[hidden] { display: none; }
-.mapp-thumb { width: 44px; height: 44px; border-radius: 10px; flex-shrink: 0; }
+.mapp-thumb { display: block; width: 44px; height: 44px; border-radius: 10px; flex-shrink: 0; }
 .mapp-thumb.empty { display: flex; align-items: center; justify-content: center; background: #f2f3f5; color: var(--text-mut); }
 .mapp-thumb.empty svg { width: 20px; height: 20px; }
 .mapp-card-body { flex: 1; min-width: 0; }
@@ -1337,3 +1338,21 @@ button.dthumb:hover { filter: brightness(0.94); }
 .mapp-wsdetail-name { font-size: 19px; font-weight: 700; }
 .mapp-wsdetail-code { font-size: 13px; color: var(--text-sub); margin-top: 4px; }
 .mapp-wsdetail-address { font-size: 12.5px; color: var(--text-mut); margin-top: 2px; }
+
+/* 자산 상세(앱) — 정보 요약 + 배정/보유 변경 권한 기반 액션 목록 */
+.mapp-detail-hero {
+  width: 96px; height: 96px; margin: 4px auto 16px; display: flex; align-items: center; justify-content: center;
+}
+.mapp-detail-hero .mapp-thumb { width: 96px; height: 96px; border-radius: 18px; }
+.mapp-detail-title { font-size: 18px; font-weight: 700; text-align: center; }
+.mapp-detail-cat { font-size: 12.5px; color: var(--text-sub); text-align: center; margin-top: 4px; }
+.mapp-detail-row { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 10px; }
+.mapp-detail-assetno { font-size: 12.5px; color: var(--text-mut); }
+.mapp-detail-note { font-size: 12.5px; color: var(--text-mut); text-align: center; margin-top: 16px; padding: 12px; background: #f7f8f9; border-radius: 10px; }
+.mapp-action-list { margin-top: 22px; }
+.mapp-action-row {
+  width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 14px 2px;
+  font-size: 14.5px; font-weight: 600; border-bottom: 1px solid #f2f3f5; text-align: left;
+}
+.mapp-action-row .mapp-menu-chev { font-size: 14px; }
+.mapp-action-row.danger { color: var(--danger); }
