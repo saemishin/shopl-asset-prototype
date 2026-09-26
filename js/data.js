@@ -24,7 +24,8 @@ window.DATA = (function () {
     { id: "A001", type: "individual", assetNo: "IT-2024-0012", product: "그램 16 (2024)", group: "전자기기류", sub: "노트북",
       status: "assigned", serial: "SN-8842-AA", createdAt: "2024-03-12", purchaseDate: "2024-03-11", price: 1890000, manufactured: "2024-01-20",
       expiry: "2027-03-10", note: "키보드 자판 일부 마모 확인 — 2025-06 교체 요청 이력 있음. 배정 반납 시 상태 재확인 필요. 트랙패드 클릭감 저하 민원 1건 접수돼 다음 정기 점검 때 같이 확인 요망.", photo: "#4b7bec", photoCount: 6,
-      labels: ["본사", "개발팀"], assignments: [{ employee: "김민수", worksite: null, since: "2024-03-15" }] },
+      // 공동 배정 샘플(구조설계안 2.3) — 앱 자산 상세의 "공동 배정 대상" 정보 섹션 확인용으로 이서연을 공동 배정자로 추가(2026-09-27)
+      labels: ["본사", "개발팀"], assignments: [{ employee: "김민수", worksite: null, since: "2024-03-15" }, { employee: "이서연", worksite: null, since: "2024-05-01" }] },
     { id: "A002", type: "individual", assetNo: "IT-2024-0013", product: "그램 16 (2024)", group: "전자기기류", sub: "노트북",
       status: "stock", serial: "SN-8842-AB", createdAt: "2024-03-12", purchaseDate: "2024-03-11", price: 1890000, expiry: "2027-03-10",
       labels: ["본사"], assignments: [] },
