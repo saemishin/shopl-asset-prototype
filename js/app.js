@@ -16,8 +16,13 @@
   };
   // "나" 페르소나 — 구성원 상세와 동일하게 더미 중 한 명을 기본값으로(?me= 쿼리로 다른 사람도 테스트 가능)
   const ME = new URLSearchParams(location.search).get("me") || "김민수";
-  // assets.js/detail.js의 WS_CODE와 동일 값(이 파일도 자기 완결적이라 중복 유지 — 이 프로토타입 전반의 컨벤션)
+  // assets.js/detail.js의 WS_CODE/WS_ADDRESS와 동일 값(이 파일도 자기 완결적이라 중복 유지 — 이 프로토타입 전반의 컨벤션)
   const WS_CODE = { "강남점": "GN-01", "판교점": "PG-01", "본사": "HQ-01" };
+  const WS_ADDRESS = {
+    "강남점": "서울특별시 강남구 테헤란로 129",
+    "판교점": "경기도 성남시 분당구 판교역로 235",
+    "본사": "서울특별시 중구 을지로 100",
+  };
   // 구성원마다 고정 근무지 1개 + 담당 근무지 여러 개(최대 100개, 프로토타입은 데모용으로 소수만) — 이 매핑
   // 자체가 구조설계안에 없던 새 더미 데이터라 이 파일에만 정의(자산관리 기능이 아니라 근무지 기능 소관이라
   // 실 서비스엔 이미 구성원마다 저장돼 있는 값을 여기선 데모용으로 시드)
@@ -58,10 +63,12 @@
     });
   }
   // 근무지 자산 — 이 구성원의 고정+담당 근무지 각각에 배정(개별형)·보유(수량형)된 자산을 모음.
-  // 고정 근무지가 먼저, 담당 근무지는 등록 순서대로(member-detail.js collectItems와 동일 로직을 근무지 기준으로)
+  // 카드 정렬: 고정 근무지가 항상 최상단, 담당 근무지는 근무지명 가나다순(member-detail.js collectItems와
+  // 동일한 자산 수집 로직을 근무지 기준으로 적용)
   function collectWorksiteGroups(name) {
     const { fixed, assigned } = myWorksites(name);
-    const worksites = [{ ws: fixed, label: "fixed" }, ...assigned.map(ws => ({ ws, label: "assigned" }))];
+    const assignedSorted = [...assigned].sort((a, b) => a.localeCompare(b, "ko"));
+    const worksites = [{ ws: fixed, label: "fixed" }, ...assignedSorted.map(ws => ({ ws, label: "assigned" }))];
     return worksites.map(({ ws, label }) => {
       const items = [];
       assets.forEach(a => {
@@ -137,23 +144,31 @@
       </div>`;
   }
   // 근무지 카드 안에 자산을 최대 5개까지만 보여주고, 초과하면 "전체보기"로 그 근무지의 전체 목록으로
-  // 이동(다음 라운드에서 구현 — 지금은 안내만). 고정/담당 라벨은 실 서비스의 근무지 목록 화면과 동일하게
-  // 핀/별 아이콘으로 구분
-  const WS_LABEL = { fixed: "📌 고정 근무지", assigned: "⭐ 담당 근무지" };
+  // 이동(다음 라운드에서 구현 — 지금은 안내만). 고정/담당 라벨은 참고 이미지대로 불릿(●)만, 아이콘 없음.
+  // 카드마다 접기/펼치기 가능(기본 펼침) — 자산 목록+전체보기 버튼이 접히는 범위
+  const WS_LABEL = { fixed: "● 고정 근무지", assigned: "● 담당 근무지" };
   const WS_CARD_MAX = 5;
+  const CHEV_DOWN = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>`;
   function worksiteCardHtml(group) {
     const shown = group.items.slice(0, WS_CARD_MAX);
     const rest = group.items.length - WS_CARD_MAX;
     return `
-      <div class="mapp-ws-card" data-ws-card data-ws-name="${group.worksite}">
+      <div class="mapp-ws-card" data-ws-card data-ws-name="${group.worksite}" data-ws-code="${WS_CODE[group.worksite] || ""}" data-ws-address="${WS_ADDRESS[group.worksite] || ""}">
         <div class="mapp-ws-head">
-          <span class="mapp-ws-label">${WS_LABEL[group.label]}</span>
-          <div class="mapp-ws-name">${group.worksite} <span class="mapp-ws-code">${WS_CODE[group.worksite] || ""}</span></div>
+          <div class="mapp-ws-head-main">
+            <div class="mapp-ws-label">${WS_LABEL[group.label]}</div>
+            <div class="mapp-ws-name">${group.worksite}${WS_CODE[group.worksite] ? `(${WS_CODE[group.worksite]})` : ""}</div>
+            <div class="mapp-ws-address">${WS_ADDRESS[group.worksite] || ""}</div>
+          </div>
+          <button type="button" class="mapp-ws-collapse" data-ws-collapse aria-expanded="true" aria-label="접기/펼치기">${CHEV_DOWN}</button>
         </div>
-        ${group.items.length ? `
-          <div class="mapp-ws-assets">${shown.map(x => assetCardHtml(x, true)).join("")}</div>
-          ${rest > 0 ? `<button type="button" class="mapp-ws-viewall" data-ws-viewall="${group.worksite}">전체보기 (${group.items.length}) ›</button>` : ""}
-        ` : `<p class="mapp-ws-empty">배정·보유 중인 자산이 없습니다.</p>`}
+        <div class="mapp-ws-count">전체 <b>${group.items.length}</b></div>
+        <div data-ws-collapsible>
+          ${group.items.length ? `
+            <div class="mapp-ws-assets">${shown.map(x => assetCardHtml(x, true)).join("")}</div>
+            ${rest > 0 ? `<button type="button" class="mapp-ws-viewall" data-ws-viewall="${group.worksite}">전체보기</button>` : ""}
+          ` : `<p class="mapp-ws-empty">배정·보유 중인 자산이 없습니다.</p>`}
+        </div>
       </div>`;
   }
   function worksiteAssetsScreenHtml(groups) {
@@ -165,7 +180,7 @@
       ${assetTabsHtml("worksite")}
       <div class="mapp-body">
         <div class="mapp-search">
-          <input type="text" data-mapp-ws-search placeholder="근무지명">
+          <input type="text" data-mapp-ws-search placeholder="근무지명/코드/주소">
         </div>
         <div class="mapp-count">전체 <b>${groups.length}</b></div>
         <div class="mapp-ws-list" data-mapp-ws-list>${groups.map(worksiteCardHtml).join("")}</div>
@@ -257,17 +272,28 @@
           if (emptyMsg) emptyMsg.hidden = anyVisible;
         });
       }
-      // 근무지 자산 — 근무지명 검색(카드 단위 hidden 토글), "전체보기"는 다음 라운드 구현 예정이라 안내만
+      // 근무지 자산 — 근무지명/코드/주소 검색(카드 단위 hidden 토글), "전체보기"는 다음 라운드 구현 예정이라 안내만
       const wsSearchInput = root.querySelector("[data-mapp-ws-search]");
       if (wsSearchInput) {
         const wsCards = [...root.querySelectorAll("[data-ws-card]")];
         wsSearchInput.addEventListener("input", () => {
           const q = wsSearchInput.value.trim().toLowerCase();
-          wsCards.forEach(card => { card.hidden = !(!q || card.dataset.wsName.toLowerCase().includes(q)); });
+          wsCards.forEach(card => {
+            const hay = `${card.dataset.wsName}${card.dataset.wsCode}${card.dataset.wsAddress}`.toLowerCase();
+            card.hidden = !(!q || hay.includes(q));
+          });
         });
       }
       root.querySelectorAll("[data-ws-viewall]").forEach(b => b.onclick = () => {
         toast(`"${b.dataset.wsViewall}" 전체 목록 — 다음 라운드에서 구현 예정`);
+      });
+      // 근무지 카드 접기/펼치기 — 기본 펼침, 자산 목록+전체보기 버튼이 접히는 범위
+      root.querySelectorAll("[data-ws-collapse]").forEach(b => b.onclick = () => {
+        const body = b.closest(".mapp-ws-card").querySelector("[data-ws-collapsible]");
+        const expanded = b.getAttribute("aria-expanded") === "true";
+        b.setAttribute("aria-expanded", String(!expanded));
+        body.hidden = expanded;
+        b.classList.toggle("collapsed", expanded);
       });
     }
     draw();
