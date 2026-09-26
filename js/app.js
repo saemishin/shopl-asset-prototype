@@ -114,19 +114,18 @@
     });
     return sortItems(items);
   }
-  // 소분류 단위 카운트(대분류 → 소분류 → 건수) — 근무지 카드 안에 자산 카드 대신 보여줄 분류 트리.
-  // 소분류는 항상 유한하니(구성원 개인 소유와 달리 근무지는 자산이 무제한일 수 있음) 최대 개수 제한 없이 전부 노출
-  function groupItemsByCategory(items) {
-    const groupOrder = [];
-    const groupMap = {};
+  // 소분류 단위 그룹핑 — 대시보드 member-detail.js/worksite-detail.js의 assetSectionHtml과 동일한 구조:
+  // 대분류별로 다시 묶지 않고, 소분류마다 헤더 하나("대분류 › 소분류 N")를 flat하게 나열. 내 자산·근무지
+  // 자산 화면이 이 그룹 단위를 공유해 "대분류 › 소분류" 표기를 앱 전체에서 통일(2026-09-27)
+  function groupItemsBySub(items) {
+    const order = [];
+    const map = {};
     items.forEach(x => {
-      const g = x.asset.group, s = x.asset.sub;
-      if (!groupMap[g]) { groupMap[g] = { order: [], map: {} }; groupOrder.push(g); }
-      const gm = groupMap[g];
-      if (!gm.map[s]) { gm.map[s] = []; gm.order.push(s); }
-      gm.map[s].push(x);
+      const s = x.asset.sub;
+      if (!map[s]) { map[s] = []; order.push(s); }
+      map[s].push(x);
     });
-    return groupOrder.map(g => ({ group: g, subs: groupMap[g].order.map(s => ({ sub: s, count: groupMap[g].map[s].length })) }));
+    return order.map(sub => ({ sub, group: map[sub][0].asset.group, items: map[sub] }));
   }
   // 근무지 자산 — 이 구성원의 고정+담당 근무지 각각에 배정(개별형)·보유(수량형)된 자산을 모음.
   // 카드 정렬: 고정 근무지가 항상 최상단, 담당 근무지는 근무지명 가나다순(member-detail.js collectItems와
@@ -192,20 +191,8 @@
       </div>`;
   }
 
-  // 대분류 단위 섹션(접기/펼치기 가능) — 근무지 자산과 달리 개인 소유라 목록이 길지 않을 걸로 판단해
-  // 소분류까지 더 쪼개진 카운트 목록이 아니라, 기존 카드 목록 그대로에 대분류 섹션 헤더만 얹음(2026-09-26)
-  function groupItemsBySection(items) {
-    const order = [];
-    const map = {};
-    items.forEach(x => {
-      const g = x.asset.group;
-      if (!map[g]) { map[g] = []; order.push(g); }
-      map[g].push(x);
-    });
-    return order.map(group => ({ group, items: map[group] }));
-  }
   function myAssetsScreenHtml(items) {
-    const sections = groupItemsBySection(items);
+    const sections = groupItemsBySub(items);
     return `
       <div class="mapp-topbar">
         <button type="button" class="mapp-back" data-mapp-back aria-label="뒤로">←</button>
@@ -221,7 +208,7 @@
           <div data-mapp-card-list>${sections.map(sec => `
             <div class="mapp-cat-section" data-cat-section>
               <button type="button" class="mapp-cat-section-head" data-cat-collapse aria-expanded="true" aria-label="접기/펼치기">
-                <span>${sec.group}</span>
+                <span>${sec.group} <span class="mapp-cat-sep">›</span> ${sec.sub}</span>
                 <span class="mapp-cat-section-count">${sec.items.length}</span>
                 ${CHEV_DOWN}
               </button>
@@ -238,17 +225,16 @@
   // 카드마다 접기/펼치기 가능(기본 펼침) — 분류 목록이 접히는 범위
   const WS_LABEL = { fixed: "● 고정 근무지", assigned: "● 담당 근무지" };
   const CHEV_DOWN = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>`;
+  // 대시보드와 동일하게 소분류마다 헤더 한 줄("대분류 › 소분류 N") — 대분류로 한 번 더 묶는 중첩 없이
+  // flat하게 나열(내 자산과 동일한 구조, 2026-09-27). 다만 그 아래 실제 자산을 바로 나열하지 않고 행 자체를
+  // 눌러서 그 근무지·그 소분류의 필터된 목록으로 이동(근무지는 자산 수가 무제한일 수 있어서, 개인 소유인
+  // 내 자산과 달리 인라인으로 다 못 보여줌)
   function worksiteCategoryTreeHtml(wsName, items) {
-    const tree = groupItemsByCategory(items);
-    return tree.map(g => `
-      <div class="mapp-ws-cat-group">
-        <div class="mapp-ws-cat-group-label">${g.group}</div>
-        ${g.subs.map(s => `
-          <button type="button" class="mapp-ws-cat-row" data-ws-cat-open data-ws="${wsName}" data-sub="${s.sub}">
-            <span>${s.sub}</span>
-            <span class="mapp-ws-cat-count">${s.count}<span class="mapp-menu-chev">›</span></span>
-          </button>`).join("")}
-      </div>`).join("");
+    return groupItemsBySub(items).map(sec => `
+      <button type="button" class="mapp-ws-cat-row" data-ws-cat-open data-ws="${wsName}" data-sub="${sec.sub}">
+        <span>${sec.group} <span class="mapp-cat-sep">›</span> ${sec.sub}</span>
+        <span class="mapp-ws-cat-count">${sec.items.length}<span class="mapp-menu-chev">›</span></span>
+      </button>`).join("");
   }
   function worksiteCardHtml(group) {
     return `

@@ -1321,14 +1321,14 @@ button.dthumb:hover { filter: brightness(0.94); }
 .mapp-ws-count { font-size: 12.5px; color: var(--text-sub); margin: 10px 0; }
 .mapp-ws-count b { color: var(--text); }
 .mapp-ws-empty { font-size: 12.5px; color: var(--text-mut); padding: 6px 0 2px; }
-.mapp-ws-cat-tree { display: flex; flex-direction: column; gap: 14px; }
-.mapp-ws-cat-group-label { font-size: 11.5px; font-weight: 700; color: var(--text-mut); margin-bottom: 4px; }
+.mapp-ws-cat-tree { display: flex; flex-direction: column; }
 .mapp-ws-cat-row {
-  display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 9px 0;
+  display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 10px 0;
   font-size: 13.5px; font-weight: 600; border-bottom: 1px solid #f2f3f5;
 }
-.mapp-ws-cat-group:last-child .mapp-ws-cat-row:last-child { border-bottom: none; }
+.mapp-ws-cat-row:last-child { border-bottom: none; }
 .mapp-ws-cat-count { display: flex; align-items: center; gap: 2px; color: var(--text-sub); font-weight: 600; }
+.mapp-cat-sep { color: var(--text-mut); font-weight: 400; }
 
 /* 근무지 카드에서 소분류를 눌렀을 때의 목적지 — 근무지명/코드/주소를 각각 줄바꿔 표시하는 헤더(상단바엔
    뒤로가기만) + 지금 보는 소분류 */

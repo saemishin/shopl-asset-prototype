@@ -235,6 +235,37 @@
     cb.querySelector("[data-cok]").onclick = () => { cb.remove(); onOk(); };
     document.body.appendChild(cb);
   }
+  // 메모 전용 빠른 수정 — "자산 수정" 전체 폼(자산관리 권한)을 거치지 않고 메모만 단독으로 고침(배정/보유
+  // 변경 권한 소관, 위 kv 렌더링의 주석 참조). 다른 필드 수정과 동일하게 필드별 활동 로그 1건 기록
+  function openMemoQuickEditModal(a) {
+    const cb = document.createElement("div");
+    cb.className = "modal-back";
+    cb.style.zIndex = 340;
+    cb.innerHTML = `
+      <div class="modal" style="width:420px">
+        <h3>메모 수정</h3>
+        <div class="body">
+          <textarea data-memo-input maxlength="500" placeholder="메모를 입력하세요" style="width:100%;min-height:140px;border:1px solid var(--line-strong);border-radius:8px;padding:10px;font:inherit;resize:vertical">${a.note || ""}</textarea>
+        </div>
+        <div class="foot">
+          <button class="btn" data-cclose>취소</button>
+          <button class="btn primary" data-cok>저장</button>
+        </div>
+      </div>`;
+    document.body.appendChild(cb);
+    cb.addEventListener("click", e => { if (e.target === cb) cb.remove(); });
+    cb.querySelector("[data-cclose]").onclick = () => cb.remove();
+    cb.querySelector("[data-cok]").onclick = () => {
+      const before = a.note || "";
+      const after = cb.querySelector("[data-memo-input]").value.trim();
+      cb.remove();
+      if (after === before) return;
+      a.note = after;
+      logActivity(a, { script: "자산 정보 수정: 메모 수정", before: before || "없음", after: after || "없음" });
+      toast("저장되었습니다.");
+      render();
+    };
+  }
   const WARN_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 9v4M12 16.5h.01M10.3 3.9 2.5 17.5a1.7 1.7 0 0 0 1.47 2.55h16.06a1.7 1.7 0 0 0 1.47-2.55L13.7 3.9a1.7 1.7 0 0 0-2.94 0z"/></svg>`;
   // 중요 데이터 삭제 확인 패턴 — 실수 방지를 위해 "DELETE"를 정확히 입력해야 삭제 버튼 활성화
   function openDeleteAssetModal(a) {
@@ -1322,7 +1353,10 @@
       { k: isIndiv ? "구매가격" : "구매가격 (품목 단가)", field: "purchasePrice", v: a.price ? window.formatPrice(a.price) : "—" },
       { k: "자산 등록일", v: window.fmtDate(a.createdAt) },
       { k: "QR 라벨", v: qrBtn },
-      { k: "메모", v: memoHtml(a.note) },
+      // 메모는 다른 필드와 달리 "자산 수정" 폼(자산관리 권한) 없이도 배정/보유 변경 권한만 있으면 옆의
+      // 편집 아이콘으로 바로 고칠 수 있음(2026-09-27, 구조설계안 4.3 예외 — 지급 이력처럼 배정·보유 흐름과
+      // 엮이는 기록이 많아 품목명·구매가격 같은 자산 고정 속성과 성격이 다르다고 판단, 앱(직원모드)도 동일)
+      { k: "메모", v: `${memoHtml(a.note)}<button class="icon-edit" data-memoedit aria-label="메모 수정" title="메모 수정">${IC_EDIT}</button>` },
     ].filter(Boolean)
      .filter(row => !row.field || !hidden.includes(row.field))
      .map(({ k, v }) => `<div><div class="k">${k}</div><div class="v">${v}</div></div>`).join("");
@@ -1414,6 +1448,8 @@
     if (sc) sc.onclick = e => statusDropdown(e.currentTarget, statusItems, a);
     const tb = c.querySelector("[data-viewer]");
     if (tb) tb.onclick = () => openViewer(a, a._primary || 0);
+    const memoEdit = c.querySelector("[data-memoedit]");
+    if (memoEdit) memoEdit.onclick = () => openMemoQuickEditModal(a);
 
     const card = c.querySelector("#assign-card");
     if (card) {
