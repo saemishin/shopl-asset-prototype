@@ -17,6 +17,18 @@
     lost: ["분실", "lost"], disposed: ["폐기", "disposed"], held: ["보유 중", "assigned"],
   };
   function todayStr() { return new Date().toISOString().slice(0, 10); }
+  // assets.js/detail.js와 동일한 기준일(이 프로토타입 전역에서 "오늘"로 취급하는 고정 날짜) — 유효기한
+  // 배지 판정을 대시보드와 동일하게 맞추기 위해 이 파일에도 중복 정의
+  const TODAY = new Date("2026-09-04");
+  // 자산 상세(앱) 정보 섹션 — detail.js의 expiryBadge/chips/memoHtml과 동일 로직(이 파일도 자기 완결적이라 중복 유지)
+  function expiryBadge(d) {
+    if (!d) return '<span class="muted">—</span>';
+    const days = Math.ceil((new Date(d) - TODAY) / 86400000);
+    const [t, c] = days < 0 ? ["만료", "exp-over"] : days <= 7 ? ["만료 예정", "exp-soon"] : ["유효", "exp-valid"];
+    return `${window.fmtDate(d)} <span class="badge ${c}">${t}</span>`;
+  }
+  const chips = arr => (arr && arr.length) ? arr.map(l => `<span class="tag">${l}</span>`).join("") : '<span class="muted">—</span>';
+  const memoHtml = note => note ? `<span>${note}</span>` : '<span class="muted">—</span>';
   // "나" 페르소나 — 구성원 상세와 동일하게 더미 중 한 명을 기본값으로(?me= 쿼리로 다른 사람도 테스트 가능)
   const ME = new URLSearchParams(location.search).get("me") || "김민수";
   // assets.js/detail.js의 WS_CODE/WS_ADDRESS와 동일 값(이 파일도 자기 완결적이라 중복 유지 — 이 프로토타입 전반의 컨벤션)
@@ -510,9 +522,24 @@
       onDone();
     };
   }
-  // 배정/보유 변경 권한이 있고 폐기되지 않은 자산에 한해, 현재 상태·이 카드의 target 레코드 존재 여부에
-  // 따라 노출 가능한 액션만 필터링(구조설계안 4.3 전체 목록 — 자산 사진 관리도 이 권한 소관)
-  function detailActions(a, target) {
+  // 상태 변경 액션(상태 뱃지 클릭 → 바텀시트) — 개별형 전용(수량형은 재고/보유중만 있고 배정·보유
+  // 레코드 존재 여부로 자동 파생돼 수동 상태 변경 액션 자체가 없음, 구조설계안 3.3). 대시보드 detail.js의
+  // STATUS_TRANSITIONS과 동일하게 현재 상태에서 갈 수 있는 전이만 노출
+  const STATUS_TRANSITIONS = {
+    stock: [["repair-start", "수리 접수"], ["lost-report", "분실 신고"], ["dispose", "폐기 처리"]],
+    assigned: [["repair-start", "수리 접수"], ["lost-report", "분실 신고"], ["dispose", "폐기 처리"]],
+    repair: [["repair-done", "수리 완료"], ["lost-report", "분실 신고"], ["dispose", "폐기 처리"]],
+    lost: [["lost-recover", "분실 회수"], ["dispose", "폐기 처리"]],
+    disposed: [],
+  };
+  function statusActions(a) {
+    if (a.type !== "individual" || !hasAssignPermission(a)) return [];
+    return STATUS_TRANSITIONS[a.status].map(([key, label]) => ({ key, label, danger: key === "dispose" }));
+  }
+  // 배정/보유 관리 액션(상단바 "더보기" → 바텀시트) — 상태 변경류를 제외한 나머지: 재배정·배정 추가·반납
+  // (개별형), 수량 변경·보유 대상 추가/해제(수량형), 사진 관리(공통). 폐기되지 않았고 배정/보유 변경
+  // 권한이 있는 자산에 한해서만 노출(구조설계안 4.3)
+  function manageActions(a, target) {
     if (a.status === "disposed" || !hasAssignPermission(a)) return [];
     const acts = [];
     if (a.type === "individual") {
@@ -523,13 +550,6 @@
         acts.push({ key: "return", label: "반납" });
       }
       if (activeCount < 5) acts.push({ key: "assign-add", label: "배정 추가" });
-      if (a.status === "stock" || a.status === "assigned") {
-        acts.push({ key: "lost-report", label: "분실 신고" });
-        acts.push({ key: "repair-start", label: "수리 접수" });
-      }
-      if (a.status === "lost") acts.push({ key: "lost-recover", label: "분실 회수" });
-      if (a.status === "repair") acts.push({ key: "repair-done", label: "수리 완료" });
-      acts.push({ key: "dispose", label: "폐기 처리", danger: true });
     } else {
       const { idx } = findRecord(a, target);
       const remaining = a.totalQty - (a.stocks || []).reduce((s, x) => s + x.qty, 0);
@@ -542,28 +562,75 @@
     acts.push({ key: "photos", label: "사진 관리" });
     return acts;
   }
+  // 바텀시트 — 상태 뱃지·상단바 "더보기"가 공유하는 실 앱 액션시트 패턴(하단에서 올라오는 목록 + 취소).
+  // 대시보드는 이 자리에 앵커 드롭다운(statusDropdown/moreDropdown)을 쓰지만, 폰 프레임 목업이라
+  // 모바일다운 바텀시트로 재해석
+  function openActionSheet(items, onPick) {
+    const back = document.createElement("div");
+    back.className = "mapp-sheet-back";
+    back.innerHTML = `
+      <div class="mapp-sheet">
+        ${items.map(x => `<button type="button" class="mapp-sheet-row${x.danger ? " danger" : ""}" data-sheet-key="${x.key}">${x.label}</button>`).join("")}
+        <button type="button" class="mapp-sheet-cancel" data-sheet-cancel>취소</button>
+      </div>`;
+    back.addEventListener("click", e => { if (e.target === back) back.remove(); });
+    back.querySelector("[data-sheet-cancel]").onclick = () => back.remove();
+    back.querySelectorAll("[data-sheet-key]").forEach(b => b.onclick = () => { back.remove(); onPick(b.dataset.sheetKey); });
+    document.body.appendChild(back);
+  }
+  const MORE_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg>`;
+  // 정보 섹션 — 대시보드 자산 상세 왼쪽 카드(dhead-id/dhead-sub/kv2)와 동일한 마크업·CSS 클래스를 그대로
+  // 재사용(같은 css/app.css를 공유하는 프로토타입 전역 컨벤션). 배정/보유 현황(다른 배정 대상 전체 목록)은
+  // 이 화면에 안 넣음 — 이 카드가 나타내는 건 "이 target의 레코드"라는 스코프를 유지(다른 대상까지 보여주면
+  // 대시보드 상세의 배정/보유 현황 섹션을 통째로 옮겨와야 해서 범위가 커짐), 다만 수량형은 전체/보유/잔여
+  // 요약 숫자만 뱃지 아래에 덧붙여 "몇 곳에 나뉘어 있는지"는 파악 가능하게 함. QR 라벨은 스코프 밖(필요해지면 추가)
   function assetDetailScreenHtml(a, target) {
-    const { idx } = findRecord(a, target);
-    const rec = idx >= 0 ? (a.type === "individual" ? a.assignments[idx] : a.stocks[idx]) : null;
-    const statusBadge = a.type === "individual"
-      ? `<span class="badge ${STATUS_LABEL[a.status][1]}">${STATUS_LABEL[a.status][0]}</span>`
-      : `<span class="badge stock">${rec ? rec.qty : 0}개</span>`;
-    // 권한 없음/폐기 안내 문구는 따로 두지 않음 — 수행 가능한 액션 버튼만 노출되는 것으로 충분(2026-09-26)
-    const acts = detailActions(a, target);
+    const isIndiv = a.type === "individual";
+    const sActs = statusActions(a);
+    const mActs = manageActions(a, target);
+    const statusBadge = isIndiv
+      ? (sActs.length
+          ? `<button type="button" class="badge ${STATUS_LABEL[a.status][1]} clickable" data-status-open>${STATUS_LABEL[a.status][0]} <span class="bchev">▾</span></button>`
+          : `<span class="badge ${STATUS_LABEL[a.status][1]}">${STATUS_LABEL[a.status][0]}</span>`)
+      : `<span class="badge stock">${STATUS_LABEL.held[0]}</span>`;
+    const heldQty = !isIndiv ? (a.stocks || []).reduce((s, x) => s + x.qty, 0) : 0;
+    const subMeta = `<div>${statusBadge}</div>${
+      isIndiv && a.assetNo ? `<div style="margin-top:5px">고유관리번호 <b>${a.assetNo}</b></div>` : ""
+    }${
+      !isIndiv ? `<div style="margin-top:5px">전체 <b>${a.totalQty}개</b> · 보유 <b>${heldQty}개</b> · 잔여 <b>${a.totalQty - heldQty}개</b></div>` : ""
+    }`;
+    const cat = window.DATA.categories.find(c => c.group === a.group && c.sub === a.sub) || {};
+    const hiddenFields = cat.hiddenFields || [];
+    const kv = [
+      { k: "분류", v: `<div><span class="type-pill">${isIndiv ? "개별 자산" : "수량 자산"}</span></div><div style="margin-top:5px">${categoryPath(a)}</div>` },
+      { k: "유효기한", field: "expiry", v: expiryBadge(a.expiry) },
+      { k: "태그", v: chips(a.labels) },
+      isIndiv ? { k: "S/N", field: "serial", v: a.serial || '<span class="muted">—</span>' } : null,
+      isIndiv ? { k: "IMEI", field: "imei", v: a.imei || '<span class="muted">—</span>' } : null,
+      { k: "제조연월일", field: "manufactured", v: a.manufactured ? window.fmtDate(a.manufactured) : '<span class="muted">—</span>' },
+      { k: "구매일", field: "purchaseDate", v: a.purchaseDate ? window.fmtDate(a.purchaseDate) : "—" },
+      { k: isIndiv ? "구매가격" : "구매가격 (품목 단가)", field: "purchasePrice", v: a.price ? window.formatPrice(a.price) : "—" },
+      { k: "자산 등록일", v: window.fmtDate(a.createdAt) },
+      { k: "메모", v: memoHtml(a.note) },
+    ].filter(Boolean)
+     .filter(row => !row.field || !hiddenFields.includes(row.field))
+     .map(({ k, v }) => `<div><div class="k">${k}</div><div class="v">${v}</div></div>`).join("");
     return `
       <div class="mapp-topbar">
         <button type="button" class="mapp-back" data-mapp-back aria-label="뒤로">←</button>
-        <span class="mapp-topbar-title">자산 상세</span>
+        ${mActs.length ? `<button type="button" class="mapp-more" data-more-open aria-label="더보기">${MORE_ICON}</button>` : ""}
       </div>
       <div class="mapp-body">
-        <div class="mapp-detail-hero">${cardThumb(a)}</div>
-        <div class="mapp-detail-title">${a.product}</div>
-        <div class="mapp-detail-cat">${categoryPath(a)}</div>
-        <div class="mapp-detail-row">
-          ${a.type === "individual" ? `<span class="mapp-detail-assetno">${a.assetNo || "—"}</span>` : ""}
-          ${statusBadge}
+        <div class="dhead-id">
+          ${cardThumb(a)}
+          <div>
+            <h1>${a.product}</h1>
+            <div class="dhead-sub">${subMeta}</div>
+          </div>
         </div>
-        ${acts.length ? `<div class="mapp-action-list">${acts.map(x => `<button type="button" class="mapp-action-row${x.danger ? " danger" : ""}" data-detail-action="${x.key}">${x.label}<span class="mapp-menu-chev">›</span></button>`).join("")}</div>` : ""}
+        <div class="dsection">
+          <div class="kv2">${kv}</div>
+        </div>
       </div>`;
   }
 
@@ -663,8 +730,7 @@
           if (findRecord(a, target).idx < 0) { Object.assign(state, state.detailFrom); delete state.detailFrom; }
           draw();
         }
-        root.querySelectorAll("[data-detail-action]").forEach(b => b.onclick = () => {
-          const key = b.dataset.detailAction;
+        function dispatchAction(key) {
           const { idx } = findRecord(a, target);
           if (key === "assign-add") openAssignAddModal(a, afterMutate);
           else if (key === "reassign") openReassignModal(a, idx, afterMutate);
@@ -678,7 +744,13 @@
           else if (key === "qty-change") openQtyChangeModal(a, idx, afterMutate);
           else if (key === "hold-release") openHoldReleaseConfirm(a, idx, afterMutate);
           else if (key === "photos") openPhotoManageModal(a, afterMutate);
-        });
+        }
+        // 상태 뱃지 → 상태 변경 바텀시트, 상단바 "더보기" → 배정/보유 관리 바텀시트(대시보드의 뱃지
+        // 드롭다운/···메뉴와 같은 진입점, 폰 프레임이라 바텀시트로 재해석)
+        const statusOpen = root.querySelector("[data-status-open]");
+        if (statusOpen) statusOpen.onclick = () => openActionSheet(statusActions(a), dispatchAction);
+        const moreOpen = root.querySelector("[data-more-open]");
+        if (moreOpen) moreOpen.onclick = () => openActionSheet(manageActions(a, target), dispatchAction);
       }
       const gotoAssets = root.querySelector('[data-mapp-goto="assets"]');
       if (gotoAssets) gotoAssets.onclick = () => { state.screen = "assets"; state.assetTab = "mine"; draw(); };

@@ -1339,19 +1339,27 @@ button.dthumb:hover { filter: brightness(0.94); }
 .mapp-wsdetail-code { font-size: 13px; color: var(--text-sub); margin-top: 4px; }
 .mapp-wsdetail-address { font-size: 12.5px; color: var(--text-mut); margin-top: 2px; }
 
-/* 자산 상세(앱) — 정보 요약 + 배정/보유 변경 권한 기반 액션 목록 */
-.mapp-detail-hero {
-  width: 96px; height: 96px; margin: 4px auto 16px; display: flex; align-items: center; justify-content: center;
+/* 자산 상세(앱) — 대시보드 자산 상세 왼쪽 카드(dhead-id/dhead-sub/kv2, 전역 css/app.css 공용 클래스)를
+   그대로 재사용. .kv2 기본값(110px 라벨+32px gap)은 데스크톱 사이드바 폭 기준이라 폰 프레임 안에선 값
+   컬럼이 좁아지므로, 이 화면 안에서만 라벨 폭·간격을 줄여 재정의(전역 .kv2 자체는 건드리지 않음) */
+.mapp-body .kv2 { grid-template-columns: 84px 1fr; column-gap: 16px; row-gap: 14px; }
+.mapp-more { margin-left: auto; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; color: var(--text); }
+.mapp-more svg { width: 20px; height: 20px; }
+/* 바텀시트 — 상태 뱃지·상단바 "더보기" 공용 액션시트 */
+.mapp-sheet-back {
+  position: fixed; inset: 0; background: rgba(17, 19, 21, .42); display: flex; align-items: flex-end;
+  justify-content: center; z-index: 200; padding: 0 16px;
 }
-.mapp-detail-hero .mapp-thumb { width: 96px; height: 96px; border-radius: 18px; }
-.mapp-detail-title { font-size: 18px; font-weight: 700; text-align: center; }
-.mapp-detail-cat { font-size: 12.5px; color: var(--text-sub); text-align: center; margin-top: 4px; }
-.mapp-detail-row { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 10px; }
-.mapp-detail-assetno { font-size: 12.5px; color: var(--text-mut); }
-.mapp-action-list { margin-top: 22px; }
-.mapp-action-row {
-  width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 14px 2px;
-  font-size: 14.5px; font-weight: 600; border-bottom: 1px solid #f2f3f5; text-align: left;
+.mapp-sheet {
+  width: 100%; max-width: 390px; background: #fff; border-radius: 18px 18px 0 0; padding-bottom: max(8px, env(safe-area-inset-bottom));
+  box-shadow: 0 -10px 40px rgba(0, 0, 0, .18); margin-bottom: 16px; overflow: hidden;
 }
-.mapp-action-row .mapp-menu-chev { font-size: 14px; }
-.mapp-action-row.danger { color: var(--danger); }
+.mapp-sheet-row {
+  display: block; width: 100%; padding: 16px 20px; font-size: 15px; font-weight: 600; text-align: center;
+  border-bottom: 1px solid #f2f3f5;
+}
+.mapp-sheet-row.danger { color: var(--danger); }
+.mapp-sheet-cancel {
+  display: block; width: 100%; padding: 16px 20px; margin-top: 8px; font-size: 15px; font-weight: 700;
+  text-align: center; color: var(--text-sub); border-top: 8px solid #f7f8f9;
+}
