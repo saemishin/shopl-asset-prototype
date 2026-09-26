@@ -1235,3 +1235,64 @@ button.dthumb:hover { filter: brightness(0.94); }
 /* 사용함 전환 안내 팝업의 "설정하러 가기" — 버튼 테두리 없는 굵은 텍스트 링크(참고 이미지) */
 .ufs-goto-link { display: block; margin-top: 18px; font-size: 14px; font-weight: 700; color: var(--text); background: none; padding: 0; }
 .ufs-goto-link:hover { color: var(--primary); }
+
+/* ============ 앱 직원모드(폰 프레임 목업) ============ */
+.mapp-stage { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: #e9ebee; padding: 40px 16px; }
+.mapp-phone {
+  width: 390px; height: 844px; background: #fff; border-radius: 46px; border: 9px solid #111;
+  box-shadow: 0 30px 70px rgba(0,0,0,.35); overflow: hidden; display: flex; flex-direction: column; position: relative;
+}
+.mapp-statusbar {
+  flex-shrink: 0; height: 34px; padding: 0 24px; display: flex; align-items: center; justify-content: space-between;
+  font-size: 13px; font-weight: 700; color: #111;
+}
+.mapp-screen { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; }
+.mapp-body { padding: 0 16px 20px; flex: 1; }
+.mapp-tabbar { flex-shrink: 0; display: flex; border-top: 1px solid var(--line); padding: 6px 0 10px; }
+.mapp-tab { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 10.5px; color: var(--text-mut); }
+.mapp-tab.active { color: var(--text); font-weight: 700; }
+.mapp-tab-ic { font-size: 18px; }
+
+/* 메뉴 화면 */
+.mapp-menu-head { flex-shrink: 0; padding: 16px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); }
+.mapp-brand { font-size: 15px; font-weight: 700; }
+.mapp-brand b { font-weight: 700; margin-left: 4px; }
+.mapp-gear { font-size: 17px; color: var(--text-sub); }
+.mapp-menu-body { padding-top: 14px; }
+.mapp-menu-cap { font-size: 12px; color: var(--text-mut); font-weight: 600; padding: 14px 2px 6px; }
+.mapp-menu-row {
+  display: flex; align-items: center; gap: 12px; padding: 13px 2px; font-size: 15px; font-weight: 600;
+  border-bottom: 1px solid #f2f3f5;
+}
+.mapp-menu-row.muted { color: var(--text-sub); font-weight: 500; }
+.mapp-menu-ic { width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 17px; }
+.mapp-menu-ic svg { width: 20px; height: 20px; }
+.mapp-menu-chev { margin-left: auto; color: var(--text-mut); font-size: 14px; }
+.mapp-menu-divider { height: 10px; background: #f7f8f9; margin: 10px -16px; }
+
+/* 자산 화면 — 상단바 + 탭 + 검색/카운트/카드 목록 */
+.mapp-topbar { flex-shrink: 0; display: flex; align-items: center; gap: 10px; padding: 14px 16px; }
+.mapp-back { font-size: 19px; color: var(--text); }
+.mapp-topbar-title { font-size: 17px; font-weight: 700; }
+.mapp-asset-tabs { flex-shrink: 0; display: flex; gap: 22px; padding: 0 16px 12px; border-bottom: 1px solid var(--line); margin-bottom: 14px; }
+.mapp-asset-tab { font-size: 14px; color: var(--text-sub); font-weight: 600; padding-bottom: 10px; margin-bottom: -13px; border-bottom: 2px solid transparent; }
+.mapp-asset-tab.active { color: var(--text); border-bottom-color: var(--primary); }
+.mapp-search { margin-bottom: 12px; }
+.mapp-search input {
+  width: 100%; height: 40px; border-radius: 20px; border: 1px solid var(--line-strong);
+  padding: 0 16px; font-size: 13.5px; background: #f7f8f9;
+}
+.mapp-count { font-size: 12.5px; color: var(--text-sub); margin-bottom: 10px; }
+.mapp-count b { color: var(--text); }
+.mapp-card-list { display: flex; flex-direction: column; gap: 10px; }
+.mapp-card {
+  display: flex; align-items: center; gap: 12px; padding: 12px; border: 1px solid var(--line); border-radius: 14px;
+}
+.mapp-card[hidden] { display: none; }
+.mapp-thumb { width: 44px; height: 44px; border-radius: 10px; flex-shrink: 0; }
+.mapp-thumb.empty { display: flex; align-items: center; justify-content: center; background: #f2f3f5; color: var(--text-mut); }
+.mapp-thumb.empty svg { width: 20px; height: 20px; }
+.mapp-card-body { flex: 1; min-width: 0; }
+.mapp-card-title { font-size: 14px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mapp-card-sub { font-size: 12px; color: var(--text-mut); margin-top: 2px; }
+.mapp-empty { text-align: center; color: var(--text-mut); font-size: 13px; padding: 30px 0; }
