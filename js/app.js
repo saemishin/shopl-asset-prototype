@@ -100,11 +100,12 @@
       return q.qty - p.qty;
     });
   }
-  // 특정 근무지에 배정(개별형)·보유(수량형)된 자산 전체(정렬 적용) — 근무지 카드의 미리보기(최대 5개)와
-  // "전체보기" 상세 화면이 이 함수를 공유해 동일한 목록/정렬을 보장
-  function itemsForWorksite(ws) {
+  // 특정 근무지에 배정(개별형)·보유(수량형)된 자산 전체(정렬 적용) — 근무지 카드의 분류별 카운트 집계와
+  // "전체보기"(분류별 자산 목록) 화면이 이 함수를 공유해 동일한 집합/정렬을 보장. sub를 주면 그 소분류로만 필터
+  function itemsForWorksite(ws, sub) {
     const items = [];
     assets.forEach(a => {
+      if (sub && a.sub !== sub) return;
       if (a.type === "individual") {
         (a.assignments || []).forEach(x => { if (x.worksite === ws) items.push({ qty: 1, asset: a }); });
       } else {
@@ -112,6 +113,20 @@
       }
     });
     return sortItems(items);
+  }
+  // 소분류 단위 카운트(대분류 → 소분류 → 건수) — 근무지 카드 안에 자산 카드 대신 보여줄 분류 트리.
+  // 소분류는 항상 유한하니(구성원 개인 소유와 달리 근무지는 자산이 무제한일 수 있음) 최대 개수 제한 없이 전부 노출
+  function groupItemsByCategory(items) {
+    const groupOrder = [];
+    const groupMap = {};
+    items.forEach(x => {
+      const g = x.asset.group, s = x.asset.sub;
+      if (!groupMap[g]) { groupMap[g] = { order: [], map: {} }; groupOrder.push(g); }
+      const gm = groupMap[g];
+      if (!gm.map[s]) { gm.map[s] = []; gm.order.push(s); }
+      gm.map[s].push(x);
+    });
+    return groupOrder.map(g => ({ group: g, subs: groupMap[g].order.map(s => ({ sub: s, count: groupMap[g].map[s].length })) }));
   }
   // 근무지 자산 — 이 구성원의 고정+담당 근무지 각각에 배정(개별형)·보유(수량형)된 자산을 모음.
   // 카드 정렬: 고정 근무지가 항상 최상단, 담당 근무지는 근무지명 가나다순(member-detail.js collectItems와
@@ -130,14 +145,12 @@
     return `<span class="mapp-thumb empty">${THUMB_EMPTY}</span>`;
   }
   // 카드 구성 확정: 대표 이미지 / 품목명 / 고유관리번호(개별형) / 상태 뱃지(개별형) 또는 보유 수량(수량형) —
-  // 분류 등 나머지 정보는 자산 상세(다음 라운드)에서 확인하는 것으로 스코프 아웃.
-  // compact=true면 근무지 카드 안에 중첩되는 축약 행(테두리 없이 리스트 안에서 나열)
-  function assetCardHtml(x, compact) {
+  // 분류 등 나머지 정보는 자산 상세에서 확인하는 것으로 스코프 아웃.
+  function assetCardHtml(x) {
     const a = x.asset;
-    const cls = compact ? "mapp-card mapp-card-compact" : "mapp-card";
     if (a.type === "individual") {
       return `
-        <div class="${cls}" data-asset-card data-asset-id="${a.id}">
+        <div class="mapp-card" data-asset-card data-asset-id="${a.id}">
           ${cardThumb(a)}
           <div class="mapp-card-body">
             <div class="mapp-card-title">${a.product}</div>
@@ -147,7 +160,7 @@
         </div>`;
     }
     return `
-      <div class="${cls}" data-asset-card data-asset-id="${a.id}">
+      <div class="mapp-card" data-asset-card data-asset-id="${a.id}">
         ${cardThumb(a)}
         <div class="mapp-card-body">
           <div class="mapp-card-title">${a.product}</div>
@@ -179,7 +192,20 @@
       </div>`;
   }
 
+  // 대분류 단위 섹션(접기/펼치기 가능) — 근무지 자산과 달리 개인 소유라 목록이 길지 않을 걸로 판단해
+  // 소분류까지 더 쪼개진 카운트 목록이 아니라, 기존 카드 목록 그대로에 대분류 섹션 헤더만 얹음(2026-09-26)
+  function groupItemsBySection(items) {
+    const order = [];
+    const map = {};
+    items.forEach(x => {
+      const g = x.asset.group;
+      if (!map[g]) { map[g] = []; order.push(g); }
+      map[g].push(x);
+    });
+    return order.map(group => ({ group, items: map[group] }));
+  }
   function myAssetsScreenHtml(items) {
+    const sections = groupItemsBySection(items);
     return `
       <div class="mapp-topbar">
         <button type="button" class="mapp-back" data-mapp-back aria-label="뒤로">←</button>
@@ -192,20 +218,39 @@
         </div>
         <div class="mapp-count">전체 <b>${items.length}</b></div>
         ${items.length ? `
-          <div class="mapp-card-list" data-mapp-card-list>${items.map(x => assetCardHtml(x)).join("")}</div>
+          <div data-mapp-card-list>${sections.map(sec => `
+            <div class="mapp-cat-section" data-cat-section>
+              <button type="button" class="mapp-cat-section-head" data-cat-collapse aria-expanded="true" aria-label="접기/펼치기">
+                <span>${sec.group}</span>
+                <span class="mapp-cat-section-count">${sec.items.length}</span>
+                ${CHEV_DOWN}
+              </button>
+              <div class="mapp-card-list" data-cat-collapsible>${sec.items.map(x => assetCardHtml(x)).join("")}</div>
+            </div>`).join("")}</div>
           <p class="mapp-empty" data-mapp-empty hidden>결과가 없습니다.</p>
         ` : `<p class="mapp-empty">배정·보유 중인 자산이 없습니다.</p>`}
       </div>`;
   }
-  // 근무지 카드 안에 자산을 최대 5개까지만 보여주고, 초과하면 "전체보기"로 그 근무지의 전체 목록으로
-  // 이동(다음 라운드에서 구현 — 지금은 안내만). 고정/담당 라벨은 참고 이미지대로 불릿(●)만, 아이콘 없음.
-  // 카드마다 접기/펼치기 가능(기본 펼침) — 자산 목록+전체보기 버튼이 접히는 범위
+  // 근무지 카드 — 자산 카드를 직접 나열하는 대신 대분류>소분류 목록 + 분류별 자산 개수만 보여줌(2026-09-26).
+  // 근무지당 자산 수는 무제한일 수 있어 "최대 5개+전체보기" 상한이 필요했지만, 분류 자체는 회사가 만든
+  // 만큼만 존재해 항상 유한하므로 그런 상한 장치가 필요 없어짐. 소분류를 누르면 그 근무지·그 소분류의
+  // 자산 목록(worksiteDetailScreenHtml)으로 이동. 고정/담당 라벨은 참고 이미지대로 불릿(●)만, 아이콘 없음.
+  // 카드마다 접기/펼치기 가능(기본 펼침) — 분류 목록이 접히는 범위
   const WS_LABEL = { fixed: "● 고정 근무지", assigned: "● 담당 근무지" };
-  const WS_CARD_MAX = 5;
   const CHEV_DOWN = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>`;
+  function worksiteCategoryTreeHtml(wsName, items) {
+    const tree = groupItemsByCategory(items);
+    return tree.map(g => `
+      <div class="mapp-ws-cat-group">
+        <div class="mapp-ws-cat-group-label">${g.group}</div>
+        ${g.subs.map(s => `
+          <button type="button" class="mapp-ws-cat-row" data-ws-cat-open data-ws="${wsName}" data-sub="${s.sub}">
+            <span>${s.sub}</span>
+            <span class="mapp-ws-cat-count">${s.count}<span class="mapp-menu-chev">›</span></span>
+          </button>`).join("")}
+      </div>`).join("");
+  }
   function worksiteCardHtml(group) {
-    const shown = group.items.slice(0, WS_CARD_MAX);
-    const rest = group.items.length - WS_CARD_MAX;
     return `
       <div class="mapp-ws-card" data-ws-card data-ws-name="${group.worksite}" data-ws-code="${WS_CODE[group.worksite] || ""}" data-ws-address="${WS_ADDRESS[group.worksite] || ""}">
         <div class="mapp-ws-head">
@@ -218,10 +263,9 @@
         </div>
         <div data-ws-collapsible>
           <div class="mapp-ws-count">전체 <b>${group.items.length}</b></div>
-          ${group.items.length ? `
-            <div class="mapp-ws-assets">${shown.map(x => assetCardHtml(x, true)).join("")}</div>
-            ${rest > 0 ? `<button type="button" class="mapp-ws-viewall" data-ws-viewall="${group.worksite}">전체보기</button>` : ""}
-          ` : `<p class="mapp-ws-empty">배정·보유 중인 자산이 없습니다.</p>`}
+          ${group.items.length
+            ? `<div class="mapp-ws-cat-tree">${worksiteCategoryTreeHtml(group.worksite, group.items)}</div>`
+            : `<p class="mapp-ws-empty">배정·보유 중인 자산이 없습니다.</p>`}
         </div>
       </div>`;
   }
@@ -240,10 +284,10 @@
         <div class="mapp-ws-list" data-mapp-ws-list>${groups.map(worksiteCardHtml).join("")}</div>
       </div>`;
   }
-  // 근무지 카드 "전체보기"의 목적지 — 그 근무지의 전체 자산 목록. 타이틀 텍스트 없이 뒤로가기 버튼만
-  // (근무지명은 바로 아래 헤더에 이미 나오므로 상단바에 중복 표기 안 함), 근무지명/코드/주소를 각각
-  // 줄바꿔 표시, 그 아래는 내 자산 탭과 동일한 구성(검색+카운트+카드 리스트, 정렬도 동일)
-  function worksiteDetailScreenHtml(ws, items) {
+  // 근무지 카드에서 소분류를 누르면 이동하는 목적지 — 그 근무지의 그 소분류 자산 목록. 타이틀 텍스트 없이
+  // 뒤로가기 버튼만(근무지명은 바로 아래 헤더에 표기), 근무지명/코드/주소를 각각 줄바꿔 표시하고 지금 보는
+  // 소분류를 그 아래에 덧붙임, 그 아래는 내 자산 탭과 동일한 구성(검색+카운트+카드 리스트, 정렬도 동일)
+  function worksiteDetailScreenHtml(ws, sub, items) {
     return `
       <div class="mapp-topbar">
         <button type="button" class="mapp-back" data-mapp-back aria-label="뒤로">←</button>
@@ -252,6 +296,7 @@
         <div class="mapp-wsdetail-name">${ws}</div>
         <div class="mapp-wsdetail-code">${WS_CODE[ws] || ""}</div>
         <div class="mapp-wsdetail-address">${WS_ADDRESS[ws] || ""}</div>
+        <div class="mapp-wsdetail-sub">${sub}</div>
       </div>
       <div class="mapp-body">
         <div class="mapp-search">
@@ -522,6 +567,65 @@
       onDone();
     };
   }
+  function openMemoEditModal(a, onDone) {
+    const back = document.createElement("div");
+    back.className = "modal-back";
+    back.innerHTML = `
+      <div class="modal" style="width:360px">
+        <div class="body" style="padding-top:20px">
+          <p style="font-size:14px;font-weight:700;margin-bottom:10px">메모 수정</p>
+          <textarea data-memo-input maxlength="500" placeholder="메모를 입력하세요" style="width:100%;min-height:120px;border:1px solid var(--line-strong);border-radius:8px;padding:10px;font:inherit;resize:vertical">${a.note || ""}</textarea>
+        </div>
+        <div class="foot">
+          <button class="btn" data-cclose>취소</button>
+          <button class="btn primary" data-cok>저장</button>
+        </div>
+      </div>`;
+    document.body.appendChild(back);
+    back.addEventListener("click", e => { if (e.target === back) back.remove(); });
+    back.querySelector("[data-cclose]").onclick = () => back.remove();
+    back.querySelector("[data-cok]").onclick = () => {
+      a.note = back.querySelector("[data-memo-input]").value.trim();
+      back.remove();
+      toast("저장되었습니다.");
+      onDone();
+    };
+  }
+  // 자산 사진 뷰어 — 조회 전용(편집은 "사진 관리" 액션에서), 조회 권한만 있어도 볼 수 있어야 해서 배정/보유
+  // 변경 권한과 무관하게 항상 열 수 있음. 대시보드 detail.js의 openViewer를 단순화(줌·정보패널·수정메뉴 없이
+  // 넘기기+닫기만) — 폰 프레임에 맞는 전체화면 뷰어
+  function openPhotoViewer(a) {
+    const items = window.assetPhotos(a);
+    if (!items.length) return;
+    let cur = a._primary || 0;
+    const back = document.createElement("div");
+    back.className = "mapp-viewer-back";
+    back.innerHTML = `
+      <div class="mapp-viewer-bar">
+        <span class="mapp-viewer-count"></span>
+        <button type="button" class="mapp-viewer-close" data-vclose aria-label="닫기">✕</button>
+      </div>
+      <div class="mapp-viewer-stage">
+        <button type="button" class="mapp-viewer-nav" data-vprev aria-label="이전">‹</button>
+        <div class="mapp-viewer-img"></div>
+        <button type="button" class="mapp-viewer-nav" data-vnext aria-label="다음">›</button>
+      </div>`;
+    document.body.appendChild(back);
+    const img = back.querySelector(".mapp-viewer-img");
+    const countEl = back.querySelector(".mapp-viewer-count");
+    const prevBtn = back.querySelector("[data-vprev]");
+    const nextBtn = back.querySelector("[data-vnext]");
+    function draw() {
+      img.style.background = items[cur].color;
+      countEl.textContent = `${cur + 1} / ${items.length}`;
+      prevBtn.hidden = nextBtn.hidden = items.length < 2;
+    }
+    prevBtn.onclick = () => { cur = (cur - 1 + items.length) % items.length; draw(); };
+    nextBtn.onclick = () => { cur = (cur + 1) % items.length; draw(); };
+    back.querySelector("[data-vclose]").onclick = () => back.remove();
+    back.addEventListener("click", e => { if (e.target === back) back.remove(); });
+    draw();
+  }
   // 상태 변경 액션(상태 뱃지 클릭 → 바텀시트) — 개별형 전용(수량형은 재고/보유중만 있고 배정·보유
   // 레코드 존재 여부로 자동 파생돼 수동 상태 변경 액션 자체가 없음, 구조설계안 3.3). 대시보드 detail.js의
   // STATUS_TRANSITIONS과 동일하게 현재 상태에서 갈 수 있는 전이만 노출
@@ -537,8 +641,12 @@
     return STATUS_TRANSITIONS[a.status].map(([key, label]) => ({ key, label, danger: key === "dispose" }));
   }
   // 배정/보유 관리 액션(상단바 "더보기" → 바텀시트) — 상태 변경류를 제외한 나머지: 재배정·배정 추가·반납
-  // (개별형), 수량 변경·보유 대상 추가/해제(수량형), 사진 관리(공통). 폐기되지 않았고 배정/보유 변경
-  // 권한이 있는 자산에 한해서만 노출(구조설계안 4.3)
+  // (개별형), 수량 변경·보유 대상 추가/해제(수량형), 사진 관리·메모 수정(공통). 폐기되지 않았고 배정/보유
+  // 변경 권한이 있는 자산에 한해서만 노출.
+  // 메모는 원래 구조설계안 5.5상 "자산 정보 수정"(자산관리 권한 소관, 자산 수정 폼)으로 다른 필드들과 묶여
+  // 있었는데, 이 화면(직원모드)에서는 예외적으로 배정/보유 변경 권한 소관으로 재분류(2026-09-26, 사용자
+  // 확인) — 지급 이력처럼 배정·보유 흐름과 직접 엮이는 메모가 많아 자산 정보 수정(품목명·구매가 등)과는
+  // 성격이 다르다고 판단. 나머지 필드(품목명·구매가격 등)는 여전히 자산관리 권한 소관으로 이 화면 스코프 밖
   function manageActions(a, target) {
     if (a.status === "disposed" || !hasAssignPermission(a)) return [];
     const acts = [];
@@ -559,6 +667,7 @@
       }
       if (remaining > 0) acts.push({ key: "hold-add", label: "보유 대상 추가" });
     }
+    acts.push({ key: "memo-edit", label: "메모 수정" });
     acts.push({ key: "photos", label: "사진 관리" });
     return acts;
   }
@@ -588,16 +697,17 @@
     const isIndiv = a.type === "individual";
     const sActs = statusActions(a);
     const mActs = manageActions(a, target);
+    const { idx: recIdx } = findRecord(a, target);
+    const rec = recIdx >= 0 ? (isIndiv ? a.assignments[recIdx] : a.stocks[recIdx]) : null;
+    // 수량형은 "내가(이 target이) 가진 수량"만 보여줌 — 다른 보유 대상들의 수량까지 합친 전체/잔여
+    // 요약은 배정현황/보유현황(다른 대상 전체 목록)과 마찬가지로 스코프 밖으로 정리(2026-09-26)
     const statusBadge = isIndiv
       ? (sActs.length
           ? `<button type="button" class="badge ${STATUS_LABEL[a.status][1]} clickable" data-status-open>${STATUS_LABEL[a.status][0]} <span class="bchev">▾</span></button>`
           : `<span class="badge ${STATUS_LABEL[a.status][1]}">${STATUS_LABEL[a.status][0]}</span>`)
-      : `<span class="badge stock">${STATUS_LABEL.held[0]}</span>`;
-    const heldQty = !isIndiv ? (a.stocks || []).reduce((s, x) => s + x.qty, 0) : 0;
+      : `<span class="badge stock">${rec ? rec.qty : 0}개</span>`;
     const subMeta = `<div>${statusBadge}</div>${
       isIndiv && a.assetNo ? `<div style="margin-top:5px">고유관리번호 <b>${a.assetNo}</b></div>` : ""
-    }${
-      !isIndiv ? `<div style="margin-top:5px">전체 <b>${a.totalQty}개</b> · 보유 <b>${heldQty}개</b> · 잔여 <b>${a.totalQty - heldQty}개</b></div>` : ""
     }`;
     const cat = window.DATA.categories.find(c => c.group === a.group && c.sub === a.sub) || {};
     const hiddenFields = cat.hiddenFields || [];
@@ -615,6 +725,11 @@
     ].filter(Boolean)
      .filter(row => !row.field || !hiddenFields.includes(row.field))
      .map(({ k, v }) => `<div><div class="k">${k}</div><div class="v">${v}</div></div>`).join("");
+    // 대표 이미지 — 사진이 있으면 눌러서 뷰어로 볼 수 있게(조회는 권한과 무관하게 항상 가능), 없으면 그냥 표시만
+    const photos = window.assetPhotos(a);
+    const heroHtml = photos.length
+      ? `<button type="button" class="dhead-thumb-btn" data-hero-viewer aria-label="사진 보기">${cardThumb(a)}</button>`
+      : cardThumb(a);
     return `
       <div class="mapp-topbar">
         <button type="button" class="mapp-back" data-mapp-back aria-label="뒤로">←</button>
@@ -622,7 +737,7 @@
       </div>
       <div class="mapp-body">
         <div class="dhead-id">
-          ${cardThumb(a)}
+          ${heroHtml}
           <div>
             <h1>${a.product}</h1>
             <div class="dhead-sub">${subMeta}</div>
@@ -682,7 +797,7 @@
       const worksiteGroups = collectWorksiteGroups(ME);
       const showTabBar = state.screen === "menu";
       const screenHtml = state.screen === "menu" ? menuScreenHtml()
-        : state.screen === "worksite-detail" ? worksiteDetailScreenHtml(state.wsDetail, itemsForWorksite(state.wsDetail))
+        : state.screen === "worksite-detail" ? worksiteDetailScreenHtml(state.wsDetail, state.wsDetailSub, itemsForWorksite(state.wsDetail, state.wsDetailSub))
         : state.screen === "asset-detail" ? assetDetailScreenHtml(assets.find(x => x.id === state.detailAssetId), state.detailTarget)
         : state.assetTab === "mine" ? myAssetsScreenHtml(items) : worksiteAssetsScreenHtml(worksiteGroups);
 
@@ -715,11 +830,6 @@
       }
       if (state.screen === "assets" && state.assetTab === "mine") {
         root.querySelectorAll("[data-asset-card]").forEach(el => el.onclick = () => openDetail(el.dataset.assetId, { type: "employee", value: ME }));
-      } else if (state.screen === "assets" && state.assetTab === "worksite") {
-        root.querySelectorAll("[data-asset-card]").forEach(el => {
-          const wsCard = el.closest("[data-ws-card]");
-          if (wsCard) el.onclick = () => openDetail(el.dataset.assetId, { type: "worksite", value: wsCard.dataset.wsName });
-        });
       } else if (state.screen === "worksite-detail") {
         root.querySelectorAll("[data-asset-card]").forEach(el => el.onclick = () => openDetail(el.dataset.assetId, { type: "worksite", value: state.wsDetail }));
       } else if (state.screen === "asset-detail") {
@@ -743,6 +853,7 @@
           else if (key === "hold-add") openHoldAddModal(a, afterMutate);
           else if (key === "qty-change") openQtyChangeModal(a, idx, afterMutate);
           else if (key === "hold-release") openHoldReleaseConfirm(a, idx, afterMutate);
+          else if (key === "memo-edit") openMemoEditModal(a, afterMutate);
           else if (key === "photos") openPhotoManageModal(a, afterMutate);
         }
         // 상태 뱃지 → 상태 변경 바텀시트, 상단바 "더보기" → 배정/보유 관리 바텀시트(대시보드의 뱃지
@@ -751,6 +862,9 @@
         if (statusOpen) statusOpen.onclick = () => openActionSheet(statusActions(a), dispatchAction);
         const moreOpen = root.querySelector("[data-more-open]");
         if (moreOpen) moreOpen.onclick = () => openActionSheet(manageActions(a, target), dispatchAction);
+        // 대표 이미지 클릭 → 사진 뷰어(조회 전용, 권한과 무관)
+        const heroBtn = root.querySelector("[data-hero-viewer]");
+        if (heroBtn) heroBtn.onclick = () => openPhotoViewer(a);
       }
       const gotoAssets = root.querySelector('[data-mapp-goto="assets"]');
       if (gotoAssets) gotoAssets.onclick = () => { state.screen = "assets"; state.assetTab = "mine"; draw(); };
@@ -761,10 +875,13 @@
         if (b.dataset.mappTab === "menu") { state.screen = "menu"; draw(); }
       });
 
-      // 검색 — category.js와 동일한 hidden 토글 패턴(input 재렌더 없음, 한글 IME 조합 깨짐 방지)
+      // 검색 — category.js와 동일한 hidden 토글 패턴(input 재렌더 없음, 한글 IME 조합 깨짐 방지).
+      // 내 자산 탭은 대분류 섹션으로 묶여 있어서, 카드 hidden 토글에 더해 섹션 안에 보이는 카드가 하나도
+      // 없으면 그 섹션(헤더 포함)도 같이 숨김(전체보기 등 섹션 없는 화면에선 sections가 빈 배열이라 no-op)
       const searchInput = root.querySelector("[data-mapp-search]");
       if (searchInput) {
         const cards = [...root.querySelectorAll("[data-asset-card]")];
+        const sections = [...root.querySelectorAll("[data-cat-section]")];
         const emptyMsg = root.querySelector("[data-mapp-empty]");
         searchInput.addEventListener("input", () => {
           const q = searchInput.value.trim().toLowerCase();
@@ -773,6 +890,9 @@
             const match = !q || card.textContent.toLowerCase().includes(q);
             card.hidden = !match;
             if (match) anyVisible = true;
+          });
+          sections.forEach(sec => {
+            sec.hidden = ![...sec.querySelectorAll("[data-asset-card]")].some(c => !c.hidden);
           });
           if (emptyMsg) emptyMsg.hidden = anyVisible;
         });
@@ -789,12 +909,22 @@
           });
         });
       }
-      root.querySelectorAll("[data-ws-viewall]").forEach(b => b.onclick = () => {
+      // 근무지 카드의 소분류 행 클릭 → 그 근무지·그 소분류의 전체 자산 목록으로 이동
+      root.querySelectorAll("[data-ws-cat-open]").forEach(b => b.onclick = () => {
         state.screen = "worksite-detail";
-        state.wsDetail = b.dataset.wsViewall;
+        state.wsDetail = b.dataset.ws;
+        state.wsDetailSub = b.dataset.sub;
         draw();
       });
-      // 근무지 카드 접기/펼치기 — 기본 펼침, 자산 목록+전체보기 버튼이 접히는 범위
+      // 내 자산 대분류 섹션 접기/펼치기 — 근무지 카드와 동일한 패턴(기본 펼침)
+      root.querySelectorAll("[data-cat-collapse]").forEach(b => b.onclick = () => {
+        const body = b.closest(".mapp-cat-section").querySelector("[data-cat-collapsible]");
+        const expanded = b.getAttribute("aria-expanded") === "true";
+        b.setAttribute("aria-expanded", String(!expanded));
+        body.hidden = expanded;
+        b.classList.toggle("collapsed", expanded);
+      });
+      // 근무지 카드 접기/펼치기 — 기본 펼침, 분류 목록이 접히는 범위
       root.querySelectorAll("[data-ws-collapse]").forEach(b => b.onclick = () => {
         const body = b.closest(".mapp-ws-card").querySelector("[data-ws-collapsible]");
         const expanded = b.getAttribute("aria-expanded") === "true";
