@@ -352,6 +352,45 @@
   function openStatusChangeConfirm(a, title, body, apply, onDone, danger) {
     confirmModal(title, body, () => { apply(); toast("상태가 변경되었습니다."); onDone(); }, danger);
   }
+  // 폐기 처리 — 대시보드 detail.js의 openDisposeModal과 동일(되돌릴 수 없는 최종 상태라 자산 삭제와 같은
+  // DELETE 입력 확인 패턴). 문구·필드 구성 전부 대시보드와 통일(2026-09-28)
+  const WARN_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 9v4M12 16.5h.01M10.3 3.9 2.5 17.5a1.7 1.7 0 0 0 1.47 2.55h16.06a1.7 1.7 0 0 0 1.47-2.55L13.7 3.9a1.7 1.7 0 0 0-2.94 0z"/></svg>`;
+  function openDisposeConfirmModal(a, onDone) {
+    const cb = document.createElement("div");
+    cb.className = "modal-back";
+    cb.style.zIndex = 340;
+    cb.innerHTML = `
+      <div class="modal" style="width:380px">
+        <h3>폐기 처리하시겠습니까?</h3>
+        <div class="body">
+          <div class="danger-note">${WARN_ICON}<span>폐기 처리하면 되돌릴 수 없습니다. 기존 배정은 자동으로 종료되며, 이후 배정 추가·자산 수정이 제한됩니다.</span></div>
+          <div class="field" style="margin-top:14px;margin-bottom:0">
+            <input type="text" data-del-input placeholder="입력">
+          </div>
+          <p class="muted" style="margin-top:6px">박스에 DELETE를 입력하면 [확인] 버튼이 활성화됩니다.</p>
+        </div>
+        <div class="foot">
+          <button class="btn" data-cclose>취소</button>
+          <button class="btn danger" data-cok disabled>확인</button>
+        </div>
+      </div>`;
+    cb.addEventListener("click", e => { if (e.target === cb) cb.remove(); });
+    cb.querySelector("[data-cclose]").onclick = () => cb.remove();
+    const input = cb.querySelector("[data-del-input]");
+    const okBtn = cb.querySelector("[data-cok]");
+    const confirmed = () => input.value.trim().toUpperCase() === "DELETE";
+    input.addEventListener("input", () => { okBtn.disabled = !confirmed(); });
+    okBtn.onclick = () => {
+      if (!confirmed()) return;
+      a.status = "disposed";
+      a.assignments = [];
+      cb.remove();
+      toast("폐기 처리되었습니다.");
+      onDone();
+    };
+    document.body.appendChild(cb);
+    input.focus();
+  }
   // 대상(구성원/근무지) 선택 select — 배정 추가·재배정·보유 대상 추가가 공유. value는 "employee:이름"/
   // "worksite:이름" 형식(폼 하나에 라디오+피커를 따로 두는 대신 옵션그룹으로 단순화)
   function targetSelectHtml(empOptions, wsOptions, placeholder) {
@@ -535,7 +574,7 @@
     back.innerHTML = `
       <div class="modal" style="width:360px">
         <div class="body" style="padding-top:20px">
-          <p style="font-size:14px;font-weight:700;margin-bottom:14px">사진 관리</p>
+          <p style="font-size:14px;font-weight:700;margin-bottom:14px">자산 사진</p>
           <div class="areg-photo-row" data-photo-row></div>
         </div>
         <div class="foot">
@@ -887,18 +926,17 @@
           if (key === "assign-add") openAssignAddModal(a, afterMutate);
           else if (key === "reassign") openReassignModal(a, idx, afterMutate);
           else if (key === "return") openReturnConfirm(a, idx, afterMutate);
-          else if (key === "lost-report") openStatusChangeConfirm(a, "분실 신고하시겠습니까?", "", () => { a.status = "lost"; }, afterMutate);
-          else if (key === "lost-recover") openStatusChangeConfirm(a, "분실 회수하시겠습니까?", "", () => { a.status = derivedActiveStatus(a); }, afterMutate);
-          else if (key === "repair-start") openStatusChangeConfirm(a, "수리 접수하시겠습니까?", "", () => { a.status = "repair"; }, afterMutate);
-          else if (key === "repair-done") openStatusChangeConfirm(a, "수리 완료 처리하시겠습니까?", "", () => { a.status = derivedActiveStatus(a); }, afterMutate);
-          else if (key === "dispose") openStatusChangeConfirm(a, "폐기 처리하시겠습니까?", "폐기 처리는 되돌릴 수 없으며, 활성 배정은 자동으로 종료됩니다.", () => { a.status = "disposed"; a.assignments = []; }, afterMutate, true);
+          else if (key === "lost-report") openStatusChangeConfirm(a, "분실 신고하시겠습니까?", "분실 신고 시 기존 배정은 유지된 채 상태만 분실로 변경됩니다.", () => { a.status = "lost"; }, afterMutate);
+          else if (key === "lost-recover") openStatusChangeConfirm(a, "분실 회수 처리하시겠습니까?", "분실 회수 시 배정 여부에 따라 배정 중 또는 재고 상태로 돌아갑니다.", () => { a.status = derivedActiveStatus(a); }, afterMutate);
+          else if (key === "repair-start") openStatusChangeConfirm(a, "수리 접수하시겠습니까?", "수리 접수 시 기존 배정은 유지된 채 상태만 수리 중으로 변경됩니다.", () => { a.status = "repair"; }, afterMutate);
+          else if (key === "repair-done") openStatusChangeConfirm(a, "수리 완료 처리하시겠습니까?", "수리 완료 시 배정 여부에 따라 배정 중 또는 재고 상태로 돌아갑니다.", () => { a.status = derivedActiveStatus(a); }, afterMutate);
+          else if (key === "dispose") openDisposeConfirmModal(a, afterMutate);
           else if (key === "hold-add") openHoldAddModal(a, afterMutate);
           else if (key === "qty-change") openQtyChangeModal(a, idx, afterMutate);
           else if (key === "hold-release") openHoldReleaseConfirm(a, idx, afterMutate);
-          else if (key === "photos") openPhotoManageModal(a, afterMutate);
         }
-        // 상태 뱃지 → 상태 변경 바텀시트, 상단바 "더보기" → 배정/보유 관리 바텀시트(대시보드의 뱃지
-        // 드롭다운/···메뉴와 같은 진입점, 폰 프레임이라 바텀시트로 재해석)
+        // 상태 뱃지 → 상태 변경 드롭다운, 상단바 "더보기" → 배정/보유 관리 드롭다운(대시보드와 동일한
+        // 앵커 드롭다운 패턴, 2026-09-27)
         const statusOpen = root.querySelector("[data-status-open]");
         if (statusOpen) statusOpen.onclick = () => openDropdownMenu(statusOpen, statusActions(a), dispatchAction);
         const moreOpen = root.querySelector("[data-more-open]");

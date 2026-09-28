@@ -99,7 +99,7 @@
         <div class="body"><div class="perm-info-note">${INFO_ICON}<span>${note}</span></div></div>
         <div class="foot">
           <button class="btn" data-cclose>취소</button>
-          <button class="btn primary" data-cok>저장</button>
+          <button class="btn primary" data-cok>확인</button>
         </div>
       </div>`;
     cb.addEventListener("click", e => { if (e.target === cb) cb.remove(); });
@@ -150,11 +150,11 @@
           <div class="field" style="margin-top:14px;margin-bottom:0">
             <input type="text" data-del-input placeholder="입력">
           </div>
-          <p class="muted" style="margin-top:6px">박스에 DELETE를 입력하면 [저장] 버튼이 활성화됩니다.</p>
+          <p class="muted" style="margin-top:6px">박스에 DELETE를 입력하면 [확인] 버튼이 활성화됩니다.</p>
         </div>
         <div class="foot">
           <button class="btn" data-cclose>취소</button>
-          <button class="btn danger" data-cok disabled>저장</button>
+          <button class="btn danger" data-cok disabled>확인</button>
         </div>
       </div>`;
     cb.addEventListener("click", e => { if (e.target === cb) cb.remove(); });
