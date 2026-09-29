@@ -532,8 +532,9 @@
         return !!info && ((info.empNo || "").toLowerCase().includes(q) || (info.phone || "").includes(q));
       })
       // 보유 수량 내림차순(많은 대상이 위로) — 개별형이 배정일(눈에 보이는 값)로 정렬하는 것과
-      // 같은 원칙으로 이름 대신 수량으로 정렬(2026-09-24, 오름차순에서 방향 변경)
-      .sort((p, q2) => q2.x.qty - p.x.qty);
+      // 같은 원칙으로 이름 대신 수량으로 정렬(2026-09-24, 오름차순에서 방향 변경).
+      // 수량이 같으면 보유 대상 이름(가나다순)으로 동점 처리(2026-09-29)
+      .sort((p, q2) => q2.x.qty - p.x.qty || (p.x.employee || p.x.worksite).localeCompare(q2.x.employee || q2.x.worksite, "ko"));
     // 검색 중 결과 없음과 완전 미보유(레코드 자체가 0건)는 다른 상황이라 문구도 구분
     if (!rows.length) return q
       ? '<p class="muted" style="padding:6px 0">일치하는 보유 대상이 없습니다</p>'

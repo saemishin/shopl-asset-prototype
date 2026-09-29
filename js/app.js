@@ -223,13 +223,14 @@
   // 보유 대상 수 제한이 없어 무제한일 수 있음). 정보로만 보여주고 각 행에 재배정/반납 같은 액션은 없음 —
   // 이 화면은 "이 target의 레코드"에만 액션을 주는 원칙을 유지, 공동 대상은 조회 전용(2026-09-27).
   // 정렬은 대시보드 detail.js와 동일: 개별형은 배정일 내림차순(최근 배정이 위), 수량형은 보유 수량
-  // 내림차순(많은 대상이 위) — "눈에 보이는 값으로 정렬한다"는 동일 원칙
+  // 내림차순(많은 대상이 위) — "눈에 보이는 값으로 정렬한다"는 동일 원칙. 수량형은 여러 대상이 섞여
+  // 보유 수량이 같을 수 있어 동점 시 보유 대상 이름(가나다순)으로 재정렬(2026-09-29)
   function otherParties(a, target) {
     const list = a.type === "individual" ? (a.assignments || []) : (a.stocks || []);
     const others = list.filter(x => !(target.type === "employee" ? x.employee === target.value : x.worksite === target.value));
     return a.type === "individual"
       ? others.sort((p, q) => p.since === q.since ? 0 : (p.since < q.since ? 1 : -1))
-      : others.sort((p, q) => q.qty - p.qty);
+      : others.sort((p, q) => q.qty - p.qty || (p.employee || p.worksite).localeCompare(q.employee || q.worksite, "ko"));
   }
   function partyRowHtml(x, isIndiv) {
     const name = x.employee || x.worksite;
