@@ -1092,6 +1092,10 @@ button.dthumb:hover { filter: brightness(0.94); }
 .hcard-tag.new { background: #1b1d1f; color: #fff; }
 .hcard-val { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; color: var(--text); font-variant-numeric: tabular-nums; }
 .hcard-val .hi { margin-right: 0; }
+/* 앱(폰 폭)은 가로 공간이 부족해 기존/변경 뱃지+값이 한 줄에서 잘리기 쉬워 뱃지 밑에 값이 오는 구조로
+   전환(대시보드 이력 탭은 폭이 넉넉해 원래 한 줄 구조 그대로 유지 — .mapp-body로 앱만 스코프, 2026-09-29) */
+.mapp-body .hcard-diff { gap: 10px; }
+.mapp-body .hcard-row { flex-direction: column; align-items: flex-start; gap: 4px; }
 .hval-avatar {
   display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
   width: 16px; height: 16px; border-radius: 50%;

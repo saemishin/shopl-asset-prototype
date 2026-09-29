@@ -503,7 +503,7 @@
     return `
       <div class="mapp-topbar">
         <button type="button" class="mapp-back" data-mapp-back aria-label="뒤로">←</button>
-        <span class="mapp-topbar-title">이력</span>
+        <span class="mapp-topbar-title">자산 이력</span>
       </div>
       <div class="mapp-body">
         ${a.type === "quantity" ? `<div class="mapp-search"><input type="text" data-history-q placeholder="구성원·근무지 이름으로 검색"></div>` : ""}
