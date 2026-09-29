@@ -10,10 +10,15 @@
    참고해 리스트 화면 공통 요소를 재현. */
 (function () {
   const { assets } = window.DATA;
+  // 뷰포트 기준(bottom:32px)으로 고정돼 있으면 폰 목업이 뷰포트 하단에 딱 붙어있지 않은 이상 토스트가
+  // 폰 밖으로 떨어져 보임 — .mapp-screen의 실제 좌표를 재서 그 영역 기준 하단/가운데에 뜨도록 함(2026-09-30)
   function toast(msg) {
     const t = document.createElement("div");
     t.textContent = msg;
-    t.style.cssText = "position:fixed;left:50%;bottom:32px;transform:translateX(-50%);background:#1b1d1f;color:#fff;padding:10px 16px;border-radius:8px;font-size:12.5px;z-index:300";
+    const screen = document.querySelector(".mapp-screen");
+    const r = screen ? screen.getBoundingClientRect() : null;
+    const pos = r ? `left:${r.left + r.width / 2}px;bottom:${window.innerHeight - r.bottom + 32}px;` : "left:50%;bottom:32px;";
+    t.style.cssText = `position:fixed;${pos}transform:translateX(-50%);background:#1b1d1f;color:#fff;padding:10px 16px;border-radius:8px;font-size:12.5px;z-index:300;max-width:280px;text-align:center`;
     document.body.appendChild(t); setTimeout(() => t.remove(), 1800);
   }
   const STATUS_LABEL = {
@@ -905,24 +910,31 @@
   // 그대로 재사용(같은 CSS 클래스 .areg-photo-*는 전역 css/app.css에 이미 정의돼 있어 추가 CSS 불필요)
   const PHOTO_COLORS = ["#5b8def", "#8f6ef0", "#eb7f8b", "#3fb37f", "#e0a63c", "#4dabf7", "#c2554e", "#3f9ba0", "#9a6bd6", "#5aa06a"];
   const CLOSE_ICON_SM = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg>`;
+  // 사진 삭제 버튼은 asset-register.js와 같은 CSS를 쓰지만(hover 시 노출) 앱은 터치라 호버가 없어
+  // .mapp-photo-modal 스코프로 항상 노출되게 오버라이드(2026-09-30). 추가는 색상만 바뀌는 더미라 실제
+  // 카메라/갤러리 연동은 없지만, 어느 메뉴를 눌러도 사진 한 장이 추가되는 것으로 시뮬레이션(요청대로).
+  // 저장 버튼은 실제로 뭔가 바뀌었을 때만(대표 변경·추가·삭제) 활성화되게 dirty 플래그로 추적
   function openPhotoManageModal(a, onDone) {
     const photos = window.assetPhotos(a).map(p => ({ ...p }));
     let primaryIdx = a._primary || 0;
+    let dirty = false;
     const back = document.createElement("div");
     back.className = "modal-back";
     back.innerHTML = `
-      <div class="modal" style="width:360px">
+      <div class="modal mapp-photo-modal" style="width:360px">
         <div class="body" style="padding-top:20px">
           <p style="font-size:14px;font-weight:700;margin-bottom:14px">자산 사진</p>
           <div class="areg-photo-row" data-photo-row></div>
         </div>
         <div class="foot">
           <button class="btn" data-cclose>취소</button>
-          <button class="btn primary" data-cok>저장</button>
+          <button class="btn primary" data-cok disabled>저장</button>
         </div>
       </div>`;
     document.body.appendChild(back);
     const row = back.querySelector("[data-photo-row]");
+    const saveBtn = back.querySelector("[data-cok]");
+    const markDirty = () => { dirty = true; saveBtn.disabled = false; };
     function renderPhotos() {
       const tiles = photos.map((p, i) => `
         <button type="button" class="areg-photo-tile${i === primaryIdx ? " primary" : ""}" data-photo-i="${i}" style="background:${p.color}" aria-label="사진 ${i + 1}${i === primaryIdx ? " (대표)" : ""}">
@@ -933,26 +945,36 @@
       row.innerHTML = tiles + addTile;
       row.querySelectorAll("[data-photo-i]").forEach(b => b.onclick = e => {
         if (e.target.closest("[data-photo-del]")) return;
-        primaryIdx = +b.dataset.photoI; renderPhotos();
+        const i = +b.dataset.photoI;
+        if (i === primaryIdx) return;
+        primaryIdx = i; markDirty(); renderPhotos();
       });
       row.querySelectorAll("[data-photo-del]").forEach(b => b.onclick = e => {
         e.stopPropagation();
         const i = +b.dataset.photoDel;
         photos.splice(i, 1);
         if (!photos.length) primaryIdx = 0; else if (primaryIdx >= photos.length) primaryIdx = photos.length - 1;
+        markDirty();
         renderPhotos();
       });
       const addBtn = row.querySelector("[data-photo-add]");
       if (addBtn) addBtn.onclick = () => {
-        photos.push({ color: PHOTO_COLORS[photos.length % PHOTO_COLORS.length], at: `${todayStr()} 00:00`, by: ME });
-        if (photos.length === 1) primaryIdx = 0;
-        renderPhotos();
+        openDropdownMenu(addBtn, [
+          { key: "camera", label: "카메라로 촬영하기" },
+          { key: "gallery", label: "갤러리에서 불러오기" },
+        ], () => {
+          photos.push({ color: PHOTO_COLORS[photos.length % PHOTO_COLORS.length], at: `${todayStr()} 00:00`, by: ME });
+          if (photos.length === 1) primaryIdx = 0;
+          markDirty();
+          renderPhotos();
+        });
       };
     }
     renderPhotos();
     back.addEventListener("click", e => { if (e.target === back) back.remove(); });
     back.querySelector("[data-cclose]").onclick = () => back.remove();
-    back.querySelector("[data-cok]").onclick = () => {
+    saveBtn.onclick = () => {
+      if (saveBtn.disabled) return;
       back.remove();
       a._photos = photos;
       a._primary = primaryIdx;
@@ -995,36 +1017,39 @@
   // 자산 사진 뷰어 — 조회 전용(편집은 "사진 관리" 액션에서), 조회 권한만 있어도 볼 수 있어야 해서 배정/보유
   // 변경 권한과 무관하게 항상 열 수 있음. 대시보드 detail.js의 openViewer를 단순화(줌·정보패널·수정메뉴 없이
   // 넘기기+닫기만) — 폰 프레임에 맞는 전체화면 뷰어
+  const IC_DOWNLOAD = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 21h16"/></svg>`;
+  // 사진 뷰어 — 폰 화면 영역에 뜨는 전체 화면(2026-09-30, 뷰포트 전체를 덮어 폰 목업이 사라져 보이던 문제
+  // 수정, 다른 전체 화면 오버레이와 동일하게 mappOverlay 사용). 상단바는 왼쪽 뒤로가기(종료)·가운데 "N/M"
+  // 카운트·오른쪽 다운로드(프로토타입이라 실제 파일은 없음, 대시보드 사진 다운로드와 동일하게 토스트로 안내)
   function openPhotoViewer(a) {
     const items = window.assetPhotos(a);
     if (!items.length) return;
     let cur = a._primary || 0;
-    const back = document.createElement("div");
-    back.className = "mapp-viewer-back";
+    const back = mappOverlay("mapp-viewer-back", 250);
     back.innerHTML = `
       <div class="mapp-viewer-bar">
+        <button type="button" class="mapp-viewer-back-btn" data-vclose aria-label="닫기">←</button>
         <span class="mapp-viewer-count"></span>
-        <button type="button" class="mapp-viewer-close" data-vclose aria-label="닫기">✕</button>
+        <button type="button" class="mapp-viewer-dl" data-vdownload aria-label="다운로드">${IC_DOWNLOAD}</button>
       </div>
       <div class="mapp-viewer-stage">
         <button type="button" class="mapp-viewer-nav" data-vprev aria-label="이전">‹</button>
         <div class="mapp-viewer-img"></div>
         <button type="button" class="mapp-viewer-nav" data-vnext aria-label="다음">›</button>
       </div>`;
-    document.body.appendChild(back);
     const img = back.querySelector(".mapp-viewer-img");
     const countEl = back.querySelector(".mapp-viewer-count");
     const prevBtn = back.querySelector("[data-vprev]");
     const nextBtn = back.querySelector("[data-vnext]");
     function draw() {
       img.style.background = items[cur].color;
-      countEl.textContent = `${cur + 1} / ${items.length}`;
+      countEl.textContent = `${cur + 1}/${items.length}`;
       prevBtn.hidden = nextBtn.hidden = items.length < 2;
     }
     prevBtn.onclick = () => { cur = (cur - 1 + items.length) % items.length; draw(); };
     nextBtn.onclick = () => { cur = (cur + 1) % items.length; draw(); };
     back.querySelector("[data-vclose]").onclick = () => back.remove();
-    back.addEventListener("click", e => { if (e.target === back) back.remove(); });
+    back.querySelector("[data-vdownload]").onclick = () => toast("다운로드 — 원본 파일명 그대로 (프로토타입)");
     draw();
   }
   // 상태 변경 액션(상태 뱃지 클릭 → 바텀시트) — 개별형 전용(수량형은 재고/보유중만 있고 배정·보유
@@ -1135,6 +1160,7 @@
     const heroHtml = `
       <div class="mapp-hero-wrap">
         <button type="button" class="mapp-hero-img" data-hero-viewer aria-label="사진 보기"${photos.length ? "" : " disabled"}>${cardThumb(a)}</button>
+        ${photos.length > 1 ? `<span class="mapp-hero-count">+${photos.length - 1}</span>` : ""}
         ${canManage(a) ? `<button type="button" class="mapp-hero-edit" data-hero-edit aria-label="사진 관리" title="사진 관리">${IC_EDIT}</button>` : ""}
       </div>`;
     // 공동 배정/보유 대상 — target 본인을 뺀 나머지를 정보로만 노출(액션 없음). 최대 5개까지 보여주고
