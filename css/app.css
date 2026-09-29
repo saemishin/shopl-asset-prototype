@@ -1362,6 +1362,9 @@ button.dthumb:hover { filter: brightness(0.94); }
   cursor: pointer;
 }
 .mapp-card[hidden] { display: none; }
+/* 목록 카드 썸네일만 따로 눌러 뷰어로 직행(2026-09-30, 앱 공통 동작) — 버튼이라 카드 자체의 클릭 영역
+   안에 얹히므로 크기는 안쪽 .mapp-thumb 그대로, 버튼 자체는 여백 없이 감싸기만 함 */
+.mapp-card-thumb-btn { display: block; flex-shrink: 0; padding: 0; }
 .mapp-thumb { display: block; width: 44px; height: 44px; border-radius: 10px; flex-shrink: 0; }
 .mapp-thumb.empty { display: flex; align-items: center; justify-content: center; background: #f2f3f5; color: var(--text-mut); }
 .mapp-thumb.empty svg { width: 20px; height: 20px; }

@@ -192,6 +192,13 @@
     if (photos.length) return `<span class="mapp-thumb" style="background:${photos[a._primary || 0].color}"></span>`;
     return `<span class="mapp-thumb empty">${THUMB_EMPTY}</span>`;
   }
+  // 목록 카드의 썸네일 영역 — 앱 공통 동작(2026-09-30): 카드 어디를 눌러도 상세로 가던 것에서, 썸네일만
+  // 따로 눌렀을 때는 상세를 거치지 않고 바로 사진 뷰어로 직행(자산 상세 화면의 대표 이미지와 동일한 동작을
+  // 목록 단계에서도). 카드 클릭 핸들러가 부모에 별도로 있어 여기선 stopPropagation으로 버블링만 막고,
+  // 사진이 없는 자산은 뷰어를 열 게 없으니 막지 않고 그대로 버블링시켜 카드 클릭(상세 진입)으로 처리
+  function cardThumbBtn(a) {
+    return `<button type="button" class="mapp-card-thumb-btn" data-card-thumb data-asset-id="${a.id}" aria-label="사진 보기">${cardThumb(a)}</button>`;
+  }
   // 카드 구성 확정: 대표 이미지 / 품목명 / 고유관리번호(개별형) / 상태 뱃지(개별형) 또는 보유 수량(수량형) —
   // 분류 등 나머지 정보는 자산 상세에서 확인하는 것으로 스코프 아웃.
   function assetCardHtml(x) {
@@ -199,7 +206,7 @@
     if (a.type === "individual") {
       return `
         <div class="mapp-card" data-asset-card data-asset-id="${a.id}">
-          ${cardThumb(a)}
+          ${cardThumbBtn(a)}
           <div class="mapp-card-body">
             <div class="mapp-card-title">${a.product}</div>
             <div class="mapp-card-sub">${a.assetNo || "—"}</div>
@@ -209,7 +216,7 @@
     }
     return `
       <div class="mapp-card" data-asset-card data-asset-id="${a.id}">
-        ${cardThumb(a)}
+        ${cardThumbBtn(a)}
         <div class="mapp-card-body">
           <div class="mapp-card-title">${a.product}</div>
         </div>
@@ -1049,7 +1056,7 @@
     prevBtn.onclick = () => { cur = (cur - 1 + items.length) % items.length; draw(); };
     nextBtn.onclick = () => { cur = (cur + 1) % items.length; draw(); };
     back.querySelector("[data-vclose]").onclick = () => back.remove();
-    back.querySelector("[data-vdownload]").onclick = () => toast("다운로드 — 원본 파일명 그대로 (프로토타입)");
+    back.querySelector("[data-vdownload]").onclick = () => toast("사진을 저장하였습니다.");
     draw();
   }
   // 상태 변경 액션(상태 뱃지 클릭 → 바텀시트) — 개별형 전용(수량형은 재고/보유중만 있고 배정·보유
@@ -1299,7 +1306,16 @@
         root.querySelectorAll("[data-asset-card]").forEach(el => el.onclick = () => openDetail(el.dataset.assetId, { type: "employee", value: ME }));
       } else if (state.screen === "worksite-detail") {
         root.querySelectorAll("[data-asset-card]").forEach(el => el.onclick = () => openDetail(el.dataset.assetId, { type: "worksite", value: state.wsDetail }));
-      } else if (state.screen === "asset-detail") {
+      }
+      // 목록 카드 썸네일 → 뷰어 직행(공통 동작, 화면 무관하게 항상 와이어링). 사진이 없으면 stopPropagation을
+      // 안 해서 카드 자체의 클릭(상세 진입)으로 자연히 넘어감
+      root.querySelectorAll("[data-card-thumb]").forEach(el => el.onclick = e => {
+        const asset = assets.find(x => x.id === el.dataset.assetId);
+        if (!asset || !window.assetPhotos(asset).length) return;
+        e.stopPropagation();
+        openPhotoViewer(asset);
+      });
+      if (state.screen === "asset-detail") {
         const a = assets.find(x => x.id === state.detailAssetId);
         const target = state.detailTarget;
         // 상태 변경 — 상태만 바꾸고 이력에 "상태 변경: …" 1건 기록(detail.js applyStatusChange와 동일)
