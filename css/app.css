@@ -1007,6 +1007,7 @@ button.dthumb:hover { filter: brightness(0.94); }
 /* 네이티브 date input은 inset만으로는 브라우저 자체 최소 크기(가로가 세로보다 작게 잡힘)가 우선돼서 클릭 판정
    영역이 아이콘보다 좁고 한쪽으로 치우쳐 있었음(실측 22×34, 기대 28×28) — width/height를 명시로 강제 */
 .dfield-pick input[type="date"] { position: absolute; inset: -8px; width: 32px; height: 32px; opacity: 0; cursor: pointer; pointer-events: auto; }
+.qty-pop-remain { margin-top: 6px; font-size: 11.5px; color: var(--text-mut); }
 .qty-pop-acts { display: flex; justify-content: flex-end; gap: 6px; margin-top: 8px; }
 .btn:disabled { opacity: .45; pointer-events: none; }
 
@@ -1281,11 +1282,13 @@ button.dthumb:hover { filter: brightness(0.94); }
 /* 배정 추가·재배정·보유 대상 추가 — 바텀시트(대시보드 모달과 동일 필드 구성, 컨테이너만 하단 시트로).
    대상 선택 피커(.modal-back)가 이 위에 겹쳐 뜨는 걸 감안해 z-index를 modal-back(기본 100)보다 낮게 둠.
    위치·크기는 JS(mappOverlay)가 매번 .mapp-screen의 실제 좌표를 재서 인라인으로 지정 — 뷰포트 전체를
-   덮으면 폰 목업 바깥으로 시트가 삐져나와 보이는 문제가 있어(2026-09-29 수정) 폰 화면 영역 안에서만 뜸 */
-.mapp-sheet-back { background: rgba(17, 19, 21, .42); display: flex; align-items: flex-end; justify-content: center; padding: 0 16px; overflow: hidden; border-radius: 0 0 37px 37px; }
+   덮으면 폰 목업 바깥으로 시트가 삐져나와 보이는 문제가 있어(2026-09-29 수정) 폰 화면 영역 안에서만 뜸.
+   컨테이너 폭이 이미 폰 화면 폭과 정확히 같아졌으므로 좌우 padding은 제거해 시트가 폰 폭에 꽉 차게 함
+   (2026-09-29 추가 수정 — 캘린더·메모 수정 시트 양옆에 불필요한 여백이 남아있던 문제) */
+.mapp-sheet-back { background: rgba(17, 19, 21, .42); display: flex; align-items: flex-end; justify-content: center; overflow: hidden; border-radius: 0 0 37px 37px; }
 .mapp-sheet {
-  width: 100%; max-width: 390px; max-height: 80%; display: flex; flex-direction: column;
-  background: #fff; border-radius: 18px 18px 0 0; margin-bottom: 16px; overflow: hidden;
+  width: 100%; max-height: 80%; display: flex; flex-direction: column;
+  background: #fff; border-radius: 18px 18px 0 0; overflow: hidden;
   box-shadow: 0 -10px 40px rgba(0, 0, 0, .18);
 }
 .mapp-sheet-head { flex-shrink: 0; padding: 18px 20px 4px; font-size: 15px; font-weight: 700; }

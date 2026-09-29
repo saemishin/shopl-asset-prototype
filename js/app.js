@@ -826,7 +826,7 @@
     };
   }
   function openReturnConfirm(a, idx, onDone) {
-    confirmModal("반납하시겠습니까?", "반납하면 배정에서 제거됩니다.", () => {
+    confirmModal("반납 처리하시겠습니까?", "반납하면 배정에서 제거됩니다.", () => {
       const old = a.assignments[idx];
       a.assignments.splice(idx, 1);
       a.status = derivedActiveStatus(a);
@@ -835,6 +835,7 @@
       onDone();
     });
   }
+  // 수량 변경 — 보유 대상 추가 페이지와 동일한 스테퍼 UI로 통일(2026-09-30, 직접입력 number 필드에서 전환)
   function openQtyChangeModal(a, idx, onDone) {
     const rec = a.stocks[idx];
     const cur = rec.qty;
@@ -846,21 +847,38 @@
       <div class="modal" style="width:340px">
         <div class="body" style="padding-top:20px">
           <p style="font-size:14px;font-weight:700;margin-bottom:14px">수량 변경</p>
-          <input type="number" data-qty-input min="0" max="${max}" value="${rec.qty}" style="width:100%;height:40px;border:1px solid var(--line-strong);border-radius:8px;padding:0 10px">
-          <p class="hint" style="margin-top:6px">잔여 수량 포함 최대 ${max}개까지 입력 가능</p>
+          <div class="qty-stepper">
+            <button type="button" class="qty-step" data-qminus aria-label="수량 감소">－</button>
+            <input type="text" inputmode="numeric" data-qinput placeholder="입력" value="${cur}">
+            <button type="button" class="qty-step" data-qplus aria-label="수량 증가">＋</button>
+          </div>
+          <p class="hint" style="margin-top:6px">잔여 수량: ${max}개</p>
         </div>
         <div class="foot">
           <button class="btn" data-cclose>취소</button>
-          <button class="btn primary" data-cok>변경</button>
+          <button class="btn primary" data-cok>저장</button>
         </div>
       </div>`;
     document.body.appendChild(back);
-    const qtyInput = back.querySelector("[data-qty-input]");
+    const input = back.querySelector("[data-qinput]");
+    const minus = back.querySelector("[data-qminus]");
+    const plus = back.querySelector("[data-qplus]");
+    const saveBtn = back.querySelector("[data-cok]");
+    const val = () => { const n = parseInt(input.value, 10); return Number.isFinite(n) ? n : null; };
+    const sync = () => {
+      const v = val();
+      minus.disabled = v === null || v <= 0;
+      plus.disabled = v === null || v >= max;
+      saveBtn.disabled = v === null || v < 0 || v > max;
+    };
+    input.addEventListener("input", () => { input.value = input.value.replace(/[^0-9]/g, ""); sync(); });
+    minus.onclick = () => { const v = val(); if (v !== null && v > 0) { input.value = v - 1; sync(); } };
+    plus.onclick = () => { const v = val() ?? 0; if (v < max) { input.value = v + 1; sync(); } };
     back.addEventListener("click", e => { if (e.target === back) back.remove(); });
     back.querySelector("[data-cclose]").onclick = () => back.remove();
-    back.querySelector("[data-cok]").onclick = () => {
-      const qty = Number(qtyInput.value);
-      if (!(qty >= 0 && qty <= max)) return;
+    saveBtn.onclick = () => {
+      const qty = val();
+      if (!(qty !== null && qty >= 0 && qty <= max)) return;
       back.remove();
       confirmModal("수량을 변경하시겠습니까?", "", () => {
         rec.qty = qty;
@@ -870,6 +888,7 @@
         onDone();
       });
     };
+    sync();
   }
   function openHoldReleaseConfirm(a, idx, onDone) {
     confirmModal("보유 대상에서 해제하시겠습니까?", "해제된 수량은 잔여 수량으로 돌아갑니다.", () => {
@@ -878,7 +897,7 @@
       a.stocks.splice(idx, 1);
       a.status = derivedHeldStatus(a);
       logActivity(a, { script: "보유 관리: 보유 대상 해제", target: x, before: `${qty}개`, after: "" });
-      toast("해제되었습니다.");
+      toast("보유 대상에서 해제되었습니다.");
       onDone();
     });
   }
@@ -945,25 +964,28 @@
   // 넉넉한 시트가 유리 — 배정 추가/재배정 시트(.mapp-sheet, max-height:80vh)와 같은 컨테이너를 쓰되,
   // 입력란만 있는 화면이라 텍스트영역에 넉넉한 최소 높이를 직접 줘서 그 시트들과 비슷한 체감 높이로 맞춤
   function openMemoEditModal(a, onDone) {
+    const before = a.note || "";
     const back = mappOverlay("mapp-sheet-back", 90);
     back.innerHTML = `
       <div class="mapp-sheet">
         <div class="mapp-sheet-head">메모 수정</div>
         <div class="mapp-sheet-body" style="display:flex">
-          <textarea data-memo-input maxlength="500" placeholder="메모를 입력하세요" style="width:100%;flex:1;min-height:280px;border:1px solid var(--line-strong);border-radius:8px;padding:10px;font:inherit;resize:none">${a.note || ""}</textarea>
+          <textarea data-memo-input maxlength="500" placeholder="입력" style="width:100%;flex:1;min-height:280px;border:1px solid var(--line-strong);border-radius:8px;padding:10px;font:inherit;resize:none">${before}</textarea>
         </div>
         <div class="mapp-sheet-foot">
           <button type="button" class="btn" data-cclose>취소</button>
-          <button type="button" class="btn primary" data-cok>저장</button>
+          <button type="button" class="btn primary" data-cok disabled>저장</button>
         </div>
       </div>`;
+    const input = back.querySelector("[data-memo-input]");
+    const saveBtn = back.querySelector("[data-cok]");
+    input.addEventListener("input", () => { saveBtn.disabled = input.value.trim() === before; });
     back.addEventListener("click", e => { if (e.target === back) back.remove(); });
     back.querySelector("[data-cclose]").onclick = () => back.remove();
-    back.querySelector("[data-cok]").onclick = () => {
-      const before = a.note || "";
-      const after = back.querySelector("[data-memo-input]").value.trim();
+    saveBtn.onclick = () => {
+      if (saveBtn.disabled) return;
+      const after = input.value.trim();
       back.remove();
-      if (after === before) return;
       a.note = after;
       logActivity(a, { script: "자산 정보 수정: 메모 수정", before: before || "없음", after: after || "없음" });
       toast("저장되었습니다.");

@@ -577,6 +577,7 @@
         <input type="text" inputmode="numeric" data-qinput placeholder="입력" value="${cur}">
         <button type="button" class="qty-step" data-qplus aria-label="수량 증가">＋</button>
       </div>
+      <div class="qty-pop-remain">잔여 수량: ${max}개</div>
       <div class="qty-pop-acts">
         <button class="btn sm" data-qcancel>취소</button>
         <button class="btn sm primary" data-qsave>저장</button>
@@ -628,7 +629,7 @@
       const row = b.closest(".acard");
       const idx = +row.dataset.idx;
       const x = a.stocks[idx];
-      confirmModal(`보유 대상에서 해제하시겠습니까?<br><span class="muted" style="font-size:12px">해제 시 이 자산의 보유 현황 목록에 나타나지 않습니다.</span>`, () => {
+      confirmModal(`보유 대상에서 해제하시겠습니까?<br><span class="muted" style="font-size:12px">해제된 수량은 잔여 수량으로 돌아갑니다.</span>`, () => {
         const qty = x.qty;
         a.stocks.splice(idx, 1);
         deriveQtyStatus(a);
