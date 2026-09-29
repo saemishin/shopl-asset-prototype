@@ -3,8 +3,9 @@
    자산 상세는 배정/보유 변경 권한(assign_permission_type, category.js에 저장된 소분류별 값으로 실제 판정)이
    있는 자산에 한해 재배정·배정 추가·반납·분실 신고/회수·수리 접수/완료·폐기·보유 대상 추가/변경/해제·사진
    관리 액션을 제공(자산 관리 권한 소관인 필드 수정·소분류 이동 등은 스코프 밖). 배정 추가·재배정·보유 대상
-   추가는 대시보드 모달과 동일한 구성의 바텀시트(openFormSheet, 2026-09-28 — 페이지로 했다가 필드가 적어
-   어색해서 되돌림), 상단바 "더보기" 맨 위엔 그 자산의 이력 페이지(asset-history, 조회 전용이라 권한 무관)로
+   추가는 대시보드 모달과 동일한 구성의 전체 화면 페이지(openFormPage, 2026-09-29 — 바텀시트였다가, 대상
+   선택 피커·날짜 선택이 각각 풀페이지·캘린더 시트로 커지면서 폼 자체도 페이지인 쪽이 자연스러워져 다시 전환),
+   상단바 "더보기" 맨 위엔 그 자산의 이력 페이지(asset-history, 조회 전용이라 권한 무관)로
    가는 항목이 항상 있음. 실 앱 화면(근무지 목록/보고서/게시판/근무지 상세 정보탭의 "더보기" 카드 패턴)을
    참고해 리스트 화면 공통 요소를 재현. */
 (function () {
@@ -511,61 +512,26 @@
       </div>`;
   }
 
-  // ===== 날짜 입력·대상 선택 피커 — detail.js와 동일 컴포넌트(이 파일도 자기 완결적이라 중복 유지) =====
-  // YYYY.MM.DD 텍스트 마스킹(8자리 숫자만) + 달력 아이콘(네이티브 피커, 미래 날짜 선택 제한). 범위를 벗어나면
-  // (자릿수·연도·월·일·미래 날짜) 에러 문구 없이 저장 버튼만 비활성.
-  const IC_CAL = `<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>`;
-  function dateFieldHtml(initialIso) {
-    const disp = initialIso ? initialIso.replace(/-/g, ".") : "";
-    return `
-      <div class="dfield">
-        <input type="text" inputmode="numeric" data-dtext placeholder="YYYY.MM.DD" maxlength="10" value="${disp}">
-        <span class="dfield-pick">${IC_CAL}<input type="date" data-dnative tabindex="-1"></span>
-      </div>`;
-  }
-  function wireDateField(scope, maxIso, onChange) {
-    const text = scope.querySelector("[data-dtext]");
-    const native = scope.querySelector("[data-dnative]");
-    native.max = maxIso;
-    const digitsOf = v => v.replace(/\D/g, "").slice(0, 8);
-    const format = d => d.length > 6 ? `${d.slice(0, 4)}.${d.slice(4, 6)}.${d.slice(6)}`
-                       : d.length > 4 ? `${d.slice(0, 4)}.${d.slice(4)}` : d;
-    const getValue = () => {
-      const d = digitsOf(text.value);
-      if (d.length !== 8) return null;
-      const y = d.slice(0, 4), m = d.slice(4, 6), dd = d.slice(6, 8);
-      const curYear = TODAY.getFullYear();
-      if (+y < curYear - 100 || +y > curYear) return null;
-      if (+m < 1 || +m > 12) return null;
-      if (+dd < 1 || +dd > 31) return null;
-      const iso = `${y}-${m}-${dd}`;
-      return iso > maxIso ? null : iso;
-    };
-    text.addEventListener("input", () => { text.value = format(digitsOf(text.value)); onChange(); });
-    native.addEventListener("change", () => {
-      if (native.value) text.value = native.value.replace(/-/g, ".");
-      onChange();
-    });
-    return getValue;
-  }
-  // 구성원 선택 — 단일 선택(라디오), 검색(이름/사번/휴대폰번호)+목록. 2차 팝업(.modal.sm)
-  function openAssignMemberPicker(initial, onApply, exclude) {
-    let picked = initial;
+  // ===== 대상 선택 피커(구성원/근무지) — 전체 화면 페이지(2026-09-29, 라디오+검색+적용 방식의 2차 팝업에서
+  // 전환). 단일 선택이라 행을 누르면 그 값으로 바로 선택 완료 + 페이지 닫힘(적용 버튼 없음). 상단엔 타이틀 +
+  // 닫기(X)만(뒤로가기 아님 — 대상 선택을 취소하는 것이지 폼의 이전 단계로 돌아가는 게 아니라서). 근무지는
+  // 이 화면(ME)의 고정 근무지(myWorksites(ME).fixed)를 "●내 고정 근무지" 섹션으로 최상단 고정, 나머지는
+  // 이름 가나다순 =====
+  function openMemberPickerPage(initial, onApply, exclude) {
     let query = "";
     const excludeNames = [].concat(exclude || []).filter(Boolean);
     const p = document.createElement("div");
-    p.className = "modal-back";
-    p.style.zIndex = 340;
+    p.className = "mapp-fullpage-back";
+    p.style.zIndex = 105;
     p.innerHTML = `
-      <div class="modal sm">
-        <h3>구성원 선택</h3>
-        <div class="body" style="display:flex;flex-direction:column;max-height:56vh">
-          <input type="text" class="picker-search" placeholder="이름/사번/휴대폰번호">
-          <div data-list style="flex:1;min-height:0;overflow-y:auto;margin-top:8px"></div>
+      <div class="mapp-fullpage">
+        <div class="mapp-fullpage-head">
+          <span class="mapp-fullpage-head-title">구성원</span>
+          <button type="button" class="mapp-fullpage-head-close" data-picker-close aria-label="닫기">${CLOSE_ICON}</button>
         </div>
-        <div class="foot">
-          <button class="btn" data-close>취소</button>
-          <button class="btn primary" data-ok>적용</button>
+        <div class="mapp-fullpage-body">
+          <input type="text" class="picker-search" placeholder="이름/사번/휴대폰번호">
+          <div data-list></div>
         </div>
       </div>`;
     document.body.appendChild(p);
@@ -574,91 +540,158 @@
       const q = query.trim().toLowerCase();
       const filtered = MEMBERS.filter(m => !excludeNames.includes(m.name) && (!q || m.name.includes(q) || m.empNo.includes(q) || m.phone.includes(q)));
       list.innerHTML = filtered.length ? filtered.map(m => `
-        <label class="picker-member-row">
-          <input type="radio" name="aa-member" value="${m.name}"${picked === m.name ? " checked" : ""}>
+        <button type="button" class="picker-member-row" data-pick="${m.name}">
           <span class="picker-avatar" style="background:${avatarColor(m.name)}">${m.name[0]}</span>
           <span class="picker-member-info"><b>${m.name}</b><span>${m.team}</span></span>
-        </label>`).join("") : `<p class="muted" style="padding:16px 0">결과가 없습니다.</p>`;
-      list.querySelectorAll('input[name="aa-member"]').forEach(r => r.onchange = () => { picked = r.value; });
+        </button>`).join("") : `<p class="muted" style="padding:16px 4px">결과가 없습니다.</p>`;
+      list.querySelectorAll("[data-pick]").forEach(b => b.onclick = () => { p.remove(); onApply(b.dataset.pick); });
     }
     p.querySelector(".picker-search").addEventListener("input", e => { query = e.target.value; renderList(); });
     renderList();
     p.addEventListener("click", e => { if (e.target === p) p.remove(); });
-    p.querySelector("[data-close]").onclick = () => p.remove();
-    p.querySelector("[data-ok]").onclick = () => { p.remove(); onApply(picked); };
+    p.querySelector("[data-picker-close]").onclick = () => p.remove();
   }
-  // 근무지 선택 — 검색(근무지명/코드)+목록
-  function openAssignWorksitePicker(initial, onApply, exclude) {
-    let picked = initial;
+  function openWorksitePickerPage(initial, onApply, exclude) {
     let query = "";
     const excludeNames = [].concat(exclude || []).filter(Boolean);
     const p = document.createElement("div");
-    p.className = "modal-back";
-    p.style.zIndex = 340;
+    p.className = "mapp-fullpage-back";
+    p.style.zIndex = 105;
     p.innerHTML = `
-      <div class="modal sm">
-        <h3>근무지 선택</h3>
-        <div class="body" style="display:flex;flex-direction:column;max-height:56vh">
-          <input type="text" class="picker-search" placeholder="근무지명/코드">
-          <div data-list style="flex:1;min-height:0;overflow-y:auto;margin-top:8px"></div>
+      <div class="mapp-fullpage">
+        <div class="mapp-fullpage-head">
+          <span class="mapp-fullpage-head-title">근무지</span>
+          <button type="button" class="mapp-fullpage-head-close" data-picker-close aria-label="닫기">${CLOSE_ICON}</button>
         </div>
-        <div class="foot">
-          <button class="btn" data-close>취소</button>
-          <button class="btn primary" data-ok>적용</button>
+        <div class="mapp-fullpage-body">
+          <input type="text" class="picker-search" placeholder="근무지명/코드/주소">
+          <div data-list></div>
         </div>
       </div>`;
     document.body.appendChild(p);
     const list = p.querySelector("[data-list]");
+    const fixedName = myWorksites(ME).fixed;
+    function rowHtml(name) {
+      const code = WS_CODE[name] ? `(${WS_CODE[name]})` : "";
+      return `
+        <button type="button" class="mapp-picker-ws-row" data-pick="${name}">
+          <div class="mapp-picker-ws-name">${name}${code}</div>
+          <div class="mapp-picker-ws-address">${WS_ADDRESS[name] || ""}</div>
+        </button>`;
+    }
     function renderList() {
       const q = query.trim().toLowerCase();
-      const filtered = Object.keys(WS_CODE).filter(name => !excludeNames.includes(name) && (!q || name.toLowerCase().includes(q) || WS_CODE[name].toLowerCase().includes(q)));
-      list.innerHTML = filtered.length ? filtered.map(name => `
-        <label class="picker-member-row">
-          <input type="radio" name="aa-worksite" value="${name}"${picked === name ? " checked" : ""}>
-          <span class="picker-member-info"><b>${name}</b><span>${WS_CODE[name]}</span></span>
-        </label>`).join("") : `<p class="muted" style="padding:16px 0">결과가 없습니다.</p>`;
-      list.querySelectorAll('input[name="aa-worksite"]').forEach(r => r.onchange = () => { picked = r.value; });
+      const matches = name => !q || name.toLowerCase().includes(q) || (WS_CODE[name] || "").toLowerCase().includes(q) || (WS_ADDRESS[name] || "").toLowerCase().includes(q);
+      const rest = Object.keys(WS_CODE)
+        .filter(name => name !== fixedName && !excludeNames.includes(name) && matches(name))
+        .sort((x, y) => x.localeCompare(y, "ko"));
+      const showFixed = fixedName && !excludeNames.includes(fixedName) && matches(fixedName);
+      list.innerHTML = (showFixed || rest.length)
+        ? (showFixed ? `<div class="mapp-picker-section"><span class="mapp-picker-dot"></span>내 고정 근무지</div>${rowHtml(fixedName)}` : "") + rest.map(rowHtml).join("")
+        : `<p class="muted" style="padding:16px 4px">결과가 없습니다.</p>`;
+      list.querySelectorAll("[data-pick]").forEach(b => b.onclick = () => { p.remove(); onApply(b.dataset.pick); });
     }
     p.querySelector(".picker-search").addEventListener("input", e => { query = e.target.value; renderList(); });
     renderList();
     p.addEventListener("click", e => { if (e.target === p) p.remove(); });
-    p.querySelector("[data-close]").onclick = () => p.remove();
-    p.querySelector("[data-ok]").onclick = () => { p.remove(); onApply(picked); };
+    p.querySelector("[data-picker-close]").onclick = () => p.remove();
+  }
+  // 날짜 선택 — 바텀시트 캘린더(2026-09-29, 텍스트 입력 필드에서 전환 — 구성원/근무지처럼 "선택"으로 제공).
+  // 월 이동(‹/›)·오늘로 이동, 선택한 날짜는 파란 원 + 아래 텍스트로 표시. maxIso 초과 날짜는 비활성
+  function openDateSheet(initialIso, maxIso, onApply) {
+    const [by, bm] = (initialIso || maxIso).split("-").map(Number);
+    let viewY = by, viewM = bm - 1;
+    let selected = initialIso || maxIso;
+    const back = document.createElement("div");
+    back.className = "mapp-sheet-back";
+    back.style.zIndex = 110;
+    back.innerHTML = `
+      <div class="mapp-sheet">
+        <div class="mapp-sheet-body" data-cal-body style="padding-top:16px"></div>
+        <div class="mapp-sheet-foot">
+          <button type="button" class="btn" data-cal-cancel>취소</button>
+          <button type="button" class="btn primary" data-cal-ok>확인</button>
+        </div>
+      </div>`;
+    document.body.appendChild(back);
+    const body = back.querySelector("[data-cal-body]");
+    const okBtn = back.querySelector("[data-cal-ok]");
+    const WD = ["일", "월", "화", "수", "목", "금", "토"];
+    const pad = n => String(n).padStart(2, "0");
+    const isoOf = (y, m, d) => `${y}-${pad(m + 1)}-${pad(d)}`;
+    function drawCal() {
+      const startDow = new Date(viewY, viewM, 1).getDay();
+      const daysInMonth = new Date(viewY, viewM + 1, 0).getDate();
+      const cells = Array(startDow).fill(null).concat(Array.from({ length: daysInMonth }, (_, i) => i + 1));
+      const rows = [];
+      for (let i = 0; i < cells.length; i += 7) rows.push(cells.slice(i, i + 7));
+      body.innerHTML = `
+        <div class="mapp-cal-head">
+          <button type="button" data-cal-prev aria-label="이전 달">‹</button>
+          <span class="mapp-cal-ym">${viewY}.${pad(viewM + 1)}</span>
+          <button type="button" data-cal-next aria-label="다음 달">›</button>
+          <button type="button" class="mapp-cal-today" data-cal-today>오늘</button>
+        </div>
+        <div class="mapp-cal-wd">${WD.map(w => `<span>${w}</span>`).join("")}</div>
+        <div class="mapp-cal-grid">${rows.map(row => row.map(d => {
+          if (d === null) return `<span class="mapp-cal-cell empty"></span>`;
+          const iso = isoOf(viewY, viewM, d);
+          const cls = ["mapp-cal-cell"];
+          if (iso === selected) cls.push("sel");
+          else if (iso === todayStr()) cls.push("today");
+          return `<button type="button" class="${cls.join(" ")}" data-cal-day="${iso}"${iso > maxIso ? " disabled" : ""}>${d}</button>`;
+        }).join("")).join("")}</div>
+        <div class="mapp-cal-sel">${selected ? window.fmtDate(selected) : ""}</div>`;
+      body.querySelector("[data-cal-prev]").onclick = () => { viewM--; if (viewM < 0) { viewM = 11; viewY--; } drawCal(); };
+      body.querySelector("[data-cal-next]").onclick = () => { viewM++; if (viewM > 11) { viewM = 0; viewY++; } drawCal(); };
+      body.querySelector("[data-cal-today]").onclick = () => {
+        const [ty, tm] = todayStr().split("-").map(Number);
+        viewY = ty; viewM = tm - 1; selected = todayStr(); drawCal();
+      };
+      body.querySelectorAll("[data-cal-day]").forEach(b => b.onclick = () => { selected = b.dataset.calDay; drawCal(); });
+      okBtn.disabled = !selected;
+    }
+    drawCal();
+    back.addEventListener("click", e => { if (e.target === back) back.remove(); });
+    back.querySelector("[data-cal-cancel]").onclick = () => back.remove();
+    okBtn.onclick = () => { if (!selected) return; back.remove(); onApply(selected); };
   }
 
-  // ===== 배정 추가·재배정·보유 대상 추가 — 바텀시트(2026-09-28, 페이지였다가 필드가 적어 어색해서 되돌림) =====
-  // 구성요소·문구는 대시보드 모달(detail.js openAssignAddModal/openReassignModal/openHoldAddModal)과 동일: 대상
-  // 라디오(구성원/근무지)+"선택 ›"→피커(그 위에 겹쳐 뜸, 실 앱의 액션시트 위 모달 패턴과 동일), 배정일 또는
-  // 보유 수량 스테퍼, 저장 시 확인 팝업. kind로 세 가지를 분기. 재배정은 기존 배정 카드(읽기전용)+안내 문구가
-  // 위에 붙고 새 대상 후보에서 현재 대상을 제외, 보유 대상 추가는 이미 보유 중인 대상 전체를 후보에서 제외
-  // (detail.js와 동일 규칙)
+  // ===== 배정 추가·재배정·보유 대상 추가 — 전체 화면 페이지(2026-09-29, 바텀시트였다가 다시 전환 — 대상
+  // 선택 피커가 풀페이지로, 날짜 선택이 캘린더 시트로 커지면서 폼 자체도 페이지인 쪽이 자연스러움). 구성요소·
+  // 문구는 대시보드 모달(detail.js openAssignAddModal/openReassignModal/openHoldAddModal)과 동일: 대상 라디오
+  // (구성원/근무지)+"선택 ›"→피커, 배정일도 같은 "선택 ›" 버튼으로 캘린더 시트를 엶. 저장 시 확인 팝업.
+  // kind로 세 가지를 분기. 재배정은 기존 배정 카드(읽기전용)+안내 문구가 위에 붙고 새 대상 후보에서 현재
+  // 대상을 제외, 보유 대상 추가는 이미 보유 중인 대상 전체를 후보에서 제외(detail.js와 동일 규칙)
   const FORM_CFG = {
     "assign-add": { title: "배정 추가", targetLabel: "배정 대상", confirm: "배정을 추가하시겠습니까?" },
     "reassign": { title: "재배정", targetLabel: "새 배정 대상", confirm: "재배정하시겠습니까?" },
     "hold-add": { title: "보유 대상 추가", targetLabel: "보유 대상", confirm: "보유 대상을 추가하시겠습니까?" },
   };
-  function openFormSheet(a, target, kind, afterMutate) {
+  function openFormPage(a, target, kind, afterMutate) {
     const cfg = FORM_CFG[kind];
-    const f = { picked: null, draft: { employee: null, worksite: null }, dateText: "", qtyText: "" };
+    const f = { picked: null, draft: { employee: null, worksite: null }, dateIso: "", qtyText: "" };
     const old = kind === "reassign" ? a.assignments[findRecord(a, target).idx] : null;
     const heldNames = kind === "hold-add" ? (a.stocks || []).map(x => x.employee || x.worksite) : [];
     const remaining = kind === "hold-add" ? a.totalQty - (a.stocks || []).reduce((s, x) => s + x.qty, 0) : 0;
 
     const back = document.createElement("div");
-    back.className = "mapp-sheet-back";
+    back.className = "mapp-fullpage-back";
+    back.style.zIndex = 95;
     back.innerHTML = `
-      <div class="mapp-sheet">
-        <div class="mapp-sheet-head">${cfg.title}</div>
-        <div class="mapp-sheet-body" data-form-body></div>
-        <div class="mapp-sheet-foot">
-          <button type="button" class="btn" data-form-cancel>취소</button>
+      <div class="mapp-fullpage">
+        <div class="mapp-fullpage-head">
+          <button type="button" class="mapp-back" data-form-back aria-label="뒤로">←</button>
+          <span class="mapp-fullpage-head-title">${cfg.title}</span>
+        </div>
+        <div class="mapp-fullpage-body" data-form-body></div>
+        <div class="mapp-fullpage-foot">
           <button type="button" class="btn primary" data-form-save disabled>저장</button>
         </div>
       </div>`;
     document.body.appendChild(back);
     const body = back.querySelector("[data-form-body]");
     const saveBtn = back.querySelector("[data-form-save]");
-    let getDate = () => null;
     const qtyVal = () => { const n = parseInt(f.qtyText, 10); return Number.isFinite(n) ? n : null; };
     const targetSummaryHtml = k => {
       const val = f.draft[k];
@@ -670,10 +703,18 @@
           <button type="button" class="aa-target-x" data-target-clear aria-label="선택 해제">${CLOSE_ICON}</button>
         </div>`;
     };
+    const dateSummaryHtml = () => {
+      if (!f.dateIso) return `<button type="button" class="perm-target-btn" data-date-open><span class="muted">선택</span><span class="chev">›</span></button>`;
+      return `
+        <div class="aa-target-selected" data-date-open>
+          <span class="perm-chip">${window.fmtDate(f.dateIso)}</span>
+          <button type="button" class="aa-target-x" data-date-clear aria-label="선택 해제">${CLOSE_ICON}</button>
+        </div>`;
+    };
     const updateSaveState = () => {
       const hasTarget = !!(f.picked && f.draft[f.picked]);
       if (kind === "hold-add") { const v = qtyVal(); saveBtn.disabled = !(hasTarget && v !== null && v >= 1 && v <= remaining); }
-      else saveBtn.disabled = !(hasTarget && getDate());
+      else saveBtn.disabled = !(hasTarget && f.dateIso);
     };
     function drawBody() {
       body.innerHTML = `
@@ -705,18 +746,22 @@
           </div>` : `
           <div class="field">
             <label>${kind === "reassign" ? "새 배정일" : "배정일"}</label>
-            ${dateFieldHtml("")}
+            <div class="perm-target-wrap">${dateSummaryHtml()}</div>
           </div>`}`;
 
       body.querySelectorAll('input[name="form-kind"]').forEach(r => r.onchange = () => { f.picked = r.value; drawBody(); });
       const openBtn = body.querySelector("[data-target-open]");
       if (openBtn) openBtn.onclick = () => {
         const exclude = kind === "reassign" ? (f.picked === "employee" ? old.employee : old.worksite) : kind === "hold-add" ? heldNames : null;
-        if (f.picked === "employee") openAssignMemberPicker(f.draft.employee, v => { f.draft.employee = v; drawBody(); }, exclude);
-        else openAssignWorksitePicker(f.draft.worksite, v => { f.draft.worksite = v; drawBody(); }, exclude);
+        if (f.picked === "employee") openMemberPickerPage(f.draft.employee, v => { f.draft.employee = v; drawBody(); }, exclude);
+        else openWorksitePickerPage(f.draft.worksite, v => { f.draft.worksite = v; drawBody(); }, exclude);
       };
       const clearBtn = body.querySelector("[data-target-clear]");
       if (clearBtn) clearBtn.onclick = e => { e.stopPropagation(); f.draft[f.picked] = null; drawBody(); };
+      const dateOpenBtn = body.querySelector("[data-date-open]");
+      if (dateOpenBtn) dateOpenBtn.onclick = () => openDateSheet(f.dateIso, todayStr(), v => { f.dateIso = v; drawBody(); });
+      const dateClearBtn = body.querySelector("[data-date-clear]");
+      if (dateClearBtn) dateClearBtn.onclick = e => { e.stopPropagation(); f.dateIso = ""; drawBody(); };
 
       if (kind === "hold-add") {
         const qinput = body.querySelector("[data-qinput]");
@@ -732,24 +777,19 @@
         qinput.addEventListener("input", () => { qinput.value = qinput.value.replace(/[^0-9]/g, ""); f.qtyText = qinput.value; syncQty(); });
         minus.onclick = () => { const v = qtyVal(); if (v !== null && v > 1) { qinput.value = v - 1; f.qtyText = qinput.value; syncQty(); } };
         plus.onclick = () => { const v = qtyVal() ?? 0; if (v < remaining) { qinput.value = v + 1; f.qtyText = qinput.value; syncQty(); } };
-        syncQty();
-      } else {
-        const dtext = body.querySelector("[data-dtext]");
-        if (f.dateText) dtext.value = f.dateText;
-        getDate = wireDateField(body, todayStr(), () => { f.dateText = dtext.value; updateSaveState(); });
-        updateSaveState();
       }
+      updateSaveState();
     }
     drawBody();
 
     back.addEventListener("click", e => { if (e.target === back) back.remove(); });
-    back.querySelector("[data-form-cancel]").onclick = () => back.remove();
+    back.querySelector("[data-form-back]").onclick = () => back.remove();
     saveBtn.onclick = () => {
       if (saveBtn.disabled) return;
       const who = f.draft[f.picked];
       const mk = extra => f.picked === "employee" ? { employee: who, worksite: null, ...extra } : { employee: null, worksite: who, ...extra };
       if (kind === "assign-add") {
-        const d = getDate();
+        const d = f.dateIso;
         const record = mk({ since: d });
         confirmModal(cfg.confirm, "", () => {
           back.remove();
@@ -761,7 +801,7 @@
           afterMutate();
         });
       } else if (kind === "reassign") {
-        const d = getDate();
+        const d = f.dateIso;
         const record = mk({ since: d });
         confirmModal(cfg.confirm, "", () => {
           back.remove();
@@ -1227,9 +1267,9 @@
         function dispatchAction(key) {
           const { idx } = findRecord(a, target);
           if (key === "history") { state.screen = "asset-history"; draw(); }
-          else if (key === "assign-add") openFormSheet(a, target, "assign-add", afterMutate);
-          else if (key === "reassign") openFormSheet(a, target, "reassign", afterMutate);
-          else if (key === "hold-add") openFormSheet(a, target, "hold-add", afterMutate);
+          else if (key === "assign-add") openFormPage(a, target, "assign-add", afterMutate);
+          else if (key === "reassign") openFormPage(a, target, "reassign", afterMutate);
+          else if (key === "hold-add") openFormPage(a, target, "hold-add", afterMutate);
           else if (key === "return") openReturnConfirm(a, idx, afterMutate);
           else if (key === "lost-report") openStatusChangeConfirm(a, "분실 신고하시겠습니까?", "분실 신고 시 기존 배정은 유지된 채 상태만 분실로 변경됩니다.", setStatus("상태 변경: 분실 신고", () => "lost"), afterMutate);
           else if (key === "lost-recover") openStatusChangeConfirm(a, "분실 회수 처리하시겠습니까?", "분실 회수 시 배정 여부에 따라 배정 중 또는 재고 상태로 돌아갑니다.", setStatus("상태 변경: 분실 회수", () => derivedActiveStatus(a)), afterMutate);
