@@ -236,6 +236,17 @@ input { font: inherit; }
 }
 .dropdown-menu button:hover,
 .dropdown-menu button.active { background: var(--primary-weak); color: var(--primary); font-weight: 600; }
+/* 비활성 항목(예: 활성 배정 5건 도달 시 배정 추가) — 메뉴에서 숨기지 않고 흐리게 표시, 사유는 다른 곳과
+   동일한 data-tip 호버 툴팁 컨벤션으로(2026-09-30, 대시보드의 "배정 추가" 비활성 버튼과 동일한 처리) */
+.dropdown-menu button:disabled { opacity: .4; cursor: not-allowed; }
+.dropdown-menu button:disabled:hover { background: none; color: inherit; font-weight: 400; }
+.dropdown-menu button[data-tip] { position: relative; }
+.dropdown-menu button[data-tip]:hover::after {
+  content: attr(data-tip);
+  position: absolute; top: 100%; left: 0; margin-top: 4px;
+  background: #1b1d1f; color: #fff; font-size: 11px; padding: 6px 10px;
+  border-radius: 6px; white-space: normal; width: 200px; line-height: 1.4; z-index: 30;
+}
 .dropdown-empty { padding: 8px 12px; font-size: 12.5px; color: var(--text-mut); }
 .dropdown-sep { height: 1px; background: var(--line); margin: 4px 2px; }
 

@@ -1045,7 +1045,10 @@
   // (개별형), 수량 변경·보유 대상 추가/해제(수량형), 사진 관리(공통). 폐기되지 않았고 배정/보유 변경 권한이
   // 있는 자산에 한해서만 노출. 메모 수정·사진 관리는 더보기가 아니라 각각 메모 값 옆 편집 아이콘/대표 이미지
   // 위 편집 아이콘으로 별도 제공(2026-09-27, assetDetailScreenHtml 참조) — 대시보드 detail.js와 동일한 구조.
-  // 순서는 "자주 쓰는 것 먼저, 되돌리는 액션(반납/보유 해제)은 맨 아래 빨간 글씨"(2026-09-29 재정렬)
+  // 순서는 "자주 쓰는 것 먼저, 되돌리는 액션(반납/보유 해제)은 맨 아래 빨간 글씨"(2026-09-29 재정렬).
+  // 배정 추가(활성 배정 5건 도달)·보유 대상 추가(잔여 수량 0)는 항목 자체를 숨기지 않고 대시보드와 동일하게
+  // 처리 — 배정 추가는 비활성+사유 툴팁, 보유 대상 추가는 항상 활성 상태로 두고 누르면 토스트로 안내
+  // (2026-09-30, 이전엔 둘 다 조건에 안 맞으면 메뉴에서 아예 빠졌었음)
   function manageActions(a, target) {
     if (a.status === "disposed" || !canManage(a)) return [];
     const acts = [];
@@ -1053,13 +1056,14 @@
       const { idx } = findRecord(a, target);
       const activeCount = (a.assignments || []).length;
       if (idx >= 0) acts.push({ key: "reassign", label: "재배정" });
-      if (activeCount < 5) acts.push({ key: "assign-add", label: "배정 추가" });
+      acts.push(activeCount >= 5
+        ? { key: "assign-add", label: "배정 추가", disabled: true, tip: "자산 하나당 활성 배정은 최대 5건까지 가능합니다." }
+        : { key: "assign-add", label: "배정 추가" });
       if (idx >= 0) acts.push({ key: "return", label: "반납", danger: true });
     } else {
       const { idx } = findRecord(a, target);
-      const remaining = a.totalQty - (a.stocks || []).reduce((s, x) => s + x.qty, 0);
       if (idx >= 0) acts.push({ key: "qty-change", label: "수량 변경" });
-      if (remaining > 0) acts.push({ key: "hold-add", label: "보유 대상 추가" });
+      acts.push({ key: "hold-add", label: "보유 대상 추가" });
       if (idx >= 0) acts.push({ key: "hold-release", label: "보유 해제", danger: true });
     }
     return acts;
@@ -1076,7 +1080,7 @@
     document.querySelectorAll(".dropdown-menu").forEach(m => m.remove());
     const menu = document.createElement("div");
     menu.className = "dropdown-menu";
-    menu.innerHTML = items.map(x => `${x.sep ? '<div class="dropdown-sep"></div>' : ""}<button type="button" data-key="${x.key}"${x.danger ? ' class="danger"' : ""}>${x.label}</button>`).join("");
+    menu.innerHTML = items.map(x => `${x.sep ? '<div class="dropdown-sep"></div>' : ""}<button type="button" data-key="${x.key}"${x.danger ? ' class="danger"' : ""}${x.disabled ? " disabled" : ""}${x.tip ? ` data-tip="${x.tip}"` : ""}>${x.label}</button>`).join("");
     const r = anchor.getBoundingClientRect();
     menu.style.cssText = `position:fixed;top:${r.bottom + 4}px;left:${Math.max(8, r.right - 180)}px;min-width:180px`;
     document.body.appendChild(menu);
@@ -1285,7 +1289,11 @@
           if (key === "history") { state.screen = "asset-history"; draw(); }
           else if (key === "assign-add") openFormPage(a, target, "assign-add", afterMutate);
           else if (key === "reassign") openFormPage(a, target, "reassign", afterMutate);
-          else if (key === "hold-add") openFormPage(a, target, "hold-add", afterMutate);
+          else if (key === "hold-add") {
+            const remaining = a.totalQty - (a.stocks || []).reduce((s, x) => s + x.qty, 0);
+            if (remaining <= 0) toast("잔여 수량이 없습니다.");
+            else openFormPage(a, target, "hold-add", afterMutate);
+          }
           else if (key === "return") openReturnConfirm(a, idx, afterMutate);
           else if (key === "lost-report") openStatusChangeConfirm(a, "분실 신고하시겠습니까?", "분실 신고 시 기존 배정은 유지된 채 상태만 분실로 변경됩니다.", setStatus("상태 변경: 분실 신고", () => "lost"), afterMutate);
           else if (key === "lost-recover") openStatusChangeConfirm(a, "분실 회수 처리하시겠습니까?", "분실 회수 시 배정 여부에 따라 배정 중 또는 재고 상태로 돌아갑니다.", setStatus("상태 변경: 분실 회수", () => derivedActiveStatus(a)), afterMutate);
