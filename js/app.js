@@ -92,6 +92,20 @@
       default: return false; // 모든 관리자 및 리더 / 관리자만
     }
   }
+  // 자산 조회 권한 판정 — hasAssignPermission과 동일한 구조(같은 프로토타입 단순화 규칙 적용). 내 자산
+  // 탭은 본인에게 배정/보유된 것만 보여줘서 조회 권한과 무관하게 항상 노출하지만(구조설계안 §8), 근무지
+  // 자산 탭은 나 아닌 다른 사람·근무지의 배정/보유 현황까지 보여주는 화면이라 소분류별 조회 권한을 실제로
+  // 적용(2026-09-30 — 지금까지는 이 필터 자체가 없어서 조회 권한과 무관하게 근무지의 모든 자산이 다 보였음)
+  function hasViewPermission(a) {
+    const cat = window.DATA.categories.find(c => c.group === a.group && c.sub === a.sub);
+    if (!cat) return false;
+    switch (cat.view) {
+      case "회사의 모든 구성원": return true;
+      case "특정 관리자/리더": return (cat.viewTarget && cat.viewTarget.members || []).includes(ME);
+      case "특정 그룹 및 직무/직급": return (cat.viewTarget && cat.viewTarget.groups || []).includes(MEMBER_TEAM[ME]);
+      default: return false; // 모든 관리자 및 리더 / 관리자만
+    }
+  }
   // 프로토타입 데모용 오버라이드(2026-09-27) — 판정 로직(hasAssignPermission)은 그대로 두되, 화면에서는
   // 항상 권한이 있다고 가정하고 액션을 노출. 실제 판정값은 그대로 계산돼 코드·디스크립션엔 남아있으므로,
   // 실 서비스에선 이 상수만 지우면 됨(true로 두면 데모 편의, false로 두면 실제 판정 그대로 동작)
@@ -150,11 +164,13 @@
     });
   }
   // 특정 근무지에 배정(개별형)·보유(수량형)된 자산 전체(정렬 적용) — 근무지 카드의 분류별 카운트 집계와
-  // "전체보기"(분류별 자산 목록) 화면이 이 함수를 공유해 동일한 집합/정렬을 보장. sub를 주면 그 소분류로만 필터
+  // "전체보기"(분류별 자산 목록) 화면이 이 함수를 공유해 동일한 집합/정렬을 보장. sub를 주면 그 소분류로만
+  // 필터. 근무지 자산은 나 아닌 다른 대상의 배정/보유 현황도 보여주므로 조회 권한 필터를 실제로 적용(2026-09-30)
   function itemsForWorksite(ws, sub) {
     const items = [];
     assets.forEach(a => {
       if (sub && a.sub !== sub) return;
+      if (!hasViewPermission(a)) return;
       if (a.type === "individual") {
         (a.assignments || []).forEach(x => { if (x.worksite === ws) items.push({ qty: 1, asset: a }); });
       } else {
@@ -314,7 +330,13 @@
         <span class="mapp-ws-cat-count">${sec.items.length}<span class="mapp-menu-chev">›</span></span>
       </button>`).join("");
   }
+  // 접근 가능한 근무지는(고정·담당) 조건 없이 전부 카드로 보여주고, 그 안에 조회 가능한 자산이 하나도
+  // 없으면(원래부터 배정·보유가 없거나, 있어도 전부 조회 권한 밖인 소분류라 필터로 걸러진 경우 — 화면에서는
+  // 두 경우를 구분하지 않고 동일하게 처리) 분류 목록 대신 안내 문구만 보여줌. 이 경우엔 접을 내용 자체가
+  // 없어 접기/펼치기 버튼도 같이 생략(2026-09-30 — 조회 권한 필터가 없던 이전엔 사실상 항상 뭔가 있었어서
+  // 이 빈 상태 자체를 실제로 마주칠 일이 없었음)
   function worksiteCardHtml(group) {
+    const hasItems = group.items.length > 0;
     return `
       <div class="mapp-ws-card" data-ws-card data-ws-name="${group.worksite}" data-ws-code="${WS_CODE[group.worksite] || ""}" data-ws-address="${WS_ADDRESS[group.worksite] || ""}">
         <div class="mapp-ws-head">
@@ -323,11 +345,11 @@
             <div class="mapp-ws-name">${group.worksite}${WS_CODE[group.worksite] ? `(${WS_CODE[group.worksite]})` : ""}</div>
             <div class="mapp-ws-address">${WS_ADDRESS[group.worksite] || ""}</div>
           </div>
-          <button type="button" class="mapp-ws-collapse" data-ws-collapse aria-expanded="true" aria-label="접기/펼치기">${CHEV_DOWN}</button>
+          ${hasItems ? `<button type="button" class="mapp-ws-collapse" data-ws-collapse aria-expanded="true" aria-label="접기/펼치기">${CHEV_DOWN}</button>` : ""}
         </div>
         <div data-ws-collapsible>
           <div class="mapp-ws-count">전체 <b>${group.items.length}</b></div>
-          ${group.items.length
+          ${hasItems
             ? `<div class="mapp-ws-cat-tree">${worksiteCategoryTreeHtml(group.worksite, group.items)}</div>`
             : `<p class="mapp-ws-empty">배정·보유 중인 자산이 없습니다.</p>`}
         </div>
