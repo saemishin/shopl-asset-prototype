@@ -2,8 +2,10 @@
    (내 자산·근무지 자산 탭) + 근무지 카드 "전체보기"의 목적지 화면 + 카드 클릭 시 진입하는 자산 상세까지 구현.
    자산 상세는 배정/보유 변경 권한(assign_permission_type, category.js에 저장된 소분류별 값으로 실제 판정)이
    있는 자산에 한해 재배정·배정 추가·반납·분실 신고/회수·수리 접수/완료·폐기·보유 대상 추가/변경/해제·사진
-   관리 액션을 제공(자산 관리 권한 소관인 필드 수정·소분류 이동 등은 스코프 밖). 실 앱 화면(근무지 목록/
-   보고서/게시판/근무지 상세 정보탭의 "더보기" 카드 패턴)을 참고해 리스트 화면 공통 요소를 재현. */
+   관리 액션을 제공(자산 관리 권한 소관인 필드 수정·소분류 이동 등은 스코프 밖). 배정 추가·재배정·보유 대상
+   추가는 대시보드처럼 팝업이 아니라 별도 페이지(asset-form)로 처리(2026-09-28), 상단바 "더보기" 맨 위엔
+   그 자산의 이력 페이지(asset-history, 조회 전용이라 권한 무관)로 가는 항목이 항상 있음. 실 앱 화면(근무지
+   목록/보고서/게시판/근무지 상세 정보탭의 "더보기" 카드 패턴)을 참고해 리스트 화면 공통 요소를 재현. */
 (function () {
   const { assets } = window.DATA;
   function toast(msg) {
@@ -16,10 +18,13 @@
     stock: ["재고", "stock"], assigned: ["배정 중", "assigned"], repair: ["수리 중", "repair"],
     lost: ["분실", "lost"], disposed: ["폐기", "disposed"], held: ["보유 중", "assigned"],
   };
-  function todayStr() { return new Date().toISOString().slice(0, 10); }
   // assets.js/detail.js와 동일한 기준일(이 프로토타입 전역에서 "오늘"로 취급하는 고정 날짜) — 유효기한
-  // 배지 판정을 대시보드와 동일하게 맞추기 위해 이 파일에도 중복 정의
+  // 배지 판정·배정일 입력 상한(미래 날짜 불가)을 대시보드와 동일하게 맞추기 위해 이 파일에도 중복 정의
   const TODAY = new Date("2026-09-04");
+  function todayStr() {
+    const p = n => String(n).padStart(2, "0");
+    return `${TODAY.getFullYear()}-${p(TODAY.getMonth() + 1)}-${p(TODAY.getDate())}`;
+  }
   // 자산 상세(앱) 정보 섹션 — detail.js의 expiryBadge/chips/memoHtml과 동일 로직(이 파일도 자기 완결적이라 중복 유지)
   function expiryBadge(d) {
     if (!d) return '<span class="muted">—</span>';
@@ -48,15 +53,24 @@
   function myWorksites(name) {
     return MY_WORKSITES[name] || { fixed: "본사", assigned: [] };
   }
-  // category.js의 MEMBERS와 동일 값(이 파일도 자기 완결적이라 중복 유지) — 배정/보유 변경 권한 판정의
-  // "특정 그룹 및 직무/직급" 매칭에 씀. 직무/직급은 구성원별 데이터가 프로토타입에 없어 매칭 대상에서 제외.
-  const MEMBER_TEAM = {
-    "김민수": "개발팀", "이서연": "디자인팀", "박지훈": "영업팀", "정우성": "CS팀",
-    "김철수": "운영팀", "최유진": "개발팀", "한소희": "디자인팀", "장민호": "국내영업",
-    "오세훈": "운영팀", "배수지": "CS팀", "윤재현": "해외영업", "임하늘": "개발팀",
-  };
-  const EMPLOYEE_NAMES = Object.keys(MEMBER_TEAM);
-  const WORKSITE_NAMES = Object.keys(WS_CODE);
+  // detail.js의 MEMBERS와 동일 값(전사 인원 12명, 프로토타입 데모용 — 이 파일도 자기 완결적이라 중복 유지).
+  // 배정 대상 선택 피커(검색: 이름/사번/휴대폰번호)와 배정/보유 변경 권한 판정("특정 그룹 및 직무/직급" 팀
+  // 매칭)에 씀. 직무/직급은 구성원별 데이터가 프로토타입에 없어 권한 매칭 대상에서 제외.
+  const MEMBERS = [
+    { name: "김민수", team: "개발팀", empNo: "2021001", phone: "010-2001-1234" },
+    { name: "이서연", team: "디자인팀", empNo: "2021015", phone: "010-3412-5678" },
+    { name: "박지훈", team: "영업팀", empNo: "2020032", phone: "010-8823-9910" },
+    { name: "정우성", team: "CS팀", empNo: "2022041", phone: "010-5567-2231" },
+    { name: "김철수", team: "운영팀", empNo: "2019008", phone: "010-9012-4456" },
+    { name: "최유진", team: "개발팀", empNo: "2023019", phone: "010-6634-8821" },
+    { name: "한소희", team: "디자인팀", empNo: "2022055", phone: "010-4478-2093" },
+    { name: "장민호", team: "국내영업", empNo: "2020018", phone: "010-2345-6712" },
+    { name: "오세훈", team: "운영팀", empNo: "2018014", phone: "010-7712-3345" },
+    { name: "배수지", team: "CS팀", empNo: "2021028", phone: "010-3356-7789" },
+    { name: "윤재현", team: "해외영업", empNo: "2019033", phone: "010-4467-8890" },
+    { name: "임하늘", team: "개발팀", empNo: "2022009", phone: "010-5578-9901" },
+  ];
+  const MEMBER_TEAM = Object.fromEntries(MEMBERS.map(m => [m.name, m.team]));
   // 배정/보유 변경 권한 판정 — 이 자산의 소분류에 분류 관리 화면(category.js)에서 저장된 assign(권한 값)·
   // assignTarget(대상)을 찾아 ME 페르소나가 그 범위에 속하는지 실제로 계산. 프로토타입엔 관리자/리더
   // 여부를 나타내는 필드가 없어 "관리자만"·"모든 관리자 및 리더"는 항상 거부(김민수·정우성 둘 다 일반
@@ -78,6 +92,27 @@
   function canManage(a) { return DEMO_ASSUME_PERMISSION || hasAssignPermission(a); }
   // detail.js와 동일한 편집 아이콘(이 파일도 자기 완결적이라 중복 정의)
   const IC_EDIT = `<svg viewBox="0 0 24 24"><path d="M4 20l1-4L16 5l3 3L8 19l-4 1z"/><path d="M13.5 6.5l4 4"/></svg>`;
+  // 배정 추가·재배정·보유 대상 추가 페이지와 이력 페이지가 쓰는 대시보드(detail.js) 공용 요소 — 아이콘·아바타·
+  // 배정 카드(assignIdentity/typeBadge). 그룹(부서) 표기는 detail.js의 EMP_GROUP(8명만) 대신 MEMBER_TEAM(12명 전부) 사용
+  const IC_EMP = `<svg class="hi" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5.5 20c0-4 3-6.5 6.5-6.5s6.5 2.5 6.5 6.5"/></svg>`;
+  const IC_WS = `<svg class="hi" viewBox="0 0 24 24"><path d="M4 20V9.5L12 4l8 5.5V20"/><path d="M9.5 20v-5h5v5"/></svg>`;
+  const INFO_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 8v.01"/></svg>`;
+  const CLOSE_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg>`;
+  const AVATAR_COLORS = ["#5b8def", "#8f6ef0", "#eb7f8b", "#3fb37f", "#e0a63c", "#4dabf7"];
+  function avatarColor(name) {
+    let h = 0;
+    for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) % 997;
+    return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length];
+  }
+  function assignIdentity(x) {
+    if (x.employee) {
+      return `<span class="acard-avatar" style="background:${avatarColor(x.employee)}">${x.employee[0]}</span>
+        <div><div class="acard-name">${x.employee}</div><div class="acard-sub">${MEMBER_TEAM[x.employee] || '<span class="muted">—</span>'}</div></div>`;
+    }
+    return `<span class="acard-avatar ws"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 20V9.5L12 4l8 5.5V20"/><path d="M9.5 20v-5h5v5"/></svg></span>
+      <div><div class="acard-name">${x.worksite}</div><div class="acard-sub">${WS_CODE[x.worksite] || '<span class="muted">—</span>'}</div></div>`;
+  }
+  const typeBadge = x => `<span class="acard-type" title="${x.employee ? "구성원" : "근무지"}">${x.employee ? IC_EMP : IC_WS}</span>`;
   const IC_PERSON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="8" r="3.5"/><path d="M5.5 20c0-4 3-6.5 6.5-6.5s6.5 2.5 6.5 6.5"/></svg>`;
   const IC_WORKSITE = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 20V9.5L12 4l8 5.5V20"/><path d="M9.5 20v-5h5v5"/></svg>`;
 
@@ -382,8 +417,10 @@
     input.addEventListener("input", () => { okBtn.disabled = !confirmed(); });
     okBtn.onclick = () => {
       if (!confirmed()) return;
+      const before = STATUS_LABEL[a.status][0];
       a.status = "disposed";
       a.assignments = [];
+      logActivity(a, { script: "상태 변경: 폐기 처리", before, after: STATUS_LABEL[a.status][0] });
       cb.remove();
       toast("폐기 처리되었습니다.");
       onDone();
@@ -391,137 +428,237 @@
     document.body.appendChild(cb);
     input.focus();
   }
-  // 대상(구성원/근무지) 선택 select — 배정 추가·재배정·보유 대상 추가가 공유. value는 "employee:이름"/
-  // "worksite:이름" 형식(폼 하나에 라디오+피커를 따로 두는 대신 옵션그룹으로 단순화)
-  function targetSelectHtml(empOptions, wsOptions, placeholder) {
+  // ===== 활동 로그(이력) — detail.js와 동일한 스키마·로직(구조설계안 5.5) =====
+  // 엔트리: { d(수정한 일시), script("그룹: 세부"), target?(구성원/근무지 레코드), before?/after?, who(수정한 사람) }.
+  // 초기 베이스라인은 자산의 현재 상태로부터 세션당 한 번만 만들어지고(asset-detail 첫 렌더에서 시드 — 조작 전 상태가
+  // 정확히 남도록), 이후 앱에서 수행하는 배정·보유·상태 변경·메모 수정은 여기 append(수정한 사람은 ME)
+  function activityOf(a) {
+    const ev = [{ d: `${a.createdAt || a.purchaseDate || "2024-01-01"} 09:00`, script: "자산 등록", who: "dana" }];
+    (a.assignments || []).forEach(x => ev.push({
+      d: `${x.since} 09:00`, script: "배정 관리: 신규 배정", target: x, before: "", after: window.fmtDate(x.since), who: "dana",
+    }));
+    (a.stocks || []).forEach(x => ev.push({
+      d: `${a.purchaseDate || "2025-01-01"} 09:00`, script: "보유 관리: 보유 대상 추가", target: x, before: "", after: `${x.qty}개`, who: "dana",
+    }));
+    if (a.status === "repair") ev.push({ d: "2026-08-14 09:00", script: "상태 변경: 수리 접수", before: "배정 중", after: "수리 중", who: "dana" });
+    if (a.status === "lost") ev.push({ d: "2026-07-21 09:00", script: "상태 변경: 분실 신고", before: "배정 중", after: "분실", who: "정우성" });
+    if (a.status === "disposed") ev.push({ d: "2025-12-30 09:00", script: "상태 변경: 폐기 처리", before: "배정 중", after: "폐기", who: "dana" });
+    if (a.note) ev.push({ d: "2026-06-02 09:00", script: "자산 정보 수정: 메모 수정", before: "", after: a.note, who: "dana" });
+    return ev.sort((x, y) => (x.d < y.d ? 1 : -1));
+  }
+  function activityLog(a) {
+    if (!a._activityLog) a._activityLog = activityOf(a);
+    return a._activityLog;
+  }
+  // 실제 조작 시각 — 날짜는 고정 데모 날짜(TODAY), 시:분만 실제 클릭 시각(detail.js nowStr와 동일)
+  function nowStr() {
+    const p = n => String(n).padStart(2, "0");
+    const real = new Date();
+    return `${todayStr()} ${p(real.getHours())}:${p(real.getMinutes())}`;
+  }
+  function logActivity(a, entry) {
+    activityLog(a).unshift({ d: nowStr(), who: ME, ...entry });
+  }
+  // 이력 카드 1건 — 대상 이름은 기존/변경 값에 포함, 값이 "없음"인 쪽엔 대상 이름을 안 붙임(detail.js historyCardHtml과 동일)
+  function historyCardHtml(e) {
+    const val = v => v || "없음";
+    const targetName = e.target ? (e.target.employee || e.target.worksite) : null;
+    const targetMark = e.target
+      ? (e.target.employee
+          ? `<span class="hval-avatar" style="background:${avatarColor(e.target.employee)}">${e.target.employee[0]}</span>`
+          : IC_WS)
+      : "";
+    const withTarget = v => (targetName && v) ? `${targetMark}${targetName} · ${val(v)}` : val(v);
     return `
-      <select data-target-select style="width:100%;height:40px;border:1px solid var(--line-strong);border-radius:8px;padding:0 10px;background:#fff">
-        <option value="">${placeholder}</option>
-        ${empOptions.length ? `<optgroup label="구성원">${empOptions.map(n => `<option value="employee:${n}">${n}</option>`).join("")}</optgroup>` : ""}
-        ${wsOptions.length ? `<optgroup label="근무지">${wsOptions.map(n => `<option value="worksite:${n}">${n}</option>`).join("")}</optgroup>` : ""}
-      </select>`;
+      <div class="hcard">
+        <div class="hcard-head">
+          <span class="hcard-time">${window.fmtDateTime(e.d)}</span>
+          <span class="hcard-avatar" style="background:${avatarColor(e.who)}">${e.who[0]}</span>
+          <span class="hcard-who">${e.who}</span>
+        </div>
+        <div class="hcard-script">${e.script}</div>
+        ${"before" in e ? `
+          <div class="hcard-diff">
+            <div class="hcard-row"><span class="hcard-tag old">기존</span><span class="hcard-val">${withTarget(e.before)}</span></div>
+            <div class="hcard-row"><span class="hcard-tag new">변경</span><span class="hcard-val">${withTarget(e.after)}</span></div>
+          </div>` : ""}
+      </div>`;
   }
-  function openAssignAddModal(a, onDone) {
-    const usedEmployees = (a.assignments || []).map(x => x.employee).filter(Boolean);
-    const usedWorksites = (a.assignments || []).map(x => x.worksite).filter(Boolean);
-    const back = document.createElement("div");
-    back.className = "modal-back";
-    back.innerHTML = `
-      <div class="modal" style="width:360px">
-        <div class="body" style="padding-top:20px">
-          <p style="font-size:14px;font-weight:700;margin-bottom:14px">배정 추가</p>
-          ${targetSelectHtml(EMPLOYEE_NAMES.filter(n => !usedEmployees.includes(n)), WORKSITE_NAMES.filter(n => !usedWorksites.includes(n)), "배정 대상 선택")}
+  // query가 있으면 수정 대상(구성원/근무지) 이름으로 필터 — 수량형 이력 전용(개별형은 검색 없음)
+  function timelineHtml(a, query) {
+    const q = (query || "").trim().toLowerCase();
+    const entries = activityLog(a).filter(e => {
+      if (!q) return true;
+      const name = e.target ? (e.target.employee || e.target.worksite || "") : "";
+      return name.toLowerCase().includes(q);
+    });
+    if (!entries.length) return '<p class="muted" style="padding:6px 0">일치하는 이력이 없습니다</p>';
+    return `<div class="dtimeline">${entries.map(historyCardHtml).join("")}</div>`;
+  }
+  // 이력 페이지 — 더보기 메뉴 "이력 보기"의 목적지. 대시보드 이력 탭과 동일한 구성(카드 목록, 수량형은 구성원·
+  // 근무지 이름 검색 추가). 조회 전용이라 배정/보유 변경 권한과 무관하게 항상 열림
+  function historyScreenHtml(a) {
+    return `
+      <div class="mapp-topbar">
+        <button type="button" class="mapp-back" data-mapp-back aria-label="뒤로">←</button>
+        <span class="mapp-topbar-title">이력</span>
+      </div>
+      <div class="mapp-body">
+        ${a.type === "quantity" ? `<div class="mapp-search"><input type="text" data-history-q placeholder="구성원·근무지 이름으로 검색"></div>` : ""}
+        <div data-history-list>${timelineHtml(a, "")}</div>
+      </div>`;
+  }
+
+  // ===== 날짜 입력·대상 선택 피커 — detail.js와 동일 컴포넌트(이 파일도 자기 완결적이라 중복 유지) =====
+  // YYYY.MM.DD 텍스트 마스킹(8자리 숫자만) + 달력 아이콘(네이티브 피커, 미래 날짜 선택 제한). 범위를 벗어나면
+  // (자릿수·연도·월·일·미래 날짜) 에러 문구 없이 저장 버튼만 비활성.
+  const IC_CAL = `<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>`;
+  function dateFieldHtml(initialIso) {
+    const disp = initialIso ? initialIso.replace(/-/g, ".") : "";
+    return `
+      <div class="dfield">
+        <input type="text" inputmode="numeric" data-dtext placeholder="YYYY.MM.DD" maxlength="10" value="${disp}">
+        <span class="dfield-pick">${IC_CAL}<input type="date" data-dnative tabindex="-1"></span>
+      </div>`;
+  }
+  function wireDateField(scope, maxIso, onChange) {
+    const text = scope.querySelector("[data-dtext]");
+    const native = scope.querySelector("[data-dnative]");
+    native.max = maxIso;
+    const digitsOf = v => v.replace(/\D/g, "").slice(0, 8);
+    const format = d => d.length > 6 ? `${d.slice(0, 4)}.${d.slice(4, 6)}.${d.slice(6)}`
+                       : d.length > 4 ? `${d.slice(0, 4)}.${d.slice(4)}` : d;
+    const getValue = () => {
+      const d = digitsOf(text.value);
+      if (d.length !== 8) return null;
+      const y = d.slice(0, 4), m = d.slice(4, 6), dd = d.slice(6, 8);
+      const curYear = TODAY.getFullYear();
+      if (+y < curYear - 100 || +y > curYear) return null;
+      if (+m < 1 || +m > 12) return null;
+      if (+dd < 1 || +dd > 31) return null;
+      const iso = `${y}-${m}-${dd}`;
+      return iso > maxIso ? null : iso;
+    };
+    text.addEventListener("input", () => { text.value = format(digitsOf(text.value)); onChange(); });
+    native.addEventListener("change", () => {
+      if (native.value) text.value = native.value.replace(/-/g, ".");
+      onChange();
+    });
+    return getValue;
+  }
+  // 구성원 선택 — 단일 선택(라디오), 검색(이름/사번/휴대폰번호)+목록. 2차 팝업(.modal.sm)
+  function openAssignMemberPicker(initial, onApply, exclude) {
+    let picked = initial;
+    let query = "";
+    const excludeNames = [].concat(exclude || []).filter(Boolean);
+    const p = document.createElement("div");
+    p.className = "modal-back";
+    p.style.zIndex = 340;
+    p.innerHTML = `
+      <div class="modal sm">
+        <h3>구성원 선택</h3>
+        <div class="body" style="display:flex;flex-direction:column;max-height:56vh">
+          <input type="text" class="picker-search" placeholder="이름/사번/휴대폰번호">
+          <div data-list style="flex:1;min-height:0;overflow-y:auto;margin-top:8px"></div>
         </div>
         <div class="foot">
-          <button class="btn" data-cclose>취소</button>
-          <button class="btn primary" data-cok disabled>추가</button>
+          <button class="btn" data-close>취소</button>
+          <button class="btn primary" data-ok>적용</button>
         </div>
       </div>`;
-    document.body.appendChild(back);
-    const sel = back.querySelector("[data-target-select]");
-    const okBtn = back.querySelector("[data-cok]");
-    sel.onchange = () => { okBtn.disabled = !sel.value; };
-    back.addEventListener("click", e => { if (e.target === back) back.remove(); });
-    back.querySelector("[data-cclose]").onclick = () => back.remove();
-    okBtn.onclick = () => {
-      const [kind, name] = sel.value.split(":");
-      back.remove();
-      confirmModal("배정을 추가하시겠습니까?", "", () => {
-        const record = kind === "employee" ? { employee: name, worksite: null, since: todayStr() } : { employee: null, worksite: name, since: todayStr() };
-        (a.assignments || (a.assignments = [])).push(record);
-        if (a.status === "stock") a.status = "assigned";
-        toast("추가되었습니다.");
-        onDone();
-      });
-    };
+    document.body.appendChild(p);
+    const list = p.querySelector("[data-list]");
+    function renderList() {
+      const q = query.trim().toLowerCase();
+      const filtered = MEMBERS.filter(m => !excludeNames.includes(m.name) && (!q || m.name.includes(q) || m.empNo.includes(q) || m.phone.includes(q)));
+      list.innerHTML = filtered.length ? filtered.map(m => `
+        <label class="picker-member-row">
+          <input type="radio" name="aa-member" value="${m.name}"${picked === m.name ? " checked" : ""}>
+          <span class="picker-avatar" style="background:${avatarColor(m.name)}">${m.name[0]}</span>
+          <span class="picker-member-info"><b>${m.name}</b><span>${m.team}</span></span>
+        </label>`).join("") : `<p class="muted" style="padding:16px 0">결과가 없습니다.</p>`;
+      list.querySelectorAll('input[name="aa-member"]').forEach(r => r.onchange = () => { picked = r.value; });
+    }
+    p.querySelector(".picker-search").addEventListener("input", e => { query = e.target.value; renderList(); });
+    renderList();
+    p.addEventListener("click", e => { if (e.target === p) p.remove(); });
+    p.querySelector("[data-close]").onclick = () => p.remove();
+    p.querySelector("[data-ok]").onclick = () => { p.remove(); onApply(picked); };
   }
-  function openReassignModal(a, idx, onDone) {
-    const old = a.assignments[idx];
-    const usedEmployees = (a.assignments || []).map(x => x.employee).filter(Boolean);
-    const usedWorksites = (a.assignments || []).map(x => x.worksite).filter(Boolean);
-    const back = document.createElement("div");
-    back.className = "modal-back";
-    back.innerHTML = `
-      <div class="modal" style="width:360px">
-        <div class="body" style="padding-top:20px">
-          <p style="font-size:14px;font-weight:700;margin-bottom:6px">재배정</p>
-          <p class="hint" style="margin-top:0;margin-bottom:12px">현재 대상(${old.employee || old.worksite})이 새 대상으로 교체됩니다.</p>
-          ${targetSelectHtml(EMPLOYEE_NAMES.filter(n => !usedEmployees.includes(n)), WORKSITE_NAMES.filter(n => !usedWorksites.includes(n)), "새 대상 선택")}
+  // 근무지 선택 — 검색(근무지명/코드)+목록
+  function openAssignWorksitePicker(initial, onApply, exclude) {
+    let picked = initial;
+    let query = "";
+    const excludeNames = [].concat(exclude || []).filter(Boolean);
+    const p = document.createElement("div");
+    p.className = "modal-back";
+    p.style.zIndex = 340;
+    p.innerHTML = `
+      <div class="modal sm">
+        <h3>근무지 선택</h3>
+        <div class="body" style="display:flex;flex-direction:column;max-height:56vh">
+          <input type="text" class="picker-search" placeholder="근무지명/코드">
+          <div data-list style="flex:1;min-height:0;overflow-y:auto;margin-top:8px"></div>
         </div>
         <div class="foot">
-          <button class="btn" data-cclose>취소</button>
-          <button class="btn primary" data-cok disabled>재배정</button>
+          <button class="btn" data-close>취소</button>
+          <button class="btn primary" data-ok>적용</button>
         </div>
       </div>`;
-    document.body.appendChild(back);
-    const sel = back.querySelector("[data-target-select]");
-    const okBtn = back.querySelector("[data-cok]");
-    sel.onchange = () => { okBtn.disabled = !sel.value; };
-    back.addEventListener("click", e => { if (e.target === back) back.remove(); });
-    back.querySelector("[data-cclose]").onclick = () => back.remove();
-    okBtn.onclick = () => {
-      const [kind, name] = sel.value.split(":");
-      back.remove();
-      confirmModal("재배정하시겠습니까?", "", () => {
-        a.assignments[idx] = kind === "employee" ? { employee: name, worksite: null, since: todayStr() } : { employee: null, worksite: name, since: todayStr() };
-        toast("재배정되었습니다.");
-        onDone();
-      });
-    };
+    document.body.appendChild(p);
+    const list = p.querySelector("[data-list]");
+    function renderList() {
+      const q = query.trim().toLowerCase();
+      const filtered = Object.keys(WS_CODE).filter(name => !excludeNames.includes(name) && (!q || name.toLowerCase().includes(q) || WS_CODE[name].toLowerCase().includes(q)));
+      list.innerHTML = filtered.length ? filtered.map(name => `
+        <label class="picker-member-row">
+          <input type="radio" name="aa-worksite" value="${name}"${picked === name ? " checked" : ""}>
+          <span class="picker-member-info"><b>${name}</b><span>${WS_CODE[name]}</span></span>
+        </label>`).join("") : `<p class="muted" style="padding:16px 0">결과가 없습니다.</p>`;
+      list.querySelectorAll('input[name="aa-worksite"]').forEach(r => r.onchange = () => { picked = r.value; });
+    }
+    p.querySelector(".picker-search").addEventListener("input", e => { query = e.target.value; renderList(); });
+    renderList();
+    p.addEventListener("click", e => { if (e.target === p) p.remove(); });
+    p.querySelector("[data-close]").onclick = () => p.remove();
+    p.querySelector("[data-ok]").onclick = () => { p.remove(); onApply(picked); };
+  }
+
+  // ===== 배정 추가·재배정·보유 대상 추가 — 앱에서는 팝업이 아니라 별도 페이지(2026-09-28) =====
+  // 구성요소·문구는 대시보드 모달(detail.js openAssignAddModal/openReassignModal/openHoldAddModal)과 동일: 대상
+  // 라디오(구성원/근무지)+"선택 ›"→피커, 배정일 또는 보유 수량 스테퍼, 저장 시 확인 팝업. 단일 화면(asset-form)이
+  // state.form.kind로 세 가지를 분기. 재배정은 기존 배정 카드(읽기전용)+안내 문구가 위에 붙고 새 대상 후보에서
+  // 현재 대상을 제외, 보유 대상 추가는 이미 보유 중인 대상 전체를 후보에서 제외(detail.js와 동일 규칙)
+  const FORM_CFG = {
+    "assign-add": { title: "배정 추가", targetLabel: "배정 대상", confirm: "배정을 추가하시겠습니까?" },
+    "reassign": { title: "재배정", targetLabel: "새 배정 대상", confirm: "재배정하시겠습니까?" },
+    "hold-add": { title: "보유 대상 추가", targetLabel: "보유 대상", confirm: "보유 대상을 추가하시겠습니까?" },
+  };
+  function formScreenHtml(kind) {
+    return `
+      <div class="mapp-topbar">
+        <button type="button" class="mapp-back" data-mapp-back aria-label="뒤로">←</button>
+        <span class="mapp-topbar-title">${FORM_CFG[kind].title}</span>
+      </div>
+      <div class="mapp-body" data-form-body></div>
+      <div class="mapp-form-foot">
+        <button type="button" class="btn" data-form-cancel>취소</button>
+        <button type="button" class="btn primary" data-form-save disabled>저장</button>
+      </div>`;
   }
   function openReturnConfirm(a, idx, onDone) {
     confirmModal("반납하시겠습니까?", "반납하면 배정에서 제거됩니다.", () => {
+      const old = a.assignments[idx];
       a.assignments.splice(idx, 1);
       a.status = derivedActiveStatus(a);
+      logActivity(a, { script: "배정 관리: 반납", target: old, before: window.fmtDate(old.since), after: "" });
       toast("반납되었습니다.");
       onDone();
     });
   }
-  function openHoldAddModal(a, onDone) {
-    const usedEmployees = (a.stocks || []).map(x => x.employee).filter(Boolean);
-    const usedWorksites = (a.stocks || []).map(x => x.worksite).filter(Boolean);
-    const remaining = a.totalQty - (a.stocks || []).reduce((s, x) => s + x.qty, 0);
-    const back = document.createElement("div");
-    back.className = "modal-back";
-    back.innerHTML = `
-      <div class="modal" style="width:360px">
-        <div class="body" style="padding-top:20px">
-          <p style="font-size:14px;font-weight:700;margin-bottom:14px">보유 대상 추가</p>
-          ${targetSelectHtml(EMPLOYEE_NAMES.filter(n => !usedEmployees.includes(n)), WORKSITE_NAMES.filter(n => !usedWorksites.includes(n)), "보유 대상 선택")}
-          <input type="number" data-qty-input min="1" max="${remaining}" placeholder="수량(잔여 ${remaining}개)" style="width:100%;height:40px;border:1px solid var(--line-strong);border-radius:8px;padding:0 10px;margin-top:8px">
-        </div>
-        <div class="foot">
-          <button class="btn" data-cclose>취소</button>
-          <button class="btn primary" data-cok disabled>추가</button>
-        </div>
-      </div>`;
-    document.body.appendChild(back);
-    const sel = back.querySelector("[data-target-select]");
-    const qtyInput = back.querySelector("[data-qty-input]");
-    const okBtn = back.querySelector("[data-cok]");
-    function updateOk() {
-      const qty = Number(qtyInput.value);
-      okBtn.disabled = !(sel.value && qty >= 1 && qty <= remaining);
-    }
-    sel.onchange = updateOk;
-    qtyInput.oninput = updateOk;
-    back.addEventListener("click", e => { if (e.target === back) back.remove(); });
-    back.querySelector("[data-cclose]").onclick = () => back.remove();
-    okBtn.onclick = () => {
-      const [kind, name] = sel.value.split(":");
-      const qty = Number(qtyInput.value);
-      back.remove();
-      confirmModal("보유 대상을 추가하시겠습니까?", "", () => {
-        const record = kind === "employee" ? { employee: name, worksite: null, qty } : { employee: null, worksite: name, qty };
-        (a.stocks || (a.stocks = [])).push(record);
-        a.status = derivedHeldStatus(a);
-        toast("추가되었습니다.");
-        onDone();
-      });
-    };
-  }
   function openQtyChangeModal(a, idx, onDone) {
     const rec = a.stocks[idx];
+    const cur = rec.qty;
     const others = a.stocks.reduce((s, x, i) => i === idx ? s : s + x.qty, 0);
     const max = a.totalQty - others;
     const back = document.createElement("div");
@@ -549,6 +686,7 @@
       confirmModal("수량을 변경하시겠습니까?", "", () => {
         rec.qty = qty;
         a.status = derivedHeldStatus(a);
+        logActivity(a, { script: "보유 관리: 보유 수량 변경", target: rec, before: `${cur}개`, after: `${qty}개` });
         toast("변경되었습니다.");
         onDone();
       });
@@ -556,8 +694,11 @@
   }
   function openHoldReleaseConfirm(a, idx, onDone) {
     confirmModal("보유 대상에서 해제하시겠습니까?", "해제된 수량은 잔여 수량으로 돌아갑니다.", () => {
+      const x = a.stocks[idx];
+      const qty = x.qty;
       a.stocks.splice(idx, 1);
       a.status = derivedHeldStatus(a);
+      logActivity(a, { script: "보유 관리: 보유 대상 해제", target: x, before: `${qty}개`, after: "" });
       toast("해제되었습니다.");
       onDone();
     });
@@ -639,8 +780,12 @@
     back.addEventListener("click", e => { if (e.target === back) back.remove(); });
     back.querySelector("[data-cclose]").onclick = () => back.remove();
     back.querySelector("[data-cok]").onclick = () => {
-      a.note = back.querySelector("[data-memo-input]").value.trim();
+      const before = a.note || "";
+      const after = back.querySelector("[data-memo-input]").value.trim();
       back.remove();
+      if (after === before) return;
+      a.note = after;
+      logActivity(a, { script: "자산 정보 수정: 메모 수정", before: before || "없음", after: after || "없음" });
       toast("저장되었습니다.");
       onDone();
     };
@@ -720,13 +865,20 @@
     }
     return acts;
   }
+  // 상단바 "더보기" 메뉴 전체 — 맨 위에 "이력 보기"(자산의 이력 페이지로 이동, 개별형·수량형 공통), 그 아래
+  // 구분선 뒤에 배정/보유 관리 액션. 이력 조회는 조회 전용이라 배정/보유 변경 권한·폐기 여부와 무관하게 항상 있음
+  // (그래서 권한이 없거나 폐기된 자산도 더보기 버튼 자체는 남고, 메뉴엔 "이력 보기"만 뜸)
+  function menuActions(a, target) {
+    const manage = manageActions(a, target).map((x, i) => i === 0 ? { ...x, sep: true } : x);
+    return [{ key: "history", label: "이력 보기" }, ...manage];
+  }
   // 앵커 드롭다운 — 상태 뱃지·상단바 "더보기"가 공유. 대시보드 detail.js의 statusDropdown/moreDropdown과
   // 동일한 패턴(버튼 바로 아래 고정 위치, 바깥 클릭 시 닫힘)으로 통일(2026-09-27, 이전엔 바텀시트였음)
   function openDropdownMenu(anchor, items, onPick) {
     document.querySelectorAll(".dropdown-menu").forEach(m => m.remove());
     const menu = document.createElement("div");
     menu.className = "dropdown-menu";
-    menu.innerHTML = items.map(x => `<button type="button" data-key="${x.key}"${x.danger ? ' class="danger"' : ""}>${x.label}</button>`).join("");
+    menu.innerHTML = items.map(x => `${x.sep ? '<div class="dropdown-sep"></div>' : ""}<button type="button" data-key="${x.key}"${x.danger ? ' class="danger"' : ""}>${x.label}</button>`).join("");
     const r = anchor.getBoundingClientRect();
     menu.style.cssText = `position:fixed;top:${r.bottom + 4}px;left:${Math.max(8, r.right - 180)}px;min-width:180px`;
     document.body.appendChild(menu);
@@ -744,8 +896,8 @@
   // 요약 숫자만 뱃지 아래에 덧붙여 "몇 곳에 나뉘어 있는지"는 파악 가능하게 함. QR 라벨은 스코프 밖(필요해지면 추가)
   function assetDetailScreenHtml(a, target) {
     const isIndiv = a.type === "individual";
+    activityLog(a);   // 첫 렌더에서 미리 시드 — 이 화면에서 조작하기 전 상태를 이력의 베이스라인으로 남기기 위해(detail.js와 동일)
     const sActs = statusActions(a);
-    const mActs = manageActions(a, target);
     const { idx: recIdx } = findRecord(a, target);
     const rec = recIdx >= 0 ? (isIndiv ? a.assignments[recIdx] : a.stocks[recIdx]) : null;
     // 수량형은 "내가(이 target이) 가진 수량"만 보여줌 — 다른 보유 대상들의 수량까지 합친 전체/잔여
@@ -797,7 +949,7 @@
     return `
       <div class="mapp-topbar">
         <button type="button" class="mapp-back" data-mapp-back aria-label="뒤로">←</button>
-        ${mActs.length ? `<button type="button" class="mapp-more" data-more-open aria-label="더보기">${MORE_ICON}</button>` : ""}
+        <button type="button" class="mapp-more" data-more-open aria-label="더보기">${MORE_ICON}</button>
       </div>
       <div class="mapp-body">
         <div class="dhead-id">
@@ -879,6 +1031,8 @@
         : state.screen === "worksite-detail" ? worksiteDetailScreenHtml(state.wsDetail, state.wsDetailSub, itemsForWorksite(state.wsDetail, state.wsDetailSub))
         : state.screen === "asset-detail" ? assetDetailScreenHtml(assets.find(x => x.id === state.detailAssetId), state.detailTarget)
         : state.screen === "asset-parties" ? partiesScreenHtml(assets.find(x => x.id === state.detailAssetId), state.detailTarget)
+        : state.screen === "asset-form" ? formScreenHtml(state.form.kind)
+        : state.screen === "asset-history" ? historyScreenHtml(assets.find(x => x.id === state.detailAssetId))
         : state.assetTab === "mine" ? myAssetsScreenHtml(items) : worksiteAssetsScreenHtml(worksiteGroups);
 
       root.innerHTML = `
@@ -894,12 +1048,21 @@
       if (back) back.onclick = () => {
         // 공동 배정/보유 대상 전체보기는 자산 상세로, 자산 상세는 진입 직전 화면(내 자산/근무지 자산/
         // 전체보기)으로, 전체보기는 근무지 자산 탭으로, 그 외엔 메뉴로 복귀
-        if (state.screen === "asset-parties") { state.screen = "asset-detail"; }
+        if (["asset-parties", "asset-form", "asset-history"].includes(state.screen)) { state.screen = "asset-detail"; delete state.form; }
         else if (state.screen === "asset-detail" && state.detailFrom) { Object.assign(state, state.detailFrom); delete state.detailFrom; }
         else if (state.screen === "worksite-detail") { state.screen = "assets"; state.assetTab = "worksite"; }
         else { state.screen = "menu"; }
         draw();
       };
+      // 액션 완료 후 화면 복귀 — 반납·재배정(다른 대상으로)·보유 해제·폐기처럼 이 카드가 나타내던 target의
+      // 레코드가 사라졌으면 진입 직전 목록으로, 아니면 자산 상세로(배정 추가·보유 대상 추가·재배정 페이지 포함)
+      function afterMutate() {
+        const a = assets.find(x => x.id === state.detailAssetId);
+        if (findRecord(a, state.detailTarget).idx < 0) { Object.assign(state, state.detailFrom); delete state.detailFrom; }
+        else state.screen = "asset-detail";
+        delete state.form;
+        draw();
+      }
       // 자산 카드 클릭 → 자산 상세(앱) 이동. target(이 카드가 나타내는 구체적 배정/보유 레코드의 주체)은
       // 화면별로 다름: 내 자산 탭은 ME 본인, 근무지 자산(카드 안 축약 카드)·전체보기는 그 카드가 속한 근무지
       function openDetail(assetId, target) {
@@ -916,22 +1079,30 @@
       } else if (state.screen === "asset-detail") {
         const a = assets.find(x => x.id === state.detailAssetId);
         const target = state.detailTarget;
-        function afterMutate() {
-          // 반납·재배정(다른 대상으로)·보유 해제·폐기처럼 이 target의 레코드가 더 이상 없어지면 목록으로 복귀
-          if (findRecord(a, target).idx < 0) { Object.assign(state, state.detailFrom); delete state.detailFrom; }
+        // 상태 변경 — 상태만 바꾸고 이력에 "상태 변경: …" 1건 기록(detail.js applyStatusChange와 동일)
+        const setStatus = (script, next) => () => {
+          const before = STATUS_LABEL[a.status][0];
+          a.status = next();
+          logActivity(a, { script, before, after: STATUS_LABEL[a.status][0] });
+        };
+        // 배정 추가·재배정·보유 대상 추가는 팝업이 아니라 별도 페이지(asset-form)로 이동
+        const openForm = kind => {
+          state.form = { kind, picked: null, draft: { employee: null, worksite: null }, dateText: "", qtyText: "" };
+          state.screen = "asset-form";
           draw();
-        }
+        };
         function dispatchAction(key) {
           const { idx } = findRecord(a, target);
-          if (key === "assign-add") openAssignAddModal(a, afterMutate);
-          else if (key === "reassign") openReassignModal(a, idx, afterMutate);
+          if (key === "history") { state.screen = "asset-history"; draw(); }
+          else if (key === "assign-add") openForm("assign-add");
+          else if (key === "reassign") openForm("reassign");
+          else if (key === "hold-add") openForm("hold-add");
           else if (key === "return") openReturnConfirm(a, idx, afterMutate);
-          else if (key === "lost-report") openStatusChangeConfirm(a, "분실 신고하시겠습니까?", "분실 신고 시 기존 배정은 유지된 채 상태만 분실로 변경됩니다.", () => { a.status = "lost"; }, afterMutate);
-          else if (key === "lost-recover") openStatusChangeConfirm(a, "분실 회수 처리하시겠습니까?", "분실 회수 시 배정 여부에 따라 배정 중 또는 재고 상태로 돌아갑니다.", () => { a.status = derivedActiveStatus(a); }, afterMutate);
-          else if (key === "repair-start") openStatusChangeConfirm(a, "수리 접수하시겠습니까?", "수리 접수 시 기존 배정은 유지된 채 상태만 수리 중으로 변경됩니다.", () => { a.status = "repair"; }, afterMutate);
-          else if (key === "repair-done") openStatusChangeConfirm(a, "수리 완료 처리하시겠습니까?", "수리 완료 시 배정 여부에 따라 배정 중 또는 재고 상태로 돌아갑니다.", () => { a.status = derivedActiveStatus(a); }, afterMutate);
+          else if (key === "lost-report") openStatusChangeConfirm(a, "분실 신고하시겠습니까?", "분실 신고 시 기존 배정은 유지된 채 상태만 분실로 변경됩니다.", setStatus("상태 변경: 분실 신고", () => "lost"), afterMutate);
+          else if (key === "lost-recover") openStatusChangeConfirm(a, "분실 회수 처리하시겠습니까?", "분실 회수 시 배정 여부에 따라 배정 중 또는 재고 상태로 돌아갑니다.", setStatus("상태 변경: 분실 회수", () => derivedActiveStatus(a)), afterMutate);
+          else if (key === "repair-start") openStatusChangeConfirm(a, "수리 접수하시겠습니까?", "수리 접수 시 기존 배정은 유지된 채 상태만 수리 중으로 변경됩니다.", setStatus("상태 변경: 수리 접수", () => "repair"), afterMutate);
+          else if (key === "repair-done") openStatusChangeConfirm(a, "수리 완료 처리하시겠습니까?", "수리 완료 시 배정 여부에 따라 배정 중 또는 재고 상태로 돌아갑니다.", setStatus("상태 변경: 수리 완료", () => derivedActiveStatus(a)), afterMutate);
           else if (key === "dispose") openDisposeConfirmModal(a, afterMutate);
-          else if (key === "hold-add") openHoldAddModal(a, afterMutate);
           else if (key === "qty-change") openQtyChangeModal(a, idx, afterMutate);
           else if (key === "hold-release") openHoldReleaseConfirm(a, idx, afterMutate);
         }
@@ -940,7 +1111,7 @@
         const statusOpen = root.querySelector("[data-status-open]");
         if (statusOpen) statusOpen.onclick = () => openDropdownMenu(statusOpen, statusActions(a), dispatchAction);
         const moreOpen = root.querySelector("[data-more-open]");
-        if (moreOpen) moreOpen.onclick = () => openDropdownMenu(moreOpen, manageActions(a, target), dispatchAction);
+        if (moreOpen) moreOpen.onclick = () => openDropdownMenu(moreOpen, menuActions(a, target), dispatchAction);
         // 대표 이미지 클릭 → 사진 뷰어(조회 전용, 권한과 무관, 사진 없으면 disabled라 클릭 안 먹음)
         const heroBtn = root.querySelector("[data-hero-viewer]");
         if (heroBtn) heroBtn.onclick = () => openPhotoViewer(a);
@@ -953,6 +1124,153 @@
         // 공동 배정/보유 대상 "전체보기" → 전용 목록 화면
         const partiesViewall = root.querySelector("[data-parties-viewall]");
         if (partiesViewall) partiesViewall.onclick = () => { state.screen = "asset-parties"; draw(); };
+      }
+      // 이력 페이지 — 수량형 검색은 목록 영역만 다시 그림(입력창을 재렌더하지 않아 한글 IME 조합이 안 깨짐)
+      if (state.screen === "asset-history") {
+        const a = assets.find(x => x.id === state.detailAssetId);
+        const q = root.querySelector("[data-history-q]");
+        const list = root.querySelector("[data-history-list]");
+        if (q) q.addEventListener("input", () => { list.innerHTML = timelineHtml(a, q.value); });
+      }
+      // 배정 추가·재배정·보유 대상 추가 페이지 — detail.js 모달과 동일한 상태 보존 방식(라디오 전환·피커 적용 때
+      // 본문만 다시 그려도 입력한 배정일/수량 텍스트와 각 종류별로 골라둔 대상이 안 날아가게 state.form에 보관)
+      if (state.screen === "asset-form") {
+        const f = state.form;
+        const a = assets.find(x => x.id === state.detailAssetId);
+        const target = state.detailTarget;
+        const cfg = FORM_CFG[f.kind];
+        const body = root.querySelector("[data-form-body]");
+        const saveBtn = root.querySelector("[data-form-save]");
+        const old = f.kind === "reassign" ? a.assignments[findRecord(a, target).idx] : null;
+        const heldNames = f.kind === "hold-add" ? (a.stocks || []).map(x => x.employee || x.worksite) : [];
+        const remaining = f.kind === "hold-add" ? a.totalQty - (a.stocks || []).reduce((sum, x) => sum + x.qty, 0) : 0;
+        let getDate = () => null;
+        const qtyVal = () => { const n = parseInt(f.qtyText, 10); return Number.isFinite(n) ? n : null; };
+        const targetSummaryHtml = k => {
+          const val = f.draft[k];
+          if (!val) return `<button type="button" class="perm-target-btn" data-target-open><span class="muted">선택</span><span class="chev">›</span></button>`;
+          const avatar = k === "employee" ? `<span class="picker-avatar sm" style="background:${avatarColor(val)}">${val[0]}</span>` : "";
+          return `
+            <div class="aa-target-selected" data-target-open>
+              ${avatar}<span class="perm-chip">${val}</span>
+              <button type="button" class="aa-target-x" data-target-clear aria-label="선택 해제">${CLOSE_ICON}</button>
+            </div>`;
+        };
+        const updateSaveState = () => {
+          const hasTarget = !!(f.picked && f.draft[f.picked]);
+          if (f.kind === "hold-add") { const v = qtyVal(); saveBtn.disabled = !(hasTarget && v !== null && v >= 1 && v <= remaining); }
+          else saveBtn.disabled = !(hasTarget && getDate());
+        };
+        function drawBody() {
+          body.innerHTML = `
+            ${old ? `
+              <div class="ra-current">
+                <div class="perm-info-note">${INFO_ICON}<span>기존 배정이 새 대상으로 교체됩니다.</span></div>
+                <div class="acard">
+                  ${typeBadge(old)}
+                  <div class="acard-id">${assignIdentity(old)}</div>
+                  <div class="acard-foot"><span class="acard-date">배정일 <b>${window.fmtDate(old.since)}</b></span></div>
+                </div>
+              </div>` : ""}
+            <div class="field">
+              <label>${cfg.targetLabel}</label>
+              <label class="radio-row"><input type="radio" name="form-kind" value="employee"${f.picked === "employee" ? " checked" : ""}><span>구성원</span></label>
+              ${f.picked === "employee" ? `<div class="perm-target-wrap">${targetSummaryHtml("employee")}</div>` : ""}
+              <label class="radio-row"><input type="radio" name="form-kind" value="worksite"${f.picked === "worksite" ? " checked" : ""}><span>근무지</span></label>
+              ${f.picked === "worksite" ? `<div class="perm-target-wrap">${targetSummaryHtml("worksite")}</div>` : ""}
+            </div>
+            ${f.kind === "hold-add" ? `
+              <div class="field">
+                <label>보유 수량</label>
+                <div class="qty-stepper">
+                  <button type="button" class="qty-step" data-qminus aria-label="수량 감소">－</button>
+                  <input type="text" inputmode="numeric" data-qinput placeholder="입력" value="">
+                  <button type="button" class="qty-step" data-qplus aria-label="수량 증가">＋</button>
+                </div>
+                <div class="acard-sub" style="margin-top:5px">잔여 수량 <b>${remaining}개</b></div>
+              </div>` : `
+              <div class="field">
+                <label>${f.kind === "reassign" ? "새 배정일" : "배정일"}</label>
+                ${dateFieldHtml("")}
+              </div>`}`;
+
+          body.querySelectorAll('input[name="form-kind"]').forEach(r => r.onchange = () => { f.picked = r.value; drawBody(); });
+          const openBtn = body.querySelector("[data-target-open]");
+          if (openBtn) openBtn.onclick = () => {
+            const exclude = f.kind === "reassign" ? (f.picked === "employee" ? old.employee : old.worksite) : f.kind === "hold-add" ? heldNames : null;
+            if (f.picked === "employee") openAssignMemberPicker(f.draft.employee, v => { f.draft.employee = v; drawBody(); }, exclude);
+            else openAssignWorksitePicker(f.draft.worksite, v => { f.draft.worksite = v; drawBody(); }, exclude);
+          };
+          const clearBtn = body.querySelector("[data-target-clear]");
+          if (clearBtn) clearBtn.onclick = e => { e.stopPropagation(); f.draft[f.picked] = null; drawBody(); };
+
+          if (f.kind === "hold-add") {
+            const qinput = body.querySelector("[data-qinput]");
+            const minus = body.querySelector("[data-qminus]");
+            const plus = body.querySelector("[data-qplus]");
+            if (f.qtyText) qinput.value = f.qtyText;
+            const syncQty = () => {
+              const v = qtyVal();
+              minus.disabled = v === null || v <= 1;
+              plus.disabled = v !== null && v >= remaining;
+              updateSaveState();
+            };
+            qinput.addEventListener("input", () => { qinput.value = qinput.value.replace(/[^0-9]/g, ""); f.qtyText = qinput.value; syncQty(); });
+            minus.onclick = () => { const v = qtyVal(); if (v !== null && v > 1) { qinput.value = v - 1; f.qtyText = qinput.value; syncQty(); } };
+            plus.onclick = () => { const v = qtyVal() ?? 0; if (v < remaining) { qinput.value = v + 1; f.qtyText = qinput.value; syncQty(); } };
+            syncQty();
+          } else {
+            const dtext = body.querySelector("[data-dtext]");
+            if (f.dateText) dtext.value = f.dateText;
+            getDate = wireDateField(body, todayStr(), () => { f.dateText = dtext.value; updateSaveState(); });
+            updateSaveState();
+          }
+        }
+        drawBody();
+
+        const leave = () => { state.screen = "asset-detail"; delete state.form; draw(); };
+        root.querySelector("[data-form-cancel]").onclick = leave;
+        saveBtn.onclick = () => {
+          if (saveBtn.disabled) return;
+          const who = f.draft[f.picked];
+          const mk = extra => f.picked === "employee" ? { employee: who, worksite: null, ...extra } : { employee: null, worksite: who, ...extra };
+          if (f.kind === "assign-add") {
+            const d = getDate();
+            const record = mk({ since: d });
+            confirmModal(cfg.confirm, "", () => {
+              (a.assignments || (a.assignments = [])).push(record);
+              // 재고⟷배정중만 배정/반납으로 자동 파생(수리중·분실·폐기는 배정 여부와 무관하게 별도 관리)
+              if (a.status === "stock") a.status = "assigned";
+              logActivity(a, { script: "배정 관리: 신규 배정", target: record, before: "", after: window.fmtDate(d) });
+              toast("추가되었습니다.");
+              afterMutate();
+            });
+          } else if (f.kind === "reassign") {
+            const d = getDate();
+            const record = mk({ since: d });
+            confirmModal(cfg.confirm, "", () => {
+              // 반납+신규배정이 아니라 기존 활성 레코드의 대상 자체를 그 자리에서 교체(구조설계안 2.3). target을
+              // 특정 한쪽으로 고정할 수 없어 before/after 텍스트로 표현(detail.js와 동일)
+              const idx = findRecord(a, target).idx;
+              const beforeLabel = `${old.employee || old.worksite} · ${window.fmtDate(old.since)}`;
+              const afterLabel = `${record.employee || record.worksite} · ${window.fmtDate(d)}`;
+              a.assignments[idx] = record;
+              logActivity(a, { script: "배정 관리: 재배정", before: beforeLabel, after: afterLabel });
+              toast("재배정되었습니다.");
+              afterMutate();
+            });
+          } else {
+            const v = qtyVal();
+            const record = mk({ qty: v });
+            confirmModal(cfg.confirm, "", () => {
+              (a.stocks || (a.stocks = [])).push(record);
+              a.status = derivedHeldStatus(a);
+              logActivity(a, { script: "보유 관리: 보유 대상 추가", target: record, before: "", after: `${v}개` });
+              toast("추가되었습니다.");
+              afterMutate();
+            });
+          }
+        };
       }
       const gotoAssets = root.querySelector('[data-mapp-goto="assets"]');
       if (gotoAssets) gotoAssets.onclick = () => { state.screen = "assets"; state.assetTab = "mine"; draw(); };
