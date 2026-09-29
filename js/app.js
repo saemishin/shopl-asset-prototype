@@ -905,18 +905,21 @@
       onDone();
     };
   }
+  // 메모 수정 — 바텀시트(2026-09-29, 센터 모달에서 전환). 메모는 길어질 수 있어 센터 모달보다 세로 공간이
+  // 넉넉한 시트가 유리 — 배정 추가/재배정 시트(.mapp-sheet, max-height:80vh)와 같은 컨테이너를 쓰되,
+  // 입력란만 있는 화면이라 텍스트영역에 넉넉한 최소 높이를 직접 줘서 그 시트들과 비슷한 체감 높이로 맞춤
   function openMemoEditModal(a, onDone) {
     const back = document.createElement("div");
-    back.className = "modal-back";
+    back.className = "mapp-sheet-back";
     back.innerHTML = `
-      <div class="modal" style="width:360px">
-        <div class="body" style="padding-top:20px">
-          <p style="font-size:14px;font-weight:700;margin-bottom:10px">메모 수정</p>
-          <textarea data-memo-input maxlength="500" placeholder="메모를 입력하세요" style="width:100%;min-height:120px;border:1px solid var(--line-strong);border-radius:8px;padding:10px;font:inherit;resize:vertical">${a.note || ""}</textarea>
+      <div class="mapp-sheet">
+        <div class="mapp-sheet-head">메모 수정</div>
+        <div class="mapp-sheet-body" style="display:flex">
+          <textarea data-memo-input maxlength="500" placeholder="메모를 입력하세요" style="width:100%;flex:1;min-height:280px;border:1px solid var(--line-strong);border-radius:8px;padding:10px;font:inherit;resize:none">${a.note || ""}</textarea>
         </div>
-        <div class="foot">
-          <button class="btn" data-cclose>취소</button>
-          <button class="btn primary" data-cok>저장</button>
+        <div class="mapp-sheet-foot">
+          <button type="button" class="btn" data-cclose>취소</button>
+          <button type="button" class="btn primary" data-cok>저장</button>
         </div>
       </div>`;
     document.body.appendChild(back);
@@ -982,38 +985,34 @@
     if (a.type !== "individual" || !canManage(a)) return [];
     return STATUS_TRANSITIONS[a.status].map(([key, label]) => ({ key, label, danger: key === "dispose" }));
   }
-  // 배정/보유 관리 액션(상단바 "더보기" → 바텀시트) — 상태 변경류를 제외한 나머지: 재배정·배정 추가·반납
+  // 배정/보유 관리 액션(상단바 "더보기" → 드롭다운) — 상태 변경류를 제외한 나머지: 재배정·배정 추가·반납
   // (개별형), 수량 변경·보유 대상 추가/해제(수량형), 사진 관리(공통). 폐기되지 않았고 배정/보유 변경 권한이
   // 있는 자산에 한해서만 노출. 메모 수정·사진 관리는 더보기가 아니라 각각 메모 값 옆 편집 아이콘/대표 이미지
-  // 위 편집 아이콘으로 별도 제공(2026-09-27, assetDetailScreenHtml 참조) — 대시보드 detail.js와 동일한 구조
+  // 위 편집 아이콘으로 별도 제공(2026-09-27, assetDetailScreenHtml 참조) — 대시보드 detail.js와 동일한 구조.
+  // 순서는 "자주 쓰는 것 먼저, 되돌리는 액션(반납/보유 해제)은 맨 아래 빨간 글씨"(2026-09-29 재정렬)
   function manageActions(a, target) {
     if (a.status === "disposed" || !canManage(a)) return [];
     const acts = [];
     if (a.type === "individual") {
       const { idx } = findRecord(a, target);
       const activeCount = (a.assignments || []).length;
-      if (idx >= 0) {
-        acts.push({ key: "reassign", label: "재배정" });
-        acts.push({ key: "return", label: "반납" });
-      }
+      if (idx >= 0) acts.push({ key: "reassign", label: "재배정" });
       if (activeCount < 5) acts.push({ key: "assign-add", label: "배정 추가" });
+      if (idx >= 0) acts.push({ key: "return", label: "반납", danger: true });
     } else {
       const { idx } = findRecord(a, target);
       const remaining = a.totalQty - (a.stocks || []).reduce((s, x) => s + x.qty, 0);
-      if (idx >= 0) {
-        acts.push({ key: "qty-change", label: "수량 변경" });
-        acts.push({ key: "hold-release", label: "보유 해제", danger: true });
-      }
+      if (idx >= 0) acts.push({ key: "qty-change", label: "수량 변경" });
       if (remaining > 0) acts.push({ key: "hold-add", label: "보유 대상 추가" });
+      if (idx >= 0) acts.push({ key: "hold-release", label: "보유 해제", danger: true });
     }
     return acts;
   }
-  // 상단바 "더보기" 메뉴 전체 — 맨 위에 "이력 보기"(자산의 이력 페이지로 이동, 개별형·수량형 공통), 그 아래
-  // 구분선 뒤에 배정/보유 관리 액션. 이력 조회는 조회 전용이라 배정/보유 변경 권한·폐기 여부와 무관하게 항상 있음
-  // (그래서 권한이 없거나 폐기된 자산도 더보기 버튼 자체는 남고, 메뉴엔 "이력 보기"만 뜸)
+  // 상단바 "더보기" 메뉴 전체 — 맨 위에 "자산 이력"(자산의 이력 페이지로 이동, 개별형·수량형 공통), 그 아래
+  // 배정/보유 관리 액션(구분선 없이 이어서, 2026-09-29). 이력 조회는 조회 전용이라 배정/보유 변경 권한·폐기
+  // 여부와 무관하게 항상 있음(그래서 권한이 없거나 폐기된 자산도 더보기 버튼 자체는 남고, 메뉴엔 "자산 이력"만 뜸)
   function menuActions(a, target) {
-    const manage = manageActions(a, target).map((x, i) => i === 0 ? { ...x, sep: true } : x);
-    return [{ key: "history", label: "이력 보기" }, ...manage];
+    return [{ key: "history", label: "자산 이력" }, ...manageActions(a, target)];
   }
   // 앵커 드롭다운 — 상태 뱃지·상단바 "더보기"가 공유. 대시보드 detail.js의 statusDropdown/moreDropdown과
   // 동일한 패턴(버튼 바로 아래 고정 위치, 바깥 클릭 시 닫힘)으로 통일(2026-09-27, 이전엔 바텀시트였음)
