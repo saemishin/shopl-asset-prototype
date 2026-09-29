@@ -3,9 +3,10 @@
    자산 상세는 배정/보유 변경 권한(assign_permission_type, category.js에 저장된 소분류별 값으로 실제 판정)이
    있는 자산에 한해 재배정·배정 추가·반납·분실 신고/회수·수리 접수/완료·폐기·보유 대상 추가/변경/해제·사진
    관리 액션을 제공(자산 관리 권한 소관인 필드 수정·소분류 이동 등은 스코프 밖). 배정 추가·재배정·보유 대상
-   추가는 대시보드처럼 팝업이 아니라 별도 페이지(asset-form)로 처리(2026-09-28), 상단바 "더보기" 맨 위엔
-   그 자산의 이력 페이지(asset-history, 조회 전용이라 권한 무관)로 가는 항목이 항상 있음. 실 앱 화면(근무지
-   목록/보고서/게시판/근무지 상세 정보탭의 "더보기" 카드 패턴)을 참고해 리스트 화면 공통 요소를 재현. */
+   추가는 대시보드 모달과 동일한 구성의 바텀시트(openFormSheet, 2026-09-28 — 페이지로 했다가 필드가 적어
+   어색해서 되돌림), 상단바 "더보기" 맨 위엔 그 자산의 이력 페이지(asset-history, 조회 전용이라 권한 무관)로
+   가는 항목이 항상 있음. 실 앱 화면(근무지 목록/보고서/게시판/근무지 상세 정보탭의 "더보기" 카드 패턴)을
+   참고해 리스트 화면 공통 요소를 재현. */
 (function () {
   const { assets } = window.DATA;
   function toast(msg) {
@@ -624,27 +625,168 @@
     p.querySelector("[data-ok]").onclick = () => { p.remove(); onApply(picked); };
   }
 
-  // ===== 배정 추가·재배정·보유 대상 추가 — 앱에서는 팝업이 아니라 별도 페이지(2026-09-28) =====
+  // ===== 배정 추가·재배정·보유 대상 추가 — 바텀시트(2026-09-28, 페이지였다가 필드가 적어 어색해서 되돌림) =====
   // 구성요소·문구는 대시보드 모달(detail.js openAssignAddModal/openReassignModal/openHoldAddModal)과 동일: 대상
-  // 라디오(구성원/근무지)+"선택 ›"→피커, 배정일 또는 보유 수량 스테퍼, 저장 시 확인 팝업. 단일 화면(asset-form)이
-  // state.form.kind로 세 가지를 분기. 재배정은 기존 배정 카드(읽기전용)+안내 문구가 위에 붙고 새 대상 후보에서
-  // 현재 대상을 제외, 보유 대상 추가는 이미 보유 중인 대상 전체를 후보에서 제외(detail.js와 동일 규칙)
+  // 라디오(구성원/근무지)+"선택 ›"→피커(그 위에 겹쳐 뜸, 실 앱의 액션시트 위 모달 패턴과 동일), 배정일 또는
+  // 보유 수량 스테퍼, 저장 시 확인 팝업. kind로 세 가지를 분기. 재배정은 기존 배정 카드(읽기전용)+안내 문구가
+  // 위에 붙고 새 대상 후보에서 현재 대상을 제외, 보유 대상 추가는 이미 보유 중인 대상 전체를 후보에서 제외
+  // (detail.js와 동일 규칙)
   const FORM_CFG = {
     "assign-add": { title: "배정 추가", targetLabel: "배정 대상", confirm: "배정을 추가하시겠습니까?" },
     "reassign": { title: "재배정", targetLabel: "새 배정 대상", confirm: "재배정하시겠습니까?" },
     "hold-add": { title: "보유 대상 추가", targetLabel: "보유 대상", confirm: "보유 대상을 추가하시겠습니까?" },
   };
-  function formScreenHtml(kind) {
-    return `
-      <div class="mapp-topbar">
-        <button type="button" class="mapp-back" data-mapp-back aria-label="뒤로">←</button>
-        <span class="mapp-topbar-title">${FORM_CFG[kind].title}</span>
-      </div>
-      <div class="mapp-body" data-form-body></div>
-      <div class="mapp-form-foot">
-        <button type="button" class="btn" data-form-cancel>취소</button>
-        <button type="button" class="btn primary" data-form-save disabled>저장</button>
+  function openFormSheet(a, target, kind, afterMutate) {
+    const cfg = FORM_CFG[kind];
+    const f = { picked: null, draft: { employee: null, worksite: null }, dateText: "", qtyText: "" };
+    const old = kind === "reassign" ? a.assignments[findRecord(a, target).idx] : null;
+    const heldNames = kind === "hold-add" ? (a.stocks || []).map(x => x.employee || x.worksite) : [];
+    const remaining = kind === "hold-add" ? a.totalQty - (a.stocks || []).reduce((s, x) => s + x.qty, 0) : 0;
+
+    const back = document.createElement("div");
+    back.className = "mapp-sheet-back";
+    back.innerHTML = `
+      <div class="mapp-sheet">
+        <div class="mapp-sheet-head">${cfg.title}</div>
+        <div class="mapp-sheet-body" data-form-body></div>
+        <div class="mapp-sheet-foot">
+          <button type="button" class="btn" data-form-cancel>취소</button>
+          <button type="button" class="btn primary" data-form-save disabled>저장</button>
+        </div>
       </div>`;
+    document.body.appendChild(back);
+    const body = back.querySelector("[data-form-body]");
+    const saveBtn = back.querySelector("[data-form-save]");
+    let getDate = () => null;
+    const qtyVal = () => { const n = parseInt(f.qtyText, 10); return Number.isFinite(n) ? n : null; };
+    const targetSummaryHtml = k => {
+      const val = f.draft[k];
+      if (!val) return `<button type="button" class="perm-target-btn" data-target-open><span class="muted">선택</span><span class="chev">›</span></button>`;
+      const avatar = k === "employee" ? `<span class="picker-avatar sm" style="background:${avatarColor(val)}">${val[0]}</span>` : "";
+      return `
+        <div class="aa-target-selected" data-target-open>
+          ${avatar}<span class="perm-chip">${val}</span>
+          <button type="button" class="aa-target-x" data-target-clear aria-label="선택 해제">${CLOSE_ICON}</button>
+        </div>`;
+    };
+    const updateSaveState = () => {
+      const hasTarget = !!(f.picked && f.draft[f.picked]);
+      if (kind === "hold-add") { const v = qtyVal(); saveBtn.disabled = !(hasTarget && v !== null && v >= 1 && v <= remaining); }
+      else saveBtn.disabled = !(hasTarget && getDate());
+    };
+    function drawBody() {
+      body.innerHTML = `
+        ${old ? `
+          <div class="ra-current">
+            <div class="perm-info-note">${INFO_ICON}<span>기존 배정이 새 대상으로 교체됩니다.</span></div>
+            <div class="acard">
+              ${typeBadge(old)}
+              <div class="acard-id">${assignIdentity(old)}</div>
+              <div class="acard-foot"><span class="acard-date">배정일 <b>${window.fmtDate(old.since)}</b></span></div>
+            </div>
+          </div>` : ""}
+        <div class="field">
+          <label>${cfg.targetLabel}</label>
+          <label class="radio-row"><input type="radio" name="form-kind" value="employee"${f.picked === "employee" ? " checked" : ""}><span>구성원</span></label>
+          ${f.picked === "employee" ? `<div class="perm-target-wrap">${targetSummaryHtml("employee")}</div>` : ""}
+          <label class="radio-row"><input type="radio" name="form-kind" value="worksite"${f.picked === "worksite" ? " checked" : ""}><span>근무지</span></label>
+          ${f.picked === "worksite" ? `<div class="perm-target-wrap">${targetSummaryHtml("worksite")}</div>` : ""}
+        </div>
+        ${kind === "hold-add" ? `
+          <div class="field">
+            <label>보유 수량</label>
+            <div class="qty-stepper">
+              <button type="button" class="qty-step" data-qminus aria-label="수량 감소">－</button>
+              <input type="text" inputmode="numeric" data-qinput placeholder="입력" value="">
+              <button type="button" class="qty-step" data-qplus aria-label="수량 증가">＋</button>
+            </div>
+            <div class="acard-sub" style="margin-top:5px">잔여 수량 <b>${remaining}개</b></div>
+          </div>` : `
+          <div class="field">
+            <label>${kind === "reassign" ? "새 배정일" : "배정일"}</label>
+            ${dateFieldHtml("")}
+          </div>`}`;
+
+      body.querySelectorAll('input[name="form-kind"]').forEach(r => r.onchange = () => { f.picked = r.value; drawBody(); });
+      const openBtn = body.querySelector("[data-target-open]");
+      if (openBtn) openBtn.onclick = () => {
+        const exclude = kind === "reassign" ? (f.picked === "employee" ? old.employee : old.worksite) : kind === "hold-add" ? heldNames : null;
+        if (f.picked === "employee") openAssignMemberPicker(f.draft.employee, v => { f.draft.employee = v; drawBody(); }, exclude);
+        else openAssignWorksitePicker(f.draft.worksite, v => { f.draft.worksite = v; drawBody(); }, exclude);
+      };
+      const clearBtn = body.querySelector("[data-target-clear]");
+      if (clearBtn) clearBtn.onclick = e => { e.stopPropagation(); f.draft[f.picked] = null; drawBody(); };
+
+      if (kind === "hold-add") {
+        const qinput = body.querySelector("[data-qinput]");
+        const minus = body.querySelector("[data-qminus]");
+        const plus = body.querySelector("[data-qplus]");
+        if (f.qtyText) qinput.value = f.qtyText;
+        const syncQty = () => {
+          const v = qtyVal();
+          minus.disabled = v === null || v <= 1;
+          plus.disabled = v !== null && v >= remaining;
+          updateSaveState();
+        };
+        qinput.addEventListener("input", () => { qinput.value = qinput.value.replace(/[^0-9]/g, ""); f.qtyText = qinput.value; syncQty(); });
+        minus.onclick = () => { const v = qtyVal(); if (v !== null && v > 1) { qinput.value = v - 1; f.qtyText = qinput.value; syncQty(); } };
+        plus.onclick = () => { const v = qtyVal() ?? 0; if (v < remaining) { qinput.value = v + 1; f.qtyText = qinput.value; syncQty(); } };
+        syncQty();
+      } else {
+        const dtext = body.querySelector("[data-dtext]");
+        if (f.dateText) dtext.value = f.dateText;
+        getDate = wireDateField(body, todayStr(), () => { f.dateText = dtext.value; updateSaveState(); });
+        updateSaveState();
+      }
+    }
+    drawBody();
+
+    back.addEventListener("click", e => { if (e.target === back) back.remove(); });
+    back.querySelector("[data-form-cancel]").onclick = () => back.remove();
+    saveBtn.onclick = () => {
+      if (saveBtn.disabled) return;
+      const who = f.draft[f.picked];
+      const mk = extra => f.picked === "employee" ? { employee: who, worksite: null, ...extra } : { employee: null, worksite: who, ...extra };
+      if (kind === "assign-add") {
+        const d = getDate();
+        const record = mk({ since: d });
+        confirmModal(cfg.confirm, "", () => {
+          back.remove();
+          (a.assignments || (a.assignments = [])).push(record);
+          // 재고⟷배정중만 배정/반납으로 자동 파생(수리중·분실·폐기는 배정 여부와 무관하게 별도 관리)
+          if (a.status === "stock") a.status = "assigned";
+          logActivity(a, { script: "배정 관리: 신규 배정", target: record, before: "", after: window.fmtDate(d) });
+          toast("추가되었습니다.");
+          afterMutate();
+        });
+      } else if (kind === "reassign") {
+        const d = getDate();
+        const record = mk({ since: d });
+        confirmModal(cfg.confirm, "", () => {
+          back.remove();
+          // 반납+신규배정이 아니라 기존 활성 레코드의 대상 자체를 그 자리에서 교체(구조설계안 2.3). target을
+          // 특정 한쪽으로 고정할 수 없어 before/after 텍스트로 표현(detail.js와 동일)
+          const idx = findRecord(a, target).idx;
+          const beforeLabel = `${old.employee || old.worksite} · ${window.fmtDate(old.since)}`;
+          const afterLabel = `${record.employee || record.worksite} · ${window.fmtDate(d)}`;
+          a.assignments[idx] = record;
+          logActivity(a, { script: "배정 관리: 재배정", before: beforeLabel, after: afterLabel });
+          toast("재배정되었습니다.");
+          afterMutate();
+        });
+      } else {
+        const v = qtyVal();
+        const record = mk({ qty: v });
+        confirmModal(cfg.confirm, "", () => {
+          back.remove();
+          (a.stocks || (a.stocks = [])).push(record);
+          a.status = derivedHeldStatus(a);
+          logActivity(a, { script: "보유 관리: 보유 대상 추가", target: record, before: "", after: `${v}개` });
+          toast("추가되었습니다.");
+          afterMutate();
+        });
+      }
+    };
   }
   function openReturnConfirm(a, idx, onDone) {
     confirmModal("반납하시겠습니까?", "반납하면 배정에서 제거됩니다.", () => {
@@ -1031,7 +1173,6 @@
         : state.screen === "worksite-detail" ? worksiteDetailScreenHtml(state.wsDetail, state.wsDetailSub, itemsForWorksite(state.wsDetail, state.wsDetailSub))
         : state.screen === "asset-detail" ? assetDetailScreenHtml(assets.find(x => x.id === state.detailAssetId), state.detailTarget)
         : state.screen === "asset-parties" ? partiesScreenHtml(assets.find(x => x.id === state.detailAssetId), state.detailTarget)
-        : state.screen === "asset-form" ? formScreenHtml(state.form.kind)
         : state.screen === "asset-history" ? historyScreenHtml(assets.find(x => x.id === state.detailAssetId))
         : state.assetTab === "mine" ? myAssetsScreenHtml(items) : worksiteAssetsScreenHtml(worksiteGroups);
 
@@ -1048,7 +1189,7 @@
       if (back) back.onclick = () => {
         // 공동 배정/보유 대상 전체보기는 자산 상세로, 자산 상세는 진입 직전 화면(내 자산/근무지 자산/
         // 전체보기)으로, 전체보기는 근무지 자산 탭으로, 그 외엔 메뉴로 복귀
-        if (["asset-parties", "asset-form", "asset-history"].includes(state.screen)) { state.screen = "asset-detail"; delete state.form; }
+        if (["asset-parties", "asset-history"].includes(state.screen)) { state.screen = "asset-detail"; }
         else if (state.screen === "asset-detail" && state.detailFrom) { Object.assign(state, state.detailFrom); delete state.detailFrom; }
         else if (state.screen === "worksite-detail") { state.screen = "assets"; state.assetTab = "worksite"; }
         else { state.screen = "menu"; }
@@ -1059,8 +1200,6 @@
       function afterMutate() {
         const a = assets.find(x => x.id === state.detailAssetId);
         if (findRecord(a, state.detailTarget).idx < 0) { Object.assign(state, state.detailFrom); delete state.detailFrom; }
-        else state.screen = "asset-detail";
-        delete state.form;
         draw();
       }
       // 자산 카드 클릭 → 자산 상세(앱) 이동. target(이 카드가 나타내는 구체적 배정/보유 레코드의 주체)은
@@ -1085,18 +1224,12 @@
           a.status = next();
           logActivity(a, { script, before, after: STATUS_LABEL[a.status][0] });
         };
-        // 배정 추가·재배정·보유 대상 추가는 팝업이 아니라 별도 페이지(asset-form)로 이동
-        const openForm = kind => {
-          state.form = { kind, picked: null, draft: { employee: null, worksite: null }, dateText: "", qtyText: "" };
-          state.screen = "asset-form";
-          draw();
-        };
         function dispatchAction(key) {
           const { idx } = findRecord(a, target);
           if (key === "history") { state.screen = "asset-history"; draw(); }
-          else if (key === "assign-add") openForm("assign-add");
-          else if (key === "reassign") openForm("reassign");
-          else if (key === "hold-add") openForm("hold-add");
+          else if (key === "assign-add") openFormSheet(a, target, "assign-add", afterMutate);
+          else if (key === "reassign") openFormSheet(a, target, "reassign", afterMutate);
+          else if (key === "hold-add") openFormSheet(a, target, "hold-add", afterMutate);
           else if (key === "return") openReturnConfirm(a, idx, afterMutate);
           else if (key === "lost-report") openStatusChangeConfirm(a, "분실 신고하시겠습니까?", "분실 신고 시 기존 배정은 유지된 채 상태만 분실로 변경됩니다.", setStatus("상태 변경: 분실 신고", () => "lost"), afterMutate);
           else if (key === "lost-recover") openStatusChangeConfirm(a, "분실 회수 처리하시겠습니까?", "분실 회수 시 배정 여부에 따라 배정 중 또는 재고 상태로 돌아갑니다.", setStatus("상태 변경: 분실 회수", () => derivedActiveStatus(a)), afterMutate);
@@ -1131,146 +1264,6 @@
         const q = root.querySelector("[data-history-q]");
         const list = root.querySelector("[data-history-list]");
         if (q) q.addEventListener("input", () => { list.innerHTML = timelineHtml(a, q.value); });
-      }
-      // 배정 추가·재배정·보유 대상 추가 페이지 — detail.js 모달과 동일한 상태 보존 방식(라디오 전환·피커 적용 때
-      // 본문만 다시 그려도 입력한 배정일/수량 텍스트와 각 종류별로 골라둔 대상이 안 날아가게 state.form에 보관)
-      if (state.screen === "asset-form") {
-        const f = state.form;
-        const a = assets.find(x => x.id === state.detailAssetId);
-        const target = state.detailTarget;
-        const cfg = FORM_CFG[f.kind];
-        const body = root.querySelector("[data-form-body]");
-        const saveBtn = root.querySelector("[data-form-save]");
-        const old = f.kind === "reassign" ? a.assignments[findRecord(a, target).idx] : null;
-        const heldNames = f.kind === "hold-add" ? (a.stocks || []).map(x => x.employee || x.worksite) : [];
-        const remaining = f.kind === "hold-add" ? a.totalQty - (a.stocks || []).reduce((sum, x) => sum + x.qty, 0) : 0;
-        let getDate = () => null;
-        const qtyVal = () => { const n = parseInt(f.qtyText, 10); return Number.isFinite(n) ? n : null; };
-        const targetSummaryHtml = k => {
-          const val = f.draft[k];
-          if (!val) return `<button type="button" class="perm-target-btn" data-target-open><span class="muted">선택</span><span class="chev">›</span></button>`;
-          const avatar = k === "employee" ? `<span class="picker-avatar sm" style="background:${avatarColor(val)}">${val[0]}</span>` : "";
-          return `
-            <div class="aa-target-selected" data-target-open>
-              ${avatar}<span class="perm-chip">${val}</span>
-              <button type="button" class="aa-target-x" data-target-clear aria-label="선택 해제">${CLOSE_ICON}</button>
-            </div>`;
-        };
-        const updateSaveState = () => {
-          const hasTarget = !!(f.picked && f.draft[f.picked]);
-          if (f.kind === "hold-add") { const v = qtyVal(); saveBtn.disabled = !(hasTarget && v !== null && v >= 1 && v <= remaining); }
-          else saveBtn.disabled = !(hasTarget && getDate());
-        };
-        function drawBody() {
-          body.innerHTML = `
-            ${old ? `
-              <div class="ra-current">
-                <div class="perm-info-note">${INFO_ICON}<span>기존 배정이 새 대상으로 교체됩니다.</span></div>
-                <div class="acard">
-                  ${typeBadge(old)}
-                  <div class="acard-id">${assignIdentity(old)}</div>
-                  <div class="acard-foot"><span class="acard-date">배정일 <b>${window.fmtDate(old.since)}</b></span></div>
-                </div>
-              </div>` : ""}
-            <div class="field">
-              <label>${cfg.targetLabel}</label>
-              <label class="radio-row"><input type="radio" name="form-kind" value="employee"${f.picked === "employee" ? " checked" : ""}><span>구성원</span></label>
-              ${f.picked === "employee" ? `<div class="perm-target-wrap">${targetSummaryHtml("employee")}</div>` : ""}
-              <label class="radio-row"><input type="radio" name="form-kind" value="worksite"${f.picked === "worksite" ? " checked" : ""}><span>근무지</span></label>
-              ${f.picked === "worksite" ? `<div class="perm-target-wrap">${targetSummaryHtml("worksite")}</div>` : ""}
-            </div>
-            ${f.kind === "hold-add" ? `
-              <div class="field">
-                <label>보유 수량</label>
-                <div class="qty-stepper">
-                  <button type="button" class="qty-step" data-qminus aria-label="수량 감소">－</button>
-                  <input type="text" inputmode="numeric" data-qinput placeholder="입력" value="">
-                  <button type="button" class="qty-step" data-qplus aria-label="수량 증가">＋</button>
-                </div>
-                <div class="acard-sub" style="margin-top:5px">잔여 수량 <b>${remaining}개</b></div>
-              </div>` : `
-              <div class="field">
-                <label>${f.kind === "reassign" ? "새 배정일" : "배정일"}</label>
-                ${dateFieldHtml("")}
-              </div>`}`;
-
-          body.querySelectorAll('input[name="form-kind"]').forEach(r => r.onchange = () => { f.picked = r.value; drawBody(); });
-          const openBtn = body.querySelector("[data-target-open]");
-          if (openBtn) openBtn.onclick = () => {
-            const exclude = f.kind === "reassign" ? (f.picked === "employee" ? old.employee : old.worksite) : f.kind === "hold-add" ? heldNames : null;
-            if (f.picked === "employee") openAssignMemberPicker(f.draft.employee, v => { f.draft.employee = v; drawBody(); }, exclude);
-            else openAssignWorksitePicker(f.draft.worksite, v => { f.draft.worksite = v; drawBody(); }, exclude);
-          };
-          const clearBtn = body.querySelector("[data-target-clear]");
-          if (clearBtn) clearBtn.onclick = e => { e.stopPropagation(); f.draft[f.picked] = null; drawBody(); };
-
-          if (f.kind === "hold-add") {
-            const qinput = body.querySelector("[data-qinput]");
-            const minus = body.querySelector("[data-qminus]");
-            const plus = body.querySelector("[data-qplus]");
-            if (f.qtyText) qinput.value = f.qtyText;
-            const syncQty = () => {
-              const v = qtyVal();
-              minus.disabled = v === null || v <= 1;
-              plus.disabled = v !== null && v >= remaining;
-              updateSaveState();
-            };
-            qinput.addEventListener("input", () => { qinput.value = qinput.value.replace(/[^0-9]/g, ""); f.qtyText = qinput.value; syncQty(); });
-            minus.onclick = () => { const v = qtyVal(); if (v !== null && v > 1) { qinput.value = v - 1; f.qtyText = qinput.value; syncQty(); } };
-            plus.onclick = () => { const v = qtyVal() ?? 0; if (v < remaining) { qinput.value = v + 1; f.qtyText = qinput.value; syncQty(); } };
-            syncQty();
-          } else {
-            const dtext = body.querySelector("[data-dtext]");
-            if (f.dateText) dtext.value = f.dateText;
-            getDate = wireDateField(body, todayStr(), () => { f.dateText = dtext.value; updateSaveState(); });
-            updateSaveState();
-          }
-        }
-        drawBody();
-
-        const leave = () => { state.screen = "asset-detail"; delete state.form; draw(); };
-        root.querySelector("[data-form-cancel]").onclick = leave;
-        saveBtn.onclick = () => {
-          if (saveBtn.disabled) return;
-          const who = f.draft[f.picked];
-          const mk = extra => f.picked === "employee" ? { employee: who, worksite: null, ...extra } : { employee: null, worksite: who, ...extra };
-          if (f.kind === "assign-add") {
-            const d = getDate();
-            const record = mk({ since: d });
-            confirmModal(cfg.confirm, "", () => {
-              (a.assignments || (a.assignments = [])).push(record);
-              // 재고⟷배정중만 배정/반납으로 자동 파생(수리중·분실·폐기는 배정 여부와 무관하게 별도 관리)
-              if (a.status === "stock") a.status = "assigned";
-              logActivity(a, { script: "배정 관리: 신규 배정", target: record, before: "", after: window.fmtDate(d) });
-              toast("추가되었습니다.");
-              afterMutate();
-            });
-          } else if (f.kind === "reassign") {
-            const d = getDate();
-            const record = mk({ since: d });
-            confirmModal(cfg.confirm, "", () => {
-              // 반납+신규배정이 아니라 기존 활성 레코드의 대상 자체를 그 자리에서 교체(구조설계안 2.3). target을
-              // 특정 한쪽으로 고정할 수 없어 before/after 텍스트로 표현(detail.js와 동일)
-              const idx = findRecord(a, target).idx;
-              const beforeLabel = `${old.employee || old.worksite} · ${window.fmtDate(old.since)}`;
-              const afterLabel = `${record.employee || record.worksite} · ${window.fmtDate(d)}`;
-              a.assignments[idx] = record;
-              logActivity(a, { script: "배정 관리: 재배정", before: beforeLabel, after: afterLabel });
-              toast("재배정되었습니다.");
-              afterMutate();
-            });
-          } else {
-            const v = qtyVal();
-            const record = mk({ qty: v });
-            confirmModal(cfg.confirm, "", () => {
-              (a.stocks || (a.stocks = [])).push(record);
-              a.status = derivedHeldStatus(a);
-              logActivity(a, { script: "보유 관리: 보유 대상 추가", target: record, before: "", after: `${v}개` });
-              toast("추가되었습니다.");
-              afterMutate();
-            });
-          }
-        };
       }
       const gotoAssets = root.querySelector('[data-mapp-goto="assets"]');
       if (gotoAssets) gotoAssets.onclick = () => { state.screen = "assets"; state.assetTab = "mine"; draw(); };
