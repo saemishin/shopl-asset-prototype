@@ -1279,13 +1279,12 @@ button.dthumb:hover { filter: brightness(0.94); }
 .mapp-back { font-size: 19px; color: var(--text); }
 .mapp-topbar-title { font-size: 17px; font-weight: 700; }
 /* 배정 추가·재배정·보유 대상 추가 — 바텀시트(대시보드 모달과 동일 필드 구성, 컨테이너만 하단 시트로).
-   대상 선택 피커(.modal-back)가 이 위에 겹쳐 뜨는 걸 감안해 z-index를 modal-back(기본 100)보다 낮게 둠 */
-.mapp-sheet-back {
-  position: fixed; inset: 0; background: rgba(17, 19, 21, .42); display: flex; align-items: flex-end;
-  justify-content: center; z-index: 90; padding: 0 16px;
-}
+   대상 선택 피커(.modal-back)가 이 위에 겹쳐 뜨는 걸 감안해 z-index를 modal-back(기본 100)보다 낮게 둠.
+   위치·크기는 JS(mappOverlay)가 매번 .mapp-screen의 실제 좌표를 재서 인라인으로 지정 — 뷰포트 전체를
+   덮으면 폰 목업 바깥으로 시트가 삐져나와 보이는 문제가 있어(2026-09-29 수정) 폰 화면 영역 안에서만 뜸 */
+.mapp-sheet-back { background: rgba(17, 19, 21, .42); display: flex; align-items: flex-end; justify-content: center; padding: 0 16px; overflow: hidden; border-radius: 0 0 37px 37px; }
 .mapp-sheet {
-  width: 100%; max-width: 390px; max-height: 80vh; display: flex; flex-direction: column;
+  width: 100%; max-width: 390px; max-height: 80%; display: flex; flex-direction: column;
   background: #fff; border-radius: 18px 18px 0 0; margin-bottom: 16px; overflow: hidden;
   box-shadow: 0 -10px 40px rgba(0, 0, 0, .18);
 }
@@ -1295,11 +1294,13 @@ button.dthumb:hover { filter: brightness(0.94); }
 .mapp-sheet-foot .btn { flex: 1; justify-content: center; }
 /* 배정 추가·재배정·보유 대상 추가 폼 + 구성원/근무지 선택 — 전체 화면 페이지(2026-09-29, 바텀시트에서
    다시 전환). 폼은 뒤로가기+타이틀 헤더, 하단 "저장" 버튼 하나만. 대상 선택은 타이틀+닫기(X) 헤더, 행을
-   누르면 바로 선택되고 닫혀서 별도 푸터 없음. 위치·크기는 고정값이 아니라 JS(mappFullpageBack)가 매번
+   누르면 바로 선택되고 닫혀서 별도 푸터 없음. 위치·크기는 고정값이 아니라 JS(mappOverlay)가 매번
    .mapp-screen의 실제 좌표를 재서 인라인 스타일로 지정 — 뷰포트 전체를 덮으면 폰 베젤·상태바까지 가려
    목업 자체가 사라져 보이는 문제가 있어(2026-09-29 수정), 폰 화면 영역에만 정확히 겹쳐 뜨도록 함.
-   z-index는 폼(95) < 대상 선택(105) < 날짜 선택 캘린더 시트(110) < 저장 확인 팝업(modal, 340) 순 */
-.mapp-fullpage-back { background: #fff; display: flex; flex-direction: column; overflow: hidden; }
+   하단 모서리는 폰 외곽 둥근 정도(46px)에서 테두리 두께(9px)를 뺀 값(37px)으로 맞춰 폰 베젤 밖으로
+   각지게 삐져나와 보이지 않게 함(2026-09-29 추가 수정 — 화면 폭은 맞았지만 바닥 모서리가 각져서 베젤을
+   침범해 보이던 문제). z-index는 폼(95) < 대상 선택(105) < 날짜 선택 캘린더 시트(110) < 저장 확인 팝업(modal, 340) 순 */
+.mapp-fullpage-back { background: #fff; display: flex; flex-direction: column; overflow: hidden; border-radius: 0 0 37px 37px; }
 .mapp-fullpage-head { flex-shrink: 0; display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--line); }
 .mapp-fullpage-head-title { flex: 1; font-size: 17px; font-weight: 700; }
 .mapp-fullpage-head-close { color: var(--text-sub); display: flex; }

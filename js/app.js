@@ -512,14 +512,14 @@
       </div>`;
   }
 
-  // 전체 화면 오버레이(폼 페이지·대상 선택 페이지 공용) — 폰 목업(.mapp-phone) 자체를 다시 그리는 draw()와
-  // 무관하게 독립적으로 떠 있어야 해서(그래야 타이핑·피커 조작 중 실수로 draw()가 불려도 안 날아감) body에
-  // 별도로 붙이되, 매번 폰 화면 영역(.mapp-screen)의 실제 좌표를 재서 그 자리에 고정 — 그래야 상태바+베젤이
-  // 그대로 보이는 채로 "폰 안의 화면"만 바뀐 것처럼 보임(2026-09-29, 뷰포트 전체를 덮어 폰 목업 자체가
-  // 사라져 보이던 문제 수정)
-  function mappFullpageBack(zIndex) {
+  // 전체 화면 오버레이 공용 헬퍼(폼 페이지·대상 선택 페이지·바텀시트 전부) — 폰 목업(.mapp-phone) 자체를
+  // 다시 그리는 draw()와 무관하게 독립적으로 떠 있어야 해서(그래야 타이핑·피커 조작 중 실수로 draw()가
+  // 불려도 안 날아감) body에 별도로 붙이되, 매번 폰 화면 영역(.mapp-screen)의 실제 좌표를 재서 그 자리에
+  // 고정 — 그래야 상태바+베젤이 그대로 보이는 채로 "폰 안의 화면"만 바뀐 것처럼 보임(2026-09-29, 뷰포트
+  // 전체를 덮어 폰 목업 자체가 사라져 보이던 문제 수정, 이어서 바텀시트도 같은 문제라 공용화)
+  function mappOverlay(className, zIndex) {
     const back = document.createElement("div");
-    back.className = "mapp-fullpage-back";
+    back.className = className;
     const screen = document.querySelector(".mapp-screen");
     const r = screen ? screen.getBoundingClientRect() : { top: 0, left: 0, width: 390, height: 844 };
     back.style.cssText = `position:fixed;top:${r.top}px;left:${r.left}px;width:${r.width}px;height:${r.height}px;z-index:${zIndex};`;
@@ -534,7 +534,7 @@
   function openMemberPickerPage(initial, onApply, exclude) {
     let query = "";
     const excludeNames = [].concat(exclude || []).filter(Boolean);
-    const p = mappFullpageBack(105);
+    const p = mappOverlay("mapp-fullpage-back", 105);
     p.innerHTML = `
       <div class="mapp-fullpage-head">
         <span class="mapp-fullpage-head-title">구성원</span>
@@ -563,7 +563,7 @@
   function openWorksitePickerPage(initial, onApply, exclude) {
     let query = "";
     const excludeNames = [].concat(exclude || []).filter(Boolean);
-    const p = mappFullpageBack(105);
+    const p = mappOverlay("mapp-fullpage-back", 105);
     p.innerHTML = `
       <div class="mapp-fullpage-head">
         <span class="mapp-fullpage-head-title">근무지</span>
@@ -606,9 +606,7 @@
     const [by, bm] = (initialIso || maxIso).split("-").map(Number);
     let viewY = by, viewM = bm - 1;
     let selected = initialIso || maxIso;
-    const back = document.createElement("div");
-    back.className = "mapp-sheet-back";
-    back.style.zIndex = 110;
+    const back = mappOverlay("mapp-sheet-back", 110);
     back.innerHTML = `
       <div class="mapp-sheet">
         <div class="mapp-sheet-body" data-cal-body style="padding-top:16px"></div>
@@ -617,7 +615,6 @@
           <button type="button" class="btn primary" data-cal-ok>확인</button>
         </div>
       </div>`;
-    document.body.appendChild(back);
     const body = back.querySelector("[data-cal-body]");
     const okBtn = back.querySelector("[data-cal-ok]");
     const WD = ["일", "월", "화", "수", "목", "금", "토"];
@@ -679,7 +676,7 @@
     const heldNames = kind === "hold-add" ? (a.stocks || []).map(x => x.employee || x.worksite) : [];
     const remaining = kind === "hold-add" ? a.totalQty - (a.stocks || []).reduce((s, x) => s + x.qty, 0) : 0;
 
-    const back = mappFullpageBack(95);
+    const back = mappOverlay("mapp-fullpage-back", 95);
     back.innerHTML = `
       <div class="mapp-fullpage-head">
         <button type="button" class="mapp-back" data-form-back aria-label="뒤로">←</button>
@@ -948,8 +945,7 @@
   // 넉넉한 시트가 유리 — 배정 추가/재배정 시트(.mapp-sheet, max-height:80vh)와 같은 컨테이너를 쓰되,
   // 입력란만 있는 화면이라 텍스트영역에 넉넉한 최소 높이를 직접 줘서 그 시트들과 비슷한 체감 높이로 맞춤
   function openMemoEditModal(a, onDone) {
-    const back = document.createElement("div");
-    back.className = "mapp-sheet-back";
+    const back = mappOverlay("mapp-sheet-back", 90);
     back.innerHTML = `
       <div class="mapp-sheet">
         <div class="mapp-sheet-head">메모 수정</div>
@@ -961,7 +957,6 @@
           <button type="button" class="btn primary" data-cok>저장</button>
         </div>
       </div>`;
-    document.body.appendChild(back);
     back.addEventListener("click", e => { if (e.target === back) back.remove(); });
     back.querySelector("[data-cclose]").onclick = () => back.remove();
     back.querySelector("[data-cok]").onclick = () => {
