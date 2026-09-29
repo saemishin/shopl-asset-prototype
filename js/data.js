@@ -26,9 +26,17 @@ window.DATA = (function () {
       expiry: "2027-03-10", note: "키보드 자판 일부 마모 확인 — 2025-06 교체 요청 이력 있음. 배정 반납 시 상태 재확인 필요. 트랙패드 클릭감 저하 민원 1건 접수돼 다음 정기 점검 때 같이 확인 요망.", photo: "#4b7bec", photoCount: 6,
       // 공동 배정 샘플(구조설계안 2.3) — 앱 자산 상세의 "공동 배정 대상" 정보 섹션 확인용으로 이서연을 공동 배정자로 추가(2026-09-27)
       labels: ["본사", "개발팀"], assignments: [{ employee: "김민수", worksite: null, since: "2024-03-15" }, { employee: "이서연", worksite: null, since: "2024-05-01" }] },
+    // 배정 추가 상한 테스트용 — 자산 하나당 활성 배정 최대 5건(구조설계안 2.1·6)을 꽉 채운 샘플(2026-09-30,
+    // 원래 status:"stock"/assignments:[] 재고 샘플이었으나 A015/A016도 같은 역할이라 이걸로 대체)
     { id: "A002", type: "individual", assetNo: "IT-2024-0013", product: "그램 16 (2024)", group: "전자기기류", sub: "노트북",
-      status: "stock", serial: "SN-8842-AB", createdAt: "2024-03-12", purchaseDate: "2024-03-11", price: 1890000, expiry: "2027-03-10",
-      labels: ["본사"], assignments: [] },
+      status: "assigned", serial: "SN-8842-AB", createdAt: "2024-03-12", purchaseDate: "2024-03-11", price: 1890000, expiry: "2027-03-10",
+      labels: ["본사"], assignments: [
+        { employee: "김민수", worksite: null, since: "2024-04-01" },
+        { employee: "이서연", worksite: null, since: "2024-05-01" },
+        { employee: "박지훈", worksite: null, since: "2024-06-01" },
+        { employee: "정우성", worksite: null, since: "2024-07-01" },
+        { employee: null, worksite: "강남점", since: "2024-08-01" },
+      ] },
     // 같은 품목(그램 16 (2024))을 여러 인원에게 배정하는 실사용 규모(인원 50명 미만인 회사도 동일 모델 10대+ 보유 흔함) 반영용 —
     // 정보는 A001/A002와 대부분 동일(같은 구매 배치), 고유관리번호/상태/배정 대상만 다름
     { id: "A011", type: "individual", assetNo: "IT-2024-0014", product: "그램 16 (2024)", group: "전자기기류", sub: "노트북",

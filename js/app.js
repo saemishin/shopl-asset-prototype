@@ -1046,19 +1046,17 @@
   // 있는 자산에 한해서만 노출. 메모 수정·사진 관리는 더보기가 아니라 각각 메모 값 옆 편집 아이콘/대표 이미지
   // 위 편집 아이콘으로 별도 제공(2026-09-27, assetDetailScreenHtml 참조) — 대시보드 detail.js와 동일한 구조.
   // 순서는 "자주 쓰는 것 먼저, 되돌리는 액션(반납/보유 해제)은 맨 아래 빨간 글씨"(2026-09-29 재정렬).
-  // 배정 추가(활성 배정 5건 도달)·보유 대상 추가(잔여 수량 0)는 항목 자체를 숨기지 않고 대시보드와 동일하게
-  // 처리 — 배정 추가는 비활성+사유 툴팁, 보유 대상 추가는 항상 활성 상태로 두고 누르면 토스트로 안내
-  // (2026-09-30, 이전엔 둘 다 조건에 안 맞으면 메뉴에서 아예 빠졌었음)
+  // 배정 추가(활성 배정 5건 도달)·보유 대상 추가(잔여 수량 0)는 항목 자체를 숨기지 않고 항상 노출 — 대시보드는
+  // 배정 추가를 비활성+호버 툴팁으로 처리하지만, 앱은 터치 환경이라 호버가 없어 그 패턴을 그대로 못 씀. 대신
+  // 둘 다 항상 활성 상태로 두고 누르면(dispatchAction) 토스트로 안내하는 방식으로 통일(2026-09-30, 배정
+  // 추가도 처음엔 대시보드처럼 비활성+data-tip 툴팁으로 만들었다가 호버 불가 문제로 토스트 방식으로 전환)
   function manageActions(a, target) {
     if (a.status === "disposed" || !canManage(a)) return [];
     const acts = [];
     if (a.type === "individual") {
       const { idx } = findRecord(a, target);
-      const activeCount = (a.assignments || []).length;
       if (idx >= 0) acts.push({ key: "reassign", label: "재배정" });
-      acts.push(activeCount >= 5
-        ? { key: "assign-add", label: "배정 추가", disabled: true, tip: "자산 하나당 활성 배정은 최대 5건까지 가능합니다." }
-        : { key: "assign-add", label: "배정 추가" });
+      acts.push({ key: "assign-add", label: "배정 추가" });
       if (idx >= 0) acts.push({ key: "return", label: "반납", danger: true });
     } else {
       const { idx } = findRecord(a, target);
@@ -1080,7 +1078,7 @@
     document.querySelectorAll(".dropdown-menu").forEach(m => m.remove());
     const menu = document.createElement("div");
     menu.className = "dropdown-menu";
-    menu.innerHTML = items.map(x => `${x.sep ? '<div class="dropdown-sep"></div>' : ""}<button type="button" data-key="${x.key}"${x.danger ? ' class="danger"' : ""}${x.disabled ? " disabled" : ""}${x.tip ? ` data-tip="${x.tip}"` : ""}>${x.label}</button>`).join("");
+    menu.innerHTML = items.map(x => `${x.sep ? '<div class="dropdown-sep"></div>' : ""}<button type="button" data-key="${x.key}"${x.danger ? ' class="danger"' : ""}>${x.label}</button>`).join("");
     const r = anchor.getBoundingClientRect();
     menu.style.cssText = `position:fixed;top:${r.bottom + 4}px;left:${Math.max(8, r.right - 180)}px;min-width:180px`;
     document.body.appendChild(menu);
@@ -1287,7 +1285,10 @@
         function dispatchAction(key) {
           const { idx } = findRecord(a, target);
           if (key === "history") { state.screen = "asset-history"; draw(); }
-          else if (key === "assign-add") openFormPage(a, target, "assign-add", afterMutate);
+          else if (key === "assign-add") {
+            if ((a.assignments || []).length >= 5) toast("활성 배정은 최대 5건까지 가능합니다.");
+            else openFormPage(a, target, "assign-add", afterMutate);
+          }
           else if (key === "reassign") openFormPage(a, target, "reassign", afterMutate);
           else if (key === "hold-add") {
             const remaining = a.totalQty - (a.stocks || []).reduce((s, x) => s + x.qty, 0);
