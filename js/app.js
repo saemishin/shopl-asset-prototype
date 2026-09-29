@@ -512,6 +512,20 @@
       </div>`;
   }
 
+  // 전체 화면 오버레이(폼 페이지·대상 선택 페이지 공용) — 폰 목업(.mapp-phone) 자체를 다시 그리는 draw()와
+  // 무관하게 독립적으로 떠 있어야 해서(그래야 타이핑·피커 조작 중 실수로 draw()가 불려도 안 날아감) body에
+  // 별도로 붙이되, 매번 폰 화면 영역(.mapp-screen)의 실제 좌표를 재서 그 자리에 고정 — 그래야 상태바+베젤이
+  // 그대로 보이는 채로 "폰 안의 화면"만 바뀐 것처럼 보임(2026-09-29, 뷰포트 전체를 덮어 폰 목업 자체가
+  // 사라져 보이던 문제 수정)
+  function mappFullpageBack(zIndex) {
+    const back = document.createElement("div");
+    back.className = "mapp-fullpage-back";
+    const screen = document.querySelector(".mapp-screen");
+    const r = screen ? screen.getBoundingClientRect() : { top: 0, left: 0, width: 390, height: 844 };
+    back.style.cssText = `position:fixed;top:${r.top}px;left:${r.left}px;width:${r.width}px;height:${r.height}px;z-index:${zIndex};`;
+    document.body.appendChild(back);
+    return back;
+  }
   // ===== 대상 선택 피커(구성원/근무지) — 전체 화면 페이지(2026-09-29, 라디오+검색+적용 방식의 2차 팝업에서
   // 전환). 단일 선택이라 행을 누르면 그 값으로 바로 선택 완료 + 페이지 닫힘(적용 버튼 없음). 상단엔 타이틀 +
   // 닫기(X)만(뒤로가기 아님 — 대상 선택을 취소하는 것이지 폼의 이전 단계로 돌아가는 게 아니라서). 근무지는
@@ -520,21 +534,16 @@
   function openMemberPickerPage(initial, onApply, exclude) {
     let query = "";
     const excludeNames = [].concat(exclude || []).filter(Boolean);
-    const p = document.createElement("div");
-    p.className = "mapp-fullpage-back";
-    p.style.zIndex = 105;
+    const p = mappFullpageBack(105);
     p.innerHTML = `
-      <div class="mapp-fullpage">
-        <div class="mapp-fullpage-head">
-          <span class="mapp-fullpage-head-title">구성원</span>
-          <button type="button" class="mapp-fullpage-head-close" data-picker-close aria-label="닫기">${CLOSE_ICON}</button>
-        </div>
-        <div class="mapp-fullpage-body">
-          <input type="text" class="picker-search" placeholder="이름/사번/휴대폰번호">
-          <div data-list></div>
-        </div>
+      <div class="mapp-fullpage-head">
+        <span class="mapp-fullpage-head-title">구성원</span>
+        <button type="button" class="mapp-fullpage-head-close" data-picker-close aria-label="닫기">${CLOSE_ICON}</button>
+      </div>
+      <div class="mapp-fullpage-body">
+        <input type="text" class="picker-search" placeholder="이름/사번/휴대폰번호">
+        <div data-list></div>
       </div>`;
-    document.body.appendChild(p);
     const list = p.querySelector("[data-list]");
     function renderList() {
       const q = query.trim().toLowerCase();
@@ -554,21 +563,16 @@
   function openWorksitePickerPage(initial, onApply, exclude) {
     let query = "";
     const excludeNames = [].concat(exclude || []).filter(Boolean);
-    const p = document.createElement("div");
-    p.className = "mapp-fullpage-back";
-    p.style.zIndex = 105;
+    const p = mappFullpageBack(105);
     p.innerHTML = `
-      <div class="mapp-fullpage">
-        <div class="mapp-fullpage-head">
-          <span class="mapp-fullpage-head-title">근무지</span>
-          <button type="button" class="mapp-fullpage-head-close" data-picker-close aria-label="닫기">${CLOSE_ICON}</button>
-        </div>
-        <div class="mapp-fullpage-body">
-          <input type="text" class="picker-search" placeholder="근무지명/코드/주소">
-          <div data-list></div>
-        </div>
+      <div class="mapp-fullpage-head">
+        <span class="mapp-fullpage-head-title">근무지</span>
+        <button type="button" class="mapp-fullpage-head-close" data-picker-close aria-label="닫기">${CLOSE_ICON}</button>
+      </div>
+      <div class="mapp-fullpage-body">
+        <input type="text" class="picker-search" placeholder="근무지명/코드/주소">
+        <div data-list></div>
       </div>`;
-    document.body.appendChild(p);
     const list = p.querySelector("[data-list]");
     const fixedName = myWorksites(ME).fixed;
     function rowHtml(name) {
@@ -675,21 +679,16 @@
     const heldNames = kind === "hold-add" ? (a.stocks || []).map(x => x.employee || x.worksite) : [];
     const remaining = kind === "hold-add" ? a.totalQty - (a.stocks || []).reduce((s, x) => s + x.qty, 0) : 0;
 
-    const back = document.createElement("div");
-    back.className = "mapp-fullpage-back";
-    back.style.zIndex = 95;
+    const back = mappFullpageBack(95);
     back.innerHTML = `
-      <div class="mapp-fullpage">
-        <div class="mapp-fullpage-head">
-          <button type="button" class="mapp-back" data-form-back aria-label="뒤로">←</button>
-          <span class="mapp-fullpage-head-title">${cfg.title}</span>
-        </div>
-        <div class="mapp-fullpage-body" data-form-body></div>
-        <div class="mapp-fullpage-foot">
-          <button type="button" class="btn primary" data-form-save disabled>저장</button>
-        </div>
+      <div class="mapp-fullpage-head">
+        <button type="button" class="mapp-back" data-form-back aria-label="뒤로">←</button>
+        <span class="mapp-fullpage-head-title">${cfg.title}</span>
+      </div>
+      <div class="mapp-fullpage-body" data-form-body></div>
+      <div class="mapp-fullpage-foot">
+        <button type="button" class="btn primary" data-form-save disabled>저장</button>
       </div>`;
-    document.body.appendChild(back);
     const body = back.querySelector("[data-form-body]");
     const saveBtn = back.querySelector("[data-form-save]");
     const qtyVal = () => { const n = parseInt(f.qtyText, 10); return Number.isFinite(n) ? n : null; };
@@ -746,7 +745,7 @@
           </div>` : `
           <div class="field">
             <label>${kind === "reassign" ? "새 배정일" : "배정일"}</label>
-            <div class="perm-target-wrap">${dateSummaryHtml()}</div>
+            <div class="mapp-date-wrap">${dateSummaryHtml()}</div>
           </div>`}`;
 
       body.querySelectorAll('input[name="form-kind"]').forEach(r => r.onchange = () => { f.picked = r.value; drawBody(); });
