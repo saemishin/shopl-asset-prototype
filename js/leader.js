@@ -68,7 +68,9 @@
     return assets.filter(a => hasViewPermission(a)).map(a => ({ asset: a, qty: a.type === "quantity" ? (a.totalQty || 0) : 1 }));
   }
   // 허브 화면용 — 대시보드 분류 관리 화면의 트리와 동일하게, 자산 보유 여부와 무관하게 조회 권한을 가진
-  // 소분류를 전부 대분류별로 묶어서 보여줌(2026-09-30 — 유형 칩 제거하면서 "허브는 순수 카테고리 트리"로 단순화)
+  // 소분류를 전부 대분류별로 묶어서 보여줌(2026-09-30 — 유형 칩 제거하면서 "허브는 순수 카테고리 트리"로 단순화).
+  // 대분류만 있고 소분류가 아직 없는 경우(window.DATA.emptyGroups, data.js "비품" 샘플)도 대시보드와 동일하게
+  // 그 대분류는 노출하고 "소분류 없음"으로 표시(2026-09-30) — 소분류가 없어 권한 체크 대상 자체가 없으니 숨길 이유가 없음
   function categoryTree() {
     const order = [];
     const map = {};
@@ -76,6 +78,9 @@
       if (!catViewPermission(c)) return;
       if (!map[c.group]) { map[c.group] = []; order.push(c.group); }
       map[c.group].push(c.sub);
+    });
+    (window.DATA.emptyGroups || []).forEach(group => {
+      if (!map[group]) { map[group] = []; order.push(group); }
     });
     return order.map(group => ({ group, subs: map[group] }));
   }
@@ -177,11 +182,11 @@
           <button type="button" class="mapp-menu-cap mapp-tree-group-head" data-tree-collapse aria-expanded="true" aria-label="접기/펼치기">
             <span>${g.group}</span>${CHEV_DOWN}
           </button>
-          <div class="mapp-ws-cat-tree" data-tree-collapsible>${g.subs.map(sub => `
+          <div class="mapp-ws-cat-tree" data-tree-collapsible>${g.subs.length ? g.subs.map(sub => `
             <button type="button" class="mapp-ws-cat-row" data-sub-open data-sub="${sub}">
               <span>${sub}</span>
               <span class="mapp-ws-cat-count">${countForSub(sub)}<span class="mapp-menu-chev">›</span></span>
-            </button>`).join("")}</div>`).join("")
+            </button>`).join("") : `<p class="mapp-ws-empty">소분류 없음</p>`}</div>`).join("")
           : `<p class="mapp-ws-empty">조회 가능한 자산이 없습니다.</p>`}
       </div>`;
   }
