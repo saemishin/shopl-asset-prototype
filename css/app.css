@@ -788,6 +788,9 @@ button.usebullet { background: var(--panel); font: inherit; cursor: pointer; }
 .pager button:disabled { opacity: .35; pointer-events: none; }
 .pager .pagesize { position: absolute; right: 0; }
 .pager .pagesize select { height: 28px; border: 1px solid var(--line-strong); border-radius: 6px; padding: 0 6px; }
+.pager-actions { position: absolute; left: 0; }
+.td-check { width: 36px; text-align: center; }
+.td-check input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; }
 
 /* ============ modal ============ */
 .modal-back {

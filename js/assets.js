@@ -197,6 +197,17 @@
   const CATEGORY_ORDER = new Map(window.DATA.categories.map((c, i) => [c.sub, i]));
   function subOrder(sub) { return CATEGORY_ORDER.has(sub) ? CATEGORY_ORDER.get(sub) : 999; }
 
+  // 자산 삭제 권한 — 전역 "자산 관리 권한"(구조설계안 4.1 manage_permission_type: 관리자만(기본값)/관리자
+  // 및 모든 리더/관리자 및 특정 리더). 소분류별 view/assign과 달리 클라이언트 전체에 하나만 적용되는 값이라
+  // 여러 소분류 자산을 섞어 선택해도 권한 불일치가 생기지 않음. 대시보드엔 구성원 role 개념이 아직 없어
+  // 실제 판정 로직은 없고, 대시보드는 관리자가 본다고 가정해 항상 true — 권한 체크 지점만 코드상에 명시해둠
+  // (2026-09-30, detail.js의 개별 삭제와 동일한 함수로 통일)
+  function canManageAssets() { return true; }
+  // 전체 탭 체크박스 선택 — 현재 페이지 안에서만 유지되는 휘발성 상태(state에 안 넣음). 정렬·필터·검색·
+  // 페이지 이동 등 render()를 다시 부르는 모든 조작에서 자동으로 비워짐(render() 맨 앞에서 항상 clear).
+  // 체크박스 자체를 토글하는 것만으로는 render()를 다시 부르지 않고 DOM을 직접 건드려서 선택을 유지함
+  let selected = new Set();
+
   const state = {
     view: "all",
     search: "",
@@ -305,12 +316,15 @@
 
   /* ---------- views ---------- */
   function view_all(list) {
+    const canDelete = canManageAssets();
     const head = `<tr>
+      ${canDelete ? `<th class="td-check"><input type="checkbox" data-check-all aria-label="전체 선택"></th>` : ""}
       ${thFilter("자산 유형", "type")}<th>분류</th><th>품목명</th><th>고유관리번호</th>${thFilter("상태", "status")}
       <th>배정·보유 현황</th>${thFilter("유효기한", "expiry")}<th>태그</th>${thFilter("메모", "note", "c")}<th>등록일</th></tr>`;
     const rows = pageSlice(sortList(list)).map(a => {
       const st = `<span class="badge ${STATUS_LABEL[a.status][1]}">${STATUS_LABEL[a.status][0]}</span>`;
       return `<tr class="clickable" data-id="${a.id}">
+        ${canDelete ? `<td class="td-check"><input type="checkbox" data-check data-id="${a.id}" aria-label="선택"></td>` : ""}
         <td><span class="type-pill">${TYPE_LABEL[a.type]}</span></td>
         <td>${a.group} <span class="muted">›</span> ${a.sub}</td>
         <td>${prodCell(a)}</td>
@@ -591,7 +605,7 @@
       document.addEventListener("click", close);
     });
   }
-  function pagerHtml(total) {
+  function pagerHtml(total, leftActionsHtml = "") {
     const totalPages = Math.max(1, Math.ceil(total / state.pageSize));
     const p = state.page;
     const winStart = Math.max(1, Math.min(p - 2, totalPages - 4));
@@ -602,6 +616,7 @@
       `<button data-page="${target}" ${disabled ? "disabled" : ""} class="${cls}">${label}</button>`;
     return `
       <div class="pager">
+        ${leftActionsHtml ? `<span class="pager-actions">${leftActionsHtml}</span>` : ""}
         ${btn("«", 1, p === 1)}
         ${btn("‹", p - 1, p === 1)}
         ${pages.map(n => btn(n, n, false, n === p ? "active" : "")).join("")}
@@ -635,7 +650,7 @@
     const filtering = activeFilterCount() > 0 || !!state.search.trim();
     const emptyMsg = filtering ? "결과가 없습니다." : "등록된 자산이 없습니다.";
     const colspan = state.view === "product" ? (state.productType === "quantity" ? 7 : 8)
-      : state.view === "employee" ? 4 : state.view === "worksite" ? 3 : 10;
+      : state.view === "employee" ? 4 : state.view === "worksite" ? 3 : (canManageAssets() ? 11 : 10);
     const empty = `<tr><td colspan="${colspan}" style="text-align:center;color:var(--text-mut);padding:32px">${emptyMsg}</td></tr>`;
     const cls = state.view === "product" ? `tbl-product tbl-product-${state.productType}` : `tbl-${state.view}`;
     return `<table class="${cls}"><thead>${v.head}</thead><tbody>${v.rows || empty}</tbody></table>`;
@@ -650,11 +665,94 @@
     scope.querySelectorAll("tbody tr[data-id]").forEach(tr =>
       tr.onclick = () => location.href = `asset-detail.html?id=${tr.dataset.id}`);
   }
+  // 전체 탭 체크박스 선택 + 일괄 삭제 — 체크박스 토글은 render()를 다시 부르지 않고 delete 버튼
+  // disabled 상태와 전체선택 체크박스 상태만 직접 갱신(선택을 페이지 안에서 유지하기 위해)
+  function bindBulkSelect(scope) {
+    const deleteBtn = document.getElementById("btn-bulk-delete");
+    if (!deleteBtn) return;
+    const checkAll = scope.querySelector("[data-check-all]");
+    const rowChecks = () => [...scope.querySelectorAll("tbody [data-check]")];
+    function syncHeader() {
+      const boxes = rowChecks();
+      const checkedCount = boxes.filter(b => b.checked).length;
+      checkAll.checked = boxes.length > 0 && checkedCount === boxes.length;
+      checkAll.indeterminate = checkedCount > 0 && checkedCount < boxes.length;
+    }
+    rowChecks().forEach(cb => {
+      // change가 tr의 click 핸들러(상세 이동)까지 안 번지도록 클릭 단계에서 막음
+      cb.addEventListener("click", e => e.stopPropagation());
+      cb.addEventListener("change", () => {
+        if (cb.checked) selected.add(cb.dataset.id); else selected.delete(cb.dataset.id);
+        deleteBtn.disabled = selected.size === 0;
+        syncHeader();
+      });
+    });
+    if (checkAll) {
+      checkAll.addEventListener("click", e => e.stopPropagation());
+      checkAll.addEventListener("change", () => {
+        rowChecks().forEach(cb => {
+          cb.checked = checkAll.checked;
+          if (checkAll.checked) selected.add(cb.dataset.id); else selected.delete(cb.dataset.id);
+        });
+        deleteBtn.disabled = selected.size === 0;
+        checkAll.indeterminate = false;
+      });
+    }
+    deleteBtn.onclick = () => {
+      if (!selected.size) return;
+      openBulkDeleteAssetModal(selected.size, () => {
+        assets.filter(a => selected.has(a.id)).forEach(a => assets.splice(assets.indexOf(a), 1));
+        selected.clear();
+        toast("삭제되었습니다.");
+        render();
+      });
+    };
+  }
+  const WARN_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 9v4M12 16.5h.01M10.3 3.9 2.5 17.5a1.7 1.7 0 0 0 1.47 2.55h16.06a1.7 1.7 0 0 0 1.47-2.55L13.7 3.9a1.7 1.7 0 0 0-2.94 0z"/></svg>`;
+  // 자산 상세의 개별 삭제 확인 모달(detail.js openDeleteAssetModal)과 UI·문구·DELETE 입력 확인 규칙은 동일,
+  // 선택 건수만 반영. 동작은 새로 작성 — 상세는 삭제 후 목록으로 페이지 이동하지만 여긴 이미 목록 화면이라
+  // 이동 없이 그 자리에서 테이블만 다시 그림(2026-09-30, 전체 탭 일괄 삭제)
+  function openBulkDeleteAssetModal(count, onConfirm) {
+    const cb = document.createElement("div");
+    cb.className = "modal-back";
+    cb.style.zIndex = 340;
+    cb.innerHTML = `
+      <div class="modal" style="width:380px">
+        <h3>선택한 ${count}개 자산을 삭제하시겠습니까?</h3>
+        <div class="body">
+          <div class="danger-note">${WARN_ICON}<span>삭제하면 복구할 수 없으니 신중하게 결정해주세요.</span></div>
+          <div class="field" style="margin-top:14px;margin-bottom:0">
+            <input type="text" data-del-input placeholder="입력">
+          </div>
+          <p class="muted" style="margin-top:6px">박스에 DELETE를 입력하면 [삭제] 버튼이 활성화됩니다.</p>
+        </div>
+        <div class="foot">
+          <button class="btn" data-cclose>취소</button>
+          <button class="btn danger" data-cok disabled>삭제</button>
+        </div>
+      </div>`;
+    cb.addEventListener("click", e => { if (e.target === cb) cb.remove(); });
+    cb.querySelector("[data-cclose]").onclick = () => cb.remove();
+    const input = cb.querySelector("[data-del-input]");
+    const okBtn = cb.querySelector("[data-cok]");
+    const confirmed = () => input.value.trim().toUpperCase() === "DELETE";
+    input.addEventListener("input", () => { okBtn.disabled = !confirmed(); });
+    okBtn.onclick = () => {
+      if (!confirmed()) return;
+      cb.remove();
+      onConfirm();
+    };
+    document.body.appendChild(cb);
+    input.focus();
+  }
 
   function render() {
     // 다른 화면(자산 삭제 등)에서 이동해온 직후 띄울 토스트 — sessionStorage에 있으면 최초 1회만 소비
     const pendingToast = sessionStorage.getItem("pendingToast");
     if (pendingToast) { sessionStorage.removeItem("pendingToast"); toast(pendingToast); }
+    // 체크박스 선택은 render()를 다시 부르는 모든 조작(정렬·필터·검색·페이지 이동 등)에서 항상 초기화 —
+    // 체크박스 자체를 토글하는 건 render()를 안 부르고 DOM만 직접 바꾸므로 이 시점엔 영향 없음
+    selected.clear();
     const c = document.getElementById("content");
     const v = currentView();
     // 품목별은 필터 범위가 분류 하나뿐(자산 유형은 헤더 필터로 별도 제공)이라 뱃지 카운트도 그 하나만 봄
@@ -698,7 +796,8 @@
 
       <div class="table-wrap">${tableInner(v)}</div>
 
-      ${pagerHtml(v.count)}
+      ${pagerHtml(v.count, state.view === "all" && canManageAssets()
+        ? `<button class="btn danger sm" id="btn-bulk-delete" disabled>삭제</button>` : "")}
     `;
 
     c.querySelectorAll(".subtabs button").forEach(b =>
@@ -715,6 +814,7 @@
         render();
       });
     bindRows(c);
+    bindBulkSelect(c);
     c.querySelectorAll("[data-ptype]").forEach(b => b.onclick = () => {
       state.productType = b.dataset.ptype;
       state.page = 1;

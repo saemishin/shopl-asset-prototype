@@ -15,6 +15,12 @@
     return `${window.fmtDate(d)} <span class="badge ${c}">${t}</span>`;
   }
   const chips = arr => (arr && arr.length) ? arr.map(l => `<span class="tag">${l}</span>`).join("") : '<span class="muted">—</span>';
+  // 자산 삭제 권한 — 전역 "자산 관리 권한"(구조설계안 4.1 manage_permission_type: 관리자만(기본값)/관리자
+  // 및 모든 리더/관리자 및 특정 리더). 소분류별 view/assign과 달리 클라이언트 전체에 하나만 적용되는 값이라
+  // 여러 자산을 섞어 선택해도 권한 불일치가 생기지 않음. 대시보드엔 구성원 role 개념이 아직 없어 실제 판정
+  // 로직은 없고, 대시보드는 관리자가 본다고 가정해 항상 true — 권한 체크 지점만 코드상에 명시해둠
+  // (2026-09-30, assets.js의 자산 목록 일괄 삭제 기능과 함께 도입 — 개별/일괄 삭제 모두 이 함수로 통일)
+  function canManageAssets() { return true; }
 
   // 메모: 최대 500자(구조설계안 3.4), 화면엔 길이 제한 없이 전체 노출(말줄임·접기 없음)
   const memoHtml = note => note ? `<span>${note}</span>` : '<span class="muted">—</span>';
@@ -1334,8 +1340,12 @@
     // 자산 수정 폼 안의 소분류 필드로 흡수됨(별도 메뉴 항목이었으나 병합).
     const MORE_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg>`;
     const mgrBtn = `<button class="btn sm icon-only corner" data-more aria-label="자산관리" title="자산관리">${MORE_ICON}</button>`;
-    // 폐기 동결(구조설계안 3.4: "폐기는 완전 동결 — 필드 수정 불가") — 자산 수정만 메뉴에서 빠짐, 삭제는 예외적으로 계속 허용
-    const moreItems = a.status === "disposed" ? ["자산 삭제"] : ["자산 수정", "자산 삭제"];
+    // 폐기 동결(구조설계안 3.4: "폐기는 완전 동결 — 필드 수정 불가") — 자산 수정만 메뉴에서 빠짐, 삭제는 예외적으로 계속 허용.
+    // 자산 삭제는 canManageAssets() 보유자만(2026-09-30)
+    const moreItems = [
+      ...(a.status !== "disposed" ? ["자산 수정"] : []),
+      ...(canManageAssets() ? ["자산 삭제"] : []),
+    ];
 
     // 필수값(분류) 먼저, 선택값이 뒤따름. 유효기한·태그는 분류 바로 다음(전체 탭 테이블 컬럼 순서와 통일).
     // 제조연월이 구매연월보다 앞(제조가 구매보다 먼저 일어나는 시점).
