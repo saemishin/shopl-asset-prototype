@@ -204,7 +204,7 @@
     return back;
   }
 
-  // 자산 수정(prefill) 시 유효기한 외 구매일·제조연월일 등의 "미래 아님" 검증 기준으로 씀 — 이 앱 전체가 쓰는
+  // 자산 수정(prefill) 시 유효기한 외 구매연월·제조연월 등의 "미래 아님" 검증 기준으로 씀 — 이 앱 전체가 쓰는
   // 고정 데모 날짜(2026-09-04)와 동일하게 맞춤(detail.js의 TODAY/todayStr과 동일 값)
   const TODAY = new Date("2026-09-04");
   function todayStr() {
@@ -284,7 +284,7 @@
           <span class="dfield-pick">${IC_CAL}<input type="date" data-dnative tabindex="-1"></span>
         </div>`;
     }
-    // maxIso가 있으면(구매일·제조연월일) 미래 날짜 불가, 없으면(유효기한) 만료일 성격상 미래 날짜도 허용.
+    // maxIso가 있으면(구매연월·제조연월) 미래 날짜 불가, 없으면(유효기한) 만료일 성격상 미래 날짜도 허용.
     // getValue()는 8자리를 다 채운 유효한 날짜면 ISO, 완전히 비어있으면 "", 불완전/범위밖이면 null을 돌려줌
     function wireDateField(scope, maxIso) {
       const text = scope.querySelector("[data-dtext]");
@@ -304,6 +304,36 @@
       };
       text.addEventListener("input", () => { text.value = format(digitsOf(text.value)); });
       native.addEventListener("change", () => { if (native.value) text.value = native.value.replace(/-/g, "."); });
+      return getValue;
+    }
+    // 제조연월·구매연월 전용(2026-09-30, 일 단위 제거 — "제조연월일"·"구매일"이었던 걸 연월 단위로 단순화).
+    // 네이티브 피커도 <input type=date> 대신 <input type=month>(일 선택 UI 자체가 없음)로 교체. 저장 값은
+    // 일자를 "01"로 고정해 기존 날짜 문자열 처리(정렬·이력 타임스탬프 등)와 호환 유지 — 표기만 fmtMonth로 연월까지만
+    function monthFieldHtml() {
+      return `
+        <div class="dfield">
+          <input type="text" inputmode="numeric" data-dtext placeholder="YYYY.MM" maxlength="7">
+          <span class="dfield-pick">${IC_CAL}<input type="month" data-dnative tabindex="-1"></span>
+        </div>`;
+    }
+    function wireMonthField(scope, maxIso) {
+      const text = scope.querySelector("[data-dtext]");
+      const native = scope.querySelector("[data-dnative]");
+      const maxMonth = maxIso ? maxIso.slice(0, 7) : null;
+      if (maxMonth) native.max = maxMonth;
+      const digitsOf = v => v.replace(/\D/g, "").slice(0, 6);
+      const format = d => d.length > 4 ? `${d.slice(0, 4)}.${d.slice(4)}` : d;
+      const getValue = () => {
+        const d = digitsOf(text.value);
+        if (!d.length) return "";
+        if (d.length !== 6) return null;
+        const y = d.slice(0, 4), m = d.slice(4, 6);
+        if (+m < 1 || +m > 12) return null;
+        const ym = `${y}-${m}`;
+        return maxMonth && ym > maxMonth ? null : `${ym}-01`;
+      };
+      text.addEventListener("input", () => { text.value = format(digitsOf(text.value)); });
+      native.addEventListener("change", () => { if (native.value) text.value = native.value.replace("-", "."); });
       return getValue;
     }
 
@@ -350,8 +380,8 @@
             </div>
             <div class="field" id="areg-serial-field"><label>S/N</label><input type="text" id="areg-serial-input" placeholder="입력" maxlength="40"></div>
             <div class="field" id="areg-imei-field"><label>IMEI</label><input type="text" id="areg-imei-input" placeholder="입력" maxlength="40"></div>
-            <div class="field" id="areg-manufactured-field"><label>제조연월일</label>${dateFieldHtml()}</div>
-            <div class="field" id="areg-purchasedate-field"><label>구매일</label>${dateFieldHtml()}</div>
+            <div class="field" id="areg-manufactured-field"><label>제조연월</label>${monthFieldHtml()}</div>
+            <div class="field" id="areg-purchasedate-field"><label>구매연월</label>${monthFieldHtml()}</div>
             <div class="field" id="areg-purchaseprice-field"><label>구매가격</label><input type="text" inputmode="numeric" id="areg-purchaseprice-input" placeholder="입력" maxlength="12"></div>
             <div class="field" id="areg-note-field"><label>메모</label><textarea id="areg-note-input" placeholder="입력" maxlength="500"></textarea></div>
           </div>
@@ -390,8 +420,8 @@
     const saveBtn = back.querySelector("#areg-save");
 
     const getExpiry = wireDateField(expiryField);
-    const getManufactured = wireDateField(manufacturedField, todayStr());
-    const getPurchaseDate = wireDateField(purchaseDateField, todayStr());
+    const getManufactured = wireMonthField(manufacturedField, todayStr());
+    const getPurchaseDate = wireMonthField(purchaseDateField, todayStr());
 
     // 고유관리번호는 QR 라벨 파일명의 식별키로 그대로 쓰여서, 파일명에 부적합한 문자가 섞이지 않도록 영문·숫자·하이픈·언더스코어만 허용.
     // 수정 모드에선 자기 자신은 중복 검사에서 제외(안 그러면 기존 값 그대로 저장하려 해도 항상 "중복"으로 걸림)
@@ -557,8 +587,11 @@
       checkValid();
     }
     function setDateInputs(fieldEl, iso) {
-      fieldEl.querySelector("[data-dtext]").value = iso ? iso.replace(/-/g, ".") : "";
-      fieldEl.querySelector("[data-dnative]").value = iso || "";
+      const native = fieldEl.querySelector("[data-dnative]");
+      const isMonth = native.type === "month";
+      const shown = iso && isMonth ? iso.slice(0, 7) : iso;
+      fieldEl.querySelector("[data-dtext]").value = shown ? shown.replace(/-/g, ".") : "";
+      native.value = shown || "";
     }
     // 자산 수정 진입 시 기존 값 전체를 채움 — selectCat을 거치지 않아(resetOtherFields 우회) 안전
     function prefillFromAsset(asset) {
@@ -762,10 +795,20 @@
           setIf("S/N 수정", "serial", serialInput.value.trim() || undefined);
           setIf("IMEI 수정", "imei", imeiInput.value.trim() || undefined);
         }
+        // 제조연월·구매연월은 연월만 다뤄서 setIf의 정확한 문자열 비교를 그대로 못 씀 — 기존 시드 데이터엔
+        // 일자가 "01"이 아닌 실제 날짜가 남아있어서(연월만 바뀐 건 아닌데) 그대로 비교하면 항상 "변경"으로
+        // 오탐지됨. 연월(앞 7자리)만 비교하고, 실제로 바뀐 경우에만 새 값(일자 "01" 고정)으로 저장
+        const monthFmt = d => d ? window.fmtMonth(d) : "";
         const manufactured = getManufactured();
-        if (manufactured !== null) setIf("제조연월일 변경", "manufactured", manufactured || undefined, dateFmt);
+        if (manufactured !== null && (manufactured || "").slice(0, 7) !== (asset.manufactured || "").slice(0, 7)) {
+          logChange("제조연월 변경", monthFmt(asset.manufactured), monthFmt(manufactured));
+          asset.manufactured = manufactured || undefined;
+        }
         const purchaseDate = getPurchaseDate();
-        if (purchaseDate !== null) setIf("구매일 변경", "purchaseDate", purchaseDate || undefined, dateFmt);
+        if (purchaseDate !== null && (purchaseDate || "").slice(0, 7) !== (asset.purchaseDate || "").slice(0, 7)) {
+          logChange("구매연월 변경", monthFmt(asset.purchaseDate), monthFmt(purchaseDate));
+          asset.purchaseDate = purchaseDate || undefined;
+        }
         // 통화 표기는 클라이언트 단위 전역 설정 — window.formatPrice 참조(구조설계안 3.4, data.js)
         const priceDigits = purchasePriceInput.value.replace(/[^0-9]/g, "");
         setIf("구매가격 변경", "price", priceDigits ? parseInt(priceDigits, 10) : undefined, v => (v != null ? window.formatPrice(v) : ""));

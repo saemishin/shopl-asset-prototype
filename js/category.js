@@ -69,8 +69,8 @@
     for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) % 997;
     return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length];
   }
-  // 구조설계안 3.3: 필드 노출 설정 대상은 S/N·IMEI·구매일·구매가격·제조연월일·유효기한 6개(IMEI·S/N은 개별형 전용) — 기본값: IMEI·유효기한 off, 나머지 on
-  const FIELD_LABEL = { serial: "S/N", imei: "IMEI", purchaseDate: "구매일", purchasePrice: "구매가격", manufactured: "제조연월일", expiry: "유효기한" };
+  // 구조설계안 3.3: 필드 노출 설정 대상은 S/N·IMEI·구매연월·구매가격·제조연월·유효기한 6개(IMEI·S/N은 개별형 전용) — 기본값: IMEI·유효기한 off, 나머지 on
+  const FIELD_LABEL = { serial: "S/N", imei: "IMEI", purchaseDate: "구매연월", purchasePrice: "구매가격", manufactured: "제조연월", expiry: "유효기한" };
   const DEFAULT_HIDDEN_FIELDS = { individual: ["imei", "expiry"], quantity: ["expiry"] };
   // 배정/보유 변경 권한 — 개별형은 "배정", 수량형은 "보유"로 부르는 게 구조설계안 4.3 표현과도 맞고,
   // 화면이 항상 하나의 자산 유형으로 스코프돼 있으니(소분류 상세·생성/수정 폼) 더 정확하게 부를 수 있음

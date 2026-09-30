@@ -25,12 +25,13 @@
     worksite: "https://docs.google.com/spreadsheets/d/10rbRIp_DL3FS-VrtHjV2HXU7VjeQtJilBbHiUFNQkos/edit?usp=drive_link",
   };
   // 근무지 코드는 구조설계안에 없는 필드 — 근무지가 "기존 재사용" 엔티티라 여기선 프로토타입 데모용 샘플값만 매핑(detail.js의 WS_CODE와 동일)
-  const WS_CODE = { "강남점": "GN-01", "판교점": "PG-01", "본사": "HQ-01" };
+  const WS_CODE = { "강남점": "GN-01", "판교점": "PG-01", "본사": "HQ-01", "역삼점": "YS-01" };
   // 근무지별 엑셀 다운로드(아이데이션 중)용 주소 — 실 서비스 DB엔 근무지마다 이미 주소값이 있어서 프로토타입엔 더미로만 시드(detail.js의 WS_ADDRESS와 동일)
   const WS_ADDRESS = {
     "강남점": "서울특별시 강남구 테헤란로 129",
     "판교점": "경기도 성남시 분당구 판교역로 235",
     "본사": "서울특별시 중구 을지로 100",
+    "역삼점": "서울특별시 강남구 역삼로 180",
   };
   // 구성원도 근무지와 동일하게 "기존 재사용" 엔티티라 프로토타입 데모용 샘플만 매핑 — 팀은 category.js의 MEMBERS와 동일 값으로 통일,
   // 사번·휴대폰번호는 검색 placeholder(아래)가 이미 약속해놓고 실제 필드가 없던 걸 이번에 시드.

@@ -44,17 +44,20 @@
   // "나" 페르소나 — 구성원 상세와 동일하게 더미 중 한 명을 기본값으로(?me= 쿼리로 다른 사람도 테스트 가능)
   const ME = new URLSearchParams(location.search).get("me") || "김민수";
   // assets.js/detail.js의 WS_CODE/WS_ADDRESS와 동일 값(이 파일도 자기 완결적이라 중복 유지 — 이 프로토타입 전반의 컨벤션)
-  const WS_CODE = { "강남점": "GN-01", "판교점": "PG-01", "본사": "HQ-01" };
+  const WS_CODE = { "강남점": "GN-01", "판교점": "PG-01", "본사": "HQ-01", "역삼점": "YS-01" };
   const WS_ADDRESS = {
     "강남점": "서울특별시 강남구 테헤란로 129",
     "판교점": "경기도 성남시 분당구 판교역로 235",
     "본사": "서울특별시 중구 을지로 100",
+    "역삼점": "서울특별시 강남구 역삼로 180",
   };
   // 구성원마다 고정 근무지 1개 + 담당 근무지 여러 개(최대 100개, 프로토타입은 데모용으로 소수만) — 이 매핑
   // 자체가 구조설계안에 없던 새 더미 데이터라 이 파일에만 정의(자산관리 기능이 아니라 근무지 기능 소관이라
   // 실 서비스엔 이미 구성원마다 저장돼 있는 값을 여기선 데모용으로 시드)
   const MY_WORKSITES = {
-    "김민수": { fixed: "본사", assigned: ["강남점", "판교점"] },
+    // 역삼점은 조회 가능한 자산이 하나도 없는 근무지 빈 상태 테스트용(2026-09-30) — 이 근무지의 유일한
+    // 자산(A026)이 조회 권한 "모든 관리자 및 리더"인 모니터라 전 구성원 기준 항상 필터링됨
+    "김민수": { fixed: "본사", assigned: ["강남점", "판교점", "역삼점"] },
     "정우성": { fixed: "강남점", assigned: ["본사"] },
   };
   function myWorksites(name) {
@@ -1172,8 +1175,8 @@
       { k: "태그", v: chips(a.labels) },
       isIndiv ? { k: "S/N", field: "serial", v: a.serial || '<span class="muted">—</span>' } : null,
       isIndiv ? { k: "IMEI", field: "imei", v: a.imei || '<span class="muted">—</span>' } : null,
-      { k: "제조연월일", field: "manufactured", v: a.manufactured ? window.fmtDate(a.manufactured) : '<span class="muted">—</span>' },
-      { k: "구매일", field: "purchaseDate", v: a.purchaseDate ? window.fmtDate(a.purchaseDate) : "—" },
+      { k: "제조연월", field: "manufactured", v: a.manufactured ? window.fmtMonth(a.manufactured) : '<span class="muted">—</span>' },
+      { k: "구매연월", field: "purchaseDate", v: a.purchaseDate ? window.fmtMonth(a.purchaseDate) : "—" },
       { k: isIndiv ? "구매가격" : "구매가격 (품목 단가)", field: "purchasePrice", v: a.price ? window.formatPrice(a.price) : "—" },
       { k: "자산 등록일", v: window.fmtDate(a.createdAt) },
       // 메모만 값 옆에 편집 아이콘을 붙여 별도 액션(더보기 메뉴가 아니라 바로 수정) — 대시보드 detail.js와

@@ -30,12 +30,13 @@
     "김민수": "개발팀", "이서연": "디자인팀", "박지훈": "영업팀", "정우성": "CS팀", "김철수": "운영팀",
     "최유진": "개발팀", "한소희": "디자인팀", "오세훈": "운영팀",
   };
-  const WS_CODE = { "강남점": "GN-01", "판교점": "PG-01", "본사": "HQ-01" };
+  const WS_CODE = { "강남점": "GN-01", "판교점": "PG-01", "본사": "HQ-01", "역삼점": "YS-01" };
   // 근무지별 엑셀 다운로드(아이데이션 중)용 주소 — 실 서비스 DB엔 근무지마다 이미 주소값이 있어서 프로토타입엔 더미로만 시드(assets.js의 WS_ADDRESS와 동일)
   const WS_ADDRESS = {
     "강남점": "서울특별시 강남구 테헤란로 129",
     "판교점": "경기도 성남시 분당구 판교역로 235",
     "본사": "서울특별시 중구 을지로 100",
+    "역삼점": "서울특별시 강남구 역삼로 180",
   };
   // 배정 추가 시 대상 후보 목록 — category.js의 MEMBERS와 동일 값(전사 인원 12명, 프로토타입 데모용)
   // empNo·phone은 assets.js의 MEMBER_INFO와 동일 값(8명), 나머지 4명은 같은 형식으로 새로 시드.
@@ -1337,9 +1338,9 @@
     const moreItems = a.status === "disposed" ? ["자산 삭제"] : ["자산 수정", "자산 삭제"];
 
     // 필수값(분류) 먼저, 선택값이 뒤따름. 유효기한·태그는 분류 바로 다음(전체 탭 테이블 컬럼 순서와 통일).
-    // 제조연월일이 구매일보다 앞(제조가 구매보다 먼저 일어나는 시점).
+    // 제조연월이 구매연월보다 앞(제조가 구매보다 먼저 일어나는 시점).
     // 선택 필드(field 태그가 있는 행)는 소분류 필드 노출 설정(hiddenFields)에서 off면 행 자체를 숨김.
-    // 구매일·구매가격을 붙여서 "취득 정보" 세트로 묶고, 그 뒤로 사용자 입력이 아니라 시스템이 자동 기록하는 필드(등록일·QR 라벨)를 배치.
+    // 구매연월·구매가격을 붙여서 "취득 정보" 세트로 묶고, 그 뒤로 사용자 입력이 아니라 시스템이 자동 기록하는 필드(등록일·QR 라벨)를 배치.
     // 메모는 마지막(최대 500자, 길어질 수 있음) — 자유 입력값이지만 길이가 가변적이라 다른 고정형 필드들 뒤에 둠.
     const cat = (window.DATA.categories || []).find(x => x.group === a.group && x.sub === a.sub) || {};
     const hidden = cat.hiddenFields || [];
@@ -1349,8 +1350,8 @@
       { k: "태그", v: chips(a.labels) },
       isIndiv ? { k: "S/N", field: "serial", v: a.serial || '<span class="muted">—</span>' } : null,
       isIndiv ? { k: "IMEI", field: "imei", v: a.imei || '<span class="muted">—</span>' } : null,
-      { k: "제조연월일", field: "manufactured", v: a.manufactured ? window.fmtDate(a.manufactured) : '<span class="muted">—</span>' },
-      { k: "구매일", field: "purchaseDate", v: a.purchaseDate ? window.fmtDate(a.purchaseDate) : "—" },
+      { k: "제조연월", field: "manufactured", v: a.manufactured ? window.fmtMonth(a.manufactured) : '<span class="muted">—</span>' },
+      { k: "구매연월", field: "purchaseDate", v: a.purchaseDate ? window.fmtMonth(a.purchaseDate) : "—" },
       // 통화 표기는 클라이언트 단위 전역 설정 — window.formatPrice 참조(구조설계안 3.4, data.js)
       { k: isIndiv ? "구매가격" : "구매가격 (품목 단가)", field: "purchasePrice", v: a.price ? window.formatPrice(a.price) : "—" },
       { k: "자산 등록일", v: window.fmtDate(a.createdAt) },

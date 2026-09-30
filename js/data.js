@@ -128,6 +128,12 @@ window.DATA = (function () {
     { id: "A028", type: "individual", assetNo: "IT-2021-0007", product: "델 U2720Q", group: "전자기기류", sub: "모니터",
       status: "assigned", serial: "CN-0KL-79", createdAt: "2021-11-16", purchaseDate: "2021-11-15", price: 690000, expiry: "",
       labels: ["본사"], assignments: [{ employee: null, worksite: "본사", since: "2022-03-01" }] },
+    // 근무지 자산 "조회 가능한 자산이 하나도 없는 근무지" 빈 상태 데모용(2026-09-30) — 역삼점(김민수의 담당
+    // 근무지, app.js MY_WORKSITES)의 유일한 자산이 모니터(조회 권한 "모든 관리자 및 리더", 관리자/리더 필드가
+    // 없는 이 프로토타입에선 전원 필터링)라 근무지 자산 화면에서 역삼점 카드가 "전체 0"+빈 상태로 뜸
+    { id: "A029", type: "individual", assetNo: "IT-2021-0008", product: "델 U2720Q", group: "전자기기류", sub: "모니터",
+      status: "assigned", serial: "CN-0KL-80", createdAt: "2021-11-16", purchaseDate: "2021-11-15", price: 690000, expiry: "",
+      labels: ["역삼점"], assignments: [{ employee: null, worksite: "역삼점", since: "2022-03-01" }] },
 
     // total_qty 120, 배분합계 115 — 잔여 5개(미배분, 소진 아님) 시연용. 한소희는 0개 보유(소진이 아닌
     // 품목에 속한 0개짜리 보유 대상이라 "미보유대상" 통계에 실제로 잡히는 유일한 샘플)
@@ -233,6 +239,8 @@ window.DATA = (function () {
   const parse = s => new Date(String(s).replace(" ", "T"));
   window.fmtDate = s => { if (!s) return "—"; const d = parse(s); return `${d.getFullYear()}.${p(d.getMonth() + 1)}.${p(d.getDate())}(${DAYS[d.getDay()]})`; };
   window.fmtDateTime = s => { if (!s) return "—"; const d = parse(s); return `${window.fmtDate(s)} ${p(d.getHours())}:${p(d.getMinutes())}`; };
+  // 제조연월·구매연월 전용(2026-09-30, 일 단위 제거 — 저장은 그대로 YYYY-MM-01이라 일자를 무시하고 연월만 표기)
+  window.fmtMonth = s => { if (!s) return "—"; const d = parse(s); return `${d.getFullYear()}.${p(d.getMonth() + 1)}`; };
 })();
 
 /* 구매가격 통화 표기 — 자산마다 다른 게 아니라 클라이언트(회사) 단위로 하나만 설정되는 전역 값(구조설계안 3.4).
