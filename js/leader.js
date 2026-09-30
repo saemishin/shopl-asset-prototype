@@ -221,8 +221,10 @@
     return `
       <div class="mapp-topbar">
         <button type="button" class="mapp-back" data-mapp-back aria-label="뒤로">←</button>
-        <span class="mapp-topbar-title">${cat.group || ""} <span class="mapp-cat-sep">›</span> ${sub}</span>
         <button type="button" class="mapp-topbar-filter" data-filter-placeholder aria-label="필터">${IC_FILTER}</button>
+      </div>
+      <div class="mapp-subdetail-head">
+        <h1 class="mapp-subdetail-title">${cat.group || ""} <span class="mapp-cat-sep">›</span> ${sub}</h1>
       </div>
       <div class="mapp-body">
         ${subItems.length ? `<div class="mapp-chip-row">${statusChips.map(([k, l]) =>

@@ -1449,6 +1449,16 @@ button.dthumb:hover { filter: brightness(0.94); }
 }
 .mapp-wsdetail-sub .mapp-cat-sep { color: var(--primary-press); opacity: .55; }
 
+/* 리더모드 소분류 상세 — 앱바에는 타이틀 없이, 아래 박스에 분류명을 표시.
+   직원모드 근무지 상세의 분류 pill과 같은 색상·모서리로 타이틀 영역을 구성 */
+.mapp-subdetail-head { padding: 0 16px 16px; flex-shrink: 0; }
+.mapp-subdetail-title {
+  margin: 0; padding: 12px 14px; border-radius: 8px;
+  background: var(--primary-weak); color: var(--primary-press);
+  font-size: 16px; font-weight: 700; line-height: 1.5; overflow-wrap: anywhere;
+}
+.mapp-subdetail-title .mapp-cat-sep { color: var(--primary-press); opacity: .55; }
+
 /* 내 자산 — 대분류 섹션(접기/펼치기 가능, 근무지 카드와 동일한 접기 패턴) */
 .mapp-cat-section[hidden] { display: none; }
 .mapp-cat-section + .mapp-cat-section { margin-top: 18px; }
