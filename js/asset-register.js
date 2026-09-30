@@ -284,8 +284,17 @@
           <span class="dfield-pick">${IC_CAL}<input type="date" data-dnative tabindex="-1"></span>
         </div>`;
     }
+    // 실제 달력에 있는 날짜인지(윤년 2월 29일까지 포함, 2월 30일·4월 31일 등은 거름) — Date에 넣었다가
+    // 그대로 되돌아오는지로 판정(달을 벗어난 일수는 Date가 다음 달로 넘겨버리는 걸 이용한 표준적인 방법)
+    const isRealDate = (y, m, dd) => {
+      const dt = new Date(y, m - 1, dd);
+      return dt.getFullYear() === y && dt.getMonth() === m - 1 && dt.getDate() === dd;
+    };
     // maxIso가 있으면(구매연월·제조연월) 미래 날짜 불가, 없으면(유효기한) 만료일 성격상 미래 날짜도 허용.
-    // getValue()는 8자리를 다 채운 유효한 날짜면 ISO, 완전히 비어있으면 "", 불완전/범위밖이면 null을 돌려줌
+    // getValue()는 8자리를 다 채운 유효한 날짜면 ISO, 완전히 비어있으면 "", 불완전/무효(달력에 없는 날짜·범위밖)면
+    // null을 돌려줌 — null을 저장 버튼 비활성·에러 메시지 판정에 그대로 씀(2026-09-30, 이전엔 무효해도 조용히 무시).
+    // getValue.touched: 포커스가 한 번 빠져나간 적 있는지 — 입력 중엔(포커스 안 빠짐) 에러 문구를 숨기고
+    // 저장 버튼 비활성만 실시간으로 걸기 위한 플래그(타이핑 도중 바로 빨간 글씨가 뜨는 걸 방지)
     function wireDateField(scope, maxIso) {
       const text = scope.querySelector("[data-dtext]");
       const native = scope.querySelector("[data-dnative]");
@@ -297,13 +306,15 @@
         const d = digitsOf(text.value);
         if (!d.length) return "";
         if (d.length !== 8) return null;
-        const y = d.slice(0, 4), m = d.slice(4, 6), dd = d.slice(6, 8);
-        if (+m < 1 || +m > 12 || +dd < 1 || +dd > 31) return null;
-        const iso = `${y}-${m}-${dd}`;
+        const y = +d.slice(0, 4), m = +d.slice(4, 6), dd = +d.slice(6, 8);
+        if (!isRealDate(y, m, dd)) return null;
+        const iso = `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}`;
         return maxIso && iso > maxIso ? null : iso;
       };
-      text.addEventListener("input", () => { text.value = format(digitsOf(text.value)); });
-      native.addEventListener("change", () => { if (native.value) text.value = native.value.replace(/-/g, "."); });
+      getValue.touched = false;
+      text.addEventListener("input", () => { text.value = format(digitsOf(text.value)); checkValid(); });
+      text.addEventListener("blur", () => { getValue.touched = true; checkValid(); });
+      native.addEventListener("change", () => { if (native.value) text.value = native.value.replace(/-/g, "."); getValue.touched = true; checkValid(); });
       return getValue;
     }
     // 제조연월·구매연월 전용(2026-09-30, 일 단위 제거 — "제조연월일"·"구매일"이었던 걸 연월 단위로 단순화).
@@ -332,8 +343,10 @@
         const ym = `${y}-${m}`;
         return maxMonth && ym > maxMonth ? null : `${ym}-01`;
       };
-      text.addEventListener("input", () => { text.value = format(digitsOf(text.value)); });
-      native.addEventListener("change", () => { if (native.value) text.value = native.value.replace("-", "."); });
+      getValue.touched = false;
+      text.addEventListener("input", () => { text.value = format(digitsOf(text.value)); checkValid(); });
+      text.addEventListener("blur", () => { getValue.touched = true; checkValid(); });
+      native.addEventListener("change", () => { if (native.value) text.value = native.value.replace("-", "."); getValue.touched = true; checkValid(); });
       return getValue;
     }
 
@@ -367,7 +380,9 @@
               <p class="field-err" data-assetno-err hidden>동일한 명칭이 존재합니다.</p>
             </div>
             <div class="field" id="areg-totalqty-field"><label>총 수량 <span class="req">*</span></label><input type="text" inputmode="numeric" id="areg-totalqty-input" placeholder="입력" maxlength="6"></div>
-            <div class="field" id="areg-expiry-field"><label>유효기한</label>${dateFieldHtml()}</div>
+            <div class="field" id="areg-expiry-field"><label>유효기한</label>${dateFieldHtml()}
+              <p class="field-err" data-date-err hidden>유효한 날짜가 아닙니다.</p>
+            </div>
             <div class="field" id="areg-tag-field">
               <div class="field-label-row">
                 <label>태그</label>
@@ -380,8 +395,12 @@
             </div>
             <div class="field" id="areg-serial-field"><label>S/N</label><input type="text" id="areg-serial-input" placeholder="입력" maxlength="40"></div>
             <div class="field" id="areg-imei-field"><label>IMEI</label><input type="text" id="areg-imei-input" placeholder="입력" maxlength="40"></div>
-            <div class="field" id="areg-manufactured-field"><label>제조연월</label>${monthFieldHtml()}</div>
-            <div class="field" id="areg-purchasedate-field"><label>구매연월</label>${monthFieldHtml()}</div>
+            <div class="field" id="areg-manufactured-field"><label>제조연월</label>${monthFieldHtml()}
+              <p class="field-err" data-date-err hidden>유효한 날짜가 아닙니다.</p>
+            </div>
+            <div class="field" id="areg-purchasedate-field"><label>구매연월</label>${monthFieldHtml()}
+              <p class="field-err" data-date-err hidden>유효한 날짜가 아닙니다.</p>
+            </div>
             <div class="field" id="areg-purchaseprice-field"><label>구매가격</label><input type="text" inputmode="numeric" id="areg-purchaseprice-input" placeholder="입력" maxlength="12"></div>
             <div class="field" id="areg-note-field"><label>메모</label><textarea id="areg-note-input" placeholder="입력" maxlength="500"></textarea></div>
           </div>
@@ -429,6 +448,19 @@
       if (!v) return false;
       return (window.DATA.assets || []).some(a => a !== opts.asset && a.assetNo && a.assetNo === v);
     }
+    // 날짜 필드(유효기한·제조연월·구매연월) 공통 유효성 판정 — 필드가 숨겨져 있으면(카테고리 필드 노출
+    // 설정에서 꺼짐) 검사 대상에서 제외. 저장 버튼 비활성은 무효면 항상 실시간으로 걸지만, 에러 문구는
+    // getValue.touched(포커스가 한 번 빠져나간 적 있는지)가 true일 때만 보여줌(2026-09-30 — 타이핑 도중
+    // 계속 빨간 글씨가 뜨는 걸 방지)
+    function dateFieldValid(fieldEl, getValue) {
+      if (fieldEl.style.display === "none") return true;
+      const invalid = getValue() === null;
+      const errEl = fieldEl.querySelector("[data-date-err]");
+      const showErr = invalid && getValue.touched;
+      if (errEl) errEl.hidden = !showErr;
+      fieldEl.querySelector("[data-dtext]").classList.toggle("has-err", showErr);
+      return !invalid;
+    }
     function checkValid() {
       const nameOk = nameInput.value.trim().length > 0;
       const noVal = assetNoInput.value.trim();
@@ -437,7 +469,10 @@
       assetNoInput.classList.toggle("has-err", dup);
       const noOk = type === "quantity" ? true : (noVal.length > 0 && !dup);
       const totalQtyOk = type === "quantity" ? /^[1-9][0-9]*$/.test(totalQtyInput.value.trim()) : true;
-      saveBtn.disabled = !(catValue && nameOk && noOk && totalQtyOk);
+      const expiryOk = dateFieldValid(expiryField, getExpiry);
+      const manufacturedOk = dateFieldValid(manufacturedField, getManufactured);
+      const purchaseDateOk = dateFieldValid(purchaseDateField, getPurchaseDate);
+      saveBtn.disabled = !(catValue && nameOk && noOk && totalQtyOk && expiryOk && manufacturedOk && purchaseDateOk);
     }
     // 품목명 자동완성 — "소분류+품목명" 조합이 품목 단위라, 같은 소분류에 이미 등록된 품목명을 제안해서
     // 띄어쓰기·표기 차이로 같은 품목이 여러 이름으로 쪼개지는 걸 막음. 태그와 달리 목록에 없는 새 이름도 항상 입력 가능(강제 선택 아님)
