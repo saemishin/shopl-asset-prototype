@@ -5,6 +5,16 @@
 (function () {
   const { assets } = window.DATA;
   const TODAY = new Date("2026-09-04");
+  // app.js의 toast()와 동일(중복) — .mapp-screen 영역 기준으로 떠서 폰 목업 밖으로 안 나가게
+  function toast(msg) {
+    const t = document.createElement("div");
+    t.textContent = msg;
+    const screen = document.querySelector(".mapp-screen");
+    const r = screen ? screen.getBoundingClientRect() : null;
+    const pos = r ? `left:${r.left + r.width / 2}px;bottom:${window.innerHeight - r.bottom + 32}px;` : "left:50%;bottom:32px;";
+    t.style.cssText = `position:fixed;${pos}transform:translateX(-50%);background:#1b1d1f;color:#fff;padding:10px 16px;border-radius:8px;font-size:12.5px;z-index:300;max-width:280px;text-align:center`;
+    document.body.appendChild(t); setTimeout(() => t.remove(), 1800);
+  }
 
   // "나" 페르소나 — 리더 1명(김민수)을 고정. 앱 직원모드의 ?me= 같은 전환 기능은 이번 러프 스코프에 없음
   const ME = "김민수";
@@ -30,12 +40,12 @@
     stock: ["재고", "stock"], assigned: ["배정 중", "assigned"], repair: ["수리 중", "repair"],
     lost: ["분실", "lost"], disposed: ["폐기", "disposed"], held: ["보유 중", "assigned"],
   };
-  // assets.js의 expiryKey/EXP_LABEL과 동일(중복) — 통계 칩이 이 4개 상태 기준
-  const EXP_LABEL = { valid: "유효", soon: "만료 예정", over: "만료", none: "미설정" };
-  function expiryKey(d) {
-    if (!d) return "none";
-    const days = Math.ceil((new Date(d) - TODAY) / 86400000);
-    return days < 0 ? "over" : days <= 7 ? "soon" : "valid";
+  // assets.js의 isDepleted/hasUnheldHolder와 동일(중복) — 수량형 소분류 화면의 "소진"·"미보유대상" 필터에 씀
+  function isDepleted(a) {
+    return a.type === "quantity" && a.totalQty - (a.stocks || []).reduce((s, x) => s + x.qty, 0) === 0;
+  }
+  function hasUnheldHolder(a) {
+    return a.type === "quantity" && (a.stocks || []).some(x => x.qty === 0);
   }
   const CATEGORY_ORDER = new Map(window.DATA.categories.map((c, i) => [c.sub, i]));
   function subOrder(sub) { return CATEGORY_ORDER.has(sub) ? CATEGORY_ORDER.get(sub) : 999; }
@@ -96,8 +106,8 @@
       </div>`;
   }
 
-  const CHEV_DOWN = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>`;
   const MENU_ICON_ASSET = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10" r="1.6"/><path d="m21 16-5-5-9 8"/></svg>`;
+  const IC_FILTER = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M8 12h8M11 18h2"/></svg>`;
 
   // 메뉴 화면 — 실 앱 스크린샷 참고(직원모드와 달리 "비용" 섹션 없음, 맨 위에 "승인" 섹션 추가, 관리
   // 섹션 맨 하단에 직원모드와 동일하게 "자산" 추가). 하단 "Powered by shopl"도 참고 이미지 그대로 재현
@@ -145,59 +155,77 @@
     ).join("")}</div>`;
   }
 
-  // 통계 칩 — "전체"는 그룹 뷰(소분류 섹션, 기본 접힘), 나머지 4개(유효/만료 예정/만료/미설정)는 그
-  // 조건에 맞는 자산만 그룹 없이 flat하게 보여주고 위에 소분류별 분포 카드를 얹음
-  function statChipsHtml(active) {
-    const chips = [{ k: "all", l: "전체" }, { k: "valid", l: "유효" }, { k: "soon", l: "만료 예정" }, { k: "over", l: "만료" }, { k: "none", l: "미설정" }];
-    return `<div class="mapp-chip-row">${chips.map(c =>
-      `<button type="button" class="mapp-chip${c.k === active ? " active" : ""}" data-chip="${c.k}">${c.l}</button>`).join("")}</div>`;
-  }
-  function statDetailHtml(items, chip) {
-    if (chip === "all") return "";
-    const bySub = groupItemsBySub(items);
-    const rows = bySub.map(sec => `<div class="mapp-stat-row"><span>${sec.group} <span class="mapp-cat-sep">›</span> ${sec.sub}</span><b>${sec.items.length}</b></div>`).join("");
-    return `
-      <div class="mapp-stat-card">
-        <div class="mapp-stat-card-head">${EXP_LABEL[chip]} 자산 <b>${items.length}</b>건</div>
-        ${items.length ? `<div class="mapp-stat-card-body">${rows}</div>` : `<p class="mapp-stat-empty">해당하는 자산이 없습니다.</p>`}
-      </div>`;
-  }
-  function assetsScreenHtml(chip) {
+  // 자산 화면(허브) — 카드를 직접 보여주지 않고 유형 칩 + 소분류별 카운트 행만 노출, 소분류를 눌러야
+  // 실제 목록(소분류 상세 화면)으로 드릴다운(2026-09-30 — 애초엔 유효기간 칩을 누르면 그 자리에서 flat
+  // 리스트가 바로 나오게 했었는데, "소분류는 드릴다운, 상태 칩은 즉시 노출"이 화면 안에서 일관성이 없다는
+  // 지적으로 전면 재설계. 이제 규칙은 하나 — 카드가 보이는 곳은 소분류 상세 화면 하나뿐)
+  function assetsScreenHtml(typeChip) {
     const allItems = sortItems(collectLeaderItems());
-    const filtered = chip === "all" ? allItems : allItems.filter(x => expiryKey(x.asset.expiry) === chip);
-    const sections = chip === "all" ? groupItemsBySub(allItems) : [];
-    const listHtml = !filtered.length ? `<p class="mapp-ws-empty">조회 가능한 자산이 없습니다.</p>`
-      : chip === "all"
-        ? `<div data-mapp-card-list>${sections.map(sec => `
-            <div class="mapp-cat-section" data-cat-section>
-              <button type="button" class="mapp-cat-section-head collapsed" data-cat-collapse aria-expanded="false" aria-label="접기/펼치기">
-                <span>${sec.group} <span class="mapp-cat-sep">›</span> ${sec.sub}</span>
-                <span class="mapp-cat-section-count">${sec.items.length}</span>
-                ${CHEV_DOWN}
-              </button>
-              <div class="mapp-card-list" data-cat-collapsible hidden>${sec.items.map(x => assetCardHtml(x)).join("")}</div>
-            </div>`).join("")}</div>`
-        : `<div class="mapp-card-list">${filtered.map(x => assetCardHtml(x)).join("")}</div>`;
+    const scoped = typeChip === "all" ? allItems : allItems.filter(x => x.asset.type === typeChip);
+    const sections = groupItemsBySub(scoped);
+    const typeChips = [["all", "전체"], ["individual", "개별 자산"], ["quantity", "수량 자산"]];
     return `
       <div class="mapp-topbar">
         <button type="button" class="mapp-back" data-mapp-back aria-label="뒤로">←</button>
         <span class="mapp-topbar-title">자산</span>
       </div>
       <div class="mapp-body">
-        ${statChipsHtml(chip)}
-        ${statDetailHtml(filtered, chip)}
-        <div class="mapp-count">전체 <b>${filtered.length}</b></div>
-        ${listHtml}
+        <div class="mapp-chip-row">${typeChips.map(([k, l]) =>
+          `<button type="button" class="mapp-chip${k === typeChip ? " active" : ""}" data-type-chip="${k}">${l}</button>`).join("")}</div>
+        <div class="mapp-count">전체 <b>${scoped.length}</b></div>
+        ${sections.length
+          ? `<div class="mapp-ws-cat-tree">${sections.map(sec => `
+              <button type="button" class="mapp-ws-cat-row" data-sub-open data-sub="${sec.sub}">
+                <span>${sec.group} <span class="mapp-cat-sep">›</span> ${sec.sub}</span>
+                <span class="mapp-ws-cat-count">${sec.items.length}<span class="mapp-menu-chev">›</span></span>
+              </button>`).join("")}</div>`
+          : `<p class="mapp-ws-empty">조회 가능한 자산이 없습니다.</p>`}
+      </div>`;
+  }
+  // 소분류 상세 화면 — 카드가 실제로 보이는 유일한 화면. 소분류가 정해지면 자산 유형도 자동으로 정해지므로
+  // (한 소분류는 개별형·수량형 중 하나만) 그 유형에 맞는 상태 칩을 바로 노출(개별형: 재고/분실/수리 중,
+  // 수량형: 재고/소진/미보유대상). 상태 칩은 다시 눌러도 해제 안 되고, 적용된 필터 칩의 ✕로만 해제(대시보드
+  // 필터바와 동일 규칙, 2026-09-30). 필터 아이콘은 이번 스코프에선 자리만(팝업 미구현)
+  const INDIV_STATUS_CHIPS = [["stock", "재고"], ["lost", "분실"], ["repair", "수리 중"]];
+  const QTY_STATUS_CHIPS = [["stock", "재고"], ["depleted", "소진"], ["unheld", "미보유대상"]];
+  function statusLabel(key, chips) { return (chips.find(c => c[0] === key) || [])[1] || ""; }
+  function matchesStatus(a, type, statusFilter) {
+    if (!statusFilter) return true;
+    if (type === "individual") return a.status === statusFilter;
+    if (statusFilter === "stock") return a.status === "stock";
+    if (statusFilter === "depleted") return isDepleted(a);
+    if (statusFilter === "unheld") return hasUnheldHolder(a);
+    return true;
+  }
+  function subDetailScreenHtml(sub, statusFilter) {
+    const cat = window.DATA.categories.find(c => c.sub === sub) || {};
+    const type = cat.type || "individual";
+    const statusChips = type === "individual" ? INDIV_STATUS_CHIPS : QTY_STATUS_CHIPS;
+    const items = sortItems(collectLeaderItems()).filter(x => x.asset.sub === sub && matchesStatus(x.asset, type, statusFilter));
+    return `
+      <div class="mapp-topbar">
+        <button type="button" class="mapp-back" data-mapp-back aria-label="뒤로">←</button>
+        <span class="mapp-topbar-title">${cat.group || ""} <span class="mapp-cat-sep">›</span> ${sub}</span>
+        <button type="button" class="mapp-topbar-filter" data-filter-placeholder aria-label="필터">${IC_FILTER}</button>
+      </div>
+      <div class="mapp-body">
+        <div class="mapp-chip-row">${statusChips.map(([k, l]) =>
+          `<button type="button" class="mapp-chip${k === statusFilter ? " active" : ""}" data-status-chip="${k}">${l}</button>`).join("")}</div>
+        ${statusFilter ? `<div class="filterbar"><span class="fchip">${statusLabel(statusFilter, statusChips)}<button type="button" data-status-clear>✕</button></span></div>` : ""}
+        <div class="mapp-count">전체 <b>${items.length}</b></div>
+        ${items.length ? `<div class="mapp-card-list">${items.map(x => assetCardHtml(x)).join("")}</div>` : `<p class="mapp-ws-empty">조회 가능한 자산이 없습니다.</p>`}
       </div>`;
   }
 
   function render() {
     const root = document.getElementById("app");
-    const state = { screen: "menu", chip: "all" };
+    const state = { screen: "menu", typeChip: "all", sub: null, statusFilter: null };
 
     function draw() {
       const showTabBar = state.screen === "menu";
-      const screenHtml = state.screen === "menu" ? menuScreenHtml() : assetsScreenHtml(state.chip);
+      const screenHtml = state.screen === "menu" ? menuScreenHtml()
+        : state.screen === "sub-detail" ? subDetailScreenHtml(state.sub, state.statusFilter)
+        : assetsScreenHtml(state.typeChip);
       root.innerHTML = `
         <div class="mapp-stage">
           <div class="mapp-phone">
@@ -208,21 +236,33 @@
         </div>`;
 
       const back = root.querySelector("[data-mapp-back]");
-      if (back) back.onclick = () => { state.screen = "menu"; draw(); };
+      if (back) back.onclick = () => {
+        // 소분류 상세 → 자산 허브(유형 칩은 유지), 그 외엔 메뉴로 복귀
+        if (state.screen === "sub-detail") { state.screen = "assets"; state.sub = null; state.statusFilter = null; }
+        else { state.screen = "menu"; }
+        draw();
+      };
       const gotoAssets = root.querySelector('[data-mapp-goto="assets"]');
-      if (gotoAssets) gotoAssets.onclick = () => { state.screen = "assets"; state.chip = "all"; draw(); };
+      if (gotoAssets) gotoAssets.onclick = () => { state.screen = "assets"; state.typeChip = "all"; draw(); };
       root.querySelectorAll("[data-mapp-tab]").forEach(b => b.onclick = () => {
         // "홈"·"승인" 탭은 이번 러프 스코프 밖이라 동작 없음(메뉴만 실제 이동)
         if (b.dataset.mappTab === "menu") { state.screen = "menu"; draw(); }
       });
-      root.querySelectorAll("[data-chip]").forEach(b => b.onclick = () => { state.chip = b.dataset.chip; draw(); });
-      root.querySelectorAll("[data-cat-collapse]").forEach(b => b.onclick = () => {
-        const body = b.closest(".mapp-cat-section").querySelector("[data-cat-collapsible]");
-        const expanded = b.getAttribute("aria-expanded") === "true";
-        b.setAttribute("aria-expanded", String(!expanded));
-        body.hidden = expanded;
-        b.classList.toggle("collapsed", expanded);
+      root.querySelectorAll("[data-type-chip]").forEach(b => b.onclick = () => { state.typeChip = b.dataset.typeChip; draw(); });
+      // 소분류 행 탭 → 소분류 상세(드릴다운)로 진입, 상태 필터는 매번 깨끗하게 시작
+      root.querySelectorAll("[data-sub-open]").forEach(b => b.onclick = () => {
+        state.screen = "sub-detail";
+        state.sub = b.dataset.sub;
+        state.statusFilter = null;
+        draw();
       });
+      // 상태 칩 — 다시 눌러도 해제 안 됨(대시보드 필터바 규칙과 동일), 해제는 적용된 필터 칩의 ✕로만
+      root.querySelectorAll("[data-status-chip]").forEach(b => b.onclick = () => { state.statusFilter = b.dataset.statusChip; draw(); });
+      const statusClear = root.querySelector("[data-status-clear]");
+      if (statusClear) statusClear.onclick = () => { state.statusFilter = null; draw(); };
+      // 필터 아이콘은 이번 스코프엔 자리만 — 팝업은 다음 라운드(직원모드 드릴다운 화면과 공용으로 검토)
+      const filterBtn = root.querySelector("[data-filter-placeholder]");
+      if (filterBtn) filterBtn.onclick = () => toast("필터 — 이후 단계에서 정의");
     }
     draw();
   }

@@ -1303,17 +1303,14 @@ button.dthumb:hover { filter: brightness(0.94); }
 .mapp-dot-badge { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #ef4444; margin-left: 4px; vertical-align: middle; }
 .mapp-tab-ic { position: relative; }
 .mapp-tab-ic .mapp-dot-badge { position: absolute; top: -2px; right: -5px; margin: 0; }
-/* 리더모드 자산 화면 — 통계 칩(선택된 칩만 소분류별 분포 카드 노출) */
+/* 리더모드 자산 화면 — 유형 칩(허브)·상태 칩(소분류 상세). 실제 필터 적용 표시는 대시보드와 동일하게
+   .filterbar/.fchip 재사용(2026-09-30, 상태 칩 자체는 누르면 항상 켜지기만 하고 해제는 fchip의 ✕로만) */
 .mapp-chip-row { display: flex; gap: 8px; overflow-x: auto; padding: 2px 0 12px; }
 .mapp-chip { flex-shrink: 0; padding: 7px 14px; border-radius: 999px; border: 1px solid var(--line-strong); font-size: 12.5px; font-weight: 600; color: var(--text-sub); background: #fff; white-space: nowrap; }
 .mapp-chip.active { background: #1b1d1f; color: #fff; border-color: #1b1d1f; }
-.mapp-stat-card { border: 1px solid var(--line); border-radius: 10px; padding: 14px; margin-bottom: 14px; background: #fafbfc; }
-.mapp-stat-card-head { font-size: 14px; font-weight: 700; margin-bottom: 8px; }
-.mapp-stat-card-head b { color: var(--primary); }
-.mapp-stat-card-body { display: flex; flex-direction: column; gap: 6px; }
-.mapp-stat-row { display: flex; justify-content: space-between; font-size: 12.5px; color: var(--text-sub); }
-.mapp-stat-row b { color: var(--text); font-weight: 700; }
-.mapp-stat-empty { font-size: 12.5px; color: var(--text-mut); padding: 8px 0; }
+/* 소분류 상세 화면 상단바 우측 필터 아이콘 — 이번 스코프는 자리만(팝업 미구현) */
+.mapp-topbar-filter { margin-left: auto; color: var(--text); flex-shrink: 0; }
+.mapp-topbar-filter svg { width: 19px; height: 19px; }
 
 /* 자산 화면 — 상단바 + 탭 + 검색/카운트/카드 목록 */
 .mapp-topbar { flex-shrink: 0; display: flex; align-items: center; gap: 10px; padding: 14px 16px; }
