@@ -25,9 +25,9 @@
     "윤재현": "해외영업", "임하늘": "개발팀",
   };
   // app.js의 hasViewPermission과 동일 로직(그대로 중복) — 리더모드 자산 화면은 "조회 권한을 가진 자산
-  // 전체"가 화면의 정의 그 자체라, 이 판정 함수가 목록 수집의 핵심
-  function hasViewPermission(a) {
-    const cat = window.DATA.categories.find(c => c.group === a.group && c.sub === a.sub);
+  // 전체"가 화면의 정의 그 자체라, 이 판정 함수가 목록 수집의 핵심. 소분류 트리(허브 화면)는 자산이 아니라
+  // 카테고리 자체를 걸러야 해서 판정 로직을 catViewPermission(cat)으로 분리하고 hasViewPermission(a)은 그걸 재사용
+  function catViewPermission(cat) {
     if (!cat) return false;
     switch (cat.view) {
       case "회사의 모든 구성원": return true;
@@ -35,6 +35,9 @@
       case "특정 그룹 및 직무/직급": return (cat.viewTarget && cat.viewTarget.groups || []).includes(MEMBER_TEAM[ME]);
       default: return false; // 모든 관리자 및 리더 / 관리자만
     }
+  }
+  function hasViewPermission(a) {
+    return catViewPermission(window.DATA.categories.find(c => c.group === a.group && c.sub === a.sub));
   }
   const STATUS_LABEL = {
     stock: ["재고", "stock"], assigned: ["배정 중", "assigned"], repair: ["수리 중", "repair"],
@@ -59,21 +62,24 @@
       return q.qty - p.qty;
     });
   }
-  function groupItemsBySub(items) {
-    const order = [];
-    const map = {};
-    items.forEach(x => {
-      const s = x.asset.sub;
-      if (!map[s]) { map[s] = []; order.push(s); }
-      map[s].push(x);
-    });
-    return order.map(sub => ({ sub, group: map[sub][0].asset.group, items: map[sub] }));
-  }
   // 대시보드 "전체" 탭과 동일하게 자산 1건당 한 행(특정 배정/보유 대상 기준이 아님) — 수량형의 qty는
   // 특정 보유자의 보유 수량이 아니라 그 자산의 총 수량(totalQty)
   function collectLeaderItems() {
     return assets.filter(a => hasViewPermission(a)).map(a => ({ asset: a, qty: a.type === "quantity" ? (a.totalQty || 0) : 1 }));
   }
+  // 허브 화면용 — 대시보드 분류 관리 화면의 트리와 동일하게, 자산 보유 여부와 무관하게 조회 권한을 가진
+  // 소분류를 전부 대분류별로 묶어서 보여줌(2026-09-30 — 유형 칩 제거하면서 "허브는 순수 카테고리 트리"로 단순화)
+  function categoryTree() {
+    const order = [];
+    const map = {};
+    window.DATA.categories.forEach(c => {
+      if (!catViewPermission(c)) return;
+      if (!map[c.group]) { map[c.group] = []; order.push(c.group); }
+      map[c.group].push(c.sub);
+    });
+    return order.map(group => ({ group, subs: map[group] }));
+  }
+  function countForSub(sub) { return assets.filter(a => a.sub === sub && hasViewPermission(a)).length; }
 
   const THUMB_EMPTY = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 15 5-4 4 3 4-4 5 4"/></svg>`;
   function cardThumb(a) {
@@ -155,30 +161,24 @@
     ).join("")}</div>`;
   }
 
-  // 자산 화면(허브) — 카드를 직접 보여주지 않고 유형 칩 + 소분류별 카운트 행만 노출, 소분류를 눌러야
-  // 실제 목록(소분류 상세 화면)으로 드릴다운(2026-09-30 — 애초엔 유효기간 칩을 누르면 그 자리에서 flat
-  // 리스트가 바로 나오게 했었는데, "소분류는 드릴다운, 상태 칩은 즉시 노출"이 화면 안에서 일관성이 없다는
-  // 지적으로 전면 재설계. 이제 규칙은 하나 — 카드가 보이는 곳은 소분류 상세 화면 하나뿐)
-  function assetsScreenHtml(typeChip) {
-    const allItems = sortItems(collectLeaderItems());
-    const scoped = typeChip === "all" ? allItems : allItems.filter(x => x.asset.type === typeChip);
-    const sections = groupItemsBySub(scoped);
-    const typeChips = [["all", "전체"], ["individual", "개별 자산"], ["quantity", "수량 자산"]];
+  // 자산 화면(허브) — 대시보드 분류 관리 화면의 트리처럼 조회 권한 가진 대분류·소분류를 전부 보여주기만
+  // 하고, 소분류를 눌러야 실제 목록(소분류 상세 화면)으로 드릴다운(2026-09-30 — 유형 칩까지 없애고 순수
+  // 카테고리 탐색 화면으로 단순화. 카드가 보이는 곳은 소분류 상세 화면 하나뿐이라는 규칙은 그대로)
+  function assetsScreenHtml() {
+    const groups = categoryTree();
     return `
       <div class="mapp-topbar">
         <button type="button" class="mapp-back" data-mapp-back aria-label="뒤로">←</button>
         <span class="mapp-topbar-title">자산</span>
       </div>
       <div class="mapp-body">
-        <div class="mapp-chip-row">${typeChips.map(([k, l]) =>
-          `<button type="button" class="mapp-chip${k === typeChip ? " active" : ""}" data-type-chip="${k}">${l}</button>`).join("")}</div>
-        <div class="mapp-count">전체 <b>${scoped.length}</b></div>
-        ${sections.length
-          ? `<div class="mapp-ws-cat-tree">${sections.map(sec => `
-              <button type="button" class="mapp-ws-cat-row" data-sub-open data-sub="${sec.sub}">
-                <span>${sec.group} <span class="mapp-cat-sep">›</span> ${sec.sub}</span>
-                <span class="mapp-ws-cat-count">${sec.items.length}<span class="mapp-menu-chev">›</span></span>
-              </button>`).join("")}</div>`
+        ${groups.length ? groups.map(g => `
+          <div class="mapp-menu-cap">${g.group}</div>
+          <div class="mapp-ws-cat-tree">${g.subs.map(sub => `
+            <button type="button" class="mapp-ws-cat-row" data-sub-open data-sub="${sub}">
+              <span>${sub}</span>
+              <span class="mapp-ws-cat-count">${countForSub(sub)}<span class="mapp-menu-chev">›</span></span>
+            </button>`).join("")}</div>`).join("")
           : `<p class="mapp-ws-empty">조회 가능한 자산이 없습니다.</p>`}
       </div>`;
   }
@@ -219,13 +219,13 @@
 
   function render() {
     const root = document.getElementById("app");
-    const state = { screen: "menu", typeChip: "all", sub: null, statusFilter: null };
+    const state = { screen: "menu", sub: null, statusFilter: null };
 
     function draw() {
       const showTabBar = state.screen === "menu";
       const screenHtml = state.screen === "menu" ? menuScreenHtml()
         : state.screen === "sub-detail" ? subDetailScreenHtml(state.sub, state.statusFilter)
-        : assetsScreenHtml(state.typeChip);
+        : assetsScreenHtml();
       root.innerHTML = `
         <div class="mapp-stage">
           <div class="mapp-phone">
@@ -237,18 +237,17 @@
 
       const back = root.querySelector("[data-mapp-back]");
       if (back) back.onclick = () => {
-        // 소분류 상세 → 자산 허브(유형 칩은 유지), 그 외엔 메뉴로 복귀
+        // 소분류 상세 → 자산 허브, 그 외엔 메뉴로 복귀
         if (state.screen === "sub-detail") { state.screen = "assets"; state.sub = null; state.statusFilter = null; }
         else { state.screen = "menu"; }
         draw();
       };
       const gotoAssets = root.querySelector('[data-mapp-goto="assets"]');
-      if (gotoAssets) gotoAssets.onclick = () => { state.screen = "assets"; state.typeChip = "all"; draw(); };
+      if (gotoAssets) gotoAssets.onclick = () => { state.screen = "assets"; draw(); };
       root.querySelectorAll("[data-mapp-tab]").forEach(b => b.onclick = () => {
         // "홈"·"승인" 탭은 이번 러프 스코프 밖이라 동작 없음(메뉴만 실제 이동)
         if (b.dataset.mappTab === "menu") { state.screen = "menu"; draw(); }
       });
-      root.querySelectorAll("[data-type-chip]").forEach(b => b.onclick = () => { state.typeChip = b.dataset.typeChip; draw(); });
       // 소분류 행 탭 → 소분류 상세(드릴다운)로 진입, 상태 필터는 매번 깨끗하게 시작
       root.querySelectorAll("[data-sub-open]").forEach(b => b.onclick = () => {
         state.screen = "sub-detail";
