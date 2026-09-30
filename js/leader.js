@@ -114,6 +114,7 @@
 
   const MENU_ICON_ASSET = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10" r="1.6"/><path d="m21 16-5-5-9 8"/></svg>`;
   const IC_FILTER = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M8 12h8M11 18h2"/></svg>`;
+  const CHEV_DOWN = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>`;
 
   // 메뉴 화면 — 실 앱 스크린샷 참고(직원모드와 달리 "비용" 섹션 없음, 맨 위에 "승인" 섹션 추가, 관리
   // 섹션 맨 하단에 직원모드와 동일하게 "자산" 추가). 하단 "Powered by shopl"도 참고 이미지 그대로 재현
@@ -173,8 +174,10 @@
       </div>
       <div class="mapp-body">
         ${groups.length ? groups.map(g => `
-          <div class="mapp-menu-cap">${g.group}</div>
-          <div class="mapp-ws-cat-tree">${g.subs.map(sub => `
+          <button type="button" class="mapp-menu-cap mapp-tree-group-head" data-tree-collapse aria-expanded="true" aria-label="접기/펼치기">
+            <span>${g.group}</span>${CHEV_DOWN}
+          </button>
+          <div class="mapp-ws-cat-tree" data-tree-collapsible>${g.subs.map(sub => `
             <button type="button" class="mapp-ws-cat-row" data-sub-open data-sub="${sub}">
               <span>${sub}</span>
               <span class="mapp-ws-cat-count">${countForSub(sub)}<span class="mapp-menu-chev">›</span></span>
@@ -254,6 +257,14 @@
         state.sub = b.dataset.sub;
         state.statusFilter = null;
         draw();
+      });
+      // 대분류 접기/펼치기 — 기본 펼침(app.js의 내 자산 대분류 섹션과 동일한 패턴), DOM만 직접 토글하고 재렌더 안 함
+      root.querySelectorAll("[data-tree-collapse]").forEach(b => b.onclick = () => {
+        const body = b.nextElementSibling;
+        const expanded = b.getAttribute("aria-expanded") === "true";
+        b.setAttribute("aria-expanded", String(!expanded));
+        body.hidden = expanded;
+        b.classList.toggle("collapsed", expanded);
       });
       // 상태 칩 — 다시 눌러도 해제 안 됨(대시보드 필터바 규칙과 동일), 해제는 적용된 필터 칩의 ✕로만
       root.querySelectorAll("[data-status-chip]").forEach(b => b.onclick = () => { state.statusFilter = b.dataset.statusChip; draw(); });
