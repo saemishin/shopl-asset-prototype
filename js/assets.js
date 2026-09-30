@@ -700,7 +700,7 @@
     }
     deleteBtn.onclick = () => {
       if (!selected.size) return;
-      openBulkDeleteAssetModal(selected.size, () => {
+      openBulkDeleteAssetModal(() => {
         assets.filter(a => selected.has(a.id)).forEach(a => assets.splice(assets.indexOf(a), 1));
         selected.clear();
         toast("삭제되었습니다.");
@@ -709,16 +709,16 @@
     };
   }
   const WARN_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 9v4M12 16.5h.01M10.3 3.9 2.5 17.5a1.7 1.7 0 0 0 1.47 2.55h16.06a1.7 1.7 0 0 0 1.47-2.55L13.7 3.9a1.7 1.7 0 0 0-2.94 0z"/></svg>`;
-  // 자산 상세의 개별 삭제 확인 모달(detail.js openDeleteAssetModal)과 UI·문구·DELETE 입력 확인 규칙은 동일,
-  // 선택 건수만 반영. 동작은 새로 작성 — 상세는 삭제 후 목록으로 페이지 이동하지만 여긴 이미 목록 화면이라
-  // 이동 없이 그 자리에서 테이블만 다시 그림(2026-09-30, 전체 탭 일괄 삭제)
-  function openBulkDeleteAssetModal(count, onConfirm) {
+  // 자산 상세의 개별 삭제 확인 모달(detail.js openDeleteAssetModal)과 UI·문구·DELETE 입력 확인 규칙,
+  // 타이틀까지 완전히 동일(선택 건수를 따로 안 밝혀도 충분하다는 판단, 2026-09-30). 동작만 새로 작성 —
+  // 상세는 삭제 후 목록으로 페이지 이동하지만 여긴 이미 목록 화면이라 이동 없이 그 자리에서 테이블만 다시 그림
+  function openBulkDeleteAssetModal(onConfirm) {
     const cb = document.createElement("div");
     cb.className = "modal-back";
     cb.style.zIndex = 340;
     cb.innerHTML = `
       <div class="modal" style="width:380px">
-        <h3>선택한 ${count}개 자산을 삭제하시겠습니까?</h3>
+        <h3>삭제하시겠습니까?</h3>
         <div class="body">
           <div class="danger-note">${WARN_ICON}<span>삭제하면 복구할 수 없으니 신중하게 결정해주세요.</span></div>
           <div class="field" style="margin-top:14px;margin-bottom:0">
@@ -797,7 +797,7 @@
       <div class="table-wrap">${tableInner(v)}</div>
 
       ${pagerHtml(v.count, state.view === "all" && canManageAssets()
-        ? `<button class="btn danger sm" id="btn-bulk-delete" disabled>삭제</button>` : "")}
+        ? `<button class="btn sm" id="btn-bulk-delete" disabled>삭제</button>` : "")}
     `;
 
     c.querySelectorAll(".subtabs button").forEach(b =>

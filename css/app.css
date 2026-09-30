@@ -289,22 +289,25 @@ input { font: inherit; }
 /* ============ table ============ */
 .table-wrap { border: 1px solid var(--line); border-radius: var(--radius); overflow-x: auto; background: var(--panel); }
 table { width: 100%; border-collapse: collapse; font-size: 12.5px; min-width: 880px; }
-/* 전체 탭 테이블(10컬럼)은 필터링으로 행이 바뀌어도 컬럼 폭이 안 흔들리도록 폭 고정.
-   nth-child는 순서 그대로라 컬럼 순서를 바꿀 때마다(자산 유형-분류-품목명-고유관리번호-상태-배정·보유
-   현황-유효기한-태그-메모-등록일) 이 폭 지정도 같이 옮겨줘야 함 — 안 그러면 폭이 엉뚱한 컬럼에 붙어서
-   "분류"처럼 긴 텍스트가 좁은 폭에 끼여 줄바꿈되는 문제가 생김(실제로 한 번 겪음) */
+/* 전체 탭 테이블(체크박스+10컬럼)은 필터링으로 행이 바뀌어도 컬럼 폭이 안 흔들리도록 폭 고정.
+   nth-child는 순서 그대로라 컬럼 순서를 바꿀 때마다(체크박스-자산 유형-분류-품목명-고유관리번호-상태-
+   배정·보유 현황-유효기한-태그-메모-등록일) 이 폭 지정도 같이 옮겨줘야 함 — 안 그러면 폭이 엉뚱한 컬럼에
+   붙어서 "분류"처럼 긴 텍스트가 좁은 폭에 끼이거나 반대로 체크박스 컬럼이 너무 넓어지는 문제가 생김
+   (실제로 겪음 — 체크박스 컬럼을 추가하면서 이 폭 지정을 안 옮겨서 발생). 메모(10번째)는 아이콘 한 칸이라
+   의도적으로 폭 지정 없이 나머지를 가져가게 둠(전체 합이 100%가 안 되는 것도 의도) */
 .tbl-all {
   table-layout: fixed;
 }
-.tbl-all th:nth-child(1), .tbl-all td:nth-child(1) { width: 8%; }
-.tbl-all th:nth-child(2), .tbl-all td:nth-child(2) { width: 13%; white-space: nowrap; }
-.tbl-all th:nth-child(3), .tbl-all td:nth-child(3) { width: 15%; }
-.tbl-all th:nth-child(4), .tbl-all td:nth-child(4) { width: 10%; }
-.tbl-all th:nth-child(5), .tbl-all td:nth-child(5) { width: 7%; }
-.tbl-all th:nth-child(6), .tbl-all td:nth-child(6) { width: 11%; }
-.tbl-all th:nth-child(7), .tbl-all td:nth-child(7) { width: 12%; }
+.tbl-all th:nth-child(1), .tbl-all td:nth-child(1) { width: 4%; }
+.tbl-all th:nth-child(2), .tbl-all td:nth-child(2) { width: 8%; }
+.tbl-all th:nth-child(3), .tbl-all td:nth-child(3) { width: 12%; white-space: nowrap; }
+.tbl-all th:nth-child(4), .tbl-all td:nth-child(4) { width: 13%; }
+.tbl-all th:nth-child(5), .tbl-all td:nth-child(5) { width: 10%; }
+.tbl-all th:nth-child(6), .tbl-all td:nth-child(6) { width: 7%; }
+.tbl-all th:nth-child(7), .tbl-all td:nth-child(7) { width: 11%; }
 .tbl-all th:nth-child(8), .tbl-all td:nth-child(8) { width: 11%; }
-.tbl-all th:nth-child(10), .tbl-all td:nth-child(10) { width: 11%; }
+.tbl-all th:nth-child(9), .tbl-all td:nth-child(9) { width: 11%; }
+.tbl-all th:nth-child(11), .tbl-all td:nth-child(11) { width: 9%; }
 /* 품목별 테이블도 동일한 이유로 폭 고정 — 개별 자산/수량 자산 토글로 컬럼 구성 자체가 달라서 하위 클래스로 분리 */
 .tbl-product { table-layout: fixed; }
 /* 자산 수 등 숫자 컬럼은 폭이 넓어서 우측 정렬하면 옆 칸과 붙어 보임 — 왼쪽 정렬이 더 보기 편함(분류 화면의 품목 테이블과 동일한 이유) */
@@ -782,14 +785,17 @@ button.usebullet { background: var(--panel); font: inherit; cursor: pointer; }
 
 /* ============ pagination ============ */
 .pager { display: flex; align-items: center; justify-content: center; gap: 4px; padding: 16px 0 4px; position: relative; }
-.pager button { width: 28px; height: 28px; border-radius: 6px; color: var(--text-sub); }
-.pager button:hover { background: #eef0f2; }
-.pager button.active { background: var(--text); color: #fff; }
-.pager button:disabled { opacity: .35; pointer-events: none; }
+/* > button(직계 자식)만 — 페이지 번호 버튼 전용 크기. 자손 선택자(.pager button)로 두면 .pager-actions
+   안의 [삭제] 버튼까지 28px 정사각형으로 눌려서 글자가 밖으로 삐져나오는 문제가 있었음(2026-09-30) */
+.pager > button { width: 28px; height: 28px; border-radius: 6px; color: var(--text-sub); }
+.pager > button:hover { background: #eef0f2; }
+.pager > button.active { background: var(--text); color: #fff; }
+.pager > button:disabled { opacity: .35; pointer-events: none; }
 .pager .pagesize { position: absolute; right: 0; }
 .pager .pagesize select { height: 28px; border: 1px solid var(--line-strong); border-radius: 6px; padding: 0 6px; }
 .pager-actions { position: absolute; left: 0; }
-.td-check { width: 36px; text-align: center; }
+/* 폭은 .tbl-all의 nth-child(1) 규칙(4%)이 담당 — 여긴 정렬·체크박스 크기만 */
+.td-check { text-align: center; }
 .td-check input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; }
 
 /* ============ modal ============ */
