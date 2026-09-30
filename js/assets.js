@@ -903,10 +903,7 @@
     if (state.view === "all") {
       document.getElementById("btn-qr-dl").onclick = openQrDownloadModal;
       document.getElementById("btn-add").onclick = () => window.openAssetAddModal();
-      document.getElementById("btn-bulk").onclick = e => dropdown(e.currentTarget, [
-        { label: "일괄 자산 추가", fn: () => location.href = "batch-register.html" },
-        { label: "일괄 배정·보유 변경", fn: () => location.href = "batch-assign.html" },
-      ]);
+      document.getElementById("btn-bulk").onclick = e => openBulkMenu(e.currentTarget);
     }
     // 엑셀 다운로드 — 실제 파일 생성 대신 양식 정의가 완료된 구글시트로 연결(2026-09-24). 프로토타입 목적상
     // "실제 파일 다운로드"를 흉내낼 필요가 없어지고, 양식은 사용자가 구글시트에서 직접 계속 다듬는 게 더
@@ -1002,17 +999,35 @@
     return `<div class="statwrap">${row1}${row2}</div>`;
   }
 
-  function dropdown(anchor, items) {
-    document.querySelectorAll(".dropdown-menu").forEach(m => m.remove());
+  // 일괄 작업 메뉴 — "일괄 추가"/"일괄 배정" 둘 다 공통 포맷이 있는 화면이라 프로토타입에 별도 구현하지
+  // 않고, 클릭 이벤트 없이 호버 시 안내 툴팁만 노출(2026-09-30, batch-register.html/batch-assign.html
+  // 페이지 삭제와 함께). 버튼이 화면 우측에 있어 메뉴도 버튼 우측 끝에 맞춰 펼침(기존엔 좌측 정렬이라
+  // 화면 밖으로 잘려 보였음)
+  function openBulkMenu(anchor) {
+    document.querySelectorAll(".dropdown-menu, .hover-tip").forEach(m => m.remove());
     const menu = document.createElement("div");
     menu.className = "dropdown-menu";
-    menu.innerHTML = items.map((it, i) => `<button data-i="${i}">${it.label}</button>`).join("");
+    menu.innerHTML = ["일괄 추가", "일괄 배정"].map(label => `<button type="button" class="inert">${label}</button>`).join("");
     const r = anchor.getBoundingClientRect();
-    menu.style.cssText = `position:fixed;top:${r.bottom + 4}px;left:${r.left}px;min-width:${Math.max(r.width, 160)}px`;
+    menu.style.cssText = `position:fixed;top:${r.bottom + 4}px;right:${window.innerWidth - r.right}px;min-width:${Math.max(r.width, 160)}px`;
     document.body.appendChild(menu);
-    menu.querySelectorAll("button").forEach(b => b.onclick = () => { menu.remove(); items[+b.dataset.i].fn(); });
+    let tip = null;
+    menu.querySelectorAll("button").forEach(b => {
+      b.addEventListener("mouseenter", () => {
+        tip = document.createElement("div");
+        tip.className = "hover-tip";
+        tip.textContent = "PM: 기획서에서 명세 확인";
+        document.body.appendChild(tip);
+        const br = b.getBoundingClientRect();
+        // 메뉴 자체가 화면 우측에 붙어있어 항목 오른쪽에 띄우면 화면 밖으로 잘림 — 왼쪽에 띄움
+        tip.style.cssText = `position:fixed;top:${br.top + br.height / 2}px;right:${window.innerWidth - br.left + 8}px;transform:translateY(-50%);`;
+      });
+      b.addEventListener("mouseleave", () => { if (tip) { tip.remove(); tip = null; } });
+    });
     setTimeout(() => {
-      const close = e => { if (!menu.contains(e.target)) { menu.remove(); document.removeEventListener("click", close); } };
+      const close = e => {
+        if (!menu.contains(e.target)) { menu.remove(); if (tip) tip.remove(); document.removeEventListener("click", close); }
+      };
       document.addEventListener("click", close);
     });
   }
