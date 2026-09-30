@@ -196,6 +196,12 @@
   // 필터바와 동일 규칙, 2026-09-30). 필터 아이콘은 이번 스코프에선 자리만(팝업 미구현)
   const INDIV_STATUS_CHIPS = [["stock", "재고"], ["lost", "분실"], ["repair", "수리 중"]];
   const QTY_STATUS_CHIPS = [["stock", "재고"], ["depleted", "소진"], ["unheld", "미보유대상"]];
+  // 대시보드 통계 카드의 "?" 도움말 툴팁과 동일 문구(assets.js statHelp) — 소진·미보유대상은 라벨만으론
+  // 뜻이 안 잡히는 파생 개념이라, 앱에선 툴팁 대신 필터 적용 시 그 아래 항상 문구로 노출(2026-09-30)
+  const STATUS_HELP = {
+    depleted: "전체 수량을 모두 배분해 남은 잔여 수량이 없는 품목의 수입니다.",
+    unheld: "보유 수량이 0개인 보유 대상의 수입니다.",
+  };
   function statusLabel(key, chips) { return (chips.find(c => c[0] === key) || [])[1] || ""; }
   function matchesStatus(a, type, statusFilter) {
     if (!statusFilter) return true;
@@ -220,6 +226,7 @@
         <div class="mapp-chip-row">${statusChips.map(([k, l]) =>
           `<button type="button" class="mapp-chip${k === statusFilter ? " active" : ""}" data-status-chip="${k}">${l}</button>`).join("")}</div>
         ${statusFilter ? `<div class="filterbar"><span class="fchip">${statusLabel(statusFilter, statusChips)}<button type="button" data-status-clear>✕</button></span></div>` : ""}
+        ${STATUS_HELP[statusFilter] ? `<p class="hint">${STATUS_HELP[statusFilter]}</p>` : ""}
         <div class="mapp-count">전체 <b>${items.length}</b></div>
         ${items.length ? `<div class="mapp-card-list">${items.map(x => assetCardHtml(x)).join("")}</div>` : `<p class="mapp-ws-empty">조회 가능한 자산이 없습니다.</p>`}
       </div>`;
