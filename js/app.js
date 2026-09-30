@@ -335,9 +335,9 @@
   }
   // 접근 가능한 근무지는(고정·담당) 조건 없이 전부 카드로 보여주고, 그 안에 조회 가능한 자산이 하나도
   // 없으면(원래부터 배정·보유가 없거나, 있어도 전부 조회 권한 밖인 소분류라 필터로 걸러진 경우 — 화면에서는
-  // 두 경우를 구분하지 않고 동일하게 처리) 분류 목록 대신 안내 문구만 보여줌. 이 경우엔 접을 내용 자체가
-  // 없어 접기/펼치기 버튼도 같이 생략(2026-09-30 — 조회 권한 필터가 없던 이전엔 사실상 항상 뭔가 있었어서
-  // 이 빈 상태 자체를 실제로 마주칠 일이 없었음)
+  // 두 경우를 구분하지 않고 동일하게 처리) 분류 목록 대신 안내 문구만 보여줌. 접기/펼치기 버튼은 내용이
+  // 없어도 그대로 노출(2026-09-30 — 처음엔 접을 게 없다고 생략했었는데, 카드마다 헤더 구성이 달라지는 게
+  // 더 어색하다는 피드백으로 항상 노출로 되돌림 — 접으면 안내 문구만 같이 숨겨질 뿐 부작용 없음)
   function worksiteCardHtml(group) {
     const hasItems = group.items.length > 0;
     return `
@@ -348,7 +348,7 @@
             <div class="mapp-ws-name">${group.worksite}${WS_CODE[group.worksite] ? `(${WS_CODE[group.worksite]})` : ""}</div>
             <div class="mapp-ws-address">${WS_ADDRESS[group.worksite] || ""}</div>
           </div>
-          ${hasItems ? `<button type="button" class="mapp-ws-collapse" data-ws-collapse aria-expanded="true" aria-label="접기/펼치기">${CHEV_DOWN}</button>` : ""}
+          <button type="button" class="mapp-ws-collapse" data-ws-collapse aria-expanded="true" aria-label="접기/펼치기">${CHEV_DOWN}</button>
         </div>
         <div data-ws-collapsible>
           <div class="mapp-ws-count">전체 <b>${group.items.length}</b></div>

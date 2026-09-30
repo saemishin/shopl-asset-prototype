@@ -69,9 +69,11 @@
     for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) % 997;
     return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length];
   }
-  // 구조설계안 3.3: 필드 노출 설정 대상은 S/N·IMEI·구매연월·구매가격·제조연월·유효기한 6개(IMEI·S/N은 개별형 전용) — 기본값: IMEI·유효기한 off, 나머지 on
+  // 구조설계안 3.3: 필드 노출 설정 대상은 유효기한·S/N·IMEI·제조연월·구매연월·구매가격 6개(IMEI·S/N은 개별형 전용)
+  // — 기본값: IMEI off, 나머지 on(2026-09-30 — 유효기한은 이전엔 기본 off였다가, 앱 전역 만료 판정에 쓰이는
+  // 필드를 꺼둔 채로 두는 게 위험하다고 판단해 기본값만 on으로 변경. 계속 소분류별로 껐다 켰다 할 수 있는 건 동일)
   const FIELD_LABEL = { serial: "S/N", imei: "IMEI", purchaseDate: "구매연월", purchasePrice: "구매가격", manufactured: "제조연월", expiry: "유효기한" };
-  const DEFAULT_HIDDEN_FIELDS = { individual: ["imei", "expiry"], quantity: ["expiry"] };
+  const DEFAULT_HIDDEN_FIELDS = { individual: ["imei"], quantity: [] };
   // 배정/보유 변경 권한 — 개별형은 "배정", 수량형은 "보유"로 부르는 게 구조설계안 4.3 표현과도 맞고,
   // 화면이 항상 하나의 자산 유형으로 스코프돼 있으니(소분류 상세·생성/수정 폼) 더 정확하게 부를 수 있음
   const assignLabel = type => type === "individual" ? "배정 변경 권한" : "보유 변경 권한";
@@ -185,10 +187,11 @@
       </tr>`;
   }
 
-  // 관리 정보 — 소분류 필드 노출 설정(구조안 3.3)을 전체 필드 대비 on/off 라벨로 표시. S/N·IMEI는 개별형에만 해당하는 필드라 수량형엔 안 보여줌
+  // 관리 정보 — 소분류 필드 노출 설정(구조안 3.3)을 전체 필드 대비 on/off 라벨로 표시. S/N·IMEI는 개별형에만 해당하는 필드라 수량형엔 안 보여줌.
+  // 순서는 자산 추가/수정 화면(asset-register.js)에서 실제 노출되는 순서와 동일하게 맞춤(2026-09-30)
   const fieldsForType = type => type === "individual"
-    ? ["serial", "imei", "purchaseDate", "purchasePrice", "manufactured", "expiry"]
-    : ["purchaseDate", "purchasePrice", "manufactured", "expiry"];
+    ? ["expiry", "serial", "imei", "manufactured", "purchaseDate", "purchasePrice"]
+    : ["expiry", "manufactured", "purchaseDate", "purchasePrice"];
 
   function usageInfoHtml(cat) {
     const hidden = cat.hiddenFields || [];
