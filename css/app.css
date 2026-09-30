@@ -1303,8 +1303,7 @@ button.dthumb:hover { filter: brightness(0.94); }
 .mapp-dot-badge { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #ef4444; margin-left: 4px; vertical-align: middle; }
 .mapp-tab-ic { position: relative; }
 .mapp-tab-ic .mapp-dot-badge { position: absolute; top: -2px; right: -5px; margin: 0; }
-/* 리더모드 자산 화면 — 유형 칩(허브)·상태 칩(소분류 상세). 실제 필터 적용 표시는 대시보드와 동일하게
-   .filterbar/.fchip 재사용(2026-09-30, 상태 칩 자체는 누르면 항상 켜지기만 하고 해제는 fchip의 ✕로만) */
+/* 리더모드 소분류 상세 화면 — 상태 칩은 전체가 기본인 단일 선택 방식(2026-09-30) */
 .mapp-chip-row { display: flex; gap: 8px; overflow-x: auto; padding: 2px 0 12px; }
 .mapp-chip { flex-shrink: 0; padding: 7px 14px; border-radius: 999px; border: 1px solid var(--line-strong); font-size: 12.5px; font-weight: 600; color: var(--text-sub); background: #fff; white-space: nowrap; }
 .mapp-chip.active { background: #1b1d1f; color: #fff; border-color: #1b1d1f; }

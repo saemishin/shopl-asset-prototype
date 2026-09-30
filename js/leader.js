@@ -191,22 +191,21 @@
       </div>`;
   }
   // 소분류 상세 화면 — 카드가 실제로 보이는 유일한 화면. 소분류가 정해지면 자산 유형도 자동으로 정해지므로
-  // (한 소분류는 개별형·수량형 중 하나만) 그 유형에 맞는 상태 칩을 바로 노출(개별형: 재고/분실/수리 중,
-  // 수량형: 재고/소진/미보유대상). 상태 칩은 다시 눌러도 해제 안 되고, 적용된 필터 칩의 ✕로만 해제(대시보드
-  // 필터바와 동일 규칙, 2026-09-30). 필터 아이콘은 이번 스코프에선 자리만(팝업 미구현)
-  const INDIV_STATUS_CHIPS = [["stock", "재고"], ["lost", "분실"], ["repair", "수리 중"]];
-  const QTY_STATUS_CHIPS = [["stock", "재고"], ["depleted", "소진"], ["unheld", "미보유대상"]];
+  // (한 소분류는 개별형·수량형 중 하나만) 그 유형에 맞는 상태 칩을 단일 선택으로 노출. 전체가 기본 선택이고,
+  // 선택한 칩을 다시 눌러도 유지되며 전체를 누르면 모든 상태를 보여줌(2026-09-30).
+  // 필터 아이콘은 이번 스코프에선 자리만(팝업 미구현)
+  const INDIV_STATUS_CHIPS = [["all", "전체"], ["stock", "재고"], ["assigned", "배정 중"], ["lost", "분실"], ["repair", "수리 중"]];
+  const QTY_STATUS_CHIPS = [["all", "전체"], ["stock", "재고"], ["held", "보유 중"], ["depleted", "소진"], ["unheld", "미보유대상"]];
   // 대시보드 통계 카드의 "?" 도움말 툴팁과 동일 문구(assets.js statHelp) — 소진·미보유대상은 라벨만으론
   // 뜻이 안 잡히는 파생 개념이라, 앱에선 툴팁 대신 필터 적용 시 그 아래 항상 문구로 노출(2026-09-30)
   const STATUS_HELP = {
     depleted: "전체 수량을 모두 배분해 남은 잔여 수량이 없는 품목의 수입니다.",
     unheld: "보유 수량이 0개인 보유 대상의 수입니다.",
   };
-  function statusLabel(key, chips) { return (chips.find(c => c[0] === key) || [])[1] || ""; }
   function matchesStatus(a, type, statusFilter) {
-    if (!statusFilter) return true;
+    if (statusFilter === "all") return true;
     if (type === "individual") return a.status === statusFilter;
-    if (statusFilter === "stock") return a.status === "stock";
+    if (statusFilter === "stock" || statusFilter === "held") return a.status === statusFilter;
     if (statusFilter === "depleted") return isDepleted(a);
     if (statusFilter === "unheld") return hasUnheldHolder(a);
     return true;
@@ -224,8 +223,7 @@
       </div>
       <div class="mapp-body">
         <div class="mapp-chip-row">${statusChips.map(([k, l]) =>
-          `<button type="button" class="mapp-chip${k === statusFilter ? " active" : ""}" data-status-chip="${k}">${l}</button>`).join("")}</div>
-        ${statusFilter ? `<div class="filterbar"><span class="fchip">${statusLabel(statusFilter, statusChips)}<button type="button" data-status-clear>✕</button></span></div>` : ""}
+          `<button type="button" class="mapp-chip${k === statusFilter ? " active" : ""}" data-status-chip="${k}" aria-pressed="${k === statusFilter}">${l}</button>`).join("")}</div>
         ${STATUS_HELP[statusFilter] ? `<p class="hint">${STATUS_HELP[statusFilter]}</p>` : ""}
         <div class="mapp-count">전체 <b>${items.length}</b></div>
         ${items.length ? `<div class="mapp-card-list">${items.map(x => assetCardHtml(x)).join("")}</div>` : `<p class="mapp-ws-empty">조회 가능한 자산이 없습니다.</p>`}
@@ -234,7 +232,7 @@
 
   function render() {
     const root = document.getElementById("app");
-    const state = { screen: "menu", sub: null, statusFilter: null };
+    const state = { screen: "menu", sub: null, statusFilter: "all" };
 
     function draw() {
       const showTabBar = state.screen === "menu";
@@ -253,7 +251,7 @@
       const back = root.querySelector("[data-mapp-back]");
       if (back) back.onclick = () => {
         // 소분류 상세 → 자산 허브, 그 외엔 메뉴로 복귀
-        if (state.screen === "sub-detail") { state.screen = "assets"; state.sub = null; state.statusFilter = null; }
+        if (state.screen === "sub-detail") { state.screen = "assets"; state.sub = null; state.statusFilter = "all"; }
         else { state.screen = "menu"; }
         draw();
       };
@@ -263,11 +261,11 @@
         // "홈"·"승인" 탭은 이번 러프 스코프 밖이라 동작 없음(메뉴만 실제 이동)
         if (b.dataset.mappTab === "menu") { state.screen = "menu"; draw(); }
       });
-      // 소분류 행 탭 → 소분류 상세(드릴다운)로 진입, 상태 필터는 매번 깨끗하게 시작
+      // 소분류 행 탭 → 소분류 상세(드릴다운)로 진입, 매번 전체를 기본 선택
       root.querySelectorAll("[data-sub-open]").forEach(b => b.onclick = () => {
         state.screen = "sub-detail";
         state.sub = b.dataset.sub;
-        state.statusFilter = null;
+        state.statusFilter = "all";
         draw();
       });
       // 대분류 접기/펼치기 — 기본 펼침(app.js의 내 자산 대분류 섹션과 동일한 패턴), DOM만 직접 토글하고 재렌더 안 함
@@ -278,10 +276,8 @@
         body.hidden = expanded;
         b.classList.toggle("collapsed", expanded);
       });
-      // 상태 칩 — 다시 눌러도 해제 안 됨(대시보드 필터바 규칙과 동일), 해제는 적용된 필터 칩의 ✕로만
+      // 상태 칩 — 하나만 선택되며, 다시 눌러도 유지. 전체를 누르면 전체 목록으로 복귀
       root.querySelectorAll("[data-status-chip]").forEach(b => b.onclick = () => { state.statusFilter = b.dataset.statusChip; draw(); });
-      const statusClear = root.querySelector("[data-status-clear]");
-      if (statusClear) statusClear.onclick = () => { state.statusFilter = null; draw(); };
       // 필터 아이콘은 이번 스코프엔 자리만 — 팝업은 다음 라운드(직원모드 드릴다운 화면과 공용으로 검토)
       const filterBtn = root.querySelector("[data-filter-placeholder]");
       if (filterBtn) filterBtn.onclick = () => toast("필터 — 이후 단계에서 정의");
