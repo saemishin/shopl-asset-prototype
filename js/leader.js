@@ -214,7 +214,10 @@
     const cat = window.DATA.categories.find(c => c.sub === sub) || {};
     const type = cat.type || "individual";
     const statusChips = type === "individual" ? INDIV_STATUS_CHIPS : QTY_STATUS_CHIPS;
-    const items = sortItems(collectLeaderItems()).filter(x => x.asset.sub === sub && matchesStatus(x.asset, type, statusFilter));
+    // 소분류 자체가 빈 경우와 상태 필터 결과만 빈 경우를 구분(대시보드와 동일 문구).
+    const subItems = collectLeaderItems().filter(x => x.asset.sub === sub);
+    const items = sortItems(subItems.filter(x => matchesStatus(x.asset, type, statusFilter)));
+    const emptyMsg = subItems.length ? "결과가 없습니다." : "등록된 자산이 없습니다.";
     return `
       <div class="mapp-topbar">
         <button type="button" class="mapp-back" data-mapp-back aria-label="뒤로">←</button>
@@ -222,11 +225,11 @@
         <button type="button" class="mapp-topbar-filter" data-filter-placeholder aria-label="필터">${IC_FILTER}</button>
       </div>
       <div class="mapp-body">
-        <div class="mapp-chip-row">${statusChips.map(([k, l]) =>
-          `<button type="button" class="mapp-chip${k === statusFilter ? " active" : ""}" data-status-chip="${k}" aria-pressed="${k === statusFilter}">${l}</button>`).join("")}</div>
-        ${STATUS_HELP[statusFilter] ? `<p class="hint">${STATUS_HELP[statusFilter]}</p>` : ""}
+        ${subItems.length ? `<div class="mapp-chip-row">${statusChips.map(([k, l]) =>
+          `<button type="button" class="mapp-chip${k === statusFilter ? " active" : ""}" data-status-chip="${k}" aria-pressed="${k === statusFilter}">${l}</button>`).join("")}</div>` : ""}
+        ${subItems.length && STATUS_HELP[statusFilter] ? `<p class="hint">${STATUS_HELP[statusFilter]}</p>` : ""}
         <div class="mapp-count">전체 <b>${items.length}</b></div>
-        ${items.length ? `<div class="mapp-card-list">${items.map(x => assetCardHtml(x)).join("")}</div>` : `<p class="mapp-ws-empty">조회 가능한 자산이 없습니다.</p>`}
+        ${items.length ? `<div class="mapp-card-list">${items.map(x => assetCardHtml(x)).join("")}</div>` : `<p class="mapp-ws-empty">${emptyMsg}</p>`}
       </div>`;
   }
 
