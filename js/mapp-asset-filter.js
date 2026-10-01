@@ -16,6 +16,7 @@
     note: svg('<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h4"/>'),
   };
   const FILTER_ICON = svg('<path d="M4 6h16M8 12h8M11 18h2"/>');
+  const RESET_ICON = svg('<path d="M4 5v5h5"/><path d="M5.6 16.5A8 8 0 1 0 6 7.2L4 10"/>');
   function empty() { return { status: [], expiry: [], labels: [], note: [] }; }
   function count(filters) { return KEYS.reduce((n, key) => n + (filters[key] || []).length, 0); }
   function config(category, mode) {
@@ -50,22 +51,27 @@
   }
   function buttonHtml(filters) {
     const n = count(filters);
-    return `<button type="button" class="mapp-topbar-filter${n ? " active" : ""}" data-mapp-filter-open aria-label="필터${n ? ` (${n}개 적용)` : ""}">${FILTER_ICON}${n ? `<span class="mapp-filter-badge">${n}</span>` : ""}</button>`;
+    return `<button type="button" class="mapp-topbar-filter${n ? " active" : ""}" data-mapp-filter-open aria-label="필터${n ? " (적용됨)" : ""}">${FILTER_ICON}</button>`;
+  }
+  function compactLabel(group, values) {
+    const labels = values.map(value => group.options.find(option => option.value === value))
+      .filter(Boolean).map(option => option.label);
+    if (!labels.length) return "전체";
+    return labels.length === 1 ? labels[0] : `${labels[0]} + ${labels.length - 1}`;
   }
   function appliedHtml(filters, groups) {
     if (!count(filters)) return "";
-    const chips = groups.flatMap(g => filters[g.key].map(value => {
-      const option = g.options.find(o => o.value === value);
-      const label = `${g.label}: ${option ? option.label : value}`;
-      return `<span class="mapp-filter-chip">${esc(label)}<button type="button" data-mapp-filter-remove="${g.key}" data-value="${esc(value)}" aria-label="${esc(label)} 해제">×</button></span>`;
-    }));
+    const chips = groups.filter(g => filters[g.key].length).map(g => {
+      const label = compactLabel(g, filters[g.key]);
+      return `<span class="mapp-filter-chip">${esc(label)}<button type="button" data-mapp-filter-remove="${g.key}" aria-label="${esc(g.label)} 필터 해제">×</button></span>`;
+    });
     return `<div class="mapp-filter-applied"><button type="button" class="mapp-filter-clear" data-mapp-filter-clear>초기화</button>${chips.join("")}</div>`;
   }
   function wireApplied(root, filters, onChange) {
     root.querySelectorAll("[data-mapp-filter-remove]").forEach(b => b.onclick = () => {
       const next = Object.fromEntries(KEYS.map(k => [k, [...filters[k]]]));
       const key = b.dataset.mappFilterRemove;
-      next[key] = next[key].filter(v => v !== b.dataset.value);
+      next[key] = [];
       onChange(next);
     });
     const clear = root.querySelector("[data-mapp-filter-clear]");
@@ -88,7 +94,7 @@
     popup.setAttribute("role", "dialog");
     popup.setAttribute("aria-modal", "true");
     popup.setAttribute("aria-label", "필터");
-    popup.innerHTML = `<div class="mapp-filter-header"><h2>필터</h2><button type="button" data-filter-reset aria-label="필터 초기화">↻ 초기화</button></div>
+    popup.innerHTML = `<div class="mapp-filter-header"><h2>필터</h2><button type="button" data-filter-reset aria-label="필터 초기화">${RESET_ICON}</button></div>
       <div class="mapp-filter-content"></div>
       <div class="mapp-filter-footer"><button type="button" data-filter-cancel>취소</button><button type="button" data-filter-confirm>확인</button></div>`;
     function align() {
@@ -113,23 +119,18 @@
       else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
     }
     function summary(g) {
-      const labels = g.options.filter(o => draft[g.key].includes(o.value)).map(o => o.label);
-      return labels.length ? labels.join(", ") : "전체";
+      return compactLabel(g, draft[g.key]);
     }
     const content = popup.querySelector(".mapp-filter-content");
     function drawOptions() {
       const g = groups.find(x => x.key === selected);
       const options = g.options.filter(o => !query || o.label.toLowerCase().includes(query.trim().toLowerCase()));
       const list = popup.querySelector("[data-filter-options]");
-      list.innerHTML = `<label class="mapp-filter-option"><input type="checkbox" data-filter-all${draft[g.key].length ? "" : " checked"}><span>전체</span></label>`
-        + options.map(o => `<label class="mapp-filter-option"><input type="checkbox" data-filter-value="${esc(o.value)}"${draft[g.key].includes(o.value) ? " checked" : ""}><span>${esc(o.label)}</span></label>`).join("")
+      list.innerHTML = options.map(o => `<label class="mapp-filter-option"><input type="checkbox" data-filter-value="${esc(o.value)}"${draft[g.key].includes(o.value) ? " checked" : ""}><span>${esc(o.label)}</span></label>`).join("")
         + (!options.length ? `<p class="mapp-filter-no-options">${query ? "결과가 없습니다." : "등록된 태그가 없습니다."}</p>` : "");
-      list.querySelector("[data-filter-all]").onchange = () => { draft[g.key] = []; drawOptions(); list.querySelector("[data-filter-all]").focus(); };
       list.querySelectorAll("[data-filter-value]").forEach(input => input.onchange = () => {
         const value = input.dataset.filterValue;
         draft[g.key] = input.checked ? [...draft[g.key], value] : draft[g.key].filter(v => v !== value);
-        // 검색 입력창을 재렌더하지 않아 한글 IME 조합을 유지한다.
-        list.querySelector("[data-filter-all]").checked = !draft[g.key].length;
       });
     }
     function draw() {

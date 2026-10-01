@@ -1529,9 +1529,9 @@ button.dthumb:hover { filter: brightness(0.94); }
 .mapp-viewer-nav[hidden] { visibility: hidden; }
 
 /* 앱 공용 소분류 필터 — 서비스 공통 양식: 목록 → 아이콘 레일+옵션 → 목록. */
-.mapp-topbar-filter { display: flex; align-items: center; gap: 4px; }
+.mapp-topbar-filter { position: relative; display: flex; align-items: center; }
 .mapp-topbar-filter.active { color: var(--primary); }
-.mapp-filter-badge { font-size: 11px; font-weight: 700; }
+.mapp-topbar-filter.active::after { content: ""; position: absolute; top: 1px; right: 0; width: 6px; height: 6px; border: 2px solid #fff; border-radius: 50%; background: var(--primary); }
 .mapp-filter-applied { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 12px; }
 .mapp-filter-chip { display: inline-flex; gap: 6px; align-items: center; max-width: 100%; overflow-wrap: anywhere; background: var(--primary-weak); color: var(--primary-press); border-radius: 6px; padding: 5px 8px; font-size: 12px; }
 .mapp-filter-chip button { flex-shrink: 0; color: inherit; font-size: 16px; line-height: 1; }
@@ -1539,7 +1539,8 @@ button.dthumb:hover { filter: brightness(0.94); }
 .mapp-asset-filter { position: fixed; z-index: 110; display: flex; flex-direction: column; overflow: hidden; border-radius: 0 0 37px 37px; background: #fff; }
 .mapp-filter-header { flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; padding: 20px 16px 16px; border-bottom: 1px solid var(--line); }
 .mapp-filter-header h2 { font-size: 20px; font-weight: 500; }
-.mapp-filter-header button { font-size: 15px; color: var(--text-sub); }
+.mapp-filter-header button { display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; color: var(--text-sub); }
+.mapp-filter-header button svg { width: 22px; height: 22px; }
 .mapp-filter-content { display: flex; flex: 1; min-height: 0; }
 .mapp-filter-overview { width: 100%; overflow-y: auto; }
 .mapp-filter-category { width: 100%; display: flex; align-items: center; text-align: left; padding-left: 16px; gap: 16px; }
