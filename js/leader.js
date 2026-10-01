@@ -1,6 +1,6 @@
 /* 앱 리더모드 — 러프 프로토타입(2026-09-30). 직원모드(app.js)와 달리 "내 자산"이 아니라 조회 권한 범위
    안의 회사 전체 자산을 보는 화면. 이번 라운드 스코프는 메뉴 화면 + 자산 화면(통계 칩 + 목록)만 —
-   검색·자산 추가·자산 상세·필터 팝업은 전부 제외(러프 확인용). 이 파일도 다른 화면 파일들과 동일하게
+   검색·자산 추가·자산 상세는 제외. 소분류 상세 필터는 직원모드와 공용 팝업 사용. 이 파일도 다른 화면 파일들과 동일하게
    자기 완결적(상수 중복 정의)이라 app.js/assets.js와 겹치는 부분이 많음 */
 (function () {
   const { assets } = window.DATA;
@@ -118,7 +118,6 @@
   }
 
   const MENU_ICON_ASSET = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10" r="1.6"/><path d="m21 16-5-5-9 8"/></svg>`;
-  const IC_FILTER = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M8 12h8M11 18h2"/></svg>`;
   const CHEV_DOWN = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>`;
 
   // 메뉴 화면 — 실 앱 스크린샷 참고(직원모드와 달리 "비용" 섹션 없음, 맨 위에 "승인" 섹션 추가, 관리
@@ -193,7 +192,7 @@
   // 소분류 상세 화면 — 카드가 실제로 보이는 유일한 화면. 소분류가 정해지면 자산 유형도 자동으로 정해지므로
   // (한 소분류는 개별형·수량형 중 하나만) 그 유형에 맞는 상태 칩을 단일 선택으로 노출. 전체가 기본 선택이고,
   // 선택한 칩을 다시 눌러도 유지되며 전체를 누르면 모든 상태를 보여줌(2026-09-30).
-  // 필터 아이콘은 이번 스코프에선 자리만(팝업 미구현)
+  // 팝업 필터와 상태 칩은 동시에 적용하지 않고 마지막으로 적용한 방식으로 교체.
   const INDIV_STATUS_CHIPS = [["all", "전체"], ["stock", "재고"], ["assigned", "배정 중"], ["lost", "분실"], ["repair", "수리 중"]];
   const QTY_STATUS_CHIPS = [["all", "전체"], ["stock", "재고"], ["held", "보유 중"], ["depleted", "소진"], ["unheld", "미보유대상"]];
   // 대시보드 통계 카드의 "?" 도움말 툴팁과 동일 문구(assets.js statHelp) — 소진·미보유대상은 라벨만으론
@@ -210,18 +209,21 @@
     if (statusFilter === "unheld") return hasUnheldHolder(a);
     return true;
   }
-  function subDetailScreenHtml(sub, statusFilter) {
+  function subDetailScreenHtml(sub, statusFilter, popupFilters) {
     const cat = window.DATA.categories.find(c => c.sub === sub) || {};
     const type = cat.type || "individual";
     const statusChips = type === "individual" ? INDIV_STATUS_CHIPS : QTY_STATUS_CHIPS;
     // 소분류 자체가 빈 경우와 상태 필터 결과만 빈 경우를 구분(대시보드와 동일 문구).
     const subItems = collectLeaderItems().filter(x => x.asset.sub === sub);
-    const items = sortItems(subItems.filter(x => matchesStatus(x.asset, type, statusFilter)));
+    const filterGroups = MappAssetFilter.config(cat, "leader");
+    const popupActive = MappAssetFilter.count(popupFilters) > 0;
+    const items = sortItems(subItems.filter(x => popupActive
+      ? MappAssetFilter.matches(x.asset, popupFilters) : matchesStatus(x.asset, type, statusFilter)));
     const emptyMsg = subItems.length ? "결과가 없습니다." : "등록된 자산이 없습니다.";
     return `
       <div class="mapp-topbar">
         <button type="button" class="mapp-back" data-mapp-back aria-label="뒤로">←</button>
-        <button type="button" class="mapp-topbar-filter" data-filter-placeholder aria-label="필터">${IC_FILTER}</button>
+        ${MappAssetFilter.buttonHtml(popupFilters)}
       </div>
       <div class="mapp-subdetail-head">
         <h1 class="mapp-subdetail-title">${cat.group || ""} <span class="mapp-cat-sep">›</span> ${sub}</h1>
@@ -230,6 +232,7 @@
         ${subItems.length ? `<div class="mapp-chip-row">${statusChips.map(([k, l]) =>
           `<button type="button" class="mapp-chip${k === statusFilter ? " active" : ""}" data-status-chip="${k}" aria-pressed="${k === statusFilter}">${l}</button>`).join("")}</div>` : ""}
         ${subItems.length && STATUS_HELP[statusFilter] ? `<p class="hint">${STATUS_HELP[statusFilter]}</p>` : ""}
+        ${MappAssetFilter.appliedHtml(popupFilters, filterGroups)}
         <div class="mapp-count">전체 <b>${items.length}</b></div>
         ${items.length ? `<div class="mapp-card-list">${items.map(x => assetCardHtml(x)).join("")}</div>` : `<p class="mapp-ws-empty">${emptyMsg}</p>`}
       </div>`;
@@ -237,12 +240,12 @@
 
   function render() {
     const root = document.getElementById("app");
-    const state = { screen: "menu", sub: null, statusFilter: "all" };
+    const state = { screen: "menu", sub: null, statusFilter: "all", popupFilters: MappAssetFilter.empty() };
 
     function draw() {
       const showTabBar = state.screen === "menu";
       const screenHtml = state.screen === "menu" ? menuScreenHtml()
-        : state.screen === "sub-detail" ? subDetailScreenHtml(state.sub, state.statusFilter)
+        : state.screen === "sub-detail" ? subDetailScreenHtml(state.sub, state.statusFilter, state.popupFilters)
         : assetsScreenHtml();
       root.innerHTML = `
         <div class="mapp-stage">
@@ -256,7 +259,7 @@
       const back = root.querySelector("[data-mapp-back]");
       if (back) back.onclick = () => {
         // 소분류 상세 → 자산 허브, 그 외엔 메뉴로 복귀
-        if (state.screen === "sub-detail") { state.screen = "assets"; state.sub = null; state.statusFilter = "all"; }
+        if (state.screen === "sub-detail") { state.screen = "assets"; state.sub = null; state.statusFilter = "all"; state.popupFilters = MappAssetFilter.empty(); }
         else { state.screen = "menu"; }
         draw();
       };
@@ -271,6 +274,7 @@
         state.screen = "sub-detail";
         state.sub = b.dataset.sub;
         state.statusFilter = "all";
+        state.popupFilters = MappAssetFilter.empty();
         draw();
       });
       // 대분류 접기/펼치기 — 기본 펼침(app.js의 내 자산 대분류 섹션과 동일한 패턴), DOM만 직접 토글하고 재렌더 안 함
@@ -281,11 +285,23 @@
         body.hidden = expanded;
         b.classList.toggle("collapsed", expanded);
       });
-      // 상태 칩 — 하나만 선택되며, 다시 눌러도 유지. 전체를 누르면 전체 목록으로 복귀
-      root.querySelectorAll("[data-status-chip]").forEach(b => b.onclick = () => { state.statusFilter = b.dataset.statusChip; draw(); });
-      // 필터 아이콘은 이번 스코프엔 자리만 — 팝업은 다음 라운드(직원모드 드릴다운 화면과 공용으로 검토)
-      const filterBtn = root.querySelector("[data-filter-placeholder]");
-      if (filterBtn) filterBtn.onclick = () => toast("필터 — 이후 단계에서 정의");
+      // 상태 칩을 선택하면 팝업 조건을 모두 해제. 팝업 적용 중에는 전체 칩도 비선택.
+      root.querySelectorAll("[data-status-chip]").forEach(b => b.onclick = () => {
+        state.popupFilters = MappAssetFilter.empty();
+        state.statusFilter = b.dataset.statusChip;
+        draw();
+      });
+      function applyPopup(filters) {
+        state.popupFilters = filters;
+        state.statusFilter = MappAssetFilter.count(filters) ? null : "all";
+        draw();
+      }
+      MappAssetFilter.wireApplied(root, state.popupFilters, applyPopup);
+      const filterBtn = root.querySelector("[data-mapp-filter-open]");
+      if (filterBtn) filterBtn.onclick = () => MappAssetFilter.open({
+        category: window.DATA.categories.find(c => c.sub === state.sub) || {},
+        mode: "leader", filters: state.popupFilters, onApply: applyPopup,
+      });
     }
     draw();
   }

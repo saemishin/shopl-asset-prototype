@@ -374,13 +374,17 @@
       </div>`;
   }
   // 근무지 카드에서 소분류를 누르면 이동하는 목적지 — 그 근무지의 그 소분류 자산 목록. 타이틀 텍스트 없이
-  // 뒤로가기 버튼만(근무지명은 바로 아래 헤더에 표기), 근무지명/코드/주소를 각각 줄바꿔 표시하고 지금 보는
+  // 뒤로가기·필터 버튼만(근무지명은 바로 아래 헤더에 표기), 근무지명/코드/주소를 각각 줄바꿔 표시하고 지금 보는
   // 소분류를 그 아래에 덧붙임, 그 아래는 내 자산 탭과 동일한 구성(검색+카운트+카드 리스트, 정렬도 동일)
-  function worksiteDetailScreenHtml(ws, sub, items) {
-    const group = (window.DATA.categories.find(c => c.sub === sub) || {}).group || "";
+  function worksiteDetailScreenHtml(ws, sub, items, filters) {
+    const cat = window.DATA.categories.find(c => c.sub === sub) || {};
+    const group = cat.group || "";
+    const filterGroups = MappAssetFilter.config(cat, "employee");
+    const filtered = items.filter(x => MappAssetFilter.matches(x.asset, filters));
     return `
       <div class="mapp-topbar">
         <button type="button" class="mapp-back" data-mapp-back aria-label="뒤로">←</button>
+        ${MappAssetFilter.buttonHtml(filters)}
       </div>
       <div class="mapp-wsdetail-head">
         <div class="mapp-wsdetail-name">${ws}</div>
@@ -392,11 +396,12 @@
         <div class="mapp-search">
           <input type="text" data-mapp-search placeholder="품목명/고유관리번호">
         </div>
-        <div class="mapp-count">전체 <b>${items.length}</b></div>
-        ${items.length ? `
-          <div class="mapp-card-list" data-mapp-card-list>${items.map(x => assetCardHtml(x)).join("")}</div>
+        ${MappAssetFilter.appliedHtml(filters, filterGroups)}
+        <div class="mapp-count">전체 <b data-worksite-result-count>${filtered.length}</b></div>
+        ${filtered.length ? `
+          <div class="mapp-card-list" data-mapp-card-list>${filtered.map(x => assetCardHtml(x)).join("")}</div>
           <p class="mapp-empty" data-mapp-empty hidden>결과가 없습니다.</p>
-        ` : `<p class="mapp-empty">배정·보유 중인 자산이 없습니다.</p>`}
+        ` : `<p class="mapp-empty" data-mapp-empty>${items.length ? "결과가 없습니다." : "배정·보유 중인 자산이 없습니다."}</p>`}
       </div>`;
   }
 
@@ -1277,7 +1282,7 @@
 
   function render() {
     const root = document.getElementById("app");
-    const state = { screen: "menu", assetTab: "mine" };
+    const state = { screen: "menu", assetTab: "mine", wsFilters: MappAssetFilter.empty(), wsSearch: "" };
 
     function draw() {
       // 배정/보유 변경 액션이 window.DATA.assets를 직접 mutate하므로, 목록은 렌더마다 새로 집계
@@ -1286,7 +1291,7 @@
       const worksiteGroups = collectWorksiteGroups(ME);
       const showTabBar = state.screen === "menu";
       const screenHtml = state.screen === "menu" ? menuScreenHtml()
-        : state.screen === "worksite-detail" ? worksiteDetailScreenHtml(state.wsDetail, state.wsDetailSub, itemsForWorksite(state.wsDetail, state.wsDetailSub))
+        : state.screen === "worksite-detail" ? worksiteDetailScreenHtml(state.wsDetail, state.wsDetailSub, itemsForWorksite(state.wsDetail, state.wsDetailSub), state.wsFilters)
         : state.screen === "asset-detail" ? assetDetailScreenHtml(assets.find(x => x.id === state.detailAssetId), state.detailTarget)
         : state.screen === "asset-parties" ? partiesScreenHtml(assets.find(x => x.id === state.detailAssetId), state.detailTarget)
         : state.screen === "asset-history" ? historyScreenHtml(assets.find(x => x.id === state.detailAssetId))
@@ -1331,6 +1336,15 @@
         root.querySelectorAll("[data-asset-card]").forEach(el => el.onclick = () => openDetail(el.dataset.assetId, { type: "employee", value: ME }));
       } else if (state.screen === "worksite-detail") {
         root.querySelectorAll("[data-asset-card]").forEach(el => el.onclick = () => openDetail(el.dataset.assetId, { type: "worksite", value: state.wsDetail }));
+      }
+      if (state.screen === "worksite-detail") {
+        const applyFilters = filters => { state.wsFilters = filters; draw(); };
+        MappAssetFilter.wireApplied(root, state.wsFilters, applyFilters);
+        const filterBtn = root.querySelector("[data-mapp-filter-open]");
+        if (filterBtn) filterBtn.onclick = () => MappAssetFilter.open({
+          category: window.DATA.categories.find(c => c.sub === state.wsDetailSub) || {},
+          mode: "employee", filters: state.wsFilters, onApply: applyFilters,
+        });
       }
       // 목록 카드 썸네일 → 뷰어 직행(공통 동작, 화면 무관하게 항상 와이어링). 사진이 없으면 stopPropagation을
       // 안 해서 카드 자체의 클릭(상세 진입)으로 자연히 넘어감
@@ -1414,7 +1428,9 @@
         const cards = [...root.querySelectorAll("[data-asset-card]")];
         const sections = [...root.querySelectorAll("[data-cat-section]")];
         const emptyMsg = root.querySelector("[data-mapp-empty]");
-        searchInput.addEventListener("input", () => {
+        if (state.screen === "worksite-detail") searchInput.value = state.wsSearch;
+        const applySearch = () => {
+          if (state.screen === "worksite-detail") state.wsSearch = searchInput.value;
           const q = searchInput.value.trim().toLowerCase();
           let anyVisible = false;
           cards.forEach(card => {
@@ -1425,8 +1441,12 @@
           sections.forEach(sec => {
             sec.hidden = ![...sec.querySelectorAll("[data-asset-card]")].some(c => !c.hidden);
           });
-          if (emptyMsg) emptyMsg.hidden = anyVisible;
-        });
+          if (emptyMsg && cards.length) emptyMsg.hidden = anyVisible;
+          const count = root.querySelector("[data-worksite-result-count]");
+          if (count) count.textContent = cards.filter(card => !card.hidden).length;
+        };
+        searchInput.addEventListener("input", applySearch);
+        applySearch();
       }
       // 근무지 자산 — 근무지명/코드/주소 검색(카드 단위 hidden 토글)
       const wsSearchInput = root.querySelector("[data-mapp-ws-search]");
@@ -1445,6 +1465,8 @@
         state.screen = "worksite-detail";
         state.wsDetail = b.dataset.ws;
         state.wsDetailSub = b.dataset.sub;
+        state.wsFilters = MappAssetFilter.empty();
+        state.wsSearch = "";
         draw();
       });
       // 내 자산 대분류 섹션 접기/펼치기 — 근무지 카드와 동일한 패턴(기본 펼침)
