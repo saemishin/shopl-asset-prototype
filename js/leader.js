@@ -1,6 +1,6 @@
 /* 앱 리더모드 — 러프 프로토타입(2026-09-30). 직원모드(app.js)와 달리 "내 자산"이 아니라 조회 권한 범위
    안의 회사 전체 자산을 보는 화면. 이번 라운드 스코프는 메뉴 화면 + 자산 화면(통계 칩 + 목록)만 —
-   검색·자산 추가·자산 상세는 제외. 소분류 상세 필터는 직원모드와 공용 팝업 사용. 이 파일도 다른 화면 파일들과 동일하게
+   자산 추가·자산 상세는 제외. 소분류 상세 검색·필터는 구현. 필터는 직원모드와 공용 팝업 사용. 이 파일도 다른 화면 파일들과 동일하게
    자기 완결적(상수 중복 정의)이라 app.js/assets.js와 겹치는 부분이 많음 */
 (function () {
   const { assets } = window.DATA;
@@ -98,7 +98,7 @@
     const a = x.asset;
     if (a.type === "individual") {
       return `
-        <div class="mapp-card">
+        <div class="mapp-card" data-asset-card data-asset-id="${a.id}">
           ${cardThumb(a)}
           <div class="mapp-card-body">
             <div class="mapp-card-title">${a.product}</div>
@@ -108,7 +108,7 @@
         </div>`;
     }
     return `
-      <div class="mapp-card">
+      <div class="mapp-card" data-asset-card data-asset-id="${a.id}">
         ${cardThumb(a)}
         <div class="mapp-card-body">
           <div class="mapp-card-title">${a.product}</div>
@@ -212,6 +212,7 @@
   function subDetailScreenHtml(sub, statusFilter, popupFilters) {
     const cat = window.DATA.categories.find(c => c.sub === sub) || {};
     const type = cat.type || "individual";
+    const searchPlaceholder = type === "quantity" ? "품목명" : "품목명/고유관리번호";
     const statusChips = type === "individual" ? INDIV_STATUS_CHIPS : QTY_STATUS_CHIPS;
     // 소분류 자체가 빈 경우와 상태 필터 결과만 빈 경우를 구분(대시보드와 동일 문구).
     const subItems = collectLeaderItems().filter(x => x.asset.sub === sub);
@@ -232,15 +233,18 @@
         ${subItems.length ? `<div class="mapp-chip-row">${statusChips.map(([k, l]) =>
           `<button type="button" class="mapp-chip${k === statusFilter ? " active" : ""}" data-status-chip="${k}" aria-pressed="${k === statusFilter}">${l}</button>`).join("")}</div>` : ""}
         ${subItems.length && STATUS_HELP[statusFilter] ? `<p class="hint">${STATUS_HELP[statusFilter]}</p>` : ""}
+        <div class="mapp-search">
+          <input type="text" data-mapp-search placeholder="${searchPlaceholder}">
+        </div>
         ${MappAssetFilter.appliedHtml(popupFilters, filterGroups)}
-        <div class="mapp-count">전체 <b>${items.length}</b></div>
-        ${items.length ? `<div class="mapp-card-list">${items.map(x => assetCardHtml(x)).join("")}</div>` : `<p class="mapp-ws-empty">${emptyMsg}</p>`}
+        <div class="mapp-count">전체 <b data-leader-result-count>${items.length}</b></div>
+        ${items.length ? `<div class="mapp-card-list">${items.map(x => assetCardHtml(x)).join("")}</div><p class="mapp-ws-empty" data-mapp-empty hidden>결과가 없습니다.</p>` : `<p class="mapp-ws-empty" data-mapp-empty>${emptyMsg}</p>`}
       </div>`;
   }
 
   function render() {
     const root = document.getElementById("app");
-    const state = { screen: "menu", sub: null, statusFilter: "all", popupFilters: MappAssetFilter.empty() };
+    const state = { screen: "menu", sub: null, statusFilter: "all", popupFilters: MappAssetFilter.empty(), subSearch: "" };
 
     function draw() {
       const showTabBar = state.screen === "menu";
@@ -259,7 +263,7 @@
       const back = root.querySelector("[data-mapp-back]");
       if (back) back.onclick = () => {
         // 소분류 상세 → 자산 허브, 그 외엔 메뉴로 복귀
-        if (state.screen === "sub-detail") { state.screen = "assets"; state.sub = null; state.statusFilter = "all"; state.popupFilters = MappAssetFilter.empty(); }
+        if (state.screen === "sub-detail") { state.screen = "assets"; state.sub = null; state.statusFilter = "all"; state.popupFilters = MappAssetFilter.empty(); state.subSearch = ""; }
         else { state.screen = "menu"; }
         draw();
       };
@@ -275,6 +279,7 @@
         state.sub = b.dataset.sub;
         state.statusFilter = "all";
         state.popupFilters = MappAssetFilter.empty();
+        state.subSearch = "";
         draw();
       });
       // 대분류 접기/펼치기 — 기본 펼침(app.js의 내 자산 대분류 섹션과 동일한 패턴), DOM만 직접 토글하고 재렌더 안 함
@@ -302,6 +307,29 @@
         category: window.DATA.categories.find(c => c.sub === state.sub) || {},
         mode: "leader", filters: state.popupFilters, onApply: applyPopup,
       });
+      // 검색은 현재 상태 칩 또는 팝업 필터 결과 안에서 추가로 적용. 자산 유형에 따라 실제 품목명과
+      // 개별형 고유관리번호만 비교해 상태·수량 텍스트가 우연히 검색되는 일을 막는다.
+      const searchInput = root.querySelector("[data-mapp-search]");
+      if (searchInput) {
+        const cards = [...root.querySelectorAll("[data-asset-card]")];
+        const emptyMsg = root.querySelector("[data-mapp-empty]");
+        searchInput.value = state.subSearch;
+        const applySearch = () => {
+          state.subSearch = searchInput.value;
+          const q = state.subSearch.trim().toLowerCase();
+          cards.forEach(card => {
+            const asset = assets.find(a => a.id === card.dataset.assetId);
+            const hay = asset ? `${asset.product}${asset.type === "individual" ? asset.assetNo || "" : ""}`.toLowerCase() : "";
+            card.hidden = !(!q || hay.includes(q));
+          });
+          const visibleCount = cards.filter(card => !card.hidden).length;
+          const count = root.querySelector("[data-leader-result-count]");
+          if (count) count.textContent = visibleCount;
+          if (emptyMsg && cards.length) emptyMsg.hidden = visibleCount > 0;
+        };
+        searchInput.addEventListener("input", applySearch);
+        applySearch();
+      }
     }
     draw();
   }

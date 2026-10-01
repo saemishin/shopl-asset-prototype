@@ -379,6 +379,7 @@
   function worksiteDetailScreenHtml(ws, sub, items, filters) {
     const cat = window.DATA.categories.find(c => c.sub === sub) || {};
     const group = cat.group || "";
+    const searchPlaceholder = cat.type === "quantity" ? "품목명" : "품목명/고유관리번호";
     const filterGroups = MappAssetFilter.config(cat, "employee");
     const filtered = items.filter(x => MappAssetFilter.matches(x.asset, filters));
     return `
@@ -394,7 +395,7 @@
       </div>
       <div class="mapp-body">
         <div class="mapp-search">
-          <input type="text" data-mapp-search placeholder="품목명/고유관리번호">
+          <input type="text" data-mapp-search placeholder="${searchPlaceholder}">
         </div>
         ${MappAssetFilter.appliedHtml(filters, filterGroups)}
         <div class="mapp-count">전체 <b data-worksite-result-count>${filtered.length}</b></div>
@@ -1434,7 +1435,9 @@
           const q = searchInput.value.trim().toLowerCase();
           let anyVisible = false;
           cards.forEach(card => {
-            const match = !q || card.textContent.toLowerCase().includes(q);
+            const asset = assets.find(a => a.id === card.dataset.assetId);
+            const hay = asset ? `${asset.product}${asset.type === "individual" ? asset.assetNo || "" : ""}`.toLowerCase() : "";
+            const match = !q || hay.includes(q);
             card.hidden = !match;
             if (match) anyVisible = true;
           });
