@@ -27,7 +27,7 @@
     if (!(category.hiddenFields || []).includes("expiry")) {
       groups.push({ key: "expiry", label: "유효기한", options: Object.entries(EXPIRY).map(([value, label]) => ({ value, label })) });
     }
-    groups.push({ key: "labels", label: "태그", searchable: true,
+    groups.push({ key: "labels", label: "태그",
       options: [...(window.DATA.tags || [])].sort((a, b) => a.localeCompare(b, "ko")).map(value => ({ value, label: value })) });
     groups.push({ key: "note", label: "메모", options: [{ value: "has", label: "있음" }, { value: "none", label: "없음" }] });
     return groups;
@@ -65,7 +65,7 @@
       const label = compactLabel(g, filters[g.key]);
       return `<span class="mapp-filter-chip">${esc(label)}<button type="button" data-mapp-filter-remove="${g.key}" aria-label="${esc(g.label)} 필터 해제">×</button></span>`;
     });
-    return `<div class="mapp-filter-applied"><button type="button" class="mapp-filter-clear" data-mapp-filter-clear>초기화</button>${chips.join("")}</div>`;
+    return `<div class="mapp-filter-applied"><button type="button" class="mapp-filter-clear" data-mapp-filter-clear aria-label="적용된 필터 전체 초기화">${RESET_ICON}</button>${chips.join("")}</div>`;
   }
   function wireApplied(root, filters, onChange) {
     root.querySelectorAll("[data-mapp-filter-remove]").forEach(b => b.onclick = () => {
@@ -81,7 +81,6 @@
     const groups = config(category, mode);
     let draft = normalize(filters, groups);
     let selected = null;
-    let query = "";
     const screen = document.querySelector(".mapp-screen");
     if (!screen || document.querySelector(".mapp-asset-filter")) return;
     const focusBefore = document.activeElement;
@@ -94,7 +93,7 @@
     popup.setAttribute("role", "dialog");
     popup.setAttribute("aria-modal", "true");
     popup.setAttribute("aria-label", "필터");
-    popup.innerHTML = `<div class="mapp-filter-header"><h2>필터</h2><button type="button" data-filter-reset aria-label="필터 초기화">${RESET_ICON}</button></div>
+    popup.innerHTML = `<div class="mapp-filter-header"><h2>필터</h2><button type="button" data-filter-reset aria-label="필터 초기화">${RESET_ICON}<span>초기화</span></button></div>
       <div class="mapp-filter-content"></div>
       <div class="mapp-filter-footer"><button type="button" data-filter-cancel>취소</button><button type="button" data-filter-confirm>확인</button></div>`;
     function align() {
@@ -124,10 +123,10 @@
     const content = popup.querySelector(".mapp-filter-content");
     function drawOptions() {
       const g = groups.find(x => x.key === selected);
-      const options = g.options.filter(o => !query || o.label.toLowerCase().includes(query.trim().toLowerCase()));
+      const options = g.options;
       const list = popup.querySelector("[data-filter-options]");
       list.innerHTML = options.map(o => `<label class="mapp-filter-option"><input type="checkbox" data-filter-value="${esc(o.value)}"${draft[g.key].includes(o.value) ? " checked" : ""}><span>${esc(o.label)}</span></label>`).join("")
-        + (!options.length ? `<p class="mapp-filter-no-options">${query ? "결과가 없습니다." : "등록된 태그가 없습니다."}</p>` : "");
+        + (!options.length ? '<p class="mapp-filter-no-options">등록된 태그가 없습니다.</p>' : "");
       list.querySelectorAll("[data-filter-value]").forEach(input => input.onchange = () => {
         const value = input.dataset.filterValue;
         draft[g.key] = input.checked ? [...draft[g.key], value] : draft[g.key].filter(v => v !== value);
@@ -136,22 +135,20 @@
     function draw() {
       if (selected === null) {
         content.innerHTML = `<div class="mapp-filter-overview">${groups.map(g => `<button type="button" class="mapp-filter-category" data-filter-category="${g.key}">
-          <span class="mapp-filter-category-icon">${ICON[g.key]}</span><span class="mapp-filter-category-text"><span>${g.label}</span><strong>${esc(summary(g))}</strong></span><span class="mapp-filter-chevron">›</span></button>`).join("")}</div>`;
-        content.querySelectorAll("[data-filter-category]").forEach(b => b.onclick = () => { selected = b.dataset.filterCategory; query = ""; draw(); });
+          <span class="mapp-filter-category-icon${draft[g.key].length ? " has-value" : ""}">${ICON[g.key]}</span><span class="mapp-filter-category-text"><span>${g.label}</span><strong>${esc(summary(g))}</strong></span><span class="mapp-filter-chevron">›</span></button>`).join("")}</div>`;
+        content.querySelectorAll("[data-filter-category]").forEach(b => b.onclick = () => { selected = b.dataset.filterCategory; draw(); });
         content.querySelector("[data-filter-category]").focus();
         return;
       }
       const g = groups.find(x => x.key === selected);
       content.innerHTML = `<nav class="mapp-filter-rail" aria-label="필터 카테고리"><button type="button" data-filter-overview aria-label="카테고리 목록">${ICON.all}</button>${groups.map(x => `<button type="button" class="${x.key === selected ? "active" : ""}" data-filter-nav="${x.key}" aria-label="${x.label}" aria-current="${x.key === selected ? "true" : "false"}">${ICON[x.key]}</button>`).join("")}</nav>
-        <section class="mapp-filter-options-panel"><h3>${g.label}</h3>${g.searchable ? '<input type="search" class="mapp-filter-search" placeholder="태그 검색" aria-label="태그 검색">' : ""}<div data-filter-options></div></section>`;
-      content.querySelector("[data-filter-overview]").onclick = () => { selected = null; query = ""; draw(); };
-      content.querySelectorAll("[data-filter-nav]").forEach(b => b.onclick = () => { selected = b.dataset.filterNav; query = ""; draw(); });
-      const search = content.querySelector(".mapp-filter-search");
-      if (search) search.oninput = () => { query = search.value; drawOptions(); };
+        <section class="mapp-filter-options-panel"><h3>${g.label}</h3><div data-filter-options></div></section>`;
+      content.querySelector("[data-filter-overview]").onclick = () => { selected = null; draw(); };
+      content.querySelectorAll("[data-filter-nav]").forEach(b => b.onclick = () => { selected = b.dataset.filterNav; draw(); });
       drawOptions();
       content.querySelector(`button[data-filter-nav="${selected}"]`).focus();
     }
-    popup.querySelector("[data-filter-reset]").onclick = () => { draft = empty(); query = ""; draw(); };
+    popup.querySelector("[data-filter-reset]").onclick = () => { draft = empty(); draw(); };
     popup.querySelector("[data-filter-cancel]").onclick = close;
     popup.querySelector("[data-filter-confirm]").onclick = () => { close(); onApply(normalize(draft, groups)); };
     document.body.appendChild(popup);
