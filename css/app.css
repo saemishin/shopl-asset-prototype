@@ -861,6 +861,7 @@ button.usebullet { background: var(--panel); font: inherit; cursor: pointer; }
 .field label { display: block; font-size: 12px; color: var(--text-sub); margin-bottom: 5px; font-weight: 600; }
 .field-label-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 5px; }
 .field-label-row label { margin-bottom: 0; }
+.areg-tag-hint { margin: -1px 0 7px; }
 .tag-manage-add { display: flex; gap: 8px; }
 .tag-manage-add input { flex: 1; }
 .tag-manage-list { display: flex; flex-direction: column; gap: 2px; }
@@ -1563,3 +1564,100 @@ button.dthumb:hover { filter: brightness(0.94); }
 .mapp-filter-footer { flex-shrink: 0; display: flex; gap: 10px; padding: 12px 10px 20px; background: #fff; }
 .mapp-filter-footer button { flex: 1; border-radius: 999px; min-height: 46px; font-size: 16px; background: #e0e0e0; }
 .mapp-filter-footer [data-filter-confirm] { background: #3297ff; color: #fff; }
+
+/* 리더모드 자산 추가 — 허브/소분류 상세의 권한 기반 FAB와 모바일 단일 컬럼 등록 페이지. */
+.mapp-asset-add-fab {
+  position: absolute; right: 20px; bottom: 22px; z-index: 20; width: 54px; height: 54px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; color: #fff; background: var(--primary);
+  box-shadow: 0 8px 22px rgba(50, 151, 255, .34); font-size: 30px; font-weight: 300; line-height: 1;
+}
+.mapp-asset-add-fab:active { transform: scale(.96); }
+.mapp-add-topbar { border-bottom: 1px solid var(--line); }
+.mapp-add-body, .mapp-add-category-body { flex: 1; min-height: 0; overflow-y: auto; padding: 18px 16px 28px; }
+.mapp-add-field { margin-bottom: 18px; }
+.mapp-add-field > label { display: block; margin-bottom: 7px; font-size: 12px; font-weight: 600; color: var(--text-sub); }
+.mapp-add-field .req { color: var(--danger); }
+.mapp-add-field input, .mapp-add-field textarea, .mapp-add-select {
+  width: 100%; min-height: 44px; border: 1px solid var(--line-strong); border-radius: 9px;
+  padding: 10px 12px; background: #fff; font-size: 14px; text-align: left;
+}
+.mapp-add-field textarea { min-height: 96px; resize: vertical; line-height: 1.5; }
+.mapp-add-select { display: flex; align-items: center; justify-content: space-between; color: var(--text-mut); }
+.mapp-add-select.selected { color: var(--text); font-weight: 600; }
+.mapp-add-select span { color: var(--text-mut); font-size: 20px; }
+.mapp-add-field input.has-err { border-color: var(--danger); }
+.mapp-add-field .field-err { margin-top: 5px; }
+.mapp-add-input-wrap, .mapp-add-tag-picker { position: relative; }
+.mapp-add-suggest {
+  position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 35; max-height: 190px; overflow-y: auto;
+  padding: 4px; border: 1px solid var(--line-strong); border-radius: 9px; background: #fff; box-shadow: 0 8px 24px rgba(0,0,0,.13);
+}
+.mapp-add-suggest[hidden] { display: none; }
+.mapp-add-suggest button { display: block; width: 100%; padding: 10px 11px; border-radius: 6px; text-align: left; font-size: 13px; }
+.mapp-add-suggest button:active { background: var(--primary-weak); color: var(--primary); }
+.mapp-add-suggest-empty { padding: 10px 11px; color: var(--text-mut); font-size: 12.5px; }
+.mapp-add-foot { flex-shrink: 0; padding: 12px 16px 18px; border-top: 1px solid var(--line); background: #fff; }
+.mapp-add-foot .btn { width: 100%; min-height: 46px; justify-content: center; border-radius: 10px; }
+.mapp-add-photos { display: flex; flex-wrap: wrap; gap: 9px; }
+.mapp-add-photo-tile, .mapp-add-photo-plus { position: relative; width: 58px; height: 58px; border-radius: 9px; flex-shrink: 0; }
+.mapp-add-photo-tile { border: 2px solid transparent; }
+.mapp-add-photo-tile.primary { border-color: var(--primary); }
+.mapp-add-photo-tile > button:first-child { width: 100%; height: 100%; color: #fff; text-align: left; padding: 4px 6px; text-shadow: 0 1px 2px rgba(0,0,0,.35); }
+.mapp-add-photo-delete { position: absolute; top: -7px; right: -7px; width: 20px; height: 20px; border-radius: 50%; background: #fff; border: 1px solid var(--line-strong); color: var(--text-sub); font-size: 14px; }
+.mapp-add-photo-plus { border: 1px dashed var(--line-strong); color: var(--text-mut); font-size: 24px; background: #fafafa; }
+.mapp-add-field-label { display: flex; align-items: center; justify-content: space-between; margin-bottom: 3px; }
+.mapp-add-field-label label { color: var(--text-sub); font-size: 12px; font-weight: 600; }
+.mapp-add-field-label button { color: var(--primary); font-size: 12px; font-weight: 600; }
+.mapp-add-tag-hint { margin: 0 0 7px; }
+.mapp-add-field .tag-input-wrap { min-height: 44px; border-radius: 9px; }
+.mapp-add-field .tag-input-wrap input[type=text] { flex: 1; min-width: 80px; width: auto; min-height: 28px; padding: 4px 2px; border: 0; outline: 0; background: transparent; }
+.mapp-add-field .tag-input-wrap input:disabled { background: transparent; }
+.mapp-add-date {
+  display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 44px; padding: 10px 12px;
+  border: 1px solid var(--line-strong); border-radius: 9px; color: var(--text-mut); background: #fff; font-size: 14px; text-align: left;
+}
+.mapp-add-date.selected { color: var(--text); }
+.mapp-add-date svg { width: 19px; height: 19px; color: var(--text-sub); }
+.mapp-add-expiry-hint { margin: 6px 0 0; }
+.mapp-add-month-sheet { border-radius: 20px 20px 0 0; }
+.mapp-add-month-sheet .mapp-sheet-body { padding: 26px 14px 22px; }
+.mapp-add-month-head { display: flex; align-items: center; justify-content: center; gap: 26px; margin-bottom: 28px; }
+.mapp-add-month-head > button { width: 32px; height: 32px; font-size: 26px; font-weight: 300; }
+.mapp-add-month-head > button:disabled { opacity: .3; }
+.mapp-add-month-head strong { min-width: 72px; text-align: center; font-size: 20px; }
+.mapp-add-month-grid { display: grid; grid-template-columns: repeat(4, 1fr); row-gap: 14px; }
+.mapp-add-month-grid button { display: flex; align-items: center; justify-content: center; height: 74px; background: transparent; font-size: 17px; }
+.mapp-add-month-grid button span { display: flex; align-items: center; justify-content: center; width: 66px; height: 66px; border-radius: 50%; }
+.mapp-add-month-grid button.sel span { background: #00a5f4; color: #fff; }
+.mapp-add-month-grid button:disabled { color: var(--text-mut); opacity: .35; }
+.mapp-add-month-sheet .mapp-cal-sel { min-height: 22px; margin-top: 26px; font-size: 17px; color: #00a5f4; }
+.mapp-add-month-sheet .mapp-sheet-foot { gap: 0; padding: 18px 0 28px; border-top-color: #f0f1f2; }
+.mapp-add-month-sheet .mapp-sheet-foot button { flex: 1; min-height: 28px; font-size: 18px; background: transparent; }
+.mapp-add-month-sheet .mapp-sheet-foot button + button { border-left: 1px solid #f0f1f2; font-weight: 700; }
+.mapp-add-month-sheet .mapp-sheet-foot button:disabled { color: var(--text-mut); opacity: .4; }
+.mapp-add-month-reset { display: flex; justify-content: flex-end; padding: 14px 20px 0; }
+.mapp-add-month-reset button { color: var(--primary); font-size: 12.5px; }
+.mapp-add-category-popup { display: flex; flex: 1; min-height: 0; flex-direction: column; background: #fff; }
+.mapp-add-category-head { justify-content: space-between; border-bottom: 1px solid var(--line); }
+.mapp-add-category-close { width: 36px; height: 36px; margin-left: auto; color: var(--text); font-size: 27px; font-weight: 300; line-height: 1; }
+.mapp-add-category-group { margin-top: 14px; }
+.mapp-add-category-group:first-of-type { margin-top: 2px; }
+.mapp-add-category-group[hidden] { display: none; }
+.mapp-add-category-group h2 { padding: 8px 4px; font-size: 12px; color: var(--text-mut); }
+.mapp-add-category-group button { display: flex; align-items: center; width: 100%; min-height: 48px; border-bottom: 1px solid #f0f1f2; text-align: left; }
+.mapp-add-category-group button span { flex: 1; font-size: 14px; font-weight: 600; }
+.mapp-add-tag-manage-body { flex: 1; min-height: 0; overflow-y: auto; padding: 18px 16px 28px; }
+.mapp-add-tag-create { display: flex; gap: 8px; }
+.mapp-add-tag-create input { flex: 1; min-width: 0; height: 42px; padding: 0 11px; border: 1px solid var(--line-strong); border-radius: 8px; font-size: 13px; }
+.mapp-add-tag-create .btn { height: 42px; }
+.mapp-add-tag-manage-list { margin-top: 18px; }
+.mapp-add-tag-manage-row { display: flex; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid var(--line); }
+.mapp-add-tag-manage-row input { flex: 1; min-width: 0; height: 40px; padding: 0 10px; border: 1px solid var(--line-strong); border-radius: 8px; font-size: 13px; }
+.mapp-add-tag-manage-row button { width: 34px; height: 34px; color: var(--text-mut); font-size: 21px; }
+.tag-manage-name-field { flex: 1; min-width: 0; }
+.tag-manage-name-field > input { width: 100%; }
+.mapp-add-tag-manage-row, .tag-manage-list .cat-manage-row { align-items: flex-start; }
+/* 등록 후 정렬을 유지하면서 새 자산을 잠시 강조한다. */
+.mapp-card-added { animation: mapp-card-added 2s ease-out; }
+@keyframes mapp-card-added { from { background: var(--primary-weak); box-shadow: inset 0 0 0 1px var(--primary); } to { background: #fff; box-shadow: none; } }
+@media (prefers-reduced-motion: reduce) { .mapp-card-added { animation: none; } }

@@ -1,6 +1,8 @@
 /* 자산 등록 팝업 — 현황/분류 화면 공용(아직 러프한 프로토타입: 저장은 토스트만, 실제 데이터 반영 없음).
    assets.js의 "자산 추가" 버튼과 category.js의 소분류별 빈 자산 목록 [자산 추가] 버튼이 이 하나를 같이 씀. */
 (function () {
+  // 태그는 앞뒤 공백 제거·연속 공백 한 칸으로 정규화하되 대소문자는 유지한다.
+  const normalizeTagName = value => value.trim().replace(/\s+/g, " ");
   function toast(msg) {
     const t = document.createElement("div");
     t.textContent = msg;
@@ -59,16 +61,16 @@
     const addErr = back.querySelector("[data-tm-add-err]");
     const saveBtn = back.querySelector("[data-tm-save]");
 
-    // 태그명은 구조설계안상 대소문자 구분이라 중복 판정도 trim 후 대소문자 그대로 정확히 일치할 때만
+    // 태그명은 구조설계안상 대소문자 구분이라 중복 판정도 공백 정규화 후 대소문자 그대로 정확히 일치할 때만
     function dupNameSet() {
       const counts = {};
-      draft.forEach(t => { const n = t.name.trim(); if (n) counts[n] = (counts[n] || 0) + 1; });
+      draft.forEach(t => { const n = normalizeTagName(t.name); if (n) counts[n] = (counts[n] || 0) + 1; });
       return new Set(Object.keys(counts).filter(n => counts[n] > 1));
     }
     // "변경 있음" 여부는 플래그가 아니라 원본(master)과의 실제 내용 비교로 판정 —
     // 추가했다가 도로 지우는 것처럼 순가감이 상쇄돼 원래 상태로 돌아왔으면 저장 비활성화가 맞음
     function isDirty() {
-      const current = [...new Set(draft.map(t => t.name.trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, "ko"));
+      const current = [...new Set(draft.map(t => normalizeTagName(t.name)).filter(Boolean))].sort((a, b) => a.localeCompare(b, "ko"));
       const orig = [...master].sort((a, b) => a.localeCompare(b, "ko"));
       if (current.length !== orig.length) return true;
       return current.some((v, i) => v !== orig[i]);
@@ -76,19 +78,26 @@
     function updateValidity() {
       const dups = dupNameSet();
       listEl.querySelectorAll("[data-tm-rename]").forEach(inp => {
-        inp.classList.toggle("has-err", dups.has(inp.value.trim()));
+        const name = normalizeTagName(inp.value);
+        const invalid = !name || dups.has(name);
+        inp.classList.toggle("has-err", invalid);
+        inp.setAttribute("aria-invalid", String(invalid));
+        listEl.querySelector(`[data-tm-required="${inp.dataset.tmRename}"]`).hidden = !!name;
       });
       listErr.hidden = dups.size === 0;
-      const addDup = draft.some(t => t.name.trim() === addInput.value.trim());
-      addInput.classList.toggle("has-err", !!addInput.value.trim() && addDup);
-      addErr.hidden = !(addInput.value.trim() && addDup);
-      addBtn.disabled = !!addInput.value.trim() && addDup;
-      saveBtn.disabled = !isDirty() || dups.size > 0;
+      const addDup = draft.some(t => normalizeTagName(t.name) === normalizeTagName(addInput.value));
+      addInput.classList.toggle("has-err", !!normalizeTagName(addInput.value) && addDup);
+      addErr.hidden = !(normalizeTagName(addInput.value) && addDup);
+      addBtn.disabled = !!normalizeTagName(addInput.value) && addDup;
+      saveBtn.disabled = !isDirty() || dups.size > 0 || draft.some(t => !normalizeTagName(t.name));
     }
     function renderList() {
       listEl.innerHTML = draft.length ? draft.map((t, i) => `
         <div class="cat-manage-row">
-          <input type="text" class="cat-manage-name-input" data-tm-rename="${i}" value="${t.name}" maxlength="20">
+          <div class="tag-manage-name-field">
+            <input type="text" class="cat-manage-name-input" data-tm-rename="${i}" value="${t.name}" maxlength="20" aria-describedby="tm-name-required-${i}">
+            <p class="field-err" id="tm-name-required-${i}" data-tm-required="${i}" hidden>명칭은 필수로 입력해야 합니다.</p>
+          </div>
           <div class="cat-manage-row-acts">
             <button type="button" class="cat-manage-icon" data-tm-del="${i}" aria-label="삭제"
               data-tip="삭제 시 이 태그를 사용 중인 자산에서 모두 삭제됩니다.">${TRASH_ICON}</button>
@@ -99,8 +108,8 @@
     renderList();
 
     function addRow() {
-      const name = addInput.value.trim().slice(0, 20);
-      if (!name || draft.some(t => t.name.trim() === name)) { addInput.focus(); return; }
+      const name = normalizeTagName(addInput.value).slice(0, 20);
+      if (!name || draft.some(t => normalizeTagName(t.name) === name)) { addInput.focus(); return; }
       draft.unshift({ name, orig: null });
       addInput.value = "";
       renderList();
@@ -122,13 +131,13 @@
     back.addEventListener("click", e => { if (e.target === back) back.remove(); });
 
     saveBtn.onclick = () => {
-      if (!isDirty() || dupNameSet().size > 0) return;
-      const finalNames = [...new Set(draft.map(t => t.name.trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, "ko"));
+      if (!isDirty() || dupNameSet().size > 0 || draft.some(t => !normalizeTagName(t.name))) return;
+      const finalNames = [...new Set(draft.map(t => normalizeTagName(t.name)).filter(Boolean))].sort((a, b) => a.localeCompare(b, "ko"));
       const remainingOrigs = new Set(draft.filter(t => t.orig).map(t => t.orig));
       const deletedOrigs = master.filter(t => !remainingOrigs.has(t));
       const renamed = draft
-        .filter(t => t.orig && t.orig !== t.name.trim())
-        .map(t => ({ from: t.orig, to: t.name.trim() }));
+        .filter(t => t.orig && t.orig !== normalizeTagName(t.name))
+        .map(t => ({ from: t.orig, to: normalizeTagName(t.name) }));
 
       (window.DATA.assets || []).forEach(a => {
         if (!a.labels || !a.labels.length) return;
@@ -156,7 +165,7 @@
     back.className = "modal-back";
     back.innerHTML = `
       <div class="modal sm">
-        <h3>소분류</h3>
+        <h3>분류</h3>
         <div class="body">
           <input type="text" class="picker-search" data-cp-search placeholder="검색" autocomplete="off">
           <div class="catpick-list" data-cp-list></div>
@@ -228,7 +237,7 @@
     back.className = "modal-back";
     back.innerHTML = `
       <div class="modal picker-modal">
-        <h3>소분류</h3>
+        <h3>분류</h3>
         <div class="body" data-body></div>
         <div class="foot">
           <button type="button" class="btn" data-cancel>취소</button>
@@ -270,7 +279,12 @@
 
   window.openAssetAddModal = function (opts) {
     opts = opts || {};
-    const categories = (window.DATA && window.DATA.categories) || [];
+    // 구조설계안 4.1/4.2: 등록·수정은 자산 관리 권한 전용이며 권한자는 모든 분류를 조회한다.
+    // 대시보드는 관리자 계정으로 가정(assets.js/detail.js와 동일). 따라서 추가·이동 후보는 전체 분류.
+    // 실제 계정 연동 시 관리권한 검사 후 조회 가능한 분류만 이 경계에서 제공한다.
+    const hasAssetManagePermission = () => true;
+    if (!hasAssetManagePermission()) return null;
+    const categories = ((window.DATA && window.DATA.categories) || []).filter(() => hasAssetManagePermission());
     const preselectValue = opts.group && opts.sub ? `${opts.group}|${opts.sub}` : null;
     const findCat = v => { const [g, s] = (v || "").split("|"); return categories.find(c => c.group === g && c.sub === s); };
     let type = (findCat(preselectValue) || {}).type || "individual";
@@ -364,7 +378,7 @@
         <h3>${opts.asset ? "자산 수정" : "자산 추가"}</h3>
         <div class="body">
           <div class="areg-col-left">
-            <div class="field"><label>소분류 <span class="req">*</span></label>
+            <div class="field"><label>분류 <span class="req">*</span></label>
               <div class="tag-input-wrap" id="areg-catwrap" style="cursor:pointer">
                 <span id="areg-cat-display" style="flex:1;font-size:12.5px">선택</span>
               </div>
@@ -388,6 +402,7 @@
                 <label>태그</label>
                 <button type="button" class="btn sm" id="areg-tag-manage">태그 관리</button>
               </div>
+              <p class="hint areg-tag-hint">최대 5개까지 선택할 수 있습니다.</p>
               <div class="tag-input-wrap" id="areg-tagwrap">
                 <div class="tag-chips" data-chips></div>
                 <input type="text" data-taginput placeholder="검색" autocomplete="off">
@@ -410,8 +425,8 @@
           <button type="button" class="btn primary" id="areg-save" disabled>저장</button>
         </div>
       </div>`;
-    back.addEventListener("click", e => { if (e.target === back) back.remove(); });
-    back.querySelectorAll("[data-close]").forEach(b => b.onclick = () => { if (!b.disabled) back.remove(); });
+    back.addEventListener("click", e => { if (e.target === back) requestClose(); });
+    back.querySelectorAll("[data-close]").forEach(b => b.onclick = () => { if (!b.disabled) requestClose(); });
     document.body.appendChild(back);
 
     const modalEl = back.querySelector(".modal");
@@ -437,6 +452,7 @@
     const noteField = back.querySelector("#areg-note-field");
     const noteInput = back.querySelector("#areg-note-input");
     const saveBtn = back.querySelector("#areg-save");
+    let initialEditValues = null;
 
     const getExpiry = wireDateField(expiryField);
     const getManufactured = wireMonthField(manufacturedField, todayStr());
@@ -461,6 +477,44 @@
       fieldEl.querySelector("[data-dtext]").classList.toggle("has-err", showErr);
       return !invalid;
     }
+    function editValues() {
+      // 표기 차이·태그 순서만으로는 변경으로 보지 않는다. 연월은 저장할 때와 같은 단위로 비교한다.
+      const dateValue = (field, getValue) => getValue() === null ? field.querySelector("[data-dtext]").value : getValue();
+      const digits = purchasePriceInput.value.replace(/[^0-9]/g, "");
+      return {
+        category: catValue, name: nameInput.value.trim(), assetNo: assetNoInput.value.trim(),
+        totalQty: totalQtyInput.value ? Number(totalQtyInput.value) : "",
+        expiry: dateValue(expiryField, getExpiry), manufactured: dateValue(manufacturedField, getManufactured),
+        purchaseDate: dateValue(purchaseDateField, getPurchaseDate), price: digits ? Number(digits) : "",
+        serial: serialInput.value.trim(), imei: imeiInput.value.trim(), note: noteInput.value.trim(),
+        tags: [...tags].sort(), photos: photos.map(photo => ({ ...photo })), primary: primaryIdx,
+      };
+    }
+    function editDirty() {
+      return !!initialEditValues && JSON.stringify(editValues()) !== JSON.stringify(initialEditValues);
+    }
+    function hasAddInput() {
+      // 분류·후보 검색어는 제외. 공백만 있거나 모두 지운 값도 제외한다.
+      const inputs = [nameInput, assetNoInput, totalQtyInput, serialInput, imeiInput, purchasePriceInput, noteInput,
+        ...[expiryField, manufacturedField, purchaseDateField].map(field => field.querySelector("[data-dtext]"))];
+      return inputs.some(input => input.value.trim()) || tags.length > 0 || photos.length > 0;
+    }
+    function requestClose() {
+      closeMenu(); closeProdMenu();
+      if (opts.asset || !hasAddInput()) { back.remove(); return; }
+      if (document.querySelector("[data-register-exit]")) return;
+      const cb = document.createElement("div");
+      cb.className = "modal-back";
+      cb.style.zIndex = 340;
+      cb.innerHTML = `<div class="modal sm" data-register-exit role="dialog" aria-modal="true" aria-label="작성을 중단하시겠습니까?">
+        <h3>작성을 중단하시겠습니까?</h3>
+        <div class="body" style="font-size:14px">지금까지 작성한 내용은 저장되지 않습니다.</div>
+        <div class="foot"><button type="button" class="btn" data-register-stay>취소</button><button type="button" class="btn primary" data-register-leave>확인</button></div></div>`;
+      document.body.appendChild(cb);
+      cb.querySelector("[data-register-stay]").onclick = () => cb.remove();
+      cb.querySelector("[data-register-leave]").onclick = () => { cb.remove(); back.remove(); };
+      cb.onclick = event => { if (event.target === cb) cb.remove(); };
+    }
     function checkValid() {
       const nameOk = nameInput.value.trim().length > 0;
       const noVal = assetNoInput.value.trim();
@@ -472,7 +526,7 @@
       const expiryOk = dateFieldValid(expiryField, getExpiry);
       const manufacturedOk = dateFieldValid(manufacturedField, getManufactured);
       const purchaseDateOk = dateFieldValid(purchaseDateField, getPurchaseDate);
-      saveBtn.disabled = !(catValue && nameOk && noOk && totalQtyOk && expiryOk && manufacturedOk && purchaseDateOk);
+      saveBtn.disabled = !(catValue && nameOk && noOk && totalQtyOk && expiryOk && manufacturedOk && purchaseDateOk && (!opts.asset || editDirty()));
     }
     // 품목명 자동완성 — "소분류+품목명" 조합이 품목 단위라, 같은 소분류에 이미 등록된 품목명을 제안해서
     // 띄어쓰기·표기 차이로 같은 품목이 여러 이름으로 쪼개지는 걸 막음. 태그와 달리 목록에 없는 새 이름도 항상 입력 가능(강제 선택 아님)
@@ -685,6 +739,7 @@
         renderChips();
       });
       tagInput.placeholder = tags.length ? "" : "검색";
+      checkValid();
     }
     function addTag(v) {
       if (!v || tags.includes(v) || tags.length >= 5) return;
@@ -759,8 +814,8 @@
         e.stopPropagation();
         const i = +b.dataset.photoDel;
         photos.splice(i, 1);
-        if (!photos.length) primaryIdx = 0;
-        else if (primaryIdx >= photos.length) primaryIdx = photos.length - 1;
+        // 대표 삭제 시 현재 사진 목록에서 가장 앞에 남은 사진을 자동 대표로 지정한다.
+        if (!photos.length || primaryIdx === i) primaryIdx = 0;
         else if (primaryIdx > i) primaryIdx -= 1;
         renderPhotos();
       });
@@ -770,6 +825,7 @@
         if (photos.length === 1) primaryIdx = 0;
         renderPhotos();
       };
+      checkValid();
     }
     renderPhotos();
 
@@ -777,6 +833,11 @@
     checkValid();
     if (opts.asset) prefillFromAsset(opts.asset);
     else if (preselectValue) selectCat(preselectValue);
+    if (opts.asset) initialEditValues = editValues();
+    checkValid();
+    // 날짜·품목명 외에도 메모/SN/IMEI/가격 등 모든 실제 편집 이벤트를 반영한다.
+    back.addEventListener("input", checkValid);
+    back.addEventListener("change", checkValid);
 
     back.querySelector("#areg-tag-manage").onclick = () => {
       closeMenu();
@@ -787,7 +848,10 @@
           const r = renamed.find(rn => rn.from === tags[i]);
           if (r) { tags[i] = r.to; changed = true; }
         }
+        // 태그 관리 저장은 마스터·기존 자산에 이미 반영되므로 자산 수정의 미저장 변경에서 제외한다.
+        if (initialEditValues) initialEditValues.tags = [...(opts.asset.labels || [])].sort();
         if (changed) renderChips();
+        checkValid();
       });
     };
 
@@ -796,6 +860,8 @@
     // 바뀐 필드마다 "자산 정보 수정: OOO" 형식으로 각각 따로 기록(뭉뚱그린 한 건이 아니라 배정/보유 관리만큼
     // 촘촘하게 — 필드별로 실제 값이 바뀐 것만 기록되고, 아무것도 안 바꾸고 저장하면 아무 것도 안 남음)
     saveBtn.addEventListener("click", () => {
+      checkValid();
+      if (saveBtn.disabled) return;
       closeMenu();
       if (opts.asset) {
         const asset = opts.asset;
@@ -856,7 +922,7 @@
         if (opts.onSaved) opts.onSaved();
       } else {
         back.remove();
-        toast("저장되었습니다. (프로토타입 — 반영 없음)");
+        toast("자산이 추가되었습니다.");
       }
     });
 

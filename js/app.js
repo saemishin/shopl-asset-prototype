@@ -991,7 +991,9 @@
         e.stopPropagation();
         const i = +b.dataset.photoDel;
         photos.splice(i, 1);
-        if (!photos.length) primaryIdx = 0; else if (primaryIdx >= photos.length) primaryIdx = photos.length - 1;
+        // 대표 삭제 시 현재 사진 목록에서 가장 앞에 남은 사진을 자동 대표로 지정한다.
+        if (!photos.length || primaryIdx === i) primaryIdx = 0;
+        else if (primaryIdx > i) primaryIdx -= 1;
         markDirty();
         renderPhotos();
       });
