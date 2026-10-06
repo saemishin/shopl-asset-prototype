@@ -712,6 +712,18 @@
     "reassign": { title: "재배정", targetLabel: "새 배정 대상", confirm: "재배정하시겠습니까?" },
     "hold-add": { title: "보유 대상 추가", targetLabel: "보유 대상", confirm: "보유 대상을 추가하시겠습니까?" },
   };
+  // 배정/보유 작성 중 이탈: 대상 유형만 선택해도 작성 시작으로 판단한다.
+  function confirmWriteExit(onLeave) {
+    const cb = document.createElement("div");
+    cb.className = "modal-back"; cb.style.zIndex = 340;
+    cb.innerHTML = `<div class="modal sm" style="width:340px" role="dialog" aria-modal="true" aria-label="작성을 중단하시겠습니까?">
+      <h3>작성을 중단하시겠습니까?</h3><div class="body" style="font-size:14px">지금까지 작성한 내용은 저장되지 않습니다.</div>
+      <div class="foot"><button type="button" class="btn" data-exit-stay>취소</button><button type="button" class="btn primary" data-exit-leave>확인</button></div></div>`;
+    document.body.appendChild(cb);
+    cb.querySelector("[data-exit-stay]").onclick = () => cb.remove();
+    cb.querySelector("[data-exit-leave]").onclick = () => { cb.remove(); onLeave(); };
+    cb.onclick = event => { if (event.target === cb) cb.remove(); };
+  }
   function openFormPage(a, target, kind, afterMutate) {
     const cfg = FORM_CFG[kind];
     const f = { picked: null, draft: { employee: null, worksite: null }, dateIso: "", qtyText: "" };
@@ -821,8 +833,13 @@
     }
     drawBody();
 
-    back.addEventListener("click", e => { if (e.target === back) back.remove(); });
-    back.querySelector("[data-form-back]").onclick = () => back.remove();
+    const requestClose = () => {
+      // 기존 재배정 대상(읽기 전용)은 제외하고 새 작성 필드만 확인한다.
+      if (f.picked || Object.values(f.draft).some(Boolean) || f.dateIso || f.qtyText) confirmWriteExit(() => back.remove());
+      else back.remove();
+    };
+    back.addEventListener("click", e => { if (e.target === back) requestClose(); });
+    back.querySelector("[data-form-back]").onclick = requestClose;
     saveBtn.onclick = () => {
       if (saveBtn.disabled) return;
       const who = f.draft[f.picked];
@@ -951,11 +968,13 @@
   // 사진 삭제 버튼은 asset-register.js와 같은 CSS를 쓰지만(hover 시 노출) 앱은 터치라 호버가 없어
   // .mapp-photo-modal 스코프로 항상 노출되게 오버라이드(2026-09-30). 추가는 색상만 바뀌는 더미라 실제
   // 카메라/갤러리 연동은 없지만, 어느 메뉴를 눌러도 사진 한 장이 추가되는 것으로 시뮬레이션(요청대로).
-  // 저장 버튼은 실제로 뭔가 바뀌었을 때만(대표 변경·추가·삭제) 활성화되게 dirty 플래그로 추적
+  // 저장 버튼은 사진 목록과 대표가 최초 상태에서 실제로 바뀐 경우에만 활성화
   function openPhotoManageModal(a, onDone) {
     const photos = window.assetPhotos(a).map(p => ({ ...p }));
     let primaryIdx = a._primary || 0;
-    let dirty = false;
+    // 사진 목록·업로드 메타와 대표 사진을 최초 상태와 비교한다. 원복하면 저장도 비활성화한다.
+    const snapshot = () => JSON.stringify({ photos, primaryIdx });
+    const initialSnapshot = snapshot();
     const back = document.createElement("div");
     back.className = "modal-back";
     back.innerHTML = `
@@ -972,8 +991,9 @@
     document.body.appendChild(back);
     const row = back.querySelector("[data-photo-row]");
     const saveBtn = back.querySelector("[data-cok]");
-    const markDirty = () => { dirty = true; saveBtn.disabled = false; };
+    const syncSaveState = () => { saveBtn.disabled = snapshot() === initialSnapshot; };
     function renderPhotos() {
+      syncSaveState();
       const tiles = photos.map((p, i) => `
         <button type="button" class="areg-photo-tile${i === primaryIdx ? " primary" : ""}" data-photo-i="${i}" style="background:${p.color}" aria-label="사진 ${i + 1}${i === primaryIdx ? " (대표)" : ""}">
           ${i === primaryIdx ? '<span class="areg-photo-star">★</span>' : ""}
@@ -985,7 +1005,7 @@
         if (e.target.closest("[data-photo-del]")) return;
         const i = +b.dataset.photoI;
         if (i === primaryIdx) return;
-        primaryIdx = i; markDirty(); renderPhotos();
+        primaryIdx = i; renderPhotos();
       });
       row.querySelectorAll("[data-photo-del]").forEach(b => b.onclick = e => {
         e.stopPropagation();
@@ -994,7 +1014,6 @@
         // 대표 삭제 시 현재 사진 목록에서 가장 앞에 남은 사진을 자동 대표로 지정한다.
         if (!photos.length || primaryIdx === i) primaryIdx = 0;
         else if (primaryIdx > i) primaryIdx -= 1;
-        markDirty();
         renderPhotos();
       });
       const addBtn = row.querySelector("[data-photo-add]");
@@ -1005,7 +1024,6 @@
         ], () => {
           photos.push({ color: PHOTO_COLORS[photos.length % PHOTO_COLORS.length], at: `${todayStr()} 00:00`, by: ME });
           if (photos.length === 1) primaryIdx = 0;
-          markDirty();
           renderPhotos();
         });
       };
@@ -1185,7 +1203,7 @@
       isIndiv ? { k: "IMEI", field: "imei", v: a.imei || '<span class="muted">—</span>' } : null,
       { k: "제조연월", field: "manufactured", v: a.manufactured ? window.fmtMonth(a.manufactured) : '<span class="muted">—</span>' },
       { k: "구매연월", field: "purchaseDate", v: a.purchaseDate ? window.fmtMonth(a.purchaseDate) : "—" },
-      { k: isIndiv ? "구매가격" : "구매가격 (품목 단가)", field: "purchasePrice", v: a.price ? window.formatPrice(a.price) : "—" },
+      { k: "구매가격", field: "purchasePrice", v: a.price ? window.formatPrice(a.price) : "—" },
       { k: "자산 등록일", v: window.fmtDate(a.createdAt) },
       // 메모만 값 옆에 편집 아이콘을 붙여 별도 액션(더보기 메뉴가 아니라 바로 수정) — 대시보드 detail.js와
       // 동일한 구조·아이콘(.icon-edit는 전역 css/app.css 공용 클래스)
@@ -1208,7 +1226,8 @@
     const others = otherParties(a, target);
     const partyHtml = others.length ? `
       <div class="dsection">
-        <div class="mapp-party-head">${isIndiv ? "공동 배정 대상" : "공동 보유 대상"} <span class="mapp-party-count">${others.length}</span></div>
+        <div class="mapp-party-head">${isIndiv ? "공동 배정 대상" : "공동 보유 대상"}</div>
+        <div class="mapp-count">전체 <b>${others.length}</b></div>
         <div class="mapp-party-list">${others.slice(0, 5).map(x => partyRowHtml(x, isIndiv)).join("")}</div>
         ${others.length > 5 ? `<button type="button" class="mapp-party-viewall" data-parties-viewall>전체보기</button>` : ""}
       </div>` : "";

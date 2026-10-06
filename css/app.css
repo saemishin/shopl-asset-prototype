@@ -1500,7 +1500,6 @@ button.dthumb:hover { filter: brightness(0.94); }
 }
 /* 공동 배정/보유 대상 — 정보로만 노출(액션 없음), 최대 5개+초과 시 전체보기(근무지 카드와 동일 패턴) */
 .mapp-party-head { font-size: 13px; font-weight: 700; margin-bottom: 10px; }
-.mapp-party-count { color: var(--text-mut); font-weight: 600; margin-left: 4px; }
 .mapp-party-list { display: flex; flex-direction: column; }
 .mapp-party-row {
   display: flex; align-items: center; justify-content: space-between; padding: 10px 0;
@@ -1661,3 +1660,32 @@ button.dthumb:hover { filter: brightness(0.94); }
 .mapp-card-added { animation: mapp-card-added 2s ease-out; }
 @keyframes mapp-card-added { from { background: var(--primary-weak); box-shadow: inset 0 0 0 1px var(--primary); } to { background: #fff; box-shadow: none; } }
 @media (prefers-reduced-motion: reduce) { .mapp-card-added { animation: none; } }
+
+/* 리더 상세: 모바일 정보 레이아웃 + 자산 전체 배정/보유 관리 */
+.mapp-leader-detail-body .dhead-id > div:last-child { min-width:0; }
+.mapp-leader-detail-body h1 { overflow-wrap:anywhere; }
+.mapp-leader-note { white-space:pre-wrap; overflow-wrap:anywhere; }
+.mapp-leader-qty-summary { display:grid; grid-template-columns:repeat(3,1fr); border-radius:12px; background:#f5f7fa; padding:16px 8px; margin:20px 0; text-align:center; color:var(--text-sub); font-size:12px; }
+.mapp-leader-qty-summary strong { display:block; margin-top:6px; font-size:18px; color:var(--text); }
+.mapp-leader-qty-summary > div+div { border-left:1px solid var(--line); }
+.mapp-leader-holders-head { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px; }
+.mapp-leader-holders-head h2 { font-size:16px; margin:0; }
+.mapp-leader-detail-body .acard-foot { flex-direction:column; align-items:flex-start; gap:10px; }
+.mapp-leader-detail-body .acard.has-actions .acard-id { padding-right:62px; }
+.mapp-leader-detail-body .acard.has-actions .acard-type { right:56px; }
+.mapp-holder-more { position:absolute; top:4px; right:4px; width:44px; height:44px; display:flex; align-items:center; justify-content:center; border:0; border-radius:8px; background:transparent; color:var(--text-sub); }
+.mapp-holder-more svg { width:20px; height:20px; }
+.mapp-holder-more:hover { background:var(--bg); }
+.mapp-leader-detail-body .acard-list { grid-template-columns:1fr; }
+.mapp-leader-holder-search { display:flex; gap:8px; margin-bottom:16px; }
+.mapp-leader-holder-kind { width:56px; min-height:44px; flex-shrink:0; display:flex; align-items:center; justify-content:center; gap:4px; border:1px solid var(--line-strong); border-radius:8px; background:#fff; color:var(--text-sub); }
+.mapp-leader-holder-kind > span { display:flex; }
+.mapp-leader-holder-kind svg, .mapp-leader-holder-menu svg { width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:1.7; }
+.mapp-leader-holder-kind .chev svg { width:12px; height:12px; }
+.mapp-leader-holder-menu button { min-height:44px; display:flex; align-items:center; gap:10px; }
+.mapp-leader-holder-menu button[aria-checked="true"] { color:var(--primary); }
+.mapp-leader-holder-menu .selection-mark { margin-left:auto; }
+.mapp-leader-holder-search input { width:100%; min-width:0; border:1px solid var(--line-strong); border-radius:8px; padding:10px; font:inherit; font-size:13px; }
+.mapp-leader-qr-sheet .label-sheet { width:100%; max-width:100%; }
+.mapp-card[role="button"] { cursor:pointer; }
+.mapp-card[role="button"]:focus-visible { outline:2px solid var(--blue); outline-offset:2px; }

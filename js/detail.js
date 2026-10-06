@@ -225,6 +225,18 @@
       document.addEventListener("click", close);
     });
   }
+  // 배정/보유 작성 중 이탈: 대상 유형만 선택해도 작성 시작으로 판단한다.
+  function confirmWriteExit(onLeave) {
+    const cb = document.createElement("div");
+    cb.className = "modal-back"; cb.style.zIndex = 340;
+    cb.innerHTML = `<div class="modal sm" style="width:340px" role="dialog" aria-modal="true" aria-label="작성을 중단하시겠습니까?">
+      <h3>작성을 중단하시겠습니까?</h3><div class="body" style="font-size:14px">지금까지 작성한 내용은 저장되지 않습니다.</div>
+      <div class="foot"><button type="button" class="btn" data-exit-stay>취소</button><button type="button" class="btn primary" data-exit-leave>확인</button></div></div>`;
+    document.body.appendChild(cb);
+    cb.querySelector("[data-exit-stay]").onclick = () => cb.remove();
+    cb.querySelector("[data-exit-leave]").onclick = () => { cb.remove(); onLeave(); };
+    cb.onclick = event => { if (event.target === cb) cb.remove(); };
+  }
   function confirmModal(msg, onOk) {
     const cb = document.createElement("div");
     cb.className = "modal-back";
@@ -847,8 +859,12 @@
     }
     draw();
 
-    back.addEventListener("click", e => { if (e.target === back) back.remove(); });
-    back.querySelector("[data-close]").onclick = () => back.remove();
+    const requestClose = () => {
+      if (picked || Object.values(draftTarget).some(Boolean) || dateText.trim()) confirmWriteExit(() => back.remove());
+      else back.remove();
+    };
+    back.addEventListener("click", e => { if (e.target === back) requestClose(); });
+    back.querySelector("[data-close]").onclick = requestClose;
     saveBtn.onclick = () => {
       if (saveBtn.disabled) return;
       const d = getDate();
@@ -947,8 +963,12 @@
     }
     draw();
 
-    back.addEventListener("click", e => { if (e.target === back) back.remove(); });
-    back.querySelector("[data-close]").onclick = () => back.remove();
+    const requestClose = () => {
+      if (picked || Object.values(draftTarget).some(Boolean) || dateText.trim()) confirmWriteExit(() => back.remove());
+      else back.remove();
+    };
+    back.addEventListener("click", e => { if (e.target === back) requestClose(); });
+    back.querySelector("[data-close]").onclick = requestClose;
     saveBtn.onclick = () => {
       if (saveBtn.disabled) return;
       const d = getDate();
@@ -1062,8 +1082,12 @@
     }
     draw();
 
-    back.addEventListener("click", e => { if (e.target === back) back.remove(); });
-    back.querySelector("[data-close]").onclick = () => back.remove();
+    const requestClose = () => {
+      if (picked || Object.values(draftTarget).some(Boolean) || qtyText.trim()) confirmWriteExit(() => back.remove());
+      else back.remove();
+    };
+    back.addEventListener("click", e => { if (e.target === back) requestClose(); });
+    back.querySelector("[data-close]").onclick = requestClose;
     saveBtn.onclick = () => {
       if (saveBtn.disabled) return;
       const v = qtyVal();
@@ -1363,7 +1387,7 @@
       { k: "제조연월", field: "manufactured", v: a.manufactured ? window.fmtMonth(a.manufactured) : '<span class="muted">—</span>' },
       { k: "구매연월", field: "purchaseDate", v: a.purchaseDate ? window.fmtMonth(a.purchaseDate) : "—" },
       // 통화 표기는 클라이언트 단위 전역 설정 — window.formatPrice 참조(구조설계안 3.4, data.js)
-      { k: isIndiv ? "구매가격" : "구매가격 (품목 단가)", field: "purchasePrice", v: a.price ? window.formatPrice(a.price) : "—" },
+      { k: "구매가격", field: "purchasePrice", v: a.price ? window.formatPrice(a.price) : "—" },
       { k: "자산 등록일", v: window.fmtDate(a.createdAt) },
       { k: "QR 라벨", v: qrBtn },
       // 메모는 다른 필드와 달리 "자산 수정" 폼(자산관리 권한) 없이도 배정/보유 변경 권한만 있으면 옆의

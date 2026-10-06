@@ -501,14 +501,16 @@
     }
     function requestClose() {
       closeMenu(); closeProdMenu();
-      if (opts.asset || !hasAddInput()) { back.remove(); return; }
+      if (opts.asset ? !editDirty() : !hasAddInput()) { back.remove(); return; }
       if (document.querySelector("[data-register-exit]")) return;
+      const title = opts.asset ? "수정을 중단하시겠습니까?" : "작성을 중단하시겠습니까?";
+      const body = opts.asset ? "수정을 중단할 경우 변경된 내용은 저장되지 않습니다." : "지금까지 작성한 내용은 저장되지 않습니다.";
       const cb = document.createElement("div");
       cb.className = "modal-back";
       cb.style.zIndex = 340;
-      cb.innerHTML = `<div class="modal sm" data-register-exit role="dialog" aria-modal="true" aria-label="작성을 중단하시겠습니까?">
-        <h3>작성을 중단하시겠습니까?</h3>
-        <div class="body" style="font-size:14px">지금까지 작성한 내용은 저장되지 않습니다.</div>
+      cb.innerHTML = `<div class="modal sm" data-register-exit role="dialog" aria-modal="true" aria-label="${title}">
+        <h3>${title}</h3>
+        <div class="body" style="font-size:14px">${body}</div>
         <div class="foot"><button type="button" class="btn" data-register-stay>취소</button><button type="button" class="btn primary" data-register-leave>확인</button></div></div>`;
       document.body.appendChild(cb);
       cb.querySelector("[data-register-stay]").onclick = () => cb.remove();

@@ -1,5 +1,5 @@
 /* 앱 리더모드 — 러프 프로토타입(2026-09-30). 직원모드(app.js)와 달리 "내 자산"이 아니라 조회 권한 범위
-   안의 회사 전체 자산을 보는 화면. 자산 상세는 아직 제외. 소분류 상세 검색·필터와 권한 기반 자산 추가를 구현.
+   안의 회사 전체 자산을 보는 화면. 자산 상세는 직원모드 레이아웃과 대시보드의 관리 정책을 적용. 소분류 검색·필터와 권한 기반 추가/수정을 구현.
    필터는 직원모드와 공용 팝업 사용. 이 파일도 다른 화면 파일들과 동일하게
    자기 완결적(상수 중복 정의)이라 app.js/assets.js와 겹치는 부분이 많음 */
 (function () {
@@ -44,7 +44,8 @@
     back.className = className;
     const screen = document.querySelector(".mapp-screen");
     const r = screen ? screen.getBoundingClientRect() : { top: 0, left: 0, width: 390, height: 844 };
-    back.style.cssText = `position:fixed;top:${r.top}px;left:${r.left}px;width:${r.width}px;height:${r.height}px;z-index:${zIndex};`;
+    // 폰보다 낮은 브라우저에서도 페이지 스크롤을 따라 폼의 하단 버튼에 접근 가능하도록 문서 좌표에 고정.
+    back.style.cssText = `position:absolute;top:${r.top + window.scrollY}px;left:${r.left + window.scrollX}px;width:${r.width}px;height:${r.height}px;z-index:${zIndex};`;
     document.body.appendChild(back);
     return back;
   }
@@ -228,13 +229,15 @@
     return ["product", "assetNo", "totalQty", "expiry", "serial", "imei", "manufactured", "purchaseDate", "purchasePrice", "note"]
       .some(key => String(draft[key] || "").trim()) || draft.photos.length > 0 || draft.labels.length > 0;
   }
-  function confirmAddExit(onLeave) {
+  function confirmAddExit(onLeave, editing = false) {
+    const title = editing ? "수정을 중단하시겠습니까?" : "작성을 중단하시겠습니까?";
+    const body = editing ? "수정을 중단할 경우 변경된 내용은 저장되지 않습니다." : "지금까지 작성한 내용은 저장되지 않습니다.";
     const cb = document.createElement("div");
     cb.className = "modal-back";
     cb.style.zIndex = 340;
-    cb.innerHTML = `<div class="modal sm" style="width:340px" role="dialog" aria-modal="true" aria-label="작성을 중단하시겠습니까?">
-      <h3>작성을 중단하시겠습니까?</h3>
-      <div class="body" style="font-size:14px">지금까지 작성한 내용은 저장되지 않습니다.</div>
+    cb.innerHTML = `<div class="modal sm" style="width:340px" role="dialog" aria-modal="true" aria-label="${title}">
+      <h3>${title}</h3>
+      <div class="body" style="font-size:14px">${body}</div>
       <div class="foot"><button type="button" class="btn" data-add-stay>취소</button><button type="button" class="btn primary" data-add-leave>확인</button></div></div>`;
     document.body.appendChild(cb);
     cb.querySelector("[data-add-stay]").onclick = () => cb.remove();
@@ -271,9 +274,14 @@
     const cat = addCategory(draft);
     if (!cat || !catViewPermission(cat) || !draft.product.trim()) return false;
     if (!(cat.hiddenFields || []).includes("expiry") && parseAddExpiry(draft.expiry) === null) return false;
+    if (draft.editingId) {
+      const asset = assets.find(a => a.id === draft.editingId);
+      if (!asset || !hasAssetManagePermission() || asset.status === "disposed" || asset.type !== cat.type) return false;
+      if (cat.type === "quantity" && Number(draft.totalQty) < (asset.stocks || []).reduce((sum,x) => sum + x.qty,0)) return false;
+    }
     if (cat.type === "quantity") return /^[1-9][0-9]*$/.test(draft.totalQty);
     const assetNo = draft.assetNo.trim();
-    return !!assetNo && !assets.some(a => a.assetNo === assetNo);
+    return !!assetNo && !assets.some(a => a.id !== draft.editingId && a.assetNo === assetNo);
   }
   function addInputHtml(label, key, draft, options) {
     const opts = options || {};
@@ -310,14 +318,14 @@
     const cat = addCategory(draft);
     const hidden = cat ? (cat.hiddenFields || []) : [];
     const categoryLabel = cat ? `${cat.group} › ${cat.sub}` : "선택";
-    const photoTiles = draft.photos.map((color, i) => `<div class="mapp-add-photo-tile${i === draft.primaryPhoto ? " primary" : ""}" style="background:${color}">
+    const photoTiles = draft.photos.map((photo, i) => `<div class="mapp-add-photo-tile${i === draft.primaryPhoto ? " primary" : ""}" style="background:${photo.color}">
       <button type="button" data-add-photo-primary="${i}" aria-label="사진 ${i + 1}${i === draft.primaryPhoto ? " 대표" : ""}">${i === draft.primaryPhoto ? "★" : ""}</button>
       <button type="button" class="mapp-add-photo-delete" data-add-photo-delete="${i}" aria-label="사진 삭제">×</button>
     </div>`).join("");
     return `
       <div class="mapp-topbar mapp-add-topbar">
         <button type="button" class="mapp-back" data-mapp-back aria-label="뒤로">←</button>
-        <span class="mapp-topbar-title">자산 추가</span>
+        <span class="mapp-topbar-title">${draft.editingId ? "자산 수정" : "자산 추가"}</span>
       </div>
       <div class="mapp-add-body">
         <div class="mapp-add-field"><label>분류 <span class="req">*</span></label>
@@ -326,7 +334,7 @@
         ${addProductFieldHtml(draft)}
         ${cat ? `
           <div class="mapp-add-field"><label>사진</label><div class="mapp-add-photos">${photoTiles}${draft.photos.length < 10 ? '<button type="button" class="mapp-add-photo-plus" data-add-photo aria-label="사진 추가">+</button>' : ""}</div></div>
-          ${cat.type === "individual" ? addInputHtml("고유관리번호", "assetNo", draft, { required: true, maxlength: 30, error: "동일한 고유관리번호가 존재합니다." }) : addInputHtml("총 수량", "totalQty", draft, { required: true, inputmode: "numeric", maxlength: 6 })}
+          ${cat.type === "individual" ? addInputHtml("고유관리번호", "assetNo", draft, { required: true, maxlength: 30, error: "동일한 고유관리번호가 존재합니다." }) : addInputHtml("총 수량", "totalQty", draft, { required: true, inputmode: "numeric", maxlength: 6 })}${draft.editingId && cat.type === "quantity" ? '<p class="field-err" data-edit-qty-error hidden>배분 수량보다 적게 입력할 수 없습니다.</p>' : ""}
           ${!hidden.includes("expiry") ? addExpiryFieldHtml(draft) : ""}
           <div class="mapp-add-field"><div class="mapp-add-field-label"><label>태그</label><button type="button" data-add-tag-manage>태그 관리</button></div><p class="hint mapp-add-tag-hint">최대 5개까지 선택할 수 있습니다.</p>
             <div class="mapp-add-tag-picker"><div class="tag-input-wrap"><div class="tag-chips" data-add-tag-chips>${addTagChipsHtml(draft.labels)}</div><input type="text" data-add-tag-search placeholder="${draft.labels.length ? "" : "검색"}" autocomplete="off"${draft.labels.length >= 5 ? " disabled" : ""}></div><div class="mapp-add-suggest" data-add-tag-menu hidden></div></div></div>
@@ -337,11 +345,11 @@
           ${!hidden.includes("purchasePrice") ? addInputHtml("구매가격", "purchasePrice", draft, { inputmode: "numeric", maxlength: 15 }) : ""}
           ${addInputHtml("메모", "note", draft, { textarea: true, maxlength: 500 })}` : ""}
       </div>
-      <div class="mapp-add-foot"><button type="button" class="btn primary" data-add-save${addDraftValid(draft) ? "" : " disabled"}>저장</button></div>`;
+      <div class="mapp-add-foot"><button type="button" class="btn primary" data-add-save${addDraftValid(draft) && editDirty(draft) ? "" : " disabled"}>저장</button></div>`;
   }
-  function assetAddCategoryScreenHtml() {
+  function assetAddCategoryScreenHtml(draft) {
     // 자산 관리 권한은 분류·자산 CRUD 범위를 부여하므로 대시보드 등록 화면처럼 전체 소분류를 선택지로 제공한다.
-    const categories = window.DATA.categories.filter(catViewPermission);
+    const categories = window.DATA.categories.filter(cat => catViewPermission(cat) && (!draft.editingId || cat.type === assets.find(a => a.id === draft.editingId).type));
     const groups = [];
     categories.forEach(cat => {
       let group = groups.find(g => g.name === cat.group);
@@ -486,16 +494,1010 @@
       ${addFabHtml()}`;
   }
 
+
+  // 구조설계안 4.1/4.3: 관리권한자는 전체 변경 가능. 조회 권한과 변경 권한은 별도로 판정한다.
+  function canManage(a) {
+    if (!a || a.status === "disposed" || !hasViewPermission(a)) return false;
+    if (hasAssetManagePermission()) return true;
+    const cat = window.DATA.categories.find(c => c.group === a.group && c.sub === a.sub);
+    switch (cat && cat.assign) {
+      case "회사의 모든 구성원": case "모든 관리자 및 리더": return true;
+      case "특정 관리자/리더": return (cat.assignTarget && cat.assignTarget.members || []).includes(ME);
+      case "특정 그룹 및 직무/직급": return (cat.assignTarget && cat.assignTarget.groups || []).includes(MEMBER_TEAM[ME]);
+      default: return false;
+    }
+  }
+  function derivedActiveStatus(a) { return (a.assignments || []).length ? "assigned" : "stock"; }
+  function derivedHeldStatus(a) { return (a.stocks || []).reduce((sum, x) => sum + x.qty, 0) > 0 ? "held" : "stock"; }
+  function categoryPath(a) { return `${esc(a.group)} › ${esc(a.sub)}`; }
+  function editDraftFor(a) {
+    return { ...emptyAddDraft({ group: a.group, sub: a.sub }), editingId: a.id, product: a.product,
+      assetNo: a.assetNo || "", totalQty: a.totalQty == null ? "" : String(a.totalQty),
+      photos: window.assetPhotos(a).map(p => ({ ...p })), primaryPhoto: a._primary || 0,
+      expiry: (a.expiry || "").replaceAll("-", "."), labels: [...(a.labels || [])], serial: a.serial || "", imei: a.imei || "",
+      manufactured: (a.manufactured || "").slice(0, 7), purchaseDate: (a.purchaseDate || "").slice(0, 7),
+      purchasePrice: a.price == null ? "" : formatAddPrice(String(a.price)), note: a.note || "" };
+  }
+  function draftSnapshot(draft) {
+    return JSON.stringify({ category: draft.category, product: draft.product.trim(), assetNo: draft.assetNo.trim(),
+      totalQty: Number(draft.totalQty), photos: draft.photos, primaryPhoto: draft.primaryPhoto, expiry: parseAddExpiry(draft.expiry) ?? draft.expiry.trim(),
+      labels: [...draft.labels].sort(), serial: draft.serial.trim(), imei: draft.imei.trim(), manufactured: draft.manufactured,
+      purchaseDate: draft.purchaseDate, purchasePrice: draft.purchasePrice.replace(/[^0-9]/g, ""), note: draft.note.trim() });
+  }
+  function editDirty(draft) {
+    return !draft.editingId || draftSnapshot(draft) !== draftSnapshot(editDraftFor(assets.find(a => a.id === draft.editingId)));
+  }
+  function applyAssetEdit(a, draft) {
+    activityLog(a);
+    const cat = addCategory(draft);
+    const set = (key, value, script, format = v => v || "") => {
+      if ((a[key] ?? "") === (value ?? "")) return;
+      logActivity(a, { script: `자산 정보 수정: ${script}`, before: format(a[key]), after: format(value) });
+      a[key] = value;
+    };
+    if (a.group !== cat.group || a.sub !== cat.sub) {
+      logActivity(a, { script: "자산 정보 수정: 소분류 이동", before: `${a.group} › ${a.sub}`, after: `${cat.group} › ${cat.sub}` });
+      a.group = cat.group; a.sub = cat.sub;
+    }
+    set("product", draft.product.trim(), "품목명 수정");
+    if (a.type === "individual") {
+      set("assetNo", draft.assetNo.trim(), "고유관리번호 수정");
+      set("serial", draft.serial.trim() || undefined, "S/N 수정"); set("imei", draft.imei.trim() || undefined, "IMEI 수정");
+    } else set("totalQty", Number(draft.totalQty), "총 수량 변경", v => `${v}개`);
+    if (JSON.stringify(a.labels || []) !== JSON.stringify(draft.labels)) {
+      logActivity(a, { script: "자산 정보 수정: 태그 수정", before: (a.labels || []).join(", "), after: draft.labels.join(", ") });
+      a.labels = [...draft.labels];
+    }
+    const expiry = parseAddExpiry(draft.expiry);
+    if (expiry !== null) set("expiry", expiry || undefined, "유효기한 변경", v => v ? window.fmtDate(v) : "");
+    for (const [key, script] of [["manufactured", "제조연월 변경"], ["purchaseDate", "구매연월 변경"]]) {
+      if ((a[key] || "").slice(0, 7) !== draft[key]) set(key, draft[key] ? `${draft[key]}-01` : undefined, script, v => v ? window.fmtMonth(v) : "");
+    }
+    set("price", draft.purchasePrice ? Number(draft.purchasePrice.replace(/[^0-9]/g, "")) : undefined, "구매가격 변경", v => v == null ? "" : window.formatPrice(v));
+    set("note", draft.note.trim() || undefined, "메모 수정");
+    a._photos = draft.photos.map(p => ({ ...p })); a._primary = draft.primaryPhoto;
+    a.photo = draft.photos[draft.primaryPhoto]?.color || null; a.photoCount = draft.photos.length;
+  }
+
+  const WS_CODE = { "강남점": "GN-01", "판교점": "PG-01", "본사": "HQ-01", "역삼점": "YS-01" };
+  const WS_ADDRESS = {
+    "강남점": "서울특별시 강남구 테헤란로 129",
+    "판교점": "경기도 성남시 분당구 판교역로 235",
+    "본사": "서울특별시 중구 을지로 100",
+    "역삼점": "서울특별시 강남구 역삼로 180",
+  };
+  // 구성원마다 고정 근무지 1개 + 담당 근무지 여러 개(최대 100개, 프로토타입은 데모용으로 소수만) — 이 매핑
+  // 자체가 구조설계안에 없던 새 더미 데이터라 이 파일에만 정의(자산관리 기능이 아니라 근무지 기능 소관이라
+  // 실 서비스엔 이미 구성원마다 저장돼 있는 값을 여기선 데모용으로 시드)
+  const MY_WORKSITES = {
+    // 역삼점은 조회 가능한 자산이 하나도 없는 근무지 빈 상태 테스트용(2026-09-30) — 이 근무지의 유일한
+    // 자산(A026)이 조회 권한 "모든 관리자 및 리더"인 모니터라 전 구성원 기준 항상 필터링됨
+    "김민수": { fixed: "본사", assigned: ["강남점", "판교점", "역삼점"] },
+    "정우성": { fixed: "강남점", assigned: ["본사"] },
+  };
+  function myWorksites(name) {
+    return MY_WORKSITES[name] || { fixed: "본사", assigned: [] };
+  }
+  // detail.js의 MEMBERS와 동일 값(전사 인원 12명, 프로토타입 데모용 — 이 파일도 자기 완결적이라 중복 유지).
+  // 배정 대상 선택 피커(검색: 이름/사번/휴대폰번호)와 배정/보유 변경 권한 판정("특정 그룹 및 직무/직급" 팀
+  // 매칭)에 씀. 직무/직급은 구성원별 데이터가 프로토타입에 없어 권한 매칭 대상에서 제외.
+  const MEMBERS = [
+    { name: "김민수", team: "개발팀", empNo: "2021001", phone: "010-2001-1234" },
+    { name: "이서연", team: "디자인팀", empNo: "2021015", phone: "010-3412-5678" },
+    { name: "박지훈", team: "영업팀", empNo: "2020032", phone: "010-8823-9910" },
+    { name: "정우성", team: "CS팀", empNo: "2022041", phone: "010-5567-2231" },
+    { name: "김철수", team: "운영팀", empNo: "2019008", phone: "010-9012-4456" },
+    { name: "최유진", team: "개발팀", empNo: "2023019", phone: "010-6634-8821" },
+    { name: "한소희", team: "디자인팀", empNo: "2022055", phone: "010-4478-2093" },
+    { name: "장민호", team: "국내영업", empNo: "2020018", phone: "010-2345-6712" },
+    { name: "오세훈", team: "운영팀", empNo: "2018014", phone: "010-7712-3345" },
+    { name: "배수지", team: "CS팀", empNo: "2021028", phone: "010-3356-7789" },
+    { name: "윤재현", team: "해외영업", empNo: "2019033", phone: "010-4467-8890" },
+    { name: "임하늘", team: "개발팀", empNo: "2022009", phone: "010-5578-9901" },
+  ];
+
+  const IC_EDIT = `<svg viewBox="0 0 24 24"><path d="M4 20l1-4L16 5l3 3L8 19l-4 1z"/><path d="M13.5 6.5l4 4"/></svg>`;
+  // 배정 추가·재배정·보유 대상 추가 페이지와 이력 페이지가 쓰는 대시보드(detail.js) 공용 요소 — 아이콘·아바타·
+  // 배정 카드(assignIdentity/typeBadge). 그룹(부서) 표기는 detail.js의 EMP_GROUP(8명만) 대신 MEMBER_TEAM(12명 전부) 사용
+  const IC_EMP = `<svg class="hi" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5.5 20c0-4 3-6.5 6.5-6.5s6.5 2.5 6.5 6.5"/></svg>`;
+  const IC_WS = `<svg class="hi" viewBox="0 0 24 24"><path d="M4 20V9.5L12 4l8 5.5V20"/><path d="M9.5 20v-5h5v5"/></svg>`;
+  const INFO_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 8v.01"/></svg>`;
+  const CLOSE_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg>`;
+  const AVATAR_COLORS = ["#5b8def", "#8f6ef0", "#eb7f8b", "#3fb37f", "#e0a63c", "#4dabf7"];
+  function avatarColor(name) {
+    let h = 0;
+    for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) % 997;
+    return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length];
+  }
+  function assignIdentity(x) {
+    if (x.employee) {
+      return `<span class="acard-avatar" style="background:${avatarColor(x.employee)}">${x.employee[0]}</span>
+        <div><div class="acard-name">${x.employee}</div><div class="acard-sub">${MEMBER_TEAM[x.employee] || '<span class="muted">—</span>'}</div></div>`;
+    }
+    return `<span class="acard-avatar ws"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 20V9.5L12 4l8 5.5V20"/><path d="M9.5 20v-5h5v5"/></svg></span>
+      <div><div class="acard-name">${x.worksite}</div><div class="acard-sub">${WS_CODE[x.worksite] || '<span class="muted">—</span>'}</div></div>`;
+  }
+  const typeBadge = x => `<span class="acard-type" title="${x.employee ? "구성원" : "근무지"}">${x.employee ? IC_EMP : IC_WS}</span>`;
+
+  function expiryBadge(d) {
+    if (!d) return '<span class="muted">—</span>';
+    const days = Math.ceil((new Date(d) - TODAY) / 86400000);
+    const [t, c] = days < 0 ? ["만료", "exp-over"] : days <= 7 ? ["만료 예정", "exp-soon"] : ["유효", "exp-valid"];
+    return `${window.fmtDate(d)} <span class="badge ${c}">${t}</span>`;
+  }
+  // "나" 페르소나 — 구성원 상세와 동일하게 더미 중 한 명을 기본값으로(?me= 쿼리로 다른 사람도 테스트 가능)
+
+  function confirmModal(title, body, onOk, danger) {
+    const cb = document.createElement("div");
+    cb.className = "modal-back";
+    cb.style.zIndex = 340;
+    cb.innerHTML = `
+      <div class="modal" style="width:360px">
+        <div class="body" style="padding-top:20px">
+          <p style="font-size:14px;font-weight:700;margin-bottom:6px">${title}</p>
+          ${body ? `<p class="hint" style="margin-top:0">${body}</p>` : ""}
+        </div>
+        <div class="foot">
+          <button class="btn" data-cclose>취소</button>
+          <button class="btn ${danger ? "danger" : "primary"}" data-cok>확인</button>
+        </div>
+      </div>`;
+    cb.addEventListener("click", e => { if (e.target === cb) cb.remove(); });
+    cb.querySelector("[data-cclose]").onclick = () => cb.remove();
+    cb.querySelector("[data-cok]").onclick = () => { cb.remove(); onOk(); };
+    document.body.appendChild(cb);
+  }
+  function openStatusChangeConfirm(a, title, body, apply, onDone, danger) {
+    confirmModal(title, body, () => { apply(); toast("상태가 변경되었습니다."); onDone(); }, danger);
+  }
+  // 폐기 처리 — 대시보드 detail.js의 openDisposeModal과 동일(되돌릴 수 없는 최종 상태라 자산 삭제와 같은
+  // DELETE 입력 확인 패턴). 문구·필드 구성 전부 대시보드와 통일(2026-09-28)
+  const WARN_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 9v4M12 16.5h.01M10.3 3.9 2.5 17.5a1.7 1.7 0 0 0 1.47 2.55h16.06a1.7 1.7 0 0 0 1.47-2.55L13.7 3.9a1.7 1.7 0 0 0-2.94 0z"/></svg>`;
+  function openDisposeConfirmModal(a, onDone) {
+    const cb = document.createElement("div");
+    cb.className = "modal-back";
+    cb.style.zIndex = 340;
+    cb.innerHTML = `
+      <div class="modal" style="width:380px">
+        <h3>폐기 처리하시겠습니까?</h3>
+        <div class="body">
+          <div class="danger-note">${WARN_ICON}<span>폐기 처리하면 되돌릴 수 없습니다. 기존 배정은 자동으로 종료되며, 이후 배정 추가·자산 수정이 제한됩니다.</span></div>
+          <div class="field" style="margin-top:14px;margin-bottom:0">
+            <input type="text" data-del-input placeholder="입력">
+          </div>
+          <p class="muted" style="margin-top:6px">박스에 DELETE를 입력하면 [확인] 버튼이 활성화됩니다.</p>
+        </div>
+        <div class="foot">
+          <button class="btn" data-cclose>취소</button>
+          <button class="btn danger" data-cok disabled>확인</button>
+        </div>
+      </div>`;
+    cb.addEventListener("click", e => { if (e.target === cb) cb.remove(); });
+    cb.querySelector("[data-cclose]").onclick = () => cb.remove();
+    const input = cb.querySelector("[data-del-input]");
+    const okBtn = cb.querySelector("[data-cok]");
+    const confirmed = () => input.value.trim().toUpperCase() === "DELETE";
+    input.addEventListener("input", () => { okBtn.disabled = !confirmed(); });
+    okBtn.onclick = () => {
+      if (!confirmed()) return;
+      const before = STATUS_LABEL[a.status][0];
+      a.status = "disposed";
+      a.assignments = [];
+      logActivity(a, { script: "상태 변경: 폐기 처리", before, after: STATUS_LABEL[a.status][0] });
+      cb.remove();
+      toast("폐기 처리되었습니다.");
+      onDone();
+    };
+    document.body.appendChild(cb);
+    input.focus();
+  }
+  // ===== 활동 로그(이력) — detail.js와 동일한 스키마·로직(구조설계안 5.5) =====
+  // 엔트리: { d(수정한 일시), script("그룹: 세부"), target?(구성원/근무지 레코드), before?/after?, who(수정한 사람) }.
+  // 초기 베이스라인은 자산의 현재 상태로부터 세션당 한 번만 만들어지고(asset-detail 첫 렌더에서 시드 — 조작 전 상태가
+  // 정확히 남도록), 이후 앱에서 수행하는 배정·보유·상태 변경·메모 수정은 여기 append(수정한 사람은 ME)
+  function activityOf(a) {
+    const ev = [{ d: `${a.createdAt || a.purchaseDate || "2024-01-01"} 09:00`, script: "자산 등록", who: "dana" }];
+    (a.assignments || []).forEach(x => ev.push({
+      d: `${x.since} 09:00`, script: "배정 관리: 신규 배정", target: { ...x }, before: "", after: window.fmtDate(x.since), who: "dana",
+    }));
+    (a.stocks || []).forEach(x => ev.push({
+      d: `${a.purchaseDate || "2025-01-01"} 09:00`, script: "보유 관리: 보유 대상 추가", target: { ...x }, before: "", after: `${x.qty}개`, who: "dana",
+    }));
+    if (a.status === "repair") ev.push({ d: "2026-08-14 09:00", script: "상태 변경: 수리 접수", before: "배정 중", after: "수리 중", who: "dana" });
+    if (a.status === "lost") ev.push({ d: "2026-07-21 09:00", script: "상태 변경: 분실 신고", before: "배정 중", after: "분실", who: "정우성" });
+    if (a.status === "disposed") ev.push({ d: "2025-12-30 09:00", script: "상태 변경: 폐기 처리", before: "배정 중", after: "폐기", who: "dana" });
+    if (a.note) ev.push({ d: "2026-06-02 09:00", script: "자산 정보 수정: 메모 수정", before: "", after: a.note, who: "dana" });
+    return ev.sort((x, y) => (x.d < y.d ? 1 : -1));
+  }
+  function activityLog(a) {
+    if (!a._activityLog) a._activityLog = activityOf(a);
+    return a._activityLog;
+  }
+  // 실제 조작 시각 — 날짜는 고정 데모 날짜(TODAY), 시:분만 실제 클릭 시각(detail.js nowStr와 동일)
+  function nowStr() {
+    const p = n => String(n).padStart(2, "0");
+    const real = new Date();
+    return `${todayStr()} ${p(real.getHours())}:${p(real.getMinutes())}`;
+  }
+  function logActivity(a, entry) {
+    activityLog(a).unshift({ d: nowStr(), who: ME, ...entry, ...(entry.target ? { target: { ...entry.target } } : {}) });
+  }
+  // 이력 카드 1건 — 대상 이름은 기존/변경 값에 포함, 값이 "없음"인 쪽엔 대상 이름을 안 붙임(detail.js historyCardHtml과 동일)
+  function historyCardHtml(e) {
+    const val = v => esc(v || "없음");
+    const targetName = e.target ? (e.target.employee || e.target.worksite) : null;
+    const targetMark = e.target
+      ? (e.target.employee
+          ? `<span class="hval-avatar" style="background:${avatarColor(e.target.employee)}">${e.target.employee[0]}</span>`
+          : IC_WS)
+      : "";
+    const withTarget = v => (targetName && v) ? `${targetMark}${esc(targetName)} · ${val(v)}` : val(v);
+    return `
+      <div class="hcard">
+        <div class="hcard-head">
+          <span class="hcard-time">${window.fmtDateTime(e.d)}</span>
+          <span class="hcard-avatar" style="background:${avatarColor(e.who)}">${e.who[0]}</span>
+          <span class="hcard-who">${e.who}</span>
+        </div>
+        <div class="hcard-script">${esc(e.script)}</div>
+        ${"before" in e ? `
+          <div class="hcard-diff">
+            <div class="hcard-row"><span class="hcard-tag old">기존</span><span class="hcard-val">${withTarget(e.before)}</span></div>
+            <div class="hcard-row"><span class="hcard-tag new">변경</span><span class="hcard-val">${withTarget(e.after)}</span></div>
+          </div>` : ""}
+      </div>`;
+  }
+  // query가 있으면 수정 대상(구성원/근무지) 이름으로 필터 — 수량형 이력 전용(개별형은 검색 없음)
+  function timelineHtml(a, query) {
+    const q = (query || "").trim().toLowerCase();
+    const entries = activityLog(a).filter(e => {
+      if (!q) return true;
+      const name = e.target ? (e.target.employee || e.target.worksite || "") : "";
+      return name.toLowerCase().includes(q);
+    });
+    if (!entries.length) return '<p class="muted" style="padding:6px 0">일치하는 이력이 없습니다</p>';
+    return `<div class="dtimeline">${entries.map(historyCardHtml).join("")}</div>`;
+  }
+  // 이력 페이지 — 더보기 메뉴 "이력 보기"의 목적지. 대시보드 이력 탭과 동일한 구성(카드 목록, 수량형은 구성원·
+  // 근무지 이름 검색 추가). 조회 전용이라 배정/보유 변경 권한과 무관하게 항상 열림
+  function historyScreenHtml(a) {
+    return `
+      <div class="mapp-topbar">
+        <button type="button" class="mapp-back" data-mapp-back aria-label="뒤로">←</button>
+        <span class="mapp-topbar-title">자산 이력</span>
+      </div>
+      <div class="mapp-body">
+        ${a.type === "quantity" ? `<div class="mapp-search"><input type="text" data-history-q placeholder="구성원·근무지 이름으로 검색"></div>` : ""}
+        <div data-history-list>${timelineHtml(a, "")}</div>
+      </div>`;
+  }
+
+  // 전체 화면 오버레이 공용 헬퍼(폼 페이지·대상 선택 페이지·바텀시트 전부) — 폰 목업(.mapp-phone) 자체를
+  // 다시 그리는 draw()와 무관하게 독립적으로 떠 있어야 해서(그래야 타이핑·피커 조작 중 실수로 draw()가
+  // 불려도 안 날아감) body에 별도로 붙이되, 매번 폰 화면 영역(.mapp-screen)의 실제 좌표를 재서 그 자리에
+  // 고정 — 그래야 상태바+베젤이 그대로 보이는 채로 "폰 안의 화면"만 바뀐 것처럼 보임(2026-09-29, 뷰포트
+  // 전체를 덮어 폰 목업 자체가 사라져 보이던 문제 수정, 이어서 바텀시트도 같은 문제라 공용화)
+
+  function openMemberPickerPage(initial, onApply, exclude) {
+    let query = "";
+    const excludeNames = [].concat(exclude || []).filter(Boolean);
+    const p = mappOverlay("mapp-fullpage-back", 105);
+    p.innerHTML = `
+      <div class="mapp-fullpage-head">
+        <span class="mapp-fullpage-head-title">구성원</span>
+        <button type="button" class="mapp-fullpage-head-close" data-picker-close aria-label="닫기">${CLOSE_ICON}</button>
+      </div>
+      <div class="mapp-fullpage-body">
+        <input type="text" class="picker-search" placeholder="이름/사번/휴대폰번호">
+        <div data-list></div>
+      </div>`;
+    const list = p.querySelector("[data-list]");
+    function renderList() {
+      const q = query.trim().toLowerCase();
+      const filtered = MEMBERS.filter(m => !excludeNames.includes(m.name) && (!q || m.name.includes(q) || m.empNo.includes(q) || m.phone.includes(q)));
+      list.innerHTML = filtered.length ? filtered.map(m => `
+        <button type="button" class="picker-member-row" data-pick="${m.name}">
+          <span class="picker-avatar" style="background:${avatarColor(m.name)}">${m.name[0]}</span>
+          <span class="picker-member-info"><b>${m.name}</b><span>${m.team}</span></span>
+        </button>`).join("") : `<p class="muted" style="padding:16px 4px">결과가 없습니다.</p>`;
+      list.querySelectorAll("[data-pick]").forEach(b => b.onclick = () => { p.remove(); onApply(b.dataset.pick); });
+    }
+    p.querySelector(".picker-search").addEventListener("input", e => { query = e.target.value; renderList(); });
+    renderList();
+    p.addEventListener("click", e => { if (e.target === p) p.remove(); });
+    p.querySelector("[data-picker-close]").onclick = () => p.remove();
+  }
+  function openWorksitePickerPage(initial, onApply, exclude) {
+    let query = "";
+    const excludeNames = [].concat(exclude || []).filter(Boolean);
+    const p = mappOverlay("mapp-fullpage-back", 105);
+    p.innerHTML = `
+      <div class="mapp-fullpage-head">
+        <span class="mapp-fullpage-head-title">근무지</span>
+        <button type="button" class="mapp-fullpage-head-close" data-picker-close aria-label="닫기">${CLOSE_ICON}</button>
+      </div>
+      <div class="mapp-fullpage-body">
+        <input type="text" class="picker-search" placeholder="근무지명/코드/주소">
+        <div data-list></div>
+      </div>`;
+    const list = p.querySelector("[data-list]");
+    const fixedName = myWorksites(ME).fixed;
+    function rowHtml(name) {
+      const code = WS_CODE[name] ? `(${WS_CODE[name]})` : "";
+      return `
+        <button type="button" class="mapp-picker-ws-row" data-pick="${name}">
+          <div class="mapp-picker-ws-name">${name}${code}</div>
+          <div class="mapp-picker-ws-address">${WS_ADDRESS[name] || ""}</div>
+        </button>`;
+    }
+    function renderList() {
+      const q = query.trim().toLowerCase();
+      const matches = name => !q || name.toLowerCase().includes(q) || (WS_CODE[name] || "").toLowerCase().includes(q) || (WS_ADDRESS[name] || "").toLowerCase().includes(q);
+      const rest = Object.keys(WS_CODE)
+        .filter(name => name !== fixedName && !excludeNames.includes(name) && matches(name))
+        .sort((x, y) => x.localeCompare(y, "ko"));
+      const showFixed = fixedName && !excludeNames.includes(fixedName) && matches(fixedName);
+      list.innerHTML = (showFixed || rest.length)
+        ? (showFixed ? `<div class="mapp-picker-section"><span class="mapp-picker-dot"></span>내 고정 근무지</div>${rowHtml(fixedName)}` : "") + rest.map(rowHtml).join("")
+        : `<p class="muted" style="padding:16px 4px">결과가 없습니다.</p>`;
+      list.querySelectorAll("[data-pick]").forEach(b => b.onclick = () => { p.remove(); onApply(b.dataset.pick); });
+    }
+    p.querySelector(".picker-search").addEventListener("input", e => { query = e.target.value; renderList(); });
+    renderList();
+    p.addEventListener("click", e => { if (e.target === p) p.remove(); });
+    p.querySelector("[data-picker-close]").onclick = () => p.remove();
+  }
+  // 날짜 선택 — 바텀시트 캘린더(2026-09-29, 텍스트 입력 필드에서 전환 — 구성원/근무지처럼 "선택"으로 제공).
+  // 월 이동(‹/›)·오늘로 이동, 선택한 날짜는 파란 원 + 아래 텍스트로 표시. maxIso 초과 날짜는 비활성
+  function openDateSheet(initialIso, maxIso, onApply) {
+    const [by, bm] = (initialIso || maxIso).split("-").map(Number);
+    let viewY = by, viewM = bm - 1;
+    let selected = initialIso || maxIso;
+    const back = mappOverlay("mapp-sheet-back", 110);
+    back.innerHTML = `
+      <div class="mapp-sheet">
+        <div class="mapp-sheet-body" data-cal-body style="padding-top:16px"></div>
+        <div class="mapp-sheet-foot">
+          <button type="button" class="btn" data-cal-cancel>취소</button>
+          <button type="button" class="btn primary" data-cal-ok>확인</button>
+        </div>
+      </div>`;
+    const body = back.querySelector("[data-cal-body]");
+    const okBtn = back.querySelector("[data-cal-ok]");
+    const WD = ["일", "월", "화", "수", "목", "금", "토"];
+    const pad = n => String(n).padStart(2, "0");
+    const isoOf = (y, m, d) => `${y}-${pad(m + 1)}-${pad(d)}`;
+    function drawCal() {
+      const startDow = new Date(viewY, viewM, 1).getDay();
+      const daysInMonth = new Date(viewY, viewM + 1, 0).getDate();
+      const cells = Array(startDow).fill(null).concat(Array.from({ length: daysInMonth }, (_, i) => i + 1));
+      const rows = [];
+      for (let i = 0; i < cells.length; i += 7) rows.push(cells.slice(i, i + 7));
+      body.innerHTML = `
+        <div class="mapp-cal-head">
+          <button type="button" data-cal-prev aria-label="이전 달">‹</button>
+          <span class="mapp-cal-ym">${viewY}.${pad(viewM + 1)}</span>
+          <button type="button" data-cal-next aria-label="다음 달">›</button>
+          <button type="button" class="mapp-cal-today" data-cal-today>오늘</button>
+        </div>
+        <div class="mapp-cal-wd">${WD.map(w => `<span>${w}</span>`).join("")}</div>
+        <div class="mapp-cal-grid">${rows.map(row => row.map(d => {
+          if (d === null) return `<span class="mapp-cal-cell empty"></span>`;
+          const iso = isoOf(viewY, viewM, d);
+          const cls = ["mapp-cal-cell"];
+          if (iso === selected) cls.push("sel");
+          else if (iso === todayStr()) cls.push("today");
+          return `<button type="button" class="${cls.join(" ")}" data-cal-day="${iso}"${iso > maxIso ? " disabled" : ""}>${d}</button>`;
+        }).join("")).join("")}</div>
+        <div class="mapp-cal-sel">${selected ? window.fmtDate(selected) : ""}</div>`;
+      body.querySelector("[data-cal-prev]").onclick = () => { viewM--; if (viewM < 0) { viewM = 11; viewY--; } drawCal(); };
+      body.querySelector("[data-cal-next]").onclick = () => { viewM++; if (viewM > 11) { viewM = 0; viewY++; } drawCal(); };
+      body.querySelector("[data-cal-today]").onclick = () => {
+        const [ty, tm] = todayStr().split("-").map(Number);
+        viewY = ty; viewM = tm - 1; selected = todayStr(); drawCal();
+      };
+      body.querySelectorAll("[data-cal-day]").forEach(b => b.onclick = () => { selected = b.dataset.calDay; drawCal(); });
+      okBtn.disabled = !selected;
+    }
+    drawCal();
+    back.addEventListener("click", e => { if (e.target === back) back.remove(); });
+    back.querySelector("[data-cal-cancel]").onclick = () => back.remove();
+    okBtn.onclick = () => { if (!selected) return; back.remove(); onApply(selected); };
+  }
+
+  // ===== 배정 추가·재배정·보유 대상 추가 — 전체 화면 페이지(2026-09-29, 바텀시트였다가 다시 전환 — 대상
+  // 선택 피커가 풀페이지로, 날짜 선택이 캘린더 시트로 커지면서 폼 자체도 페이지인 쪽이 자연스러움). 구성요소·
+  // 문구는 대시보드 모달(detail.js openAssignAddModal/openReassignModal/openHoldAddModal)과 동일: 대상 라디오
+  // (구성원/근무지)+"선택 ›"→피커, 배정일도 같은 "선택 ›" 버튼으로 캘린더 시트를 엶. 저장 시 확인 팝업.
+  // kind로 세 가지를 분기. 재배정은 기존 배정 카드(읽기전용)+안내 문구가 위에 붙고 새 대상 후보에서 현재
+  // 대상을 제외, 보유 대상 추가는 이미 보유 중인 대상 전체를 후보에서 제외(detail.js와 동일 규칙)
+  const FORM_CFG = {
+    "assign-add": { title: "배정 추가", targetLabel: "배정 대상", confirm: "배정을 추가하시겠습니까?" },
+    "reassign": { title: "재배정", targetLabel: "새 배정 대상", confirm: "재배정하시겠습니까?" },
+    "hold-add": { title: "보유 대상 추가", targetLabel: "보유 대상", confirm: "보유 대상을 추가하시겠습니까?" },
+  };
+  function openFormPage(a, target, kind, afterMutate) {
+    const cfg = FORM_CFG[kind];
+    const f = { picked: null, draft: { employee: null, worksite: null }, dateIso: "", qtyText: "" };
+    const old = kind === "reassign" ? a.assignments[target.index] : null;
+    const heldNames = kind === "hold-add" ? (a.stocks || []).map(x => x.employee || x.worksite) : [];
+    const remaining = kind === "hold-add" ? a.totalQty - (a.stocks || []).reduce((s, x) => s + x.qty, 0) : 0;
+
+    const back = mappOverlay("mapp-fullpage-back", 95);
+    back.innerHTML = `
+      <div class="mapp-fullpage-head">
+        <button type="button" class="mapp-back" data-form-back aria-label="뒤로">←</button>
+        <span class="mapp-fullpage-head-title">${cfg.title}</span>
+      </div>
+      <div class="mapp-fullpage-body" data-form-body></div>
+      <div class="mapp-fullpage-foot">
+        <button type="button" class="btn primary" data-form-save disabled>저장</button>
+      </div>`;
+    const body = back.querySelector("[data-form-body]");
+    const saveBtn = back.querySelector("[data-form-save]");
+    const qtyVal = () => { const n = parseInt(f.qtyText, 10); return Number.isFinite(n) ? n : null; };
+    const targetSummaryHtml = k => {
+      const val = f.draft[k];
+      if (!val) return `<button type="button" class="perm-target-btn" data-target-open><span class="muted">선택</span><span class="chev">›</span></button>`;
+      const avatar = k === "employee" ? `<span class="picker-avatar sm" style="background:${avatarColor(val)}">${val[0]}</span>` : "";
+      return `
+        <div class="aa-target-selected" data-target-open>
+          ${avatar}<span class="perm-chip">${val}</span>
+          <button type="button" class="aa-target-x" data-target-clear aria-label="선택 해제">${CLOSE_ICON}</button>
+        </div>`;
+    };
+    const dateSummaryHtml = () => {
+      if (!f.dateIso) return `<button type="button" class="perm-target-btn" data-date-open><span class="muted">선택</span><span class="chev">›</span></button>`;
+      return `
+        <div class="aa-target-selected" data-date-open>
+          <span class="perm-chip">${window.fmtDate(f.dateIso)}</span>
+          <button type="button" class="aa-target-x" data-date-clear aria-label="선택 해제">${CLOSE_ICON}</button>
+        </div>`;
+    };
+    const updateSaveState = () => {
+      const hasTarget = !!(f.picked && f.draft[f.picked]);
+      if (kind === "hold-add") { const v = qtyVal(); saveBtn.disabled = !(hasTarget && v !== null && v >= 1 && v <= remaining); }
+      else saveBtn.disabled = !(hasTarget && f.dateIso);
+    };
+    function drawBody() {
+      body.innerHTML = `
+        ${old ? `
+          <div class="ra-current">
+            <div class="perm-info-note">${INFO_ICON}<span>기존 배정이 새 대상으로 교체됩니다.</span></div>
+            <div class="acard">
+              ${typeBadge(old)}
+              <div class="acard-id">${assignIdentity(old)}</div>
+              <div class="acard-foot"><span class="acard-date">배정일 <b>${window.fmtDate(old.since)}</b></span></div>
+            </div>
+          </div>` : ""}
+        <div class="field">
+          <label>${cfg.targetLabel}</label>
+          <label class="radio-row"><input type="radio" name="form-kind" value="employee"${f.picked === "employee" ? " checked" : ""}><span>구성원</span></label>
+          ${f.picked === "employee" ? `<div class="perm-target-wrap">${targetSummaryHtml("employee")}</div>` : ""}
+          <label class="radio-row"><input type="radio" name="form-kind" value="worksite"${f.picked === "worksite" ? " checked" : ""}><span>근무지</span></label>
+          ${f.picked === "worksite" ? `<div class="perm-target-wrap">${targetSummaryHtml("worksite")}</div>` : ""}
+        </div>
+        ${kind === "hold-add" ? `
+          <div class="field">
+            <label>보유 수량</label>
+            <div class="qty-stepper">
+              <button type="button" class="qty-step" data-qminus aria-label="수량 감소">－</button>
+              <input type="text" inputmode="numeric" data-qinput placeholder="입력" value="">
+              <button type="button" class="qty-step" data-qplus aria-label="수량 증가">＋</button>
+            </div>
+            <div class="acard-sub" style="margin-top:5px">잔여 수량 <b>${remaining}개</b></div>
+          </div>` : `
+          <div class="field">
+            <label>${kind === "reassign" ? "새 배정일" : "배정일"}</label>
+            <div class="mapp-date-wrap">${dateSummaryHtml()}</div>
+          </div>`}`;
+
+      body.querySelectorAll('input[name="form-kind"]').forEach(r => r.onchange = () => { f.picked = r.value; drawBody(); });
+      const openBtn = body.querySelector("[data-target-open]");
+      if (openBtn) openBtn.onclick = () => {
+        const exclude = kind === "reassign" ? (f.picked === "employee" ? old.employee : old.worksite) : kind === "hold-add" ? heldNames : null;
+        if (f.picked === "employee") openMemberPickerPage(f.draft.employee, v => { f.draft.employee = v; drawBody(); }, exclude);
+        else openWorksitePickerPage(f.draft.worksite, v => { f.draft.worksite = v; drawBody(); }, exclude);
+      };
+      const clearBtn = body.querySelector("[data-target-clear]");
+      if (clearBtn) clearBtn.onclick = e => { e.stopPropagation(); f.draft[f.picked] = null; drawBody(); };
+      const dateOpenBtn = body.querySelector("[data-date-open]");
+      if (dateOpenBtn) dateOpenBtn.onclick = () => openDateSheet(f.dateIso, todayStr(), v => { f.dateIso = v; drawBody(); });
+      const dateClearBtn = body.querySelector("[data-date-clear]");
+      if (dateClearBtn) dateClearBtn.onclick = e => { e.stopPropagation(); f.dateIso = ""; drawBody(); };
+
+      if (kind === "hold-add") {
+        const qinput = body.querySelector("[data-qinput]");
+        const minus = body.querySelector("[data-qminus]");
+        const plus = body.querySelector("[data-qplus]");
+        if (f.qtyText) qinput.value = f.qtyText;
+        const syncQty = () => {
+          const v = qtyVal();
+          minus.disabled = v === null || v <= 1;
+          plus.disabled = v !== null && v >= remaining;
+          updateSaveState();
+        };
+        qinput.addEventListener("input", () => { qinput.value = qinput.value.replace(/[^0-9]/g, ""); f.qtyText = qinput.value; syncQty(); });
+        minus.onclick = () => { const v = qtyVal(); if (v !== null && v > 1) { qinput.value = v - 1; f.qtyText = qinput.value; syncQty(); } };
+        plus.onclick = () => { const v = qtyVal() ?? 0; if (v < remaining) { qinput.value = v + 1; f.qtyText = qinput.value; syncQty(); } };
+      }
+      updateSaveState();
+    }
+    drawBody();
+
+    const requestClose = () => {
+      // 기존 재배정 대상(읽기 전용)은 제외하고 새 작성 필드만 확인한다.
+      if (f.picked || Object.values(f.draft).some(Boolean) || f.dateIso || f.qtyText) confirmAddExit(() => back.remove());
+      else back.remove();
+    };
+    back.addEventListener("click", e => { if (e.target === back) requestClose(); });
+    back.querySelector("[data-form-back]").onclick = requestClose;
+    saveBtn.onclick = () => {
+      if (saveBtn.disabled) return;
+      const who = f.draft[f.picked];
+      const mk = extra => f.picked === "employee" ? { employee: who, worksite: null, ...extra } : { employee: null, worksite: who, ...extra };
+      if (kind === "assign-add") {
+        const d = f.dateIso;
+        const record = mk({ since: d });
+        confirmModal(cfg.confirm, "", () => {
+          back.remove();
+          (a.assignments || (a.assignments = [])).push(record);
+          // 재고⟷배정중만 배정/반납으로 자동 파생(수리중·분실·폐기는 배정 여부와 무관하게 별도 관리)
+          if (a.status === "stock") a.status = "assigned";
+          logActivity(a, { script: "배정 관리: 신규 배정", target: record, before: "", after: window.fmtDate(d) });
+          toast("추가되었습니다.");
+          afterMutate();
+        });
+      } else if (kind === "reassign") {
+        const d = f.dateIso;
+        const record = mk({ since: d });
+        confirmModal(cfg.confirm, "", () => {
+          back.remove();
+          // 반납+신규배정이 아니라 기존 활성 레코드의 대상 자체를 그 자리에서 교체(구조설계안 2.3). target을
+          // 특정 한쪽으로 고정할 수 없어 before/after 텍스트로 표현(detail.js와 동일)
+          const idx = target.index;
+          const beforeLabel = `${old.employee || old.worksite} · ${window.fmtDate(old.since)}`;
+          const afterLabel = `${record.employee || record.worksite} · ${window.fmtDate(d)}`;
+          a.assignments[idx] = record;
+          logActivity(a, { script: "배정 관리: 재배정", before: beforeLabel, after: afterLabel });
+          toast("재배정되었습니다.");
+          afterMutate();
+        });
+      } else {
+        const v = qtyVal();
+        const record = mk({ qty: v });
+        confirmModal(cfg.confirm, "", () => {
+          back.remove();
+          (a.stocks || (a.stocks = [])).push(record);
+          a.status = derivedHeldStatus(a);
+          logActivity(a, { script: "보유 관리: 보유 대상 추가", target: record, before: "", after: `${v}개` });
+          toast("추가되었습니다.");
+          afterMutate();
+        });
+      }
+    };
+  }
+  function openReturnConfirm(a, idx, onDone) {
+    confirmModal("반납 처리하시겠습니까?", "반납하면 배정에서 제거됩니다.", () => {
+      const old = a.assignments[idx];
+      a.assignments.splice(idx, 1);
+      if (a.status === "assigned" || a.status === "stock") a.status = derivedActiveStatus(a);
+      logActivity(a, { script: "배정 관리: 반납", target: old, before: window.fmtDate(old.since), after: "" });
+      toast("반납되었습니다.");
+      onDone();
+    });
+  }
+  // 수량 변경 — 보유 대상 추가 페이지와 동일한 스테퍼 UI로 통일(2026-09-30, 직접입력 number 필드에서 전환)
+  function openQtyChangeModal(a, idx, onDone) {
+    const rec = a.stocks[idx];
+    const cur = rec.qty;
+    const others = a.stocks.reduce((s, x, i) => i === idx ? s : s + x.qty, 0);
+    const max = a.totalQty - others;
+    const back = document.createElement("div");
+    back.className = "modal-back";
+    back.innerHTML = `
+      <div class="modal" style="width:340px">
+        <div class="body" style="padding-top:20px">
+          <p style="font-size:14px;font-weight:700;margin-bottom:14px">수량 변경</p>
+          <div class="qty-stepper">
+            <button type="button" class="qty-step" data-qminus aria-label="수량 감소">－</button>
+            <input type="text" inputmode="numeric" data-qinput placeholder="입력" value="${cur}">
+            <button type="button" class="qty-step" data-qplus aria-label="수량 증가">＋</button>
+          </div>
+          <p class="hint" style="margin-top:6px">잔여 수량: ${max}개</p>
+        </div>
+        <div class="foot">
+          <button class="btn" data-cclose>취소</button>
+          <button class="btn primary" data-cok>저장</button>
+        </div>
+      </div>`;
+    document.body.appendChild(back);
+    const input = back.querySelector("[data-qinput]");
+    const minus = back.querySelector("[data-qminus]");
+    const plus = back.querySelector("[data-qplus]");
+    const saveBtn = back.querySelector("[data-cok]");
+    const val = () => { const n = parseInt(input.value, 10); return Number.isFinite(n) ? n : null; };
+    const sync = () => {
+      const v = val();
+      minus.disabled = v === null || v <= 0;
+      plus.disabled = v === null || v >= max;
+      saveBtn.disabled = v === null || v < 0 || v > max || v === cur;
+    };
+    input.addEventListener("input", () => { input.value = input.value.replace(/[^0-9]/g, ""); sync(); });
+    minus.onclick = () => { const v = val(); if (v !== null && v > 0) { input.value = v - 1; sync(); } };
+    plus.onclick = () => { const v = val() ?? 0; if (v < max) { input.value = v + 1; sync(); } };
+    back.addEventListener("click", e => { if (e.target === back) back.remove(); });
+    back.querySelector("[data-cclose]").onclick = () => back.remove();
+    saveBtn.onclick = () => {
+      const qty = val();
+      if (!(qty !== null && qty >= 0 && qty <= max)) return;
+      back.remove();
+      confirmModal("수량을 변경하시겠습니까?", "", () => {
+        rec.qty = qty;
+        a.status = derivedHeldStatus(a);
+        logActivity(a, { script: "보유 관리: 보유 수량 변경", target: rec, before: `${cur}개`, after: `${qty}개` });
+        toast("변경되었습니다.");
+        onDone();
+      });
+    };
+    sync();
+  }
+  function openHoldReleaseConfirm(a, idx, onDone) {
+    confirmModal("보유 대상에서 해제하시겠습니까?", "해제된 수량은 잔여 수량으로 돌아갑니다.", () => {
+      const x = a.stocks[idx];
+      const qty = x.qty;
+      a.stocks.splice(idx, 1);
+      a.status = derivedHeldStatus(a);
+      logActivity(a, { script: "보유 관리: 보유 대상 해제", target: { ...x }, before: `${qty}개`, after: "" });
+      toast("보유 대상에서 해제되었습니다.");
+      onDone();
+    });
+  }
+  // 사진 관리 — asset-register.js의 사진 타일 UI·데이터 형태(window.assetPhotos, a._photos/a._primary)를
+  // 그대로 재사용(같은 CSS 클래스 .areg-photo-*는 전역 css/app.css에 이미 정의돼 있어 추가 CSS 불필요)
+
+  function openPhotoManageModal(a, onDone) {
+    const photos = window.assetPhotos(a).map(p => ({ ...p }));
+    let primaryIdx = a._primary || 0;
+    // 사진 목록·업로드 메타와 대표 사진을 최초 상태와 비교한다. 원복하면 저장도 비활성화한다.
+    const snapshot = () => JSON.stringify({ photos, primaryIdx });
+    const initialSnapshot = snapshot();
+    const back = document.createElement("div");
+    back.className = "modal-back";
+    back.innerHTML = `
+      <div class="modal mapp-photo-modal" style="width:360px">
+        <div class="body" style="padding-top:20px">
+          <p style="font-size:14px;font-weight:700;margin-bottom:14px">자산 사진</p>
+          <div class="areg-photo-row" data-photo-row></div>
+        </div>
+        <div class="foot">
+          <button class="btn" data-cclose>취소</button>
+          <button class="btn primary" data-cok disabled>저장</button>
+        </div>
+      </div>`;
+    document.body.appendChild(back);
+    const row = back.querySelector("[data-photo-row]");
+    const saveBtn = back.querySelector("[data-cok]");
+    const syncSaveState = () => { saveBtn.disabled = snapshot() === initialSnapshot; };
+    function renderPhotos() {
+      syncSaveState();
+      const tiles = photos.map((p, i) => `
+        <button type="button" class="areg-photo-tile${i === primaryIdx ? " primary" : ""}" data-photo-i="${i}" style="background:${p.color}" aria-label="사진 ${i + 1}${i === primaryIdx ? " (대표)" : ""}">
+          ${i === primaryIdx ? '<span class="areg-photo-star">★</span>' : ""}
+          <span class="areg-photo-del" data-photo-del="${i}" aria-label="삭제">${CLOSE_ICON_SM}</span>
+        </button>`).join("");
+      const addTile = photos.length < 10 ? `<button type="button" class="areg-photo-add" data-photo-add aria-label="사진 추가">+</button>` : "";
+      row.innerHTML = tiles + addTile;
+      row.querySelectorAll("[data-photo-i]").forEach(b => b.onclick = e => {
+        if (e.target.closest("[data-photo-del]")) return;
+        const i = +b.dataset.photoI;
+        if (i === primaryIdx) return;
+        primaryIdx = i; renderPhotos();
+      });
+      row.querySelectorAll("[data-photo-del]").forEach(b => b.onclick = e => {
+        e.stopPropagation();
+        const i = +b.dataset.photoDel;
+        photos.splice(i, 1);
+        // 대표 삭제 시 현재 사진 목록에서 가장 앞에 남은 사진을 자동 대표로 지정한다.
+        if (!photos.length || primaryIdx === i) primaryIdx = 0;
+        else if (primaryIdx > i) primaryIdx -= 1;
+        renderPhotos();
+      });
+      const addBtn = row.querySelector("[data-photo-add]");
+      if (addBtn) addBtn.onclick = () => {
+        openDropdownMenu(addBtn, [
+          { key: "camera", label: "카메라로 촬영하기" },
+          { key: "gallery", label: "갤러리에서 불러오기" },
+        ], () => {
+          photos.push({ color: PHOTO_COLORS[photos.length % PHOTO_COLORS.length], at: `${todayStr()} 00:00`, by: ME });
+          if (photos.length === 1) primaryIdx = 0;
+          renderPhotos();
+        });
+      };
+    }
+    renderPhotos();
+    back.addEventListener("click", e => { if (e.target === back) back.remove(); });
+    back.querySelector("[data-cclose]").onclick = () => back.remove();
+    saveBtn.onclick = () => {
+      if (saveBtn.disabled) return;
+      back.remove();
+      a._photos = photos;
+      a._primary = primaryIdx;
+      toast("저장되었습니다.");
+      onDone();
+    };
+  }
+  // 메모 수정 — 바텀시트(2026-09-29, 센터 모달에서 전환). 메모는 길어질 수 있어 센터 모달보다 세로 공간이
+  // 넉넉한 시트가 유리 — 배정 추가/재배정 시트(.mapp-sheet, max-height:80vh)와 같은 컨테이너를 쓰되,
+  // 입력란만 있는 화면이라 텍스트영역에 넉넉한 최소 높이를 직접 줘서 그 시트들과 비슷한 체감 높이로 맞춤
+  function openMemoEditModal(a, onDone) {
+    const before = a.note || "";
+    const back = mappOverlay("mapp-sheet-back", 90);
+    back.innerHTML = `
+      <div class="mapp-sheet">
+        <div class="mapp-sheet-head">메모 수정</div>
+        <div class="mapp-sheet-body" style="display:flex">
+          <textarea data-memo-input maxlength="500" placeholder="입력" style="width:100%;flex:1;min-height:280px;border:1px solid var(--line-strong);border-radius:8px;padding:10px;font:inherit;resize:none">${esc(before)}</textarea>
+        </div>
+        <div class="mapp-sheet-foot">
+          <button type="button" class="btn" data-cclose>취소</button>
+          <button type="button" class="btn primary" data-cok disabled>저장</button>
+        </div>
+      </div>`;
+    const input = back.querySelector("[data-memo-input]");
+    const saveBtn = back.querySelector("[data-cok]");
+    input.addEventListener("input", () => { saveBtn.disabled = input.value.trim() === before; });
+    back.addEventListener("click", e => { if (e.target === back) back.remove(); });
+    back.querySelector("[data-cclose]").onclick = () => back.remove();
+    saveBtn.onclick = () => {
+      if (saveBtn.disabled) return;
+      const after = input.value.trim();
+      back.remove();
+      a.note = after;
+      logActivity(a, { script: "자산 정보 수정: 메모 수정", before: before || "없음", after: after || "없음" });
+      toast("저장되었습니다.");
+      onDone();
+    };
+  }
+  // 자산 사진 뷰어 — 조회 전용(편집은 "사진 관리" 액션에서), 조회 권한만 있어도 볼 수 있어야 해서 배정/보유
+  // 변경 권한과 무관하게 항상 열 수 있음. 대시보드 detail.js의 openViewer를 단순화(줌·정보패널·수정메뉴 없이
+  // 넘기기+닫기만) — 폰 프레임에 맞는 전체화면 뷰어
+  const IC_DOWNLOAD = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 21h16"/></svg>`;
+  // 사진 뷰어 — 폰 화면 영역에 뜨는 전체 화면(2026-09-30, 뷰포트 전체를 덮어 폰 목업이 사라져 보이던 문제
+  // 수정, 다른 전체 화면 오버레이와 동일하게 mappOverlay 사용). 상단바는 왼쪽 뒤로가기(종료)·가운데 "N/M"
+  // 카운트·오른쪽 다운로드(프로토타입이라 실제 파일은 없음, 대시보드 사진 다운로드와 동일하게 토스트로 안내)
+  function openPhotoViewer(a) {
+    const items = window.assetPhotos(a);
+    if (!items.length) return;
+    let cur = a._primary || 0;
+    const back = mappOverlay("mapp-viewer-back", 250);
+    back.innerHTML = `
+      <div class="mapp-viewer-bar">
+        <button type="button" class="mapp-viewer-back-btn" data-vclose aria-label="닫기">←</button>
+        <span class="mapp-viewer-count"></span>
+        <button type="button" class="mapp-viewer-dl" data-vdownload aria-label="다운로드">${IC_DOWNLOAD}</button>
+      </div>
+      <div class="mapp-viewer-stage">
+        <button type="button" class="mapp-viewer-nav" data-vprev aria-label="이전">‹</button>
+        <div class="mapp-viewer-img"></div>
+        <button type="button" class="mapp-viewer-nav" data-vnext aria-label="다음">›</button>
+      </div>`;
+    const img = back.querySelector(".mapp-viewer-img");
+    const countEl = back.querySelector(".mapp-viewer-count");
+    const prevBtn = back.querySelector("[data-vprev]");
+    const nextBtn = back.querySelector("[data-vnext]");
+    function draw() {
+      img.style.background = items[cur].color;
+      countEl.textContent = `${cur + 1}/${items.length}`;
+      prevBtn.hidden = nextBtn.hidden = items.length < 2;
+    }
+    prevBtn.onclick = () => { cur = (cur - 1 + items.length) % items.length; draw(); };
+    nextBtn.onclick = () => { cur = (cur + 1) % items.length; draw(); };
+    back.querySelector("[data-vclose]").onclick = () => back.remove();
+    back.querySelector("[data-vdownload]").onclick = () => toast("사진을 저장하였습니다.");
+    draw();
+  }
+  // 상태 변경 액션(상태 뱃지 클릭 → 바텀시트) — 개별형 전용(수량형은 재고/보유중만 있고 배정·보유
+  // 레코드 존재 여부로 자동 파생돼 수동 상태 변경 액션 자체가 없음, 구조설계안 3.3). 대시보드 detail.js의
+  // STATUS_TRANSITIONS과 동일하게 현재 상태에서 갈 수 있는 전이만 노출
+
+  const STATUS_TRANSITIONS = {
+    stock: [["repair-start", "수리 접수"], ["lost-report", "분실 신고"], ["dispose", "폐기 처리"]],
+    assigned: [["repair-start", "수리 접수"], ["lost-report", "분실 신고"], ["dispose", "폐기 처리"]],
+    repair: [["repair-done", "수리 완료"], ["lost-report", "분실 신고"], ["dispose", "폐기 처리"]],
+    lost: [["lost-recover", "분실 회수"], ["dispose", "폐기 처리"]],
+    disposed: [],
+  };
+  function statusActions(a) {
+    if (a.type !== "individual" || !canManage(a)) return [];
+    return STATUS_TRANSITIONS[a.status].map(([key, label]) => ({ key, label, danger: key === "dispose" }));
+  }
+
+
+  function qrSampleSvg() {
+    const n = 21, cell = 4, size = n * cell;
+    const mods = [];
+    const finder = (ox, oy) => {
+      for (let y = 0; y < 7; y++) for (let x = 0; x < 7; x++) {
+        if (x === 0 || x === 6 || y === 0 || y === 6 || (x >= 2 && x <= 4 && y >= 2 && y <= 4)) mods.push([ox + x, oy + y]);
+      }
+    };
+    finder(0, 0); finder(n - 7, 0); finder(0, n - 7);
+    let seed = 42;
+    const rand = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+      const inFinder = (x < 8 && y < 8) || (x >= n - 8 && y < 8) || (x < 8 && y >= n - 8);
+      if (!inFinder && rand() > 0.55) mods.push([x, y]);
+    }
+    const rects = mods.map(([x, y]) => `<rect x="${x * cell}" y="${y * cell}" width="${cell}" height="${cell}"/>`).join("");
+    return `<svg viewBox="0 0 ${size} ${size}" fill="#1b1d1f"><rect width="${size}" height="${size}" fill="#fff"/>${rects}</svg>`;
+  }
+
+
+  // 직원 상세의 레이아웃 + 대시보드의 자산 전체 단위 배정/보유 관리. 특정 대상에 귀속되지 않는다.
+  function openDropdownMenu(anchor, items, onPick) {
+    document.querySelectorAll(".dropdown-menu").forEach(m => m.remove());
+    const menu = document.createElement("div");
+    menu.className = "dropdown-menu"; menu.setAttribute("role", "menu");
+    menu.innerHTML = items.map(x => `${x.sep ? '<div class="dropdown-sep"></div>' : ""}<button type="button" role="menuitem" data-key="${x.key}"${x.danger ? ' class="danger"' : ""}>${x.label}</button>`).join("");
+    const r = anchor.getBoundingClientRect();
+    menu.style.cssText = `position:fixed;left:${Math.max(8, r.right - 180)}px;min-width:180px`;
+    document.body.appendChild(menu);
+    const height = menu.getBoundingClientRect().height;
+    menu.style.top = `${r.bottom+height+4 > window.innerHeight ? Math.max(8,r.top-height-4) : r.bottom+4}px`;
+    anchor.setAttribute("aria-expanded", "true");
+    const close = () => {
+      menu.remove(); anchor.setAttribute("aria-expanded", "false");
+      document.removeEventListener("click", outside); document.removeEventListener("keydown", keydown);
+    };
+    const outside = e => { if (!menu.contains(e.target) && !anchor.contains(e.target)) close(); };
+    const buttons = [...menu.querySelectorAll("button")];
+    const keydown = e => {
+      if (e.key === "Escape") { e.preventDefault(); close(); anchor.focus({preventScroll:true}); }
+      if (["ArrowDown", "ArrowUp", "Home", "End"].includes(e.key)) {
+        e.preventDefault(); const i = buttons.indexOf(document.activeElement);
+        buttons[e.key === "Home" ? 0 : e.key === "End" ? buttons.length-1 : (i+(e.key === "ArrowDown" ? 1 : -1)+buttons.length)%buttons.length].focus({preventScroll:true});
+      }
+    };
+    buttons.forEach(b => b.onclick = () => { close(); onPick(b.dataset.key); });
+    buttons[0]?.focus({preventScroll:true});
+    document.addEventListener("click", outside); document.addEventListener("keydown", keydown);
+  }
+  // 모바일 검색 대상: 닫힌 버튼에는 아이콘만, 메뉴에는 아이콘과 명칭을 함께 표시한다.
+  function openHolderCategoryMenu(anchor, current, onPick) {
+    document.querySelectorAll(".dropdown-menu").forEach(menu => menu.remove());
+    const menu = document.createElement("div");
+    menu.id = "leader-holder-category-menu";
+    menu.className = "dropdown-menu mapp-leader-holder-menu";
+    menu.setAttribute("role", "menu"); menu.setAttribute("aria-label", "검색 대상");
+    menu.innerHTML = [["employee", "구성원", IC_EMP], ["worksite", "근무지", IC_WS]].map(([key,label,icon]) =>
+      `<button type="button" role="menuitemradio" aria-checked="${key === current}" data-kind="${key}"><span aria-hidden="true">${icon}</span><span>${label}</span><span class="selection-mark" aria-hidden="true">${key === current ? "✓" : ""}</span></button>`).join("");
+    const rect = anchor.getBoundingClientRect();
+    menu.style.cssText = `position:fixed;left:${Math.max(8, Math.min(rect.left, window.innerWidth-168))}px;width:160px;`;
+    anchor.setAttribute("aria-expanded", "true"); anchor.setAttribute("aria-controls", menu.id);
+    document.body.appendChild(menu);
+    const height = menu.getBoundingClientRect().height;
+    menu.style.top = `${rect.bottom+height+4 > window.innerHeight ? Math.max(8,rect.top-height-4) : rect.bottom+4}px`;
+    const close = () => {
+      menu.remove(); anchor.setAttribute("aria-expanded", "false"); anchor.removeAttribute("aria-controls");
+      document.removeEventListener("click", outside); document.removeEventListener("keydown", keydown);
+    };
+    const outside = event => { if (!menu.contains(event.target) && !anchor.contains(event.target)) close(); };
+    const buttons = [...menu.querySelectorAll("button")];
+    const keydown = event => {
+      if (event.key === "Escape") { event.preventDefault(); close(); anchor.focus({ preventScroll: true }); }
+      if (["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
+        event.preventDefault(); const index = buttons.indexOf(document.activeElement);
+        const next = event.key === "Home" ? 0 : event.key === "End" ? buttons.length-1 : (index + (event.key === "ArrowDown" ? 1 : -1) + buttons.length) % buttons.length;
+        buttons[next].focus({ preventScroll: true });
+      }
+    };
+    buttons.forEach(button => button.onclick = () => { close(); onPick(button.dataset.kind); anchor.focus({ preventScroll: true }); });
+    (buttons.find(button => button.dataset.kind === current) || buttons[0]).focus({ preventScroll: true });
+    document.addEventListener("click", outside); document.addEventListener("keydown", keydown);
+  }
+
+  const QR_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM19 14h2v2h-2zM14 19h2v2h-2zM19 19h2v2h-2z"/></svg>`;
+  const MORE_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg>`;
+  // 직원모드의 정보 레이아웃을 참고하되 전체 자산의 배정/보유 현황과 QR을 제공한다.
+  function leaderAssetDetailHtml(a) {
+    activityLog(a);
+    const indiv = a.type === "individual", editable = canManage(a), photos = window.assetPhotos(a);
+    const hidden = (window.DATA.categories.find(c => c.group === a.group && c.sub === a.sub) || {}).hiddenFields || [];
+    const kv = [
+      ["분류", `<span class="type-pill">${indiv ? "개별 자산" : "수량 자산"}</span><div>${categoryPath(a)}</div>`],
+      ["유효기한", expiryBadge(a.expiry), "expiry"], ["태그", (a.labels || []).map(l => `<span class="tag">${esc(l)}</span>`).join("") || "—"],
+      ...(indiv ? [["S/N", esc(a.serial || "—"), "serial"], ["IMEI", esc(a.imei || "—"), "imei"]] : []),
+      ["제조연월", a.manufactured ? window.fmtMonth(a.manufactured) : "—", "manufactured"],
+      ["구매연월", a.purchaseDate ? window.fmtMonth(a.purchaseDate) : "—", "purchaseDate"],
+      ["구매가격", a.price != null ? window.formatPrice(a.price) : "—", "purchasePrice"],
+      ["자산 등록일", window.fmtDate(a.createdAt)],
+      ["QR 라벨", `<button type="button" class="btn sm icon-only" data-qr-open aria-label="QR 라벨">${QR_ICON}</button>`],
+      ["메모", `<span class="mapp-leader-note">${esc(a.note || "—")}</span>${editable ? `<button type="button" class="icon-edit" data-memoedit aria-label="메모 수정">${IC_EDIT}</button>` : ""}`],
+    ].filter(row => !row[2] || !hidden.includes(row[2])).map(([k,v]) => `<div><div class="k">${k}</div><div class="v">${v}</div></div>`).join("");
+    const distributed = (a.stocks || []).reduce((sum,x) => sum + x.qty,0);
+    const badge = statusActions(a).length ? `<button type="button" class="badge ${STATUS_LABEL[a.status][1]} clickable" data-status-open>${STATUS_LABEL[a.status][0]} ▾</button>` : `<span class="badge ${STATUS_LABEL[a.status][1]}">${STATUS_LABEL[a.status][0]}</span>`;
+    return `<div class="mapp-topbar"><button type="button" class="mapp-back" data-mapp-back aria-label="뒤로">←</button><button type="button" class="mapp-more" data-more-open aria-label="더보기">${MORE_ICON}</button></div>
+      <div class="mapp-body mapp-leader-detail-body">
+        <div class="dhead-id"><div class="mapp-hero-wrap"><button type="button" class="mapp-hero-img" data-hero-viewer aria-label="사진 보기"${photos.length ? "" : " disabled"}>${cardThumb(a)}</button>${photos.length > 1 ? `<span class="mapp-hero-count">+${photos.length-1}</span>` : ""}${editable ? `<button type="button" class="mapp-hero-edit" data-hero-edit aria-label="사진 관리">${IC_EDIT}</button>` : ""}</div>
+          <div><h1>${esc(a.product)}</h1><div class="dhead-sub">${badge}${indiv ? `<div>고유관리번호 <b>${esc(a.assetNo)}</b></div>` : ""}</div></div></div>
+        ${!indiv ? `<div class="mapp-leader-qty-summary"><div>총 수량<strong>${a.totalQty}개</strong></div><div>배분 수량<strong>${distributed}개</strong></div><div>잔여 수량<strong>${a.totalQty-distributed}개</strong></div></div>` : ""}
+        <div class="dsection"><div class="kv2">${kv}</div></div>
+        <div class="dsection"><div class="mapp-leader-holders-head"><h2>${indiv ? "배정 현황" : "보유 현황"}</h2>${editable ? `<button type="button" class="btn sm" data-holder-add>${indiv ? "배정 추가" : "보유 대상 추가"}</button>` : ""}</div>
+          <div class="mapp-count">전체 <b>${(indiv ? a.assignments || [] : a.stocks || []).length}</b></div>
+          ${!indiv ? `<div class="mapp-leader-holder-search"><button type="button" class="mapp-leader-holder-kind" data-holder-category aria-label="검색 대상: 구성원" aria-haspopup="menu" aria-expanded="false"><span aria-hidden="true">${IC_EMP}</span><span class="chev" aria-hidden="true">${CHEV_DOWN}</span></button><input type="text" data-holder-query placeholder="이름/사번/휴대폰번호"></div>` : ""}
+          <div data-holder-list></div>
+        </div></div>`;
+  }
+  function leaderHolderList(a, query, kind, requestedPage) {
+    const indiv = a.type === "individual", q = (query || "").trim().toLowerCase();
+    const rows = (indiv ? a.assignments || [] : a.stocks || []).map((x,idx) => ({x,idx})).filter(({x}) => {
+      if (!q) return true;
+      if (kind === "worksite") return x.worksite && (x.worksite.toLowerCase().includes(q) || (WS_CODE[x.worksite] || "").toLowerCase().includes(q));
+      const member = MEMBERS.find(m => m.name === x.employee);
+      return x.employee && (x.employee.toLowerCase().includes(q) || !!member && (member.empNo.includes(q) || member.phone.includes(q)));
+    }).sort((p,r) => indiv ? r.x.since.localeCompare(p.x.since) : r.x.qty-p.x.qty || (p.x.employee || p.x.worksite).localeCompare(r.x.employee || r.x.worksite,"ko"));
+    const pages = Math.max(1,Math.ceil(rows.length/20)), page = Math.min(requestedPage,pages);
+    return { page, html: rows.length ? `<div class="acard-list">${rows.slice((page-1)*20,page*20).map(({x,idx}) => `<div class="acard${canManage(a) ? " has-actions" : ""}">${typeBadge(x)}${canManage(a) ? `<button type="button" class="mapp-holder-more" data-holder-more data-index="${idx}" aria-label="${esc(x.employee || x.worksite)} ${indiv ? "배정" : "보유"} 관리" aria-haspopup="menu" aria-expanded="false">${MORE_ICON}</button>` : ""}<div class="acard-id">${assignIdentity(x)}</div><div class="acard-foot"><span class="acard-date">${indiv ? `배정일 <b>${window.fmtDate(x.since)}</b>` : `보유 수량 <b>${x.qty}개</b>`}</span></div></div>`).join("")}</div>${pages>1 ? `<div class="pager"><button data-holder-page="-1"${page===1 ? " disabled" : ""} aria-label="이전 페이지">‹</button><span>${page} / ${pages}</span><button data-holder-page="1"${page===pages ? " disabled" : ""} aria-label="다음 페이지">›</button></div>` : ""}` : `<p class="muted">${q ? "결과가 없습니다." : indiv ? "배정 대상이 없습니다." : "보유 대상이 없습니다."}</p>` };
+  }
+  function openLeaderQr(a) {
+    const back = mappOverlay("mapp-sheet-back", 90);
+    back.innerHTML = `<div class="mapp-sheet"><div class="mapp-sheet-head">QR 라벨</div><div class="mapp-sheet-body mapp-leader-qr-sheet"><div class="label-sheet"><div class="label-qr">${qrSampleSvg()}</div><div class="label-text"><div class="label-product">${esc(a.product)}</div>${a.assetNo ? `<div class="label-no">${esc(a.assetNo)}</div>` : ""}<div class="label-cat">${categoryPath(a)}</div></div></div></div><div class="mapp-sheet-foot"><button type="button" class="btn" data-qr-close>닫기</button><button type="button" class="btn primary" data-qr-download>다운로드</button></div></div>`;
+    back.querySelector('[data-qr-close]').onclick = () => back.remove();
+    back.onclick = e => { if (e.target === back) back.remove(); };
+    back.querySelector('[data-qr-download]').onclick = () => {
+      const now = new Date(), pad = n => String(n).padStart(2,"0");
+      const stamp = `${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+      toast(`"QR_${a.type === "individual" ? a.assetNo : a.product}_${stamp}.png" 다운로드 (프로토타입 — 반영 없음)`); back.remove();
+    };
+  }
+
+  function openDeleteAssetModal(a, onDone) {
+    const cb = document.createElement("div");
+    cb.className = "modal-back";
+    cb.style.zIndex = 340;
+    cb.innerHTML = `
+      <div class="modal" style="width:380px">
+        <h3>삭제하시겠습니까?</h3>
+        <div class="body">
+          <div class="danger-note">${WARN_ICON}<span>삭제하면 복구할 수 없으니 신중하게 결정해주세요.</span></div>
+          <div class="field" style="margin-top:14px;margin-bottom:0">
+            <input type="text" data-del-input placeholder="입력">
+          </div>
+          <p class="muted" style="margin-top:6px">박스에 DELETE를 입력하면 [삭제] 버튼이 활성화됩니다.</p>
+        </div>
+        <div class="foot">
+          <button class="btn" data-cclose>취소</button>
+          <button class="btn danger" data-cok disabled>삭제</button>
+        </div>
+      </div>`;
+    cb.addEventListener("click", e => { if (e.target === cb) cb.remove(); });
+    cb.querySelector("[data-cclose]").onclick = () => cb.remove();
+    const input = cb.querySelector("[data-del-input]");
+    const okBtn = cb.querySelector("[data-cok]");
+    const confirmed = () => input.value.trim().toUpperCase() === "DELETE";
+    input.addEventListener("input", () => { okBtn.disabled = !confirmed(); });
+    okBtn.onclick = () => {
+      if (!confirmed()) return;
+      assets.splice(assets.indexOf(a), 1);
+      cb.remove(); onDone(); toast("삭제되었습니다.");
+    };
+    document.body.appendChild(cb);
+    input.focus();
+  }
+
   function render() {
     const root = document.getElementById("app");
-    const state = { screen: "menu", sub: null, statusFilter: "all", popupFilters: MappAssetFilter.empty(), subSearch: "", addDraft: null, addOrigin: null, tagManageDraft: null };
+    const state = { screen: "menu", sub: null, statusFilter: "all", popupFilters: MappAssetFilter.empty(), subSearch: "", addDraft: null, addOrigin: null, tagManageDraft: null, detailAssetId: null, listScroll: 0, holderQuery: "", holderCategory: "employee", holderPage: 1 };
 
     function draw() {
       const showTabBar = state.screen === "menu";
       const screenHtml = state.screen === "menu" ? menuScreenHtml()
         : state.screen === "sub-detail" ? subDetailScreenHtml(state.sub, state.statusFilter, state.popupFilters)
+        : state.screen === "asset-detail" ? leaderAssetDetailHtml(assets.find(a => a.id === state.detailAssetId))
+        : state.screen === "asset-history" ? historyScreenHtml(assets.find(a => a.id === state.detailAssetId))
         : state.screen === "asset-add" ? assetAddScreenHtml(state.addDraft)
-        : state.screen === "asset-add-category" ? assetAddCategoryScreenHtml()
+        : state.screen === "asset-add-category" ? assetAddCategoryScreenHtml(state.addDraft)
         : state.screen === "asset-add-tags" ? assetAddTagManageScreenHtml(state.tagManageDraft)
         : assetsScreenHtml();
       root.innerHTML = `
@@ -513,10 +1515,12 @@
         if (state.screen === "asset-add-category") state.screen = "asset-add";
         else if (state.screen === "asset-add") {
           const leave = () => { state.screen = state.addOrigin; state.addDraft = null; state.addOrigin = null; draw(); };
-          if (hasAddInput(state.addDraft)) confirmAddExit(leave);
+          if (state.addDraft.editingId ? editDirty(state.addDraft) : hasAddInput(state.addDraft)) confirmAddExit(leave, !!state.addDraft.editingId);
           else leave();
           return;
         }
+        else if (state.screen === "asset-history") state.screen = "asset-detail";
+        else if (state.screen === "asset-detail") { state.screen = "sub-detail"; draw(); root.querySelector(".mapp-screen").scrollTop = state.listScroll; return; }
         else if (state.screen === "sub-detail") { state.screen = "assets"; state.sub = null; state.statusFilter = "all"; state.popupFilters = MappAssetFilter.empty(); state.subSearch = ""; }
         else { state.screen = "menu"; }
         draw();
@@ -595,6 +1599,131 @@
         searchInput.addEventListener("input", applySearch);
         applySearch();
       }
+      root.querySelectorAll("[data-asset-card]").forEach(card => {
+        card.setAttribute("role", "button"); card.tabIndex = 0;
+        const open = () => {
+          const a = assets.find(x => x.id === card.dataset.assetId);
+          if (!a || !hasViewPermission(a)) return;
+          state.listScroll = root.querySelector(".mapp-screen").scrollTop;
+          state.detailAssetId = a.id; state.screen = "asset-detail";
+          state.holderQuery = ""; state.holderCategory = "employee"; state.holderPage = 1; draw();
+        };
+        card.onclick = open;
+        card.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } };
+      });
+      if (state.screen === "asset-detail") {
+        const a = assets.find(x => x.id === state.detailAssetId);
+        // 반납/해제 후에도 자산 상세에 머문다. 자산 자체를 삭제한 경우에만 목록으로 복귀한다.
+        const afterMutate = () => { state.screen = "asset-detail"; draw(); };
+        function dispatchAction(key) {
+          if (key === "history") { state.screen = "asset-history"; draw(); return; }
+          if (key === "edit") {
+            if (!hasAssetManagePermission() || a.status === "disposed") return;
+            state.addOrigin = "asset-detail"; state.addDraft = editDraftFor(a); state.screen = "asset-add"; draw(); return;
+          }
+          if (key === "delete") {
+            if (!hasAssetManagePermission()) return;
+            openDeleteAssetModal(a, () => { state.detailAssetId = null; state.screen = "sub-detail"; draw(); }); return;
+          }
+          if (!canManage(a)) return;
+          if (key === "assign-add") {
+            if ((a.assignments || []).length >= 5) toast("활성 배정은 최대 5건까지 가능합니다.");
+            else openFormPage(a, null, "assign-add", afterMutate);
+            return;
+          }
+          if (key === "hold-add") {
+            if (a.totalQty - (a.stocks || []).reduce((sum,x) => sum+x.qty,0) <= 0) toast("잔여 수량이 없습니다.");
+            else openFormPage(a, null, "hold-add", afterMutate);
+            return;
+          }
+          if (!statusActions(a).some(action => action.key === key)) return;
+          if (key === "dispose") { openDisposeConfirmModal(a, afterMutate); return; }
+          const transitions = {
+            "lost-report": ["분실 신고하시겠습니까?", "분실 신고 시 기존 배정은 유지된 채 상태만 분실로 변경됩니다.", "분실 신고", () => "lost"],
+            "lost-recover": ["분실 회수 처리하시겠습니까?", "분실 회수 시 배정 여부에 따라 배정 중 또는 재고 상태로 돌아갑니다.", "분실 회수", () => derivedActiveStatus(a)],
+            "repair-start": ["수리 접수하시겠습니까?", "수리 접수 시 기존 배정은 유지된 채 상태만 수리 중으로 변경됩니다.", "수리 접수", () => "repair"],
+            "repair-done": ["수리 완료 처리하시겠습니까?", "수리 완료 시 배정 여부에 따라 배정 중 또는 재고 상태로 돌아갑니다.", "수리 완료", () => derivedActiveStatus(a)],
+          };
+          const [title, body, script, next] = transitions[key];
+          openStatusChangeConfirm(a, title, body, () => {
+            const before = STATUS_LABEL[a.status][0]; a.status = next();
+            logActivity(a, { script: `상태 변경: ${script}`, before, after: STATUS_LABEL[a.status][0] });
+          }, afterMutate);
+        }
+        const status = root.querySelector('[data-status-open]');
+        if (status) status.onclick = () => openDropdownMenu(status, statusActions(a), dispatchAction);
+        const more = root.querySelector('[data-more-open]');
+        more.onclick = () => {
+          const items = [{ key: "history", label: "자산 이력" }];
+          if (hasAssetManagePermission()) {
+            if (a.status !== "disposed") items.push({ key: "edit", label: "자산 수정", sep: true });
+            items.push({ key: "delete", label: "자산 삭제", danger: true });
+          }
+          openDropdownMenu(more, items, dispatchAction);
+        };
+        root.querySelector('[data-hero-viewer]').onclick = () => openPhotoViewer(a);
+        const photoEdit = root.querySelector('[data-hero-edit]');
+        if (photoEdit) photoEdit.onclick = () => { if (canManage(a)) openPhotoManageModal(a, afterMutate); };
+        const memoEdit = root.querySelector('[data-memoedit]');
+        if (memoEdit) memoEdit.onclick = () => { if (canManage(a)) openMemoEditModal(a, afterMutate); };
+        root.querySelector('[data-qr-open]').onclick = () => openLeaderQr(a);
+        const add = root.querySelector('[data-holder-add]');
+        if (add) add.onclick = () => dispatchAction(a.type === "individual" ? "assign-add" : "hold-add");
+        function drawHolders() {
+          const list = root.querySelector('[data-holder-list]');
+          const rendered = leaderHolderList(a, state.holderQuery, state.holderCategory, state.holderPage);
+          state.holderPage = rendered.page; list.innerHTML = rendered.html;
+          list.querySelectorAll('[data-holder-page]').forEach(button => button.onclick = () => { state.holderPage += Number(button.dataset.holderPage); drawHolders(); list.scrollIntoView({block:"nearest"}); });
+          list.querySelectorAll('[data-holder-more]').forEach(button => button.onclick = () => {
+            const items = a.type === "individual"
+              ? [{key:"date",label:"배정일 수정"},{key:"reassign",label:"재배정"},{key:"return",label:"반납",danger:true,sep:true}]
+              : [{key:"qty",label:"수량 변경"},{key:"release",label:"보유 해제",danger:true,sep:true}];
+            openDropdownMenu(button, items, key => {
+            if (!canManage(a)) return;
+            const idx = Number(button.dataset.index);
+            if (key === "return") openReturnConfirm(a, idx, afterMutate);
+            if (key === "reassign") openFormPage(a, { index: idx }, "reassign", afterMutate);
+            if (key === "qty") openQtyChangeModal(a, idx, afterMutate);
+            if (key === "release") openHoldReleaseConfirm(a, idx, afterMutate);
+            if (key === "date") {
+              const record = a.assignments[idx];
+              openDateSheet(record.since, todayStr(), value => {
+                if (!value || value === record.since) return;
+                confirmModal("배정일을 변경하시겠습니까?", "", () => {
+                  const before = record.since; record.since = value;
+                  logActivity(a, { script: "배정 관리: 배정일 변경", target: record, before: window.fmtDate(before), after: window.fmtDate(value) });
+                  afterMutate(); toast("변경되었습니다.");
+                });
+              });
+            }
+            });
+          });
+        }
+        const holderQuery = root.querySelector('[data-holder-query]');
+        const holderCategory = root.querySelector('[data-holder-category]');
+        if (holderQuery) {
+          const syncHolderCategory = () => {
+            const employee = state.holderCategory === "employee";
+            holderCategory.innerHTML = `<span aria-hidden="true">${employee ? IC_EMP : IC_WS}</span><span class="chev" aria-hidden="true">${CHEV_DOWN}</span>`;
+            holderCategory.setAttribute("aria-label", `검색 대상: ${employee ? "구성원" : "근무지"}`);
+            holderCategory.title = employee ? "구성원" : "근무지";
+            holderQuery.placeholder = employee ? "이름/사번/휴대폰번호" : "근무지명/코드";
+          };
+          holderQuery.value = state.holderQuery; syncHolderCategory();
+          holderQuery.oninput = () => { state.holderQuery = holderQuery.value; state.holderPage = 1; drawHolders(); };
+          holderCategory.onclick = () => openHolderCategoryMenu(holderCategory, state.holderCategory, kind => {
+            if (kind === state.holderCategory) return;
+            state.holderCategory = kind; state.holderQuery = ""; state.holderPage = 1;
+            holderQuery.value = ""; syncHolderCategory(); drawHolders();
+          });
+        }
+        drawHolders();
+      }
+      if (state.screen === "asset-history") {
+        const a = assets.find(x => x.id === state.detailAssetId), input = root.querySelector('[data-history-q]');
+        if (input) input.oninput = () => { root.querySelector('[data-history-list]').innerHTML = timelineHtml(a, input.value); };
+      }
+
       if (state.screen === "asset-add") {
         const draft = state.addDraft;
         const field = key => root.querySelector(`[data-add-field="${key}"]`);
@@ -607,7 +1736,7 @@
         function updateAddValidity() {
           syncAddDraft();
           const cat = addCategory(draft);
-          const duplicate = cat && cat.type === "individual" && !!draft.assetNo.trim() && assets.some(a => a.assetNo === draft.assetNo.trim());
+          const duplicate = cat && cat.type === "individual" && !!draft.assetNo.trim() && assets.some(a => a.id !== draft.editingId && a.assetNo === draft.assetNo.trim());
           const error = root.querySelector("[data-add-error]");
           if (error) error.hidden = !duplicate;
           const assetNoInput = field("assetNo");
@@ -620,7 +1749,9 @@
             expiryInput.setAttribute("aria-invalid", String(!!showError));
           }
           const save = root.querySelector("[data-add-save]");
-          if (save) save.disabled = !addDraftValid(draft);
+          if (save) save.disabled = !addDraftValid(draft) || !editDirty(draft);
+          const qtyError = root.querySelector("[data-edit-qty-error]");
+          if (qtyError) qtyError.hidden = Number(draft.totalQty) >= (assets.find(a => a.id === draft.editingId).stocks || []).reduce((sum,x) => sum + x.qty,0);
         }
         root.querySelector("[data-add-category]").onclick = () => { syncAddDraft(); state.screen = "asset-add-category"; draw(); };
         root.querySelectorAll("[data-add-field]").forEach(input => input.addEventListener("input", () => {
@@ -681,7 +1812,7 @@
           tagSearch.placeholder = draft.labels.length ? "" : "검색";
           tagChips.querySelectorAll("[data-add-tag-remove]").forEach(button => button.onclick = () => {
             draft.labels = draft.labels.filter(tag => tag !== button.dataset.addTagRemove);
-            renderSelectedTags();
+            renderSelectedTags(); updateAddValidity();
             tagMenu.hidden = true;
           });
         }
@@ -695,7 +1826,7 @@
             if (draft.labels.length < 5) draft.labels.push(button.dataset.addTagPick);
             tagSearch.value = "";
             tagMenu.hidden = true;
-            renderSelectedTags();
+            renderSelectedTags(); updateAddValidity();
           });
         }
         if (tagSearch) {
@@ -715,7 +1846,7 @@
           syncAddDraft();
           const key = button.dataset.addDate;
           const apply = value => {
-            draft[key] = value;
+            draft[key] = value; updateAddValidity();
             const shown = value ? (button.dataset.addDateMode === "month" ? value.replace("-", ".") : window.fmtDate(value)) : "선택";
             button.classList.toggle("selected", !!value);
             button.innerHTML = `<span>${shown}</span>${CAL_ICON}`;
@@ -740,12 +1871,21 @@
           openAddDropdown(addPhoto, [
             { key: "camera", label: "카메라로 촬영하기" },
             { key: "gallery", label: "갤러리에서 불러오기" },
-          ], () => { draft.photos.push(PHOTO_COLORS[draft.photos.length % PHOTO_COLORS.length]); draw(); });
+          ], () => { draft.photos.push({ color: PHOTO_COLORS[draft.photos.length % PHOTO_COLORS.length], at: `${todayStr()} 00:00`, by: ME }); draw(); });
         };
         const save = root.querySelector("[data-add-save]");
         if (save) save.onclick = () => {
           updateAddValidity();
-          if (!addDraftValid(draft)) return;
+          if (!addDraftValid(draft) || !editDirty(draft)) return;
+          if (draft.editingId) {
+            const asset = assets.find(a => a.id === draft.editingId);
+            const moved = asset.group + "|" + asset.sub !== draft.category;
+            applyAssetEdit(asset, draft);
+            state.sub = asset.sub;
+            if (moved) { state.statusFilter = "all"; state.popupFilters = MappAssetFilter.empty(); state.subSearch = ""; state.listScroll = 0; }
+            state.addDraft = null; state.addOrigin = null; state.screen = "asset-detail";
+            draw(); toast("저장되었습니다."); return;
+          }
           const cat = addCategory(draft);
           const numericIds = assets.map(a => Number(String(a.id).replace(/\D/g, ""))).filter(Number.isFinite);
           const asset = {
@@ -764,9 +1904,9 @@
           if (draft.purchasePrice) asset.price = Number(draft.purchasePrice.replace(/[^0-9]/g, ""));
           if (draft.note.trim()) asset.note = draft.note.trim();
           if (draft.photos.length) {
-            asset._photos = draft.photos.map(color => ({ color, at: "2026-09-04 00:00", by: ME }));
+            asset._photos = draft.photos.map(p => ({ ...p }));
             asset._primary = draft.primaryPhoto;
-            asset.photo = draft.photos[draft.primaryPhoto];
+            asset.photo = draft.photos[draft.primaryPhoto].color;
             asset.photoCount = draft.photos.length;
           }
           assets.push(asset);
@@ -795,7 +1935,8 @@
           const category = addCategory({ category: row.dataset.addCategoryPick });
           if (!catViewPermission(category)) return;
           // 현재 분류를 다시 선택하면 입력을 유지하고 팝업만 닫는다(대시보드와 동일).
-          if (row.dataset.addCategoryPick !== state.addDraft.category) {
+          if (state.addDraft.editingId) state.addDraft.category = row.dataset.addCategoryPick;
+          else if (row.dataset.addCategoryPick !== state.addDraft.category) {
             state.addDraft = emptyAddDraft(category);
             state.addDraft.product = product;
           }
