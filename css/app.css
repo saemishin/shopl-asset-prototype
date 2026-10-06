@@ -1689,3 +1689,145 @@ button.dthumb:hover { filter: brightness(0.94); }
 .mapp-leader-qr-sheet .label-sheet { width:100%; max-width:100%; }
 .mapp-card[role="button"] { cursor:pointer; }
 .mapp-card[role="button"]:focus-visible { outline:2px solid var(--blue); outline-offset:2px; }
+
+/* 앱 요금제 및 기능 — 기존 서비스 목록/소개 카드 양식. 관리 섹션은 비용 다음에 신규 추가. */
+.mapp-menu-link { width: 100%; text-align: left; }
+.mapp-plan-page { min-height: 100%; background: #f6f6f6; color: #333; padding-bottom: 26px; }
+.mapp-plan-page > .mapp-topbar { position: sticky; top: 0; z-index: 2; background: #f6f6f6; }
+.mapp-plan-page .mapp-topbar { padding: 17px 16px; gap: 16px; }
+.mapp-plan-page .mapp-back { font-size: 24px; line-height: 1; }
+.mapp-plan-page .mapp-topbar-title { font-size: 19px; font-weight: 500; }
+.mapp-plan-body { padding: 22px 16px 8px; }
+.mapp-plan-current { padding: 20px 12px; border-radius: 22px; background: #eaeaea; text-align: center; }
+.mapp-plan-current strong { display: inline-block; padding: 7px 13px; border-radius: 999px; color: #fff; background: #333; font-size: 17px; font-weight: 600; }
+.mapp-plan-current p { margin: 12px 0 0; font-size: 15px; font-weight: 600; }
+.mapp-plan-intro { text-align: center; padding: 26px 2px 6px; }
+.mapp-plan-intro > p { font-size: 15px; margin: 0 0 15px; }
+.mapp-plan-intro > div { font-size: 12px; line-height: 1.4; color: #999; }
+.mapp-plan-dashboard { display: block; border: 1px solid #e5e5e5; border-radius: 10px; background: transparent; color: #888; font-size: 13px; padding: 9px 12px; }
+.mapp-plan-intro .mapp-plan-dashboard { margin: 12px auto 0; border-radius: 999px; }
+.mapp-plan-group { margin-top: 20px; }
+.mapp-plan-group h2 { margin: 0 10px 11px; font-size: 14px; font-weight: 500; }
+.mapp-plan-list { background: #fff; border-radius: 24px; padding: 0 20px; overflow: hidden; }
+.mapp-plan-row { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 55px; text-align: left; color: #aaa; font-size: 16px; font-weight: 600; border-bottom: 1px solid #f1f1f1; gap: 14px; }
+.mapp-plan-row:last-child { border-bottom: 0; }
+.mapp-plan-row.on { color: #333; }
+.mapp-plan-use-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #009dff; margin-left: 4px; vertical-align: super; }
+.mapp-plan-chevron { font-size: 25px; font-weight: 400; color: #999; }
+.mapp-plan-hero { background: #d9edf7; padding-bottom: 36px; }
+.mapp-plan-hero > svg { display: block; width: 265px; max-width: 90%; margin: 0 auto; }
+.mapp-plan-detail-body { padding: 0 18px; margin-top: -35px; position: relative; }
+.mapp-plan-info-card { border-radius: 22px; background: #fff; padding: 20px; margin-bottom: 10px; }
+.mapp-plan-toggle-row { display: flex; align-items: center; justify-content: flex-end; gap: 10px; margin-bottom: 12px; }
+.mapp-plan-tier { color: #008bd9; font-size: 12px; font-weight: 600; background: #eaf5ff; border-radius: 999px; padding: 5px 9px; }
+.mapp-plan-info-card h1 { font-size: 22px; font-weight: 700; margin: 0 0 20px; }
+.mapp-plan-info-card > p { font-size: 14px; line-height: 1.45; color: #888; margin: 0 0 12px; word-break: keep-all; }
+.mapp-plan-info-card > p:last-child { margin-bottom: 8px; }
+.mapp-plan-settings h2 { font-size: 14px; margin: 4px 0 8px; }
+.mapp-plan-settings ul { padding-left: 15px; font-size: 16px; color: #666; }
+.mapp-plan-settings li { list-style: disc; }
+.mapp-plan-info-card > .mapp-plan-guide { margin: 24px 0 16px; color: #aaa; font-size: 12px; }
+.mapp-plan-settings .mapp-plan-dashboard { width: 100%; text-align: center; }
+.mapp-plan-dialog-back { z-index: 350; background: rgba(0,0,0,.65); display: flex; align-items: center; justify-content: center; padding: 20px; border-radius: 0 0 37px 37px; }
+.mapp-plan-dialog { background: #fff; border-radius: 21px; width: 100%; max-height: 90%; display: flex; flex-direction: column; overflow: hidden; }
+.mapp-plan-dialog-body { padding: 27px 22px 22px; overflow-y: auto; }
+.mapp-plan-dialog-body h2 { margin: 0 0 18px; font-size: 17px; line-height: 1.45; font-weight: 700; }
+.mapp-plan-dialog-body > p { font-size: 15px; line-height: 1.5; color: #666; margin: 0; word-break: keep-all; }
+.mapp-plan-dialog-foot { display: flex; border-top: 1px solid #eee; flex-shrink: 0; }
+.mapp-plan-dialog-foot button { flex: 1; padding: 18px 6px; font-size: 16px; font-weight: 600; }
+.mapp-plan-dialog-foot button + button { border-left: 1px solid #eee; }
+.mapp-plan-link-content { border-top: 1px solid #f2f2f2; margin-top: 22px; padding-top: 20px; }
+.mapp-plan-link-url { font-size: 14px; margin: 0 0 16px; overflow-wrap: anywhere; user-select: text; }
+.mapp-plan-link-actions { display: flex; gap: 10px; }
+.mapp-plan-link-actions button { flex: 1; display: flex; flex-direction: column; gap: 5px; align-items: center; border-radius: 16px; background: #eaf4ff; padding: 14px; font-size: 16px; }
+.mapp-plan-row:focus-visible, .mapp-menu-link:focus-visible, .mapp-plan-dashboard:focus-visible, .mapp-plan-dialog button:focus-visible { outline: 2px solid #009dff; outline-offset: -3px; }
+.mapp-plan-toggle-row .toggle-switch.on { background: #009dff; }
+
+/* 앱 첫 메뉴의 구성원/근무지 폴딩 — 두 그룹은 독립적으로 펼칠 수 있다. */
+.mapp-menu-fold { width: 100%; text-align: left; border-bottom: 0; }
+.mapp-menu-fold .mapp-menu-chev { display: flex; }
+.mapp-menu-fold .mapp-menu-chev svg { width: 15px; height: 15px; }
+.mapp-menu-fold[aria-expanded="true"] .mapp-menu-chev { transform: rotate(180deg); }
+.mapp-menu-sublist { padding: 0 0 6px 34px; }
+.mapp-menu-sublist[hidden] { display: none; }
+.mapp-menu-subrow { display: block; width: 100%; padding: 11px 2px; text-align: left; font-size: 15px; font-weight: 400; color: var(--text); }
+.mapp-menu-fold:focus-visible, button.mapp-menu-subrow:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+/* 관리 메뉴 상세의 공통 정보 카드. */
+.mapp-directory-page { min-height: 100%; background: #f7f8f9; }
+.mapp-directory-page .mapp-topbar { background: #fff; }
+.mapp-directory-info { padding: 20px; background: #fff; border-radius: 16px; }
+.mapp-directory-info h2 { font-size: 16px; margin: 0 0 16px; }
+.mapp-directory-info dl { margin: 0; }
+.mapp-directory-info dl > div { padding: 13px 0; border-top: 1px solid var(--line); }
+.mapp-directory-info dt { font-size: 12px; color: var(--text-mut); margin-bottom: 5px; }
+.mapp-directory-info dd { font-size: 14px; margin: 0; overflow-wrap: anywhere; }
+
+/* 앱 구성원·근무지 상세: 제공된 운영 화면의 헤더/업무 탭. 자산 목록만 실제 기능을 연결한다. */
+.mapp-directory-page { background: #f6f6f6; flex: 1; }
+.mapp-directory-top-actions { display: flex; align-items: center; gap: 12px; margin-left: auto; }
+.mapp-directory-top-actions button { width: 28px; height: 28px; font-size: 24px; }
+.mapp-directory-top-actions svg { width: 24px; height: 24px; }
+.mapp-directory-member-header, .mapp-directory-site-header { padding: 0 16px 20px; background: #fff; }
+.mapp-directory-member-top { display: flex; align-items: flex-end; justify-content: space-between; margin: 0 0 16px; }
+.mapp-directory-avatar { display: grid; place-items: center; width: 88px; height: 88px; border-radius: 24px; color: white; font-size: 32px; font-weight: 600; }
+.mapp-directory-contact { display: flex; gap: 12px; }
+.mapp-directory-contact button { width: 40px; height: 40px; background: #f6f6f6; border-radius: 12px; color: #009dff; font-size: 26px; }
+.mapp-directory-contact svg { width: 24px; height: 24px; }
+.mapp-directory-member-header h1, .mapp-directory-site-header h1 { margin: 0 0 10px; font-size: 20px; font-weight: 700; }
+.mapp-directory-member-header p { margin: 0 0 10px; font-size: 15px; }
+.mapp-directory-working { font-size: 14px; color: #009dff; }
+.mapp-directory-site-hero { position: relative; display: flex; height: 148px; background: #dae8ef; overflow: hidden; }
+.mapp-directory-site-hero .mapp-topbar { position: absolute; inset: 0 0 auto; z-index: 1; background: transparent; }
+.mapp-directory-site-hero .mapp-back, .mapp-directory-site-hero .mapp-directory-top-actions button { background: #ffffffdb; border-radius: 50%; }
+.mapp-directory-map { width: 67%; }
+.mapp-directory-map svg { width: 100%; height: 100%; object-fit: cover; }
+.mapp-directory-site-photo { display: flex; flex: 1; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: #168fcc; background: #edf3f6; font-size: 14px; }
+.mapp-directory-site-photo svg { width: 42px; height: 42px; }
+.mapp-directory-site-header { padding-top: 16px; }
+.mapp-directory-site-status { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.mapp-directory-site-status > span:first-child { border: 1px solid #777; padding: 2px 6px; border-radius: 6px; font-size: 12px; }
+.mapp-directory-favorite { color: #ffd000; background: #fffbdf; border: 1px solid #ffd000; border-radius: 50%; width: 32px; height: 32px; display: grid; place-items: center; font-size: 23px; }
+.mapp-directory-site-header small { color: #aaa; font-size: 12px; }
+.mapp-directory-site-header p { margin: 8px 0 0; line-height: 1.5; font-size: 13px; }
+.mapp-directory-site-header p button { margin-left: 6px; color: #009dff; }
+.mapp-directory-tabs { display: flex; background: #fff; }
+.mapp-directory-tabs button { flex: 1; border-bottom: 2px solid transparent; padding: 12px 0; font-size: 16px; font-weight: 600; color: #bbb; }
+.mapp-directory-tabs button.active { color: #333; border-bottom-color: #333; }
+.mapp-directory-task-body { padding: 16px; }
+.mapp-directory-nav-card { width: 100%; display: flex; align-items: center; gap: 12px; padding: 18px 16px; border-radius: 24px; background: #fff; margin-bottom: 16px; text-align: left; }
+.mapp-directory-nav-card strong { font-size: 18px; }
+.mapp-directory-task-icon { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 9px; background: #e7f4f2; }
+.mapp-directory-task-icon svg { width: 25px; height: 25px; }
+.mapp-directory-task-icon.asset { background: #eaf0ff; }
+.mapp-directory-task-icon.todo { background: #e0f5ff; }
+.mapp-directory-task-icon.report { background: #fff9dd; }
+.mapp-directory-task-card { background: #fff; border-radius: 24px; padding: 0 16px 16px; margin-bottom: 16px; }
+.mapp-directory-fold { width: 100%; padding: 22px 0 18px; display: flex; justify-content: space-between; align-items: center; text-align: left; font-size: 18px; }
+.mapp-directory-fold > span { font-size: 23px; line-height: 1; }
+.mapp-directory-fold[aria-expanded="false"] > span { transform: rotate(180deg); }
+.mapp-directory-empty { margin: 12px 0; color: #aaa; font-size: 14px; line-height: 1.6; }
+.mapp-directory-asset-tools > span { display: block; font-size: 12px; margin: 0 0 12px; color: var(--text-sub); }
+.mapp-directory-search { display: flex; align-items: center; padding: 0 10px; background: #f6f6f6; border: 1px solid #eee; border-radius: 9px; margin-bottom: 16px; }
+.mapp-directory-search input[type="search"] { min-width: 0; width: 100%; flex: 1; height: 38px; background: transparent; border: 0; outline: 0; font-size: 13px; }
+.mapp-directory-search input::-webkit-search-cancel-button { -webkit-appearance: none; }
+.mapp-directory-search button { font-size: 20px; padding: 6px; color: #888; }
+.mapp-directory-asset-row { display: flex; gap: 10px; width: 100%; align-items: center; justify-content: space-between; padding: 14px 0; text-align: left; border-bottom: 1px solid #f1f1f1; }
+.mapp-directory-asset-row > span:first-child { min-width: 0; flex: 1; }
+.mapp-directory-asset-row strong { font-size: 14px; font-weight: 400; overflow-wrap: anywhere; display: block; }
+.mapp-directory-asset-row small { display: block; font-size: 11px; color: #999; margin-top: 4px; }
+.mapp-directory-asset-row .badge { flex-shrink: 0; font-size: 10px; }
+.mapp-directory-member-label { margin: 0 16px 16px; padding: 14px; background: #eee; border-radius: 12px; font-weight: 600; }
+.mapp-directory-member-assets { margin: 0 16px 20px; padding: 20px 16px; background: white; border-radius: 24px; }
+.mapp-directory-fold-body[hidden], .mapp-directory-asset-row[hidden], .mapp-directory-empty[hidden], .mapp-directory-search button[hidden] { display: none; }
+.mapp-directory-tabs button:focus-visible, .mapp-directory-nav-card:focus-visible, .mapp-directory-fold:focus-visible, .mapp-directory-asset-row:focus-visible { outline: 2px solid #009dff; outline-offset: -2px; }
+
+/* 근무지 상세에서 연 자산 목록/상세: 작은 대상명으로 맥락만 유지한다. */
+.mapp-directory-context { color: var(--text-sub); font-size: 13px; font-weight: 400; line-height: 1.5; }
+.mapp-scoped-context { margin: 4px 0 16px; }
+
+/* 공동 대상 섹션은 0건에도 유지하며 추가는 제목 옆에서 제공한다. */
+.mapp-party-header { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px; }
+.mapp-party-header .mapp-party-head { margin:0; min-width:0; }
+.mapp-party-header > button { flex-shrink:0; }
+.mapp-party-empty { margin:0; padding:12px 0; color:var(--text-mut); font-size:13px; }
+/* 구성원 업무 자산 카드: 내 자산과 같은 소분류별 접기/펼치기 목록. */

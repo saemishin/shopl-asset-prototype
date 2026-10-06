@@ -10,6 +10,149 @@
    참고해 리스트 화면 공통 요소를 재현. */
 (function () {
   const { assets } = window.DATA;
+
+  // 요금제 및 기능은 회사 전역 설정이며 직원/리더 모드와 별개로 관리자급(서버 역할 2/7/9)만 접근한다.
+  // 이번 화면을 확인하기 위한 관리자급 권한 가정이다. 기존 자산 화면의 페르소나/권한 시뮬레이션은 유지한다.
+  const DEMO_ASSUME_FEATURE_ADMIN = true;
+  const ASSET_MGMT_FLAG_KEY = "shopl_proto_assetMgmtUse";
+  const COMPANY_PLAN_KEY = "shopl_proto_companyPlan";
+  const PLAN_RANK = { Lite: 0, Standard: 1, Pro: 2, Enterprise: 3, Trial: 2 };
+  function companyPlan() {
+    const plan = localStorage.getItem(COMPANY_PLAN_KEY) || "Enterprise";
+    return Object.hasOwn(PLAN_RANK, plan) ? plan : "Lite";
+  }
+  function planAllows(minimum) { return PLAN_RANK[companyPlan()] >= PLAN_RANK[minimum]; }
+  function canConfigureFeatures() { return DEMO_ASSUME_FEATURE_ADMIN; }
+  // 신규 고객사 및 출시 시 기존 Pro 이상 고객사는 최초 사용값이 ON. 이후 명시적으로 저장한 OFF는 유지한다.
+  // 무료 체험은 기존 요금제 공통 판정처럼 Pro 수준. 요금제 자격과 회사 사용값은 서로 다른 축이다.
+  function assetMgmtEnabled() { return planAllows("Pro") && localStorage.getItem(ASSET_MGMT_FLAG_KEY) !== "0"; }
+  const FEATURE_GROUPS = [
+    { name: "출퇴근 및 방문", items: [["출퇴근", "Lite"], ["스케줄", "Lite"], ["휴가", "Lite"], ["초과근무", "Standard"], ["근태 마감", "Standard"], ["방문계획 및 달성", "Standard"], ["위치 확인", "Pro"]] },
+    { name: "문서", items: [["전자문서", "Standard"]] },
+    { name: "커뮤니케이션", items: [["할 일", "Pro"], ["공지 및 설문", "Standard"], ["보고서", "Pro"], ["게시판", "Pro"], ["AI 챗봇", "Pro"], ["채팅", "Pro"]] },
+    { name: "매장 데이터 수집", items: [["판매량", "Enterprise"], ["가격", "Enterprise"], ["재고", "Enterprise"], ["전시현황", "Enterprise"]] },
+    { name: "목표 및 평가", items: [["목표 달성 관리", "Enterprise"], ["인센티브", "Enterprise"]] },
+    { name: "비용", items: [["비용 결재", "Pro"]] },
+    { name: "관리", items: [["자산 관리", "Pro"]] },
+  ];
+  // 기타 기능의 사용값은 목록 재현용 ON 시드. 해당 기능 상세/토글은 이번 구현 범위 밖이다.
+  function featureIsOn(name, minimum) { return name === "자산 관리" ? assetMgmtEnabled() : planAllows(minimum); }
+  const ASSET_FEATURE_DESCRIPTION = [
+    "회사가 보유한 자산을 등록하고 배정·보유 현황을 관리하는 기능입니다.",
+    "자산을 유형별로 분류하고, 구성원·근무지에 배정하거나 상태를 관리할 수 있습니다.",
+  ];
+  const ASSET_FEATURE_ART = `<svg viewBox="0 0 320 180" fill="none" aria-hidden="true">
+    <rect x="26" y="24" width="268" height="144" rx="15" fill="#bdddeb"/>
+    <rect x="26" y="40" width="268" height="128" rx="12" fill="#f6fafc"/>
+    <circle cx="40" cy="32" r="3" fill="#659eb5"/><circle cx="50" cy="32" r="3" fill="#53c8af"/><circle cx="60" cy="32" r="3" fill="#3199ed"/>
+    <rect x="43" y="58" width="91" height="93" rx="10" fill="#e5f0f5"/>
+    <path d="m61 83 28-14 28 14-28 15-28-15Z" fill="#7ebce4"/><path d="M61 83v33l28 15V98L61 83Z" fill="#519fce"/><path d="M117 83v33l-28 15V98l28-15Z" fill="#3091c7"/><path d="m75 76 28 15v13" stroke="#e8f7ff" stroke-width="5"/>
+    <rect x="150" y="61" width="125" height="26" rx="7" fill="#e8f2f7"/><rect x="160" y="70" width="51" height="6" rx="3" fill="#8bb6ca"/>
+    <rect x="150" y="99" width="125" height="26" rx="7" fill="#e8f2f7"/><rect x="160" y="108" width="69" height="6" rx="3" fill="#8bb6ca"/>
+    <circle cx="260" cy="74" r="6" fill="#3ab5a1"/><path d="m257 74 2 2 4-4" stroke="white" stroke-width="1.5"/>
+    <circle cx="260" cy="112" r="6" fill="#3ab5a1"/><path d="m257 112 2 2 4-4" stroke="white" stroke-width="1.5"/>
+    <rect x="180" y="137" width="95" height="7" rx="3.5" fill="#bdddeb"/>
+  </svg>`;
+  function planFeaturesScreenHtml() {
+    const plan = companyPlan();
+    const label = plan === "Trial" ? "무료 체험" : plan;
+    return `<div class="mapp-plan-page">
+      <div class="mapp-topbar"><button type="button" class="mapp-back" data-mapp-back aria-label="뒤로">←</button><span class="mapp-topbar-title">요금제 및 기능</span></div>
+      <div class="mapp-plan-body">
+        <div class="mapp-plan-current"><strong>${label}</strong><p>${label}${plan === "Trial" ? "을 이용 중입니다." : " 요금제를 사용 중입니다."}</p></div>
+        <div class="mapp-plan-intro"><p>사용할 기능을 선택해보세요.</p><div>세부 기능은 대시보드에서 설정할 수 있습니다.<br>(대시보드 &gt; 기능 설정)</div><button type="button" class="mapp-plan-dashboard" data-plan-dashboard>대시보드 링크 보기</button></div>
+        ${FEATURE_GROUPS.map(group => `<section class="mapp-plan-group"><h2>${group.name}</h2><div class="mapp-plan-list">${group.items.map(([name, minimum]) => {
+          const on = featureIsOn(name, minimum);
+          return `<button type="button" class="mapp-plan-row${on ? " on" : ""}" data-plan-feature="${name}"><span>${name}${on ? '<i class="mapp-plan-use-dot" aria-label="사용 중"></i>' : ""}</span><span class="mapp-plan-chevron" aria-hidden="true">›</span></button>`;
+        }).join("")}</div></section>`).join("")}
+      </div></div>`;
+  }
+  function assetFeatureScreenHtml() {
+    const on = assetMgmtEnabled();
+    return `<div class="mapp-plan-page mapp-plan-detail">
+      <div class="mapp-plan-hero"><div class="mapp-topbar"><button type="button" class="mapp-back" data-mapp-back aria-label="뒤로">←</button></div>${ASSET_FEATURE_ART}</div>
+      <div class="mapp-plan-detail-body">
+        <section class="mapp-plan-info-card"><div class="mapp-plan-toggle-row">
+          ${!planAllows("Pro") ? '<span class="mapp-plan-tier">Pro 이상</span>' : ""}
+          <button type="button" class="toggle-switch${on ? " on" : ""}" data-plan-toggle role="switch" aria-label="자산 관리 사용 여부" aria-checked="${on}"><span class="toggle-knob"></span></button></div>
+          <h1>자산 관리</h1>${ASSET_FEATURE_DESCRIPTION.map(text => `<p>${text}</p>`).join("")}</section>
+        <section class="mapp-plan-info-card mapp-plan-settings"><h2>세부 기능 설정</h2><ul><li>자산 관리 권한</li></ul>
+          <p class="mapp-plan-guide">세부 기능은 대시보드에서 설정할 수 있습니다.<br>(대시보드 &gt; 자산 &gt; 설정)</p>
+          <button type="button" class="mapp-plan-dashboard" data-plan-dashboard>대시보드 링크 보기</button></section>
+      </div></div>`;
+  }
+  function openPlanDialog({ title, body, actions }) {
+    const previousFocus = document.activeElement;
+    const screen = document.querySelector(".mapp-screen");
+    const rect = screen.getBoundingClientRect();
+    const back = document.createElement("div");
+    back.className = "mapp-plan-dialog-back";
+    back.style.cssText = `position:absolute;top:${rect.top + window.scrollY}px;left:${rect.left + window.scrollX}px;width:${rect.width}px;height:${rect.height}px;`;
+    back.innerHTML = `<div class="mapp-plan-dialog" role="dialog" aria-modal="true" aria-labelledby="plan-dialog-title"><div class="mapp-plan-dialog-body"><h2 id="plan-dialog-title">${title}</h2>${body || ""}</div><div class="mapp-plan-dialog-foot">${actions.map((action, index) => `<button type="button" data-plan-dialog-action="${index}">${action.label}</button>`).join("")}</div></div>`;
+    function close() {
+      back.remove(); document.removeEventListener("keydown", onKey);
+      if (previousFocus && previousFocus.isConnected) previousFocus.focus();
+    }
+    function onKey(event) {
+      if (event.key === "Escape") { event.preventDefault(); close(); }
+      if (event.key === "Tab") {
+        const buttons = [...back.querySelectorAll("button")];
+        const first = buttons[0], last = buttons[buttons.length - 1];
+        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+      }
+    }
+    back.querySelectorAll("[data-plan-dialog-action]").forEach(button => button.onclick = () => { close(); const action = actions[Number(button.dataset.planDialogAction)]; if (action.run) action.run(); });
+    back.onclick = event => { if (event.target === back) close(); };
+    document.addEventListener("keydown", onKey);
+    document.body.appendChild(back);
+    back.querySelector("button").focus();
+    return back;
+  }
+  function openPlanDashboardLink() {
+    const url = "https://dashboard.shoplworks.com";
+    const back = openPlanDialog({ title: "대시보드(PC) 링크", body: `<p>PC에서 접속해주세요.</p><div class="mapp-plan-link-content"><p class="mapp-plan-link-url">${url}</p><div class="mapp-plan-link-actions"><button type="button" data-plan-copy><span aria-hidden="true">▣</span>복사</button><button type="button" data-plan-share><span aria-hidden="true">↗</span>공유</button></div></div>`, actions: [{ label: "닫기" }] });
+    back.querySelector("[data-plan-copy]").onclick = async () => {
+      try { await navigator.clipboard.writeText(url); toast("링크가 복사되었습니다. PC에서 접속해주세요."); }
+      catch { toast("주소를 길게 눌러 복사해주세요."); }
+    };
+    back.querySelector("[data-plan-share]").onclick = async () => {
+      if (!navigator.share) { toast("이 환경에서는 공유를 지원하지 않습니다. 주소를 복사해주세요."); return; }
+      try { await navigator.share({ title: "대시보드(PC) 링크", url }); }
+      catch (error) { if (error.name !== "AbortError") toast("공유할 수 없습니다. 주소를 복사해주세요."); }
+    };
+  }
+  function wirePlanFeatures(root, state, draw) {
+    const goto = root.querySelector('[data-mapp-goto="plan-features"]');
+    if (goto) goto.onclick = () => { if (!canConfigureFeatures()) return; state.screen = "plan-features"; draw(); };
+    root.querySelectorAll("[data-plan-dashboard]").forEach(button => button.onclick = openPlanDashboardLink);
+    root.querySelectorAll("[data-plan-feature]").forEach(button => button.onclick = () => {
+      if (button.dataset.planFeature !== "자산 관리") { toast("이 기능의 상세 화면은 프로토타입 구현 범위에 포함되지 않습니다."); return; }
+      state.featureListScroll = root.querySelector(".mapp-screen").scrollTop;
+      state.screen = "asset-feature"; draw();
+    });
+    const toggle = root.querySelector("[data-plan-toggle]");
+    if (!toggle) return;
+    toggle.onclick = () => {
+      if (!canConfigureFeatures()) return;
+      if (!planAllows("Pro")) {
+        openPlanDialog({ title: "Pro 요금제부터 사용할 수 있습니다.", body: "<p>자산 관리 기능을 사용하려면 요금제를 업그레이드해주세요.</p>", actions: [{ label: "취소" }, { label: "대시보드 링크 보기", run: openPlanDashboardLink }] });
+        return;
+      }
+      const on = assetMgmtEnabled();
+      openPlanDialog({ title: on ? "사용 안 함으로 설정하시겠습니까?" : "사용함으로 설정하시겠습니까?",
+        body: "", // 앱 운영 양식: 사용함/사용 안 함 확인은 바디 없이 타이틀·취소/확인만 제공.
+        actions: [{ label: "취소" }, { label: "확인", run: () => {
+          // 확인 당시에도 관리자/요금제 검사. 취소하거나 저장에 실패하면 기존 사용값과 화면을 유지한다.
+          if (!canConfigureFeatures() || !planAllows("Pro")) { draw(); return; }
+          try { localStorage.setItem(ASSET_MGMT_FLAG_KEY, on ? "0" : "1"); }
+          catch { toast("저장하지 못했습니다. 다시 시도해주세요."); return; }
+          draw(); toast("저장되었습니다.");
+        } }],
+      });
+    };
+  }
+
   // 뷰포트 기준(bottom:32px)으로 고정돼 있으면 폰 목업이 뷰포트 하단에 딱 붙어있지 않은 이상 토스트가
   // 폰 밖으로 떨어져 보임 — .mapp-screen의 실제 좌표를 재서 그 영역 기준 하단/가운데에 뜨도록 함(2026-09-30)
   function toast(msg) {
@@ -99,8 +242,7 @@
   // 탭은 본인에게 배정/보유된 것만 보여줘서 조회 권한과 무관하게 항상 노출하지만(구조설계안 §8), 근무지
   // 자산 탭은 나 아닌 다른 사람·근무지의 배정/보유 현황까지 보여주는 화면이라 소분류별 조회 권한을 실제로
   // 적용(2026-09-30 — 지금까지는 이 필터 자체가 없어서 조회 권한과 무관하게 근무지의 모든 자산이 다 보였음)
-  function hasViewPermission(a) {
-    const cat = window.DATA.categories.find(c => c.group === a.group && c.sub === a.sub);
+  function catViewPermission(cat) {
     if (!cat) return false;
     switch (cat.view) {
       case "회사의 모든 구성원": return true;
@@ -108,6 +250,9 @@
       case "특정 그룹 및 직무/직급": return (cat.viewTarget && cat.viewTarget.groups || []).includes(MEMBER_TEAM[ME]);
       default: return false; // 모든 관리자 및 리더 / 관리자만
     }
+  }
+  function hasViewPermission(a) {
+    return catViewPermission(window.DATA.categories.find(c => c.group === a.group && c.sub === a.sub));
   }
   // 프로토타입 데모용 오버라이드(2026-09-27) — 판정 로직(hasAssignPermission)은 그대로 두되, 화면에서는
   // 항상 권한이 있다고 가정하고 액션을 노출. 실제 판정값은 그대로 계산돼 코드·디스크립션엔 남아있으므로,
@@ -153,7 +298,7 @@
     return items;
   }
   // assets.js의 subOrder()와 동일 — 카드 목록도 대시보드와 같은 규칙(분류순→품목명순→동점 처리)으로 정렬,
-  // 다만 모바일 카드 리스트는 소분류 구분 헤더 없이 평평한 목록이라 정렬만 적용하고 그룹 라벨은 안 보여줌
+  // 내 자산과 구성원·근무지 대상 목록이 이 정렬 함수를 함께 사용한다. 그룹 표시 여부는 화면별로 결정.
   const CATEGORY_ORDER = new Map(window.DATA.categories.map((c, i) => [c.sub, i]));
   function subOrder(sub) { return CATEGORY_ORDER.has(sub) ? CATEGORY_ORDER.get(sub) : 999; }
   function sortItems(items) {
@@ -1124,12 +1269,12 @@
     if (a.type !== "individual" || !canManage(a)) return [];
     return STATUS_TRANSITIONS[a.status].map(([key, label]) => ({ key, label, danger: key === "dispose" }));
   }
-  // 배정/보유 관리 액션(상단바 "더보기" → 드롭다운) — 상태 변경류를 제외한 나머지: 재배정·배정 추가·반납
+  // 배정/보유 관리 액션(상단바 "더보기" → 드롭다운) — 상태 변경류를 제외한 나머지: 배정일 수정·재배정·배정 추가·반납
   // (개별형), 수량 변경·보유 대상 추가/해제(수량형), 사진 관리(공통). 폐기되지 않았고 배정/보유 변경 권한이
   // 있는 자산에 한해서만 노출. 메모 수정·사진 관리는 더보기가 아니라 각각 메모 값 옆 편집 아이콘/대표 이미지
   // 위 편집 아이콘으로 별도 제공(2026-09-27, assetDetailScreenHtml 참조) — 대시보드 detail.js와 동일한 구조.
   // 순서는 "자주 쓰는 것 먼저, 되돌리는 액션(반납/보유 해제)은 맨 아래 빨간 글씨"(2026-09-29 재정렬).
-  // 배정 추가(활성 배정 5건 도달)·보유 대상 추가(잔여 수량 0)는 항목 자체를 숨기지 않고 항상 노출 — 대시보드는
+  // 공동 대상 제목 옆 추가 버튼(배정 5건/잔여 수량 0)도 권한이 있으면 숨기지 않고 항상 노출 — 대시보드는
   // 배정 추가를 비활성+호버 툴팁으로 처리하지만, 앱은 터치 환경이라 호버가 없어 그 패턴을 그대로 못 씀. 대신
   // 둘 다 항상 활성 상태로 두고 누르면(dispatchAction) 토스트로 안내하는 방식으로 통일(2026-09-30, 배정
   // 추가도 처음엔 대시보드처럼 비활성+data-tip 툴팁으로 만들었다가 호버 불가 문제로 토스트 방식으로 전환)
@@ -1138,13 +1283,11 @@
     const acts = [];
     if (a.type === "individual") {
       const { idx } = findRecord(a, target);
-      if (idx >= 0) acts.push({ key: "reassign", label: "재배정" });
-      acts.push({ key: "assign-add", label: "배정 추가" });
+      if (idx >= 0) acts.push({ key: "date", label: "배정일 수정" }, { key: "reassign", label: "재배정" });
       if (idx >= 0) acts.push({ key: "return", label: "반납", danger: true });
     } else {
       const { idx } = findRecord(a, target);
       if (idx >= 0) acts.push({ key: "qty-change", label: "수량 변경" });
-      acts.push({ key: "hold-add", label: "보유 대상 추가" });
       if (idx >= 0) acts.push({ key: "hold-release", label: "보유 해제", danger: true });
     }
     return acts;
@@ -1192,7 +1335,7 @@
       : `<span class="badge stock">${rec ? rec.qty : 0}개</span>`;
     const subMeta = `<div>${statusBadge}</div>${
       isIndiv && a.assetNo ? `<div style="margin-top:5px">고유관리번호 <b>${a.assetNo}</b></div>` : ""
-    }`;
+    }${isIndiv && rec ? `<div>배정일 ${window.fmtDate(rec.since)}</div>` : ""}`;
     const cat = window.DATA.categories.find(c => c.group === a.group && c.sub === a.sub) || {};
     const hiddenFields = cat.hiddenFields || [];
     const kv = [
@@ -1224,13 +1367,14 @@
     // 공동 배정/보유 대상 — target 본인을 뺀 나머지를 정보로만 노출(액션 없음). 최대 5개까지 보여주고
     // 초과하면 "전체보기"로 전용 목록 화면(partiesScreenHtml) 이동(근무지 카드의 최대 5개+전체보기와 동일 패턴)
     const others = otherParties(a, target);
-    const partyHtml = others.length ? `
+    // 공동 대상이 0건이어도 섹션을 유지해 추가 진입점을 제공한다. 행은 계속 조회 전용이다.
+    const partyHtml = `
       <div class="dsection">
-        <div class="mapp-party-head">${isIndiv ? "공동 배정 대상" : "공동 보유 대상"}</div>
+        <div class="mapp-party-header"><h2 class="mapp-party-head">${isIndiv ? "공동 배정 대상" : "공동 보유 대상"}</h2>${canManage(a) && a.status !== "disposed" ? `<button type="button" class="btn sm" data-party-add>${isIndiv ? "배정 추가" : "보유 대상 추가"}</button>` : ""}</div>
         <div class="mapp-count">전체 <b>${others.length}</b></div>
-        <div class="mapp-party-list">${others.slice(0, 5).map(x => partyRowHtml(x, isIndiv)).join("")}</div>
+        ${others.length ? `<div class="mapp-party-list">${others.slice(0, 5).map(x => partyRowHtml(x, isIndiv)).join("")}</div>` : `<p class="mapp-party-empty">${isIndiv ? "공동 배정 대상이 없습니다." : "공동 보유 대상이 없습니다."}</p>`}
         ${others.length > 5 ? `<button type="button" class="mapp-party-viewall" data-parties-viewall>전체보기</button>` : ""}
-      </div>` : "";
+      </div>`;
     return `
       <div class="mapp-topbar">
         <button type="button" class="mapp-back" data-mapp-back aria-label="뒤로">←</button>
@@ -1267,7 +1411,179 @@
 
   // 메뉴 화면 — 실 앱 스크린샷 그대로(관리 섹션 마지막에 "자산" 신규 추가, 화살표 없이 바로 이동)
   const MENU_ICON_ASSET = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10" r="1.6"/><path d="m21 16-5-5-9 8"/></svg>`;
-  function menuScreenHtml() {
+
+  // 앱 메뉴의 관리 진입점. 목록 화면은 자산 프로토타입 범위 밖이므로 대시보드처럼 임의의 상세로 이동.
+  const DEMO_DIRECTORY_MEMBER = "김민수";
+  const DEMO_DIRECTORY_WORKSITE = "강남점";
+  function directoryMenuHtml(kind, expanded) {
+    const member = kind === "member";
+    const label = member ? "구성원" : "근무지";
+    const icon = member
+      ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="7" r="3.5"/><path d="M5 21v-3a7 7 0 0 1 14 0v3H5Z"/></svg>'
+      : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h3M14 7h2M8 11h3M8 15h3"/></svg>';
+    return `<div class="mapp-menu-folder">
+      <button type="button" class="mapp-menu-row mapp-menu-fold" data-menu-fold="${kind}" aria-expanded="${!!expanded}" aria-controls="mapp-menu-${kind}-list"><span class="mapp-menu-ic">${icon}</span><span>${label}</span><span class="mapp-menu-chev" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m3 6 5 5 5-5"/></svg></span></button>
+      <div class="mapp-menu-sublist" id="mapp-menu-${kind}-list"${expanded ? "" : " hidden"}>
+        <button type="button" class="mapp-menu-subrow" data-directory-open="${kind}">${label} 관리</button>
+        <span class="mapp-menu-subrow">${member ? "퇴사 직원" : "비활성 근무지"}</span>
+        <span class="mapp-menu-subrow">설정</span>
+      </div></div>`;
+  }
+  // 상세 자체의 조회 권한은 기존 구성원/근무지 기능의 책임이다. 자산은 기존 소분류 조회 판정을
+  // 재사용하며 본인 배정·보유 예외를 유지한다. 기능 설정 관리자 데모 가정으로 자산 권한을 확대하지 않는다.
+  function directoryEsc(value) {
+    return String(value ?? "").replace(/[&<>"']/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]));
+  }
+  function directoryTarget(kind) {
+    return { type: kind === "member" ? "employee" : "worksite", value: kind === "member" ? DEMO_DIRECTORY_MEMBER : DEMO_DIRECTORY_WORKSITE };
+  }
+  function directoryCanViewAsset(a, kind) {
+    return (kind === "member" && DEMO_DIRECTORY_MEMBER === ME) || hasViewPermission(a);
+  }
+  function directoryAssetAvailable(kind) {
+    if (!assetMgmtEnabled()) return false;
+    // 자산 0건도 분류 조회 권한으로 노출. 메뉴/부모 탭은 데이터 건수로 숨기지 않는다.
+    return (kind === "member" && DEMO_DIRECTORY_MEMBER === ME) || window.DATA.categories.some(cat => catViewPermission(cat));
+  }
+  function directoryItems(kind) {
+    const target = directoryTarget(kind), result = [];
+    assets.forEach(a => {
+      if (a.deleted_at || !directoryCanViewAsset(a, kind)) return;
+      const list = a.type === "individual" ? a.assignments || [] : a.stocks || [];
+      list.forEach(record => {
+        if (record[target.type] === target.value) result.push({ asset: a, qty: a.type === "individual" ? 1 : record.qty });
+      });
+    });
+    return sortItems(result);
+  }
+  // 다른 업무 기능은 이번 프로토타입의 정적 ON 시드/요금제를 재사용한다. 실제 앱 연결 시에는 보고서·게시판
+  // 그룹 접근, 수집 대상자 등의 서버 판정을 각각 유지해야 한다(첨부 릴리즈 분석). 아래 true는 임의 상세의
+  // 조회자가 본인 또는 관리 대상에 접근 가능하고 기존 업무 그룹도 보유한다는 데모 가정이며 역할 판정이 아니다.
+  const DEMO_DIRECTORY_TASK_ACCESS = true;
+  const DIRECTORY_WORK_TASKS = [["tam", "판매 목표", "목표 달성 관리", "Enterprise"], ["todo", "할 일", "할 일", "Pro"], ["report", "보고서", "보고서", "Pro"], ["board", "게시판", "게시판", "Pro"], ["sales", "판매량", "판매량", "Enterprise"], ["price", "가격", "가격", "Enterprise"], ["inventory", "재고", "재고", "Enterprise"], ["display", "전시현황", "전시현황", "Enterprise"]];
+  function directoryTaskMenus(kind) {
+    return DIRECTORY_WORK_TASKS.filter(([key, , feature, minimum]) =>
+      (kind === "worksite" || ["todo", "report", "board"].includes(key)) &&
+      (kind === "worksite" || DEMO_DIRECTORY_TASK_ACCESS) && featureIsOn(feature, minimum));
+  }
+  function directoryTaskVisible(kind) {
+    // 기존 업무 조건에 자산 조건을 OR로 추가: 다른 업무가 모두 OFF여도 자산으로 업무 탭을 열 수 있다.
+    return directoryTaskMenus(kind).length > 0 || directoryAssetAvailable(kind);
+  }
+  const DIRECTORY_ICONS = {
+    asset: '<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 5v5M15 5v5M10 15h4"/>',
+    todo: '<rect x="4" y="4" width="16" height="16" rx="2"/><path d="m8 9 2 2 4-4M8 16h8"/>',
+    report: '<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 3h6v3H9zM9 11h6M9 15h4"/>',
+    board: '<path d="M7 3h12v17H5V7l2-4Z"/><path d="M9 8h6M9 12h6M9 16h3"/>'
+  };
+  function directoryIcon(key) { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${DIRECTORY_ICONS[key] || DIRECTORY_ICONS.report}</svg>`; }
+  function directoryAssetSectionHtml(kind, state, category) {
+    const items = directoryItems(kind).filter(item => !category || (item.asset.group === category.group && item.asset.sub === category.sub));
+    if (!items.length) return `${kind === "member" ? '<div class="mapp-count">전체 <b>0</b></div>' : ""}<p class="mapp-directory-empty">배정·보유 중인 자산이 없습니다.</p>`;
+    const cat = category && window.DATA.categories.find(c => c.group === category.group && c.sub === category.sub);
+    const searchPlaceholder = cat && cat.type === "quantity" ? "품목명" : "품목명/고유관리번호";
+    // 구성원 목록은 분류별 섹션 없이 나열하되 내 자산과 같은 sortItems 정렬을 유지한다.
+    // 분류 저장 순서 → 품목명 → 개별형 관리번호 / 수량형 해당 대상의 보유량 내림차순.
+    return `<div class="mapp-directory-asset-tools"><span>전체 <b data-directory-count>${items.length}</b></span>
+      <div class="mapp-directory-search"><input type="search" data-directory-search placeholder="${searchPlaceholder}" aria-label="자산 검색" value="${directoryEsc(state.directorySearch || "")}"><button type="button" data-directory-search-clear aria-label="검색어 지우기"${state.directorySearch ? "" : " hidden"}>×</button></div></div>
+      <div class="mapp-directory-asset-list">${items.map(x => {
+        const a = x.asset, status = STATUS_LABEL[a.status] || [a.status, ""];
+        return `<button type="button" class="mapp-directory-asset-row" data-directory-asset="${directoryEsc(a.id)}"><span><strong>${directoryEsc(a.product)}</strong>${a.type === "individual" ? `<small>${directoryEsc(a.assetNo || "—")}</small>` : ""}${kind === "member" ? `<small class="mapp-directory-asset-category">${directoryEsc(a.group)} › ${directoryEsc(a.sub)}</small>` : ""}</span><span class="badge ${a.type === "individual" ? status[1] : "stock"}">${a.type === "individual" ? status[0] : `${x.qty}개`}</span></button>`;
+      }).join("")}</div>
+      <p class="mapp-directory-empty" data-directory-search-empty hidden>결과가 없습니다.</p>`;
+  }
+  // 근무지 업무 카드에는 직원모드 근무지 자산과 같은 분류별 건수만 표시한다.
+  // 자산 전체를 인라인으로 나열하지 않으며 검색은 소분류 목록 안에서만 제공한다.
+  function directoryWorksiteSummaryHtml() {
+    const items = directoryItems("worksite"), groups = new Map();
+    items.forEach(item => {
+      const key = item.asset.group + "|" + item.asset.sub;
+      if (!groups.has(key)) groups.set(key, { group: item.asset.group, sub: item.asset.sub, count: 0 });
+      groups.get(key).count++;
+    });
+    return `<div class="mapp-count">전체 <b>${items.length}</b></div>${items.length
+      ? `<div class="mapp-ws-cat-tree">${[...groups.values()].map(category => `<button type="button" class="mapp-ws-cat-row" data-directory-sub-open data-group="${directoryEsc(category.group)}" data-sub="${directoryEsc(category.sub)}"><span>${directoryEsc(category.group)} <span class="mapp-cat-sep">›</span> ${directoryEsc(category.sub)}</span><span class="mapp-ws-cat-count">${category.count}<span class="mapp-menu-chev">›</span></span></button>`).join("")}</div>`
+      : '<p class="mapp-directory-empty">배정·보유 중인 자산이 없습니다.</p>'}`;
+  }
+  function directoryWorksiteAssetsScreenHtml(state) {
+    const ws = DEMO_DIRECTORY_WORKSITE, category = state.directoryCategory;
+    return `<div class="mapp-directory-page"><div class="mapp-topbar"><button type="button" class="mapp-back" data-mapp-back aria-label="뒤로">←</button></div>
+      <div class="mapp-wsdetail-head"><div class="mapp-directory-context">${ws}</div><div class="mapp-wsdetail-sub">${directoryEsc(category.group)} <span class="mapp-cat-sep">›</span> ${directoryEsc(category.sub)}</div></div>
+      <div class="mapp-directory-member-assets">${directoryAssetAvailable("worksite") ? directoryAssetSectionHtml("worksite", state, category) : '<p class="mapp-directory-empty">배정·보유 중인 자산이 없습니다.</p>'}</div></div>`;
+  }
+  function directoryProfileScreenHtml(kind, state) {
+    const member = kind === "member", name = directoryTarget(kind).value;
+    const info = MEMBERS.find(person => person.name === name) || {};
+    const taskVisible = directoryTaskVisible(kind);
+    if (state.directoryTab === "work" && !taskVisible) state.directoryTab = "info";
+    const selected = state.directoryTab || (taskVisible ? "work" : "info");
+    const tabs = member ? [["info", "정보"], ["attendance", "근태"], ["work", "업무"]] : [["attendance", "근무"], ["work", "업무"], ["info", "정보"]];
+    const asset = directoryAssetAvailable(kind);
+    const otherMenus = directoryTaskMenus(kind);
+    const taskBody = member
+      ? `${asset ? `<section class="mapp-directory-task-card"><button type="button" class="mapp-directory-fold" data-directory-fold="asset" aria-expanded="${state.directoryAssetExpanded !== false}"><strong>자산</strong><span aria-hidden="true">⌃</span></button><div class="mapp-directory-fold-body"${state.directoryAssetExpanded === false ? " hidden" : ""}>${directoryAssetSectionHtml("member", state)}</div></section>` : ""}${otherMenus.map(([key, label]) => `<button type="button" class="mapp-directory-nav-card" data-directory-placeholder><span class="mapp-directory-task-icon ${key}">${directoryIcon(key)}</span><strong>${label}</strong></button>`).join("")}`
+      : `${asset ? `<section class="mapp-directory-task-card"><button type="button" class="mapp-directory-fold" data-directory-fold="asset" aria-expanded="${state.directoryAssetExpanded !== false}"><strong>자산</strong><span aria-hidden="true">⌃</span></button><div class="mapp-directory-fold-body"${state.directoryAssetExpanded === false ? " hidden" : ""}>${directoryWorksiteSummaryHtml()}</div></section>` : ""}${otherMenus.map(([key, label]) => `<section class="mapp-directory-task-card"><button type="button" class="mapp-directory-fold" data-directory-fold="${key}" aria-expanded="true"><strong>${label}</strong><span aria-hidden="true">⌃</span></button><div class="mapp-directory-fold-body"><p class="mapp-directory-empty">${key === "tam" ? "배정된 판매 목표가 없습니다." : key === "todo" ? "오늘 배정된 할 일이 없습니다." : `${label}${["board", "sales", "price", "display"].includes(key) ? "이" : "가"} 없습니다.`}</p></div></section>`).join("")}`;
+    const rows = member ? [["그룹", info.team], ["직무", "매니저"], ["직급", "Lv.3"], ["사번", info.empNo], ["휴대폰번호", info.phone]] : [["근무지 코드", WS_CODE[name]], ["주소", WS_ADDRESS[name]]];
+    return `<div class="mapp-directory-page">
+      ${member ? `<div class="mapp-topbar"><button type="button" class="mapp-back" data-mapp-back aria-label="뒤로">←</button><div class="mapp-directory-top-actions"><button type="button" data-directory-placeholder aria-label="검색">${'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="10" cy="10" r="7"/><path d="m15 15 6 6"/></svg>' }</button><button type="button" data-directory-placeholder aria-label="더보기">⋮</button></div></div>
+        <header class="mapp-directory-member-header"><div class="mapp-directory-member-top"><span class="mapp-directory-avatar" style="background:${avatarColor(name)}">${name[0]}</span><div class="mapp-directory-contact"><button type="button" data-directory-placeholder aria-label="전화">☎</button><button type="button" data-directory-placeholder aria-label="채팅">${directoryIcon("board")}</button></div></div><h1>${name}</h1><p>${directoryEsc(info.team)}</p><span class="mapp-directory-working">● 근무 중 ›</span></header>`
+      : `<div class="mapp-directory-site-hero"><div class="mapp-topbar"><button type="button" class="mapp-back" data-mapp-back aria-label="뒤로">←</button><div class="mapp-directory-top-actions"><button type="button" data-directory-placeholder aria-label="검색">${'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="10" cy="10" r="7"/><path d="m15 15 6 6"/></svg>' }</button></div></div><div class="mapp-directory-map" aria-label="근무지 위치"><svg viewBox="0 0 200 120" aria-hidden="true"><rect width="200" height="120" fill="#e6e9e6"/><path d="M-20 100 140 0M0 40l210 60M70 0l50 120M-10 100l220-90" stroke="#fff" stroke-width="12"/><path d="M100 30a16 16 0 0 0-16 16c0 16 16 29 16 29s16-13 16-29a16 16 0 0 0-16-16Z" fill="#333"/><circle cx="100" cy="46" r="8" fill="#e6e9e6"/></svg></div><div class="mapp-directory-site-photo">${directoryIcon("asset")}<span>${name}</span></div></div><header class="mapp-directory-site-header"><div class="mapp-directory-site-status"><span>활성 ›</span><span class="mapp-directory-favorite" aria-label="즐겨찾는 근무지">★</span></div><h1>${name}</h1><small>${WS_CODE[name] || "—"}</small><p>${WS_ADDRESS[name] || "주소 없음"}<button type="button" data-directory-address-copy aria-label="주소 복사">▣</button></p></header>`}
+      <div class="mapp-directory-tabs" role="tablist" aria-label="${member ? "구성원" : "근무지"} 상세">${tabs.filter(([key]) => key !== "work" || taskVisible).map(([key, label]) => `<button type="button" role="tab" aria-selected="${selected === key}" class="${selected === key ? "active" : ""}" data-directory-tab="${key}">${label}</button>`).join("")}</div>
+      <div class="mapp-directory-task-body">${selected === "work" ? taskBody : selected === "info" ? `<section class="mapp-directory-info"><h2>기본 정보</h2><dl>${rows.map(([label, value]) => `<div><dt>${label}</dt><dd>${directoryEsc(value || "—")}</dd></div>`).join("")}</dl></section>` : '<p class="mapp-directory-empty">근무 내역이 없습니다.</p>'}</div></div>`;
+  }
+  function wireDirectoryProfile(root, state, draw) {
+    root.querySelectorAll("[data-directory-tab]").forEach(button => button.onclick = () => { state.directoryTab = button.dataset.directoryTab; draw(); });
+    root.querySelectorAll("[data-directory-placeholder]").forEach(button => button.onclick = () => toast("이 기능은 프로토타입 범위 밖입니다."));
+    root.querySelectorAll("[data-directory-fold]").forEach(button => button.onclick = () => {
+      const expanded = button.getAttribute("aria-expanded") === "true";
+      button.setAttribute("aria-expanded", String(!expanded)); button.nextElementSibling.hidden = expanded;
+      if (button.dataset.directoryFold === "asset") state.directoryAssetExpanded = !expanded;
+    });
+    root.querySelectorAll("[data-directory-sub-open]").forEach(button => button.onclick = () => {
+      if (!directoryAssetAvailable("worksite")) return;
+      state.directoryScroll = root.querySelector(".mapp-screen").scrollTop;
+      state.directoryCategory = { group: button.dataset.group, sub: button.dataset.sub };
+      state.directorySearch = ""; state.screen = "directory-worksite-assets"; draw();
+    });
+    const copy = root.querySelector("[data-directory-address-copy]");
+    if (copy) copy.onclick = async () => { try { await navigator.clipboard.writeText(WS_ADDRESS[DEMO_DIRECTORY_WORKSITE]); toast("주소가 복사되었습니다."); } catch { toast("주소를 복사하지 못했습니다."); } };
+    const search = root.querySelector("[data-directory-search]");
+    if (!search) return;
+    const clear = root.querySelector("[data-directory-search-clear]");
+    function filter() {
+      state.directorySearch = search.value;
+      const query = search.value.trim().toLowerCase(); let total = 0;
+      root.querySelectorAll("[data-directory-asset]").forEach(row => {
+        const a = assets.find(asset => asset.id === row.dataset.directoryAsset);
+        // 품목명만 수량형, 품목명/관리번호 개별형. 대소문자는 검색시에만 정규화한다.
+        const matched = !query || a.product.toLowerCase().includes(query) || (a.type === "individual" && (a.assetNo || "").toLowerCase().includes(query));
+        row.hidden = !matched; if (matched) total++;
+      });
+      root.querySelector("[data-directory-count]").textContent = total;
+      root.querySelector("[data-directory-search-empty]").hidden = total > 0;
+      clear.hidden = !search.value;
+    }
+    search.addEventListener("input", filter);
+    clear.onclick = () => { search.value = ""; filter(); search.focus(); };
+    filter();
+  }
+  function wireDirectoryMenu(root, state, draw) {
+    root.querySelectorAll("[data-menu-fold]").forEach(button => button.onclick = () => {
+      const kind = button.dataset.menuFold;
+      const expanded = !state.menuExpanded[kind];
+      state.menuExpanded[kind] = expanded;
+      button.setAttribute("aria-expanded", String(expanded));
+      root.querySelector(`#mapp-menu-${kind}-list`).hidden = !expanded;
+    });
+    root.querySelectorAll("[data-directory-open]").forEach(button => button.onclick = () => {
+      state.menuScroll = root.querySelector(".mapp-screen").scrollTop;
+      state.screen = button.dataset.directoryOpen === "member" ? "member-profile" : "worksite-profile";
+      state.directoryTab = "work"; state.directoryAssetExpanded = true; state.directorySearch = ""; state.directoryScroll = 0;
+      draw();
+    });
+  }
+
+  function menuScreenHtml(menuExpanded = {}) {
     return `
       <div class="mapp-menu-head">
         <span class="mapp-brand">shopl <b>샤플앤컴퍼니</b></span>
@@ -1277,19 +1593,15 @@
         <div class="mapp-menu-cap">비용</div>
         <div class="mapp-menu-row"><span class="mapp-menu-ic">🧾</span>비용 정산</div>
         <div class="mapp-menu-cap">관리</div>
-        <div class="mapp-menu-row">
-          <span class="mapp-menu-ic">👤</span>구성원<span class="mapp-menu-chev">⌄</span>
-        </div>
-        <div class="mapp-menu-row">
-          <span class="mapp-menu-ic">📍</span>근무지<span class="mapp-menu-chev">⌄</span>
-        </div>
+        ${directoryMenuHtml("member", menuExpanded.member)}
+        ${directoryMenuHtml("worksite", menuExpanded.worksite)}
         <div class="mapp-menu-row"><span class="mapp-menu-ic">👥</span>그룹</div>
-        <div class="mapp-menu-row" data-mapp-goto="assets"><span class="mapp-menu-ic">${MENU_ICON_ASSET}</span>자산</div>
+        ${assetMgmtEnabled() ? `<div class="mapp-menu-row" data-mapp-goto="assets"><span class="mapp-menu-ic">${MENU_ICON_ASSET}</span>자산</div>` : ""}
         <div class="mapp-menu-cap">설정 및 결제</div>
         <div class="mapp-menu-row">
           <span class="mapp-menu-ic">⚙</span>회사 설정<span class="mapp-menu-chev">⌄</span>
         </div>
-        <div class="mapp-menu-row"><span class="mapp-menu-ic">🔌</span>요금제 및 기능</div>
+        ${canConfigureFeatures() ? `<button type="button" class="mapp-menu-row mapp-menu-link" data-mapp-goto="plan-features"><span class="mapp-menu-ic">🔌</span>요금제 및 기능</button>` : ""}
         <div class="mapp-menu-divider"></div>
         <div class="mapp-menu-row muted"><span class="mapp-menu-ic">🎧</span>고객 센터</div>
       </div>`;
@@ -1304,15 +1616,30 @@
 
   function render() {
     const root = document.getElementById("app");
-    const state = { screen: "menu", assetTab: "mine", wsFilters: MappAssetFilter.empty(), wsSearch: "" };
+    const state = { screen: "menu", menuExpanded: { member: false, worksite: false }, menuScroll: 0, assetTab: "mine", wsFilters: MappAssetFilter.empty(), wsSearch: "" };
 
     function draw() {
+      const featureScreens = ["plan-features", "asset-feature"];
+      if (featureScreens.includes(state.screen) && !canConfigureFeatures()) state.screen = "menu";
+      if (!["menu", "member-profile", "worksite-profile", ...featureScreens].includes(state.screen) && !assetMgmtEnabled()) {
+        // 회사 기능 OFF/요금제 미충족이면 이미 열려 있던 상세·편집 페이지도 접근을 차단한다.
+        const filterCancel = document.querySelector(".mapp-asset-filter [data-filter-cancel]");
+        if (filterCancel) filterCancel.click(); // 공용 필터의 포커스/스크롤 이벤트도 정상 해제.
+        document.querySelectorAll(".mapp-fullpage-back, .mapp-sheet-back, .mapp-viewer-back, .dropdown-menu, .modal-back").forEach(node => node.remove());
+        delete state.detailFrom;
+        state.screen = "menu";
+      }
       // 배정/보유 변경 액션이 window.DATA.assets를 직접 mutate하므로, 목록은 렌더마다 새로 집계
       // (한 번만 계산해 두면 재배정·반납 등으로 바뀐 내용이 목록 화면에 반영되지 않음)
       const items = sortItems(collectMyItems(ME));
       const worksiteGroups = collectWorksiteGroups(ME);
       const showTabBar = state.screen === "menu";
-      const screenHtml = state.screen === "menu" ? menuScreenHtml()
+      const screenHtml = state.screen === "menu" ? menuScreenHtml(state.menuExpanded)
+        : state.screen === "member-profile" ? directoryProfileScreenHtml("member", state)
+        : state.screen === "worksite-profile" ? directoryProfileScreenHtml("worksite", state)
+        : state.screen === "directory-worksite-assets" ? directoryWorksiteAssetsScreenHtml(state)
+        : state.screen === "plan-features" ? planFeaturesScreenHtml()
+        : state.screen === "asset-feature" ? assetFeatureScreenHtml()
         : state.screen === "worksite-detail" ? worksiteDetailScreenHtml(state.wsDetail, state.wsDetailSub, itemsForWorksite(state.wsDetail, state.wsDetailSub), state.wsFilters)
         : state.screen === "asset-detail" ? assetDetailScreenHtml(assets.find(x => x.id === state.detailAssetId), state.detailTarget)
         : state.screen === "asset-parties" ? partiesScreenHtml(assets.find(x => x.id === state.detailAssetId), state.detailTarget)
@@ -1328,12 +1655,33 @@
           </div>
         </div>`;
 
+      wireDirectoryMenu(root, state, draw);
+      wireDirectoryProfile(root, state, draw);
+      wirePlanFeatures(root, state, draw);
       const back = root.querySelector("[data-mapp-back]");
       if (back) back.onclick = () => {
+        if (state.screen === "directory-worksite-assets") {
+          state.screen = "worksite-profile"; draw();
+          root.querySelector(".mapp-screen").scrollTop = state.directoryScroll || 0; return;
+        }
+        if (["member-profile", "worksite-profile"].includes(state.screen)) {
+          state.screen = "menu"; draw();
+          root.querySelector(".mapp-screen").scrollTop = state.menuScroll;
+          return;
+        }
+        if (state.screen === "asset-feature") {
+          state.screen = "plan-features"; draw();
+          root.querySelector(".mapp-screen").scrollTop = state.featureListScroll || 0;
+          return;
+        }
         // 공동 배정/보유 대상 전체보기는 자산 상세로, 자산 상세는 진입 직전 화면(내 자산/근무지 자산/
         // 전체보기)으로, 전체보기는 근무지 자산 탭으로, 그 외엔 메뉴로 복귀
         if (["asset-parties", "asset-history"].includes(state.screen)) { state.screen = "asset-detail"; }
-        else if (state.screen === "asset-detail" && state.detailFrom) { Object.assign(state, state.detailFrom); delete state.detailFrom; }
+        else if (state.screen === "asset-detail" && state.detailFrom) {
+          const directoryReturn = ["member-profile", "directory-worksite-assets"].includes(state.detailFrom.screen);
+          Object.assign(state, state.detailFrom); delete state.detailFrom;
+          draw(); if (directoryReturn) root.querySelector(".mapp-screen").scrollTop = state.directoryListScroll || 0; return;
+        }
         else if (state.screen === "worksite-detail") { state.screen = "assets"; state.assetTab = "worksite"; }
         else { state.screen = "menu"; }
         draw();
@@ -1342,8 +1690,13 @@
       // 레코드가 사라졌으면 진입 직전 목록으로, 아니면 자산 상세로(배정 추가·보유 대상 추가·재배정 페이지 포함)
       function afterMutate() {
         const a = assets.find(x => x.id === state.detailAssetId);
-        if (findRecord(a, state.detailTarget).idx < 0) { Object.assign(state, state.detailFrom); delete state.detailFrom; }
+        let directoryReturn = false;
+        if (findRecord(a, state.detailTarget).idx < 0) {
+          directoryReturn = ["member-profile", "directory-worksite-assets"].includes(state.detailFrom.screen);
+          Object.assign(state, state.detailFrom); delete state.detailFrom;
+        }
         draw();
+        if (directoryReturn) root.querySelector(".mapp-screen").scrollTop = state.directoryListScroll || 0;
       }
       // 자산 카드 클릭 → 자산 상세(앱) 이동. target(이 카드가 나타내는 구체적 배정/보유 레코드의 주체)은
       // 화면별로 다름: 내 자산 탭은 ME 본인, 근무지 자산(카드 안 축약 카드)·전체보기는 그 카드가 속한 근무지
@@ -1354,6 +1707,13 @@
         state.detailTarget = target;
         draw();
       }
+      root.querySelectorAll("[data-directory-asset]").forEach(row => row.onclick = () => {
+        const kind = state.screen === "member-profile" ? "member" : "worksite";
+        const a = assets.find(asset => asset.id === row.dataset.directoryAsset);
+        if (!a || !directoryAssetAvailable(kind) || !directoryCanViewAsset(a, kind)) return;
+        state.directoryListScroll = root.querySelector(".mapp-screen").scrollTop;
+        openDetail(a.id, directoryTarget(kind));
+      });
       if (state.screen === "assets" && state.assetTab === "mine") {
         root.querySelectorAll("[data-asset-card]").forEach(el => el.onclick = () => openDetail(el.dataset.assetId, { type: "employee", value: ME }));
       } else if (state.screen === "worksite-detail") {
@@ -1388,6 +1748,19 @@
         function dispatchAction(key) {
           const { idx } = findRecord(a, target);
           if (key === "history") { state.screen = "asset-history"; draw(); }
+          // 내 자산·근무지 자산·구성원/근무지 상세 모두 현재 target의 배정일만 정정한다.
+          else if (key === "date") {
+            if (a.type !== "individual" || a.status === "disposed" || !canManage(a) || idx < 0) return;
+            const record = a.assignments[idx];
+            openDateSheet(record.since, todayStr(), value => {
+              if (!value || value === record.since) return;
+              confirmModal("배정일을 수정하시겠습니까?", "", () => {
+                const before = record.since; record.since = value;
+                logActivity(a, { script: "배정 관리: 배정일 변경", target: record, before: window.fmtDate(before), after: window.fmtDate(value) });
+                afterMutate(); toast("배정일이 수정되었습니다.");
+              });
+            });
+          }
           else if (key === "assign-add") {
             if ((a.assignments || []).length >= 5) toast("활성 배정은 최대 5건까지 가능합니다.");
             else openFormPage(a, target, "assign-add", afterMutate);
@@ -1413,6 +1786,11 @@
         if (statusOpen) statusOpen.onclick = () => openDropdownMenu(statusOpen, statusActions(a), dispatchAction);
         const moreOpen = root.querySelector("[data-more-open]");
         if (moreOpen) moreOpen.onclick = () => openDropdownMenu(moreOpen, menuActions(a, target), dispatchAction);
+        const partyAdd = root.querySelector("[data-party-add]");
+        if (partyAdd) partyAdd.onclick = () => {
+          if (!canManage(a) || a.status === "disposed") return;
+          dispatchAction(a.type === "individual" ? "assign-add" : "hold-add");
+        };
         // 대표 이미지 클릭 → 사진 뷰어(조회 전용, 권한과 무관, 사진 없으면 disabled라 클릭 안 먹음)
         const heroBtn = root.querySelector("[data-hero-viewer]");
         if (heroBtn) heroBtn.onclick = () => openPhotoViewer(a);
@@ -1510,6 +1888,9 @@
         b.classList.toggle("collapsed", expanded);
       });
     }
+    window.addEventListener("storage", event => {
+      if ([ASSET_MGMT_FLAG_KEY, COMPANY_PLAN_KEY].includes(event.key) || event.key === null) draw();
+    });
     draw();
   }
 

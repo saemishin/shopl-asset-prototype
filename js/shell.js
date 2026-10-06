@@ -3,7 +3,11 @@
   // 기능 설정 > 관리 탭의 "자산 관리" 토글 상태 — 이 앱은 페이지 이동마다 전체 새로고침(SPA 아님)이라
   // window.DATA 같은 인메모리 값으론 유지가 안 돼서 localStorage로 저장(feature-settings.js와 키 공유)
   const ASSET_MGMT_FLAG_KEY = "shopl_proto_assetMgmtUse";
-  function assetMgmtOn() { return localStorage.getItem(ASSET_MGMT_FLAG_KEY) !== "0"; }
+  // 앱과 동일: 자산 관리는 Pro 이상(무료 체험 Pro 수준), 최초 ON. 사용자가 저장한 OFF는 유지.
+  function assetMgmtOn() {
+    const plan = localStorage.getItem("shopl_proto_companyPlan") || "Enterprise";
+    return ["Pro", "Enterprise", "Trial"].includes(plan) && localStorage.getItem(ASSET_MGMT_FLAG_KEY) !== "0";
+  }
 
   function buildNav() {
     return [

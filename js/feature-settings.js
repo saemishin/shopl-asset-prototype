@@ -5,7 +5,10 @@
    스코프 밖이라 이번에 제거, 2026-09-24). */
 (function () {
   const ASSET_MGMT_FLAG_KEY = "shopl_proto_assetMgmtUse";
-  function assetMgmtOn() { return localStorage.getItem(ASSET_MGMT_FLAG_KEY) !== "0"; }
+  // 회사 사용값과 최소 요금제는 별개. 신규/출시 시 기존 Pro 이상은 최초 ON, 이후 저장한 OFF는 보존.
+  const COMPANY_PLAN_KEY = "shopl_proto_companyPlan";
+  function assetPlanEligible() { return ["Pro", "Enterprise", "Trial"].includes(localStorage.getItem(COMPANY_PLAN_KEY) || "Enterprise"); }
+  function assetMgmtOn() { return assetPlanEligible() && localStorage.getItem(ASSET_MGMT_FLAG_KEY) !== "0"; }
   function setAssetMgmtOn(v) { localStorage.setItem(ASSET_MGMT_FLAG_KEY, v ? "1" : "0"); }
 
   function toast(msg) {
@@ -112,6 +115,10 @@
       const assetRow = c.querySelector("[data-asset-mgmt-row]");
       if (assetRow) {
         assetRow.querySelector("[data-toggle]").onclick = () => {
+          if (!assetPlanEligible()) {
+            confirmModal("Pro 요금제부터 사용할 수 있습니다.", "자산 관리 기능을 사용하려면 요금제를 업그레이드해주세요.", () => {});
+            return;
+          }
           const on = assetMgmtOn();
           if (on) {
             confirmModal(
