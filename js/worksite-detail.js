@@ -75,11 +75,11 @@
       return q.qty - p.qty;
     }));
     const groupsHtml = groups.map(([sub, list]) => `
-      <div class="mdetail-group-head" data-sub="${sub}">${list[0].asset.group} <span class="muted">›</span> ${sub} <span class="muted">${list.length}</span></div>
+      <div class="mdetail-group-head" data-sub="${sub}">${list[0].asset.group} <span class="muted">›</span> ${sub} <span class="muted" data-asset-group-count>${list.length}</span></div>
       ${list.map(x => rowHtml(x, sub)).join("")}`).join("");
     return `
       <div class="mdetail-count-row">
-        <span class="mdetail-count">전체 <b>${items.length}</b></span>
+        <span class="mdetail-count">전체 <b data-asset-result-count>${items.length}</b></span>
         <div class="searchbox">
           <input class="search" type="text" data-asset-search placeholder="품목명/고유관리번호">
           <button class="search-clear" type="button" data-asset-search-clear aria-label="검색어 지우기">✕</button>
@@ -108,8 +108,12 @@
       });
       heads.forEach(head => {
         const sub = head.dataset.sub;
-        head.hidden = !rows.some(r => r.dataset.sub === sub && !r.hidden);
+        const count = rows.filter(row => row.dataset.sub === sub && !row.hidden).length;
+        head.hidden = count === 0;
+        head.querySelector("[data-asset-group-count]").textContent = count;
       });
+      // 건수는 수량형 보유량 합계가 아닌 검색된 자산 행 수(기존 전체 건수 기준 유지).
+      c.querySelector("[data-asset-result-count]").textContent = rows.filter(row => !row.hidden).length;
       if (emptyMsg) emptyMsg.hidden = anyVisible;
       sbox.classList.toggle("has-term", !!input.value);
     };

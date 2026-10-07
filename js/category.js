@@ -162,7 +162,7 @@
 
   function productRowHtml(p) {
     return `
-      <tr class="clickable cat-prod-row" data-product="${p.product}">
+      <tr class="clickable cat-prod-row" data-product="${p.product}" data-search-count="${p.total}">
         <td>${prodCell(p.items[0], p.product)}</td>
         <td class="num">${p.total}</td>
         <td class="num">${p.assigned}</td>
@@ -177,7 +177,7 @@
     const qty = (a.stocks || []).reduce((s, x) => s + x.qty, 0);
     const targets = (a.stocks || []).length;
     return `
-      <tr class="clickable" data-asset="${a.id}">
+      <tr class="clickable" data-asset="${a.id}" data-search-count="1">
         <td>${prodCell(a, a.product)}</td>
         <td class="num">${a.totalQty}</td>
         <td class="num">${qty}</td>
@@ -225,7 +225,7 @@
           <h4>품목 목록</h4>
         </div>
         <div class="cat-asset-countrow">
-          <p class="cat-asset-count">전체 ${total}</p>
+          <p class="cat-asset-count">전체 <span data-product-result-count>${total}</span></p>
           ${products.length ? ASSET_SEARCH_HTML : ""}
         </div>
         ${products.length ? `
@@ -244,7 +244,7 @@
         <h4>품목 목록</h4>
       </div>
       <div class="cat-asset-countrow">
-        <p class="cat-asset-count">전체 ${list.length}</p>
+        <p class="cat-asset-count">전체 <span data-product-result-count>${list.length}</span></p>
         ${list.length ? ASSET_SEARCH_HTML : ""}
       </div>
       ${list.length ? `
@@ -1124,6 +1124,9 @@
           tr.hidden = !match;
           if (match) anyVisible = true;
         });
+        // 개별형은 검색된 품목들의 자산 수 합계, 수량형은 검색된 자산 행 수로 기존 기준 유지.
+        const count = rows.reduce((sum, row) => row.hidden ? sum : sum + Number(row.dataset.searchCount), 0);
+        c.querySelector("[data-product-result-count]").textContent = count;
         if (emptyMsg) emptyMsg.hidden = anyVisible;
         sbox.classList.toggle("has-term", !!searchInput.value);
       };

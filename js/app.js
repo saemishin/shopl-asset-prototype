@@ -445,13 +445,13 @@
         <div class="mapp-search">
           <input type="text" data-mapp-search placeholder="품목명/고유관리번호">
         </div>
-        <div class="mapp-count">전체 <b>${items.length}</b></div>
+        <div class="mapp-count">전체 <b data-mine-result-count>${items.length}</b></div>
         ${items.length ? `
           <div data-mapp-card-list>${sections.map(sec => `
             <div class="mapp-cat-section" data-cat-section>
               <button type="button" class="mapp-cat-section-head" data-cat-collapse aria-expanded="true" aria-label="접기/펼치기">
                 <span>${sec.group} <span class="mapp-cat-sep">›</span> ${sec.sub}</span>
-                <span class="mapp-cat-section-count">${sec.items.length}</span>
+                <span class="mapp-cat-section-count" data-cat-result-count>${sec.items.length}</span>
                 ${CHEV_DOWN}
               </button>
               <div class="mapp-card-list" data-cat-collapsible>${sec.items.map(x => assetCardHtml(x)).join("")}</div>
@@ -1841,10 +1841,16 @@
         const cards = [...root.querySelectorAll("[data-asset-card]")];
         const sections = [...root.querySelectorAll("[data-cat-section]")];
         const emptyMsg = root.querySelector("[data-mapp-empty]");
+        // 검색 중 펼침은 임시 상태. 검색을 지우면 검색 직전 수동 접힘으로 복원한다.
+        // 목록 복귀 시 상태를 보존하는 정책과는 별개이며 기존 화면 재진입 초기화는 유지한다.
+        let searchFoldState = null;
         if (state.screen === "worksite-detail") searchInput.value = state.wsSearch;
         const applySearch = () => {
           if (state.screen === "worksite-detail") state.wsSearch = searchInput.value;
           const q = searchInput.value.trim().toLowerCase();
+          if (q && !searchFoldState) {
+            searchFoldState = new Map(sections.map(sec => [sec, sec.querySelector("[data-cat-collapse]").getAttribute("aria-expanded") === "true"]));
+          }
           let anyVisible = false;
           cards.forEach(card => {
             const asset = assets.find(a => a.id === card.dataset.assetId);
@@ -1854,10 +1860,20 @@
             if (match) anyVisible = true;
           });
           sections.forEach(sec => {
-            sec.hidden = ![...sec.querySelectorAll("[data-asset-card]")].some(c => !c.hidden);
+            const matchedCount = [...sec.querySelectorAll("[data-asset-card]")].filter(card => !card.hidden).length;
+            sec.hidden = matchedCount === 0;
+            sec.querySelector("[data-cat-result-count]").textContent = matchedCount;
+            const expanded = q ? true : searchFoldState?.get(sec);
+            if (expanded !== undefined) {
+              const button = sec.querySelector("[data-cat-collapse]");
+              button.setAttribute("aria-expanded", String(expanded));
+              button.classList.toggle("collapsed", !expanded);
+              sec.querySelector("[data-cat-collapsible]").hidden = !expanded;
+            }
           });
+          if (!q) searchFoldState = null;
           if (emptyMsg && cards.length) emptyMsg.hidden = anyVisible;
-          const count = root.querySelector("[data-worksite-result-count]");
+          const count = root.querySelector("[data-worksite-result-count], [data-mine-result-count]");
           if (count) count.textContent = cards.filter(card => !card.hidden).length;
         };
         searchInput.addEventListener("input", applySearch);
