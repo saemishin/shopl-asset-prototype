@@ -229,7 +229,12 @@ window.DATA = (function () {
     }
   } catch (e) { /* sessionStorage 접근 불가 환경 대비 */ }
 
-  return { categories, assets, emptyGroups, tags };
+  // 배정/보유 대상의 상태를 기존 구성원·근무지 응답에서 전달받는 프로토타입 연결 지점.
+  // employee: active/retired, worksite: active/inactive. 값이 없는 기존 데모 대상은 활성으로 가정한다.
+  // 실제 앱에서는 이름 키 대신 기존 대상 ID/상태 응답을 사용하며, 자산 상태와 혼동하지 않는다.
+  // 상태가 바뀌어도 기존 배정/보유 레코드나 수량은 여기서 자동 변경하지 않는다.
+  const targetStatuses = { employee: {}, worksite: {} };
+  return { categories, assets, emptyGroups, tags, targetStatuses };
 })();
 
 /* 자산 관리 공통 날짜 표기: yyyy.mm.dd(요일) hh:mm / 날짜만: yyyy.mm.dd(요일) */

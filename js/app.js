@@ -514,8 +514,9 @@
         <div class="mapp-search">
           <input type="text" data-mapp-ws-search placeholder="근무지명/코드/주소">
         </div>
-        <div class="mapp-count">전체 <b>${groups.length}</b></div>
+        <div class="mapp-count">전체 <b data-worksite-count>${groups.length}</b></div>
         <div class="mapp-ws-list" data-mapp-ws-list>${groups.map(worksiteCardHtml).join("")}</div>
+        <p class="mapp-empty" data-mapp-ws-empty${groups.length ? " hidden" : ""}>결과가 없습니다.</p>
       </div>`;
   }
   // 근무지 카드에서 소분류를 누르면 이동하는 목적지 — 그 근무지의 그 소분류 자산 목록. 타이틀 텍스트 없이
@@ -1041,11 +1042,22 @@
     });
   }
   // 수량 변경 — 보유 대상 추가 페이지와 동일한 스테퍼 UI로 통일(2026-09-30, 직접입력 number 필드에서 전환)
+  // 퇴사 구성원·비활성 근무지도 기존 보유량 감소/0 정리는 가능하지만 추가 배분은 불가.
+  // 상태는 기존 대상 엔티티에서 받은 값이며 자산 자체의 재고/보유 상태와는 별개다.
+  function stockChangeLimit(a, idx) {
+    const record = a.stocks[idx];
+    const kind = record.employee ? "employee" : "worksite";
+    const name = record.employee || record.worksite;
+    const status = window.DATA.targetStatuses?.[kind]?.[name];
+    const decreaseOnly = status === (kind === "employee" ? "retired" : "inactive");
+    const otherSum = a.stocks.reduce((sum, stock, i) => i === idx ? sum : sum + stock.qty, 0);
+    const available = a.totalQty - otherSum;
+    return { max: decreaseOnly ? Math.min(record.qty, available) : available, decreaseOnly };
+  }
   function openQtyChangeModal(a, idx, onDone) {
     const rec = a.stocks[idx];
     const cur = rec.qty;
-    const others = a.stocks.reduce((s, x, i) => i === idx ? s : s + x.qty, 0);
-    const max = a.totalQty - others;
+    const { max, decreaseOnly } = stockChangeLimit(a, idx);
     const back = document.createElement("div");
     back.className = "modal-back";
     back.innerHTML = `
@@ -1057,7 +1069,7 @@
             <input type="text" inputmode="numeric" data-qinput placeholder="입력" value="${cur}">
             <button type="button" class="qty-step" data-qplus aria-label="수량 증가">＋</button>
           </div>
-          <p class="hint" style="margin-top:6px">잔여 수량: ${max}개</p>
+          <p class="hint" style="margin-top:6px">${decreaseOnly ? `변경 가능 수량: 0~${max}개` : `잔여 수량: ${max}개`}</p>
         </div>
         <div class="foot">
           <button class="btn" data-cclose>취소</button>
@@ -1074,7 +1086,7 @@
       const v = val();
       minus.disabled = v === null || v <= 0;
       plus.disabled = v === null || v >= max;
-      saveBtn.disabled = v === null || v < 0 || v > max;
+      saveBtn.disabled = v === null || v < 0 || v > max || v === cur;
     };
     input.addEventListener("input", () => { input.value = input.value.replace(/[^0-9]/g, ""); sync(); });
     minus.onclick = () => { const v = val(); if (v !== null && v > 0) { input.value = v - 1; sync(); } };
@@ -1083,7 +1095,8 @@
     back.querySelector("[data-cclose]").onclick = () => back.remove();
     saveBtn.onclick = () => {
       const qty = val();
-      if (!(qty !== null && qty >= 0 && qty <= max)) return;
+      // 저장 직전에 현재 대상 상태도 재확인한다. 비활성화 후 수량 증가가 반영되지 않게 한다.
+      if (!(qty !== null && qty >= 0 && qty <= stockChangeLimit(a, idx).max) || qty === cur) return;
       back.remove();
       confirmModal("수량을 변경하시겠습니까?", "", () => {
         rec.qty = qty;
@@ -1854,13 +1867,21 @@
       const wsSearchInput = root.querySelector("[data-mapp-ws-search]");
       if (wsSearchInput) {
         const wsCards = [...root.querySelectorAll("[data-ws-card]")];
-        wsSearchInput.addEventListener("input", () => {
+        const wsCount = root.querySelector("[data-worksite-count]");
+        const wsEmpty = root.querySelector("[data-mapp-ws-empty]");
+        const applyWorksiteSearch = () => {
           const q = wsSearchInput.value.trim().toLowerCase();
+          let count = 0;
           wsCards.forEach(card => {
             const hay = `${card.dataset.wsName}${card.dataset.wsCode}${card.dataset.wsAddress}`.toLowerCase();
             card.hidden = !(!q || hay.includes(q));
+            if (!card.hidden) count++;
           });
-        });
+          wsCount.textContent = count;
+          wsEmpty.hidden = count > 0;
+        };
+        wsSearchInput.addEventListener("input", applyWorksiteSearch);
+        applyWorksiteSearch();
       }
       // 근무지 카드의 소분류 행 클릭 → 그 근무지·그 소분류의 전체 자산 목록으로 이동
       root.querySelectorAll("[data-ws-cat-open]").forEach(b => b.onclick = () => {

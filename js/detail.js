@@ -582,12 +582,23 @@
   }
   // 수량 변경 팝오버 — 스테퍼(0 미만 불가, total_qty 잔여 수량 초과 불가) + 직접입력(포커스 시 기존값 지우고
   // 새로 입력, 미입력 시 저장 비활성). 0은 구조설계안 2.1 "quantity 0 포함해서 직접 증감" 명시대로 허용
+  // 퇴사 구성원·비활성 근무지도 기존 보유량 감소/0 정리는 가능하지만 추가 배분은 불가.
+  // 상태는 기존 대상 엔티티에서 받은 값이며 자산 자체의 재고/보유 상태와는 별개다.
+  function stockChangeLimit(a, idx) {
+    const record = a.stocks[idx];
+    const kind = record.employee ? "employee" : "worksite";
+    const name = record.employee || record.worksite;
+    const status = window.DATA.targetStatuses?.[kind]?.[name];
+    const decreaseOnly = status === (kind === "employee" ? "retired" : "inactive");
+    const otherSum = a.stocks.reduce((sum, stock, i) => i === idx ? sum : sum + stock.qty, 0);
+    const available = a.totalQty - otherSum;
+    return { max: decreaseOnly ? Math.min(record.qty, available) : available, decreaseOnly };
+  }
   function openQtyPopover(anchor, a, idx) {
     document.querySelectorAll(".qty-popover").forEach(m => m.remove());
     const cur = a.stocks[idx].qty;
     // 이 보유자를 제외한 나머지 보유자들의 합 — 이 값 + 새 입력값이 total_qty를 못 넘음(잔여 수량 상한)
-    const otherSum = a.stocks.reduce((s, x, i) => i === idx ? s : s + x.qty, 0);
-    const max = a.totalQty - otherSum;
+    const { max, decreaseOnly } = stockChangeLimit(a, idx);
     const pop = document.createElement("div");
     pop.className = "qty-popover";
     pop.innerHTML = `
@@ -596,7 +607,7 @@
         <input type="text" inputmode="numeric" data-qinput placeholder="입력" value="${cur}">
         <button type="button" class="qty-step" data-qplus aria-label="수량 증가">＋</button>
       </div>
-      <div class="qty-pop-remain">잔여 수량: ${max}개</div>
+      <div class="qty-pop-remain">${decreaseOnly ? `변경 가능 수량: 0~${max}개` : `잔여 수량: ${max}개`}</div>
       <div class="qty-pop-acts">
         <button class="btn sm" data-qcancel>취소</button>
         <button class="btn sm primary" data-qsave>저장</button>
@@ -614,7 +625,7 @@
       const v = val();
       minus.disabled = v === null || v <= 0;
       plus.disabled = v === null || v >= max;
-      save.disabled = v === null || v < 0 || v > max;
+      save.disabled = v === null || v < 0 || v > max || v === cur;
     };
     input.addEventListener("input", () => {
       input.value = input.value.replace(/[^0-9]/g, "");
@@ -624,7 +635,7 @@
     plus.onclick = () => { const v = val() ?? 0; if (v < max) { input.value = v + 1; sync(); } };
     save.onclick = () => {
       const v = val();
-      if (v === null || v < 0 || v > max) return;
+      if (v === null || v < 0 || v > stockChangeLimit(a, idx).max || v === cur) return;
       const x = a.stocks[idx];
       pop.remove();
       confirmModal("수량을 변경하시겠습니까?", () => {
