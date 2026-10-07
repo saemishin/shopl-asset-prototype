@@ -3,6 +3,34 @@
 (function () {
   // 태그는 앞뒤 공백 제거·연속 공백 한 칸으로 정규화하되 대소문자는 유지한다.
   const normalizeTagName = value => value.trim().replace(/\s+/g, " ");
+  // 일괄 작업의 태그 구분자 |는 명칭에 입력하지 않는다. 다른 특수문자는 허용한다.
+  // 입력·붙여넣기에서 조용히 제외하며 선택 영역과 커서, 기존 20자 제한을 유지한다.
+  function bindTagNameInput(input, onInput) {
+    function insertWithoutSeparator(event, text) {
+      if (!text || !text.includes("|")) return;
+      event.preventDefault();
+      const start = input.selectionStart, end = input.selectionEnd;
+      const room = input.maxLength < 0 ? text.length : Math.max(0, input.maxLength - input.value.length + end - start);
+      const allowed = text.replace(/\|/g, "").slice(0, room);
+      if (!allowed) return;
+      input.setRangeText(allowed, start, end, "end");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+    input.addEventListener("beforeinput", event => {
+      if (!event.isComposing) insertWithoutSeparator(event, event.data);
+    });
+    input.addEventListener("paste", event => insertWithoutSeparator(event, event.clipboardData.getData("text")));
+    input.addEventListener("input", () => {
+      const before = input.value;
+      if (before.includes("|")) {
+        const start = before.slice(0, input.selectionStart).replace(/\|/g, "").length;
+        const end = before.slice(0, input.selectionEnd).replace(/\|/g, "").length;
+        input.value = before.replace(/\|/g, "");
+        input.setSelectionRange(start, end);
+      }
+      onInput();
+    });
+  }
   function toast(msg) {
     const t = document.createElement("div");
     t.textContent = msg;
@@ -103,6 +131,10 @@
               data-tip="삭제 시 이 태그를 사용 중인 자산에서 모두 삭제됩니다.">${TRASH_ICON}</button>
           </div>
         </div>`).join("") : `<p class="tag-manage-empty">등록된 태그가 없습니다.</p>`;
+      listEl.querySelectorAll("[data-tm-rename]").forEach(input => bindTagNameInput(input, () => {
+        draft[+input.dataset.tmRename].name = input.value;
+        updateValidity();
+      }));
       updateValidity();
     }
     renderList();
@@ -115,13 +147,9 @@
       renderList();
     }
     addBtn.onclick = addRow;
-    addInput.addEventListener("input", updateValidity);
+    bindTagNameInput(addInput, updateValidity);
     addInput.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); addRow(); } });
 
-    listEl.addEventListener("input", e => {
-      const r = e.target.closest("[data-tm-rename]");
-      if (r) { draft[+r.dataset.tmRename].name = e.target.value; updateValidity(); }
-    });
     listEl.addEventListener("click", e => {
       const d = e.target.closest("[data-tm-del]");
       if (d) { draft.splice(+d.dataset.tmDel, 1); renderList(); }
@@ -383,7 +411,8 @@
                 <span id="areg-cat-display" style="flex:1;font-size:12.5px">선택</span>
               </div>
             </div>
-            <div class="field" id="areg-name-field"><label>품목명 <span class="req">*</span></label><input type="text" id="areg-name" placeholder="입력" maxlength="50" autocomplete="off"></div>
+            <div class="field" id="areg-name-field"><label>품목명 <span class="req">*</span></label><input type="text" id="areg-name" placeholder="입력" maxlength="50" autocomplete="off" aria-describedby="areg-name-error">
+              <p class="field-err" id="areg-name-error" data-name-err hidden>동일한 명칭이 이미 등록되어 있습니다.</p></div>
           </div>
           <div class="areg-col-right" id="areg-col-right">
             <div class="field" id="areg-photo-field">
@@ -433,6 +462,7 @@
     const rightCol = back.querySelector("#areg-col-right");
     const nameField = back.querySelector("#areg-name-field");
     const nameInput = back.querySelector("#areg-name");
+    const nameErr = back.querySelector("[data-name-err]");
     const photoRow = back.querySelector("#areg-photo-row");
     const assetNoField = back.querySelector("#areg-assetno");
     const assetNoInput = back.querySelector("#areg-assetno-input");
@@ -463,6 +493,14 @@
     function assetNoDup(v) {
       if (!v) return false;
       return (window.DATA.assets || []).some(a => a !== opts.asset && a.assetNo && a.assetNo === v);
+    }
+    // 수량형은 동일 소분류 안에서 품목명이 유일하다. 개별형은 같은 품목의 여러 유닛을 허용한다.
+    // 검색만 대소문자를 무시하며 중복 판정은 저장값대로 구분한다. 수정 대상 자신은 제외한다.
+    function quantityNameDup(v) {
+      const cat = findCat(catValue);
+      if (type !== "quantity" || !cat || !v) return false;
+      return (window.DATA.assets || []).some(a => a !== opts.asset && !a.deleted_at && a.type === "quantity"
+        && a.group === cat.group && a.sub === cat.sub && a.product.trim() === v);
     }
     // 날짜 필드(유효기한·제조연월·구매연월) 공통 유효성 판정 — 필드가 숨겨져 있으면(카테고리 필드 노출
     // 설정에서 꺼짐) 검사 대상에서 제외. 저장 버튼 비활성은 무효면 항상 실시간으로 걸지만, 에러 문구는
@@ -518,7 +556,12 @@
       cb.onclick = event => { if (event.target === cb) cb.remove(); };
     }
     function checkValid() {
-      const nameOk = nameInput.value.trim().length > 0;
+      const name = nameInput.value.trim();
+      const nameDup = quantityNameDup(name);
+      nameErr.hidden = !nameDup;
+      nameInput.classList.toggle("has-err", nameDup);
+      nameInput.setAttribute("aria-invalid", String(nameDup));
+      const nameOk = name.length > 0 && !nameDup;
       const noVal = assetNoInput.value.trim();
       const dup = type !== "quantity" && assetNoDup(noVal);
       assetNoErr.hidden = !dup;

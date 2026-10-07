@@ -151,6 +151,34 @@
   const esc = value => String(value == null ? "" : value).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   // 태그는 앞뒤 공백 제거·연속 공백 한 칸으로 정규화하되 대소문자는 유지한다.
   const normalizeTagName = value => value.trim().replace(/\s+/g, " ");
+  // 일괄 작업의 태그 구분자 |는 명칭에 입력하지 않는다. 다른 특수문자는 허용한다.
+  // 입력·붙여넣기에서 조용히 제외하며 선택 영역과 커서, 기존 20자 제한을 유지한다.
+  function bindTagNameInput(input, onInput) {
+    function insertWithoutSeparator(event, text) {
+      if (!text || !text.includes("|")) return;
+      event.preventDefault();
+      const start = input.selectionStart, end = input.selectionEnd;
+      const room = input.maxLength < 0 ? text.length : Math.max(0, input.maxLength - input.value.length + end - start);
+      const allowed = text.replace(/\|/g, "").slice(0, room);
+      if (!allowed) return;
+      input.setRangeText(allowed, start, end, "end");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+    input.addEventListener("beforeinput", event => {
+      if (!event.isComposing) insertWithoutSeparator(event, event.data);
+    });
+    input.addEventListener("paste", event => insertWithoutSeparator(event, event.clipboardData.getData("text")));
+    input.addEventListener("input", () => {
+      const before = input.value;
+      if (before.includes("|")) {
+        const start = before.slice(0, input.selectionStart).replace(/\|/g, "").length;
+        const end = before.slice(0, input.selectionEnd).replace(/\|/g, "").length;
+        input.value = before.replace(/\|/g, "");
+        input.setSelectionRange(start, end);
+      }
+      onInput();
+    });
+  }
   function formatAddPrice(value) {
     const digits = value.replace(/[^0-9]/g, "").slice(0, 12);
     return digits ? Number(digits).toLocaleString("ko-KR") : "";
@@ -413,9 +441,17 @@
       <p id="mapp-add-expiry-hint" class="hint mapp-add-expiry-hint">*8자리 입력 (YYYY.MM.DD)</p>
       <p id="mapp-add-expiry-error" class="field-err" data-add-expiry-error${showError ? "" : " hidden"}>유효한 날짜가 아닙니다.</p></div>`;
   }
+  // 수량형만 동일 소분류의 품목명 중복을 차단한다. 대소문자는 저장 정책대로 구분한다.
+  // 기존 자산 수정은 자기 자신을 제외하고, 소분류 이동 시에도 목적지의 중복을 검사한다.
+  function quantityNameDup(draft) {
+    const cat = addCategory(draft);
+    const name = draft.product.trim();
+    return !!cat && cat.type === "quantity" && !!name && assets.some(a => a.id !== draft.editingId
+      && !a.deleted_at && a.type === "quantity" && a.group === cat.group && a.sub === cat.sub && a.product.trim() === name);
+  }
   function addDraftValid(draft) {
     const cat = addCategory(draft);
-    if (!cat || !catViewPermission(cat) || !draft.product.trim()) return false;
+    if (!cat || !catViewPermission(cat) || !draft.product.trim() || quantityNameDup(draft)) return false;
     if (!(cat.hiddenFields || []).includes("expiry") && parseAddExpiry(draft.expiry) === null) return false;
     if (draft.editingId) {
       const asset = assets.find(a => a.id === draft.editingId);
@@ -436,8 +472,9 @@
   }
   function addProductFieldHtml(draft) {
     return `<div class="mapp-add-field"><label for="mapp-add-product">품목명 <span class="req">*</span></label>
-      <div class="mapp-add-input-wrap"><input id="mapp-add-product" data-add-field="product" type="text" maxlength="50" value="${esc(draft.product)}" placeholder="입력" autocomplete="off">
-        <div class="mapp-add-suggest" data-add-product-menu hidden></div></div></div>`;
+      <div class="mapp-add-input-wrap"><input id="mapp-add-product" data-add-field="product" type="text" maxlength="50" value="${esc(draft.product)}" placeholder="입력" autocomplete="off" aria-describedby="mapp-add-product-error">
+        <div class="mapp-add-suggest" data-add-product-menu hidden></div></div>
+      <p id="mapp-add-product-error" class="field-err" data-add-product-error hidden>동일한 명칭이 이미 등록되어 있습니다.</p></div>`;
   }
   function addDateSelectHtml(label, key, draft, mode) {
     const value = draft[key];
@@ -2169,6 +2206,11 @@
         function updateAddValidity() {
           syncAddDraft();
           const cat = addCategory(draft);
+          const nameDuplicate = quantityNameDup(draft);
+          const nameInput = field("product");
+          root.querySelector("[data-add-product-error]").hidden = !nameDuplicate;
+          nameInput.classList.toggle("has-err", nameDuplicate);
+          nameInput.setAttribute("aria-invalid", String(nameDuplicate));
           const duplicate = cat && cat.type === "individual" && !!draft.assetNo.trim() && assets.some(a => a.id !== draft.editingId && a.assetNo === draft.assetNo.trim());
           const error = root.querySelector("[data-add-error]");
           if (error) error.hidden = !duplicate;
@@ -2420,10 +2462,10 @@
           tagDraft.unshift({ name, orig: null });
           draw();
         }
-        createInput.addEventListener("input", updateTagManageValidity);
+        bindTagNameInput(createInput, updateTagManageValidity);
         createInput.addEventListener("keydown", event => { if (event.key === "Enter") { event.preventDefault(); addManagedTag(); } });
         createButton.onclick = addManagedTag;
-        list.querySelectorAll("[data-add-tag-rename]").forEach(input => input.addEventListener("input", () => {
+        list.querySelectorAll("[data-add-tag-rename]").forEach(input => bindTagNameInput(input, () => {
           tagDraft[+input.dataset.addTagRename].name = input.value;
           updateTagManageValidity();
         }));
