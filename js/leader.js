@@ -1079,7 +1079,8 @@
           ? `<span class="hval-avatar" style="background:${avatarColor(e.target.employee)}">${e.target.employee[0]}</span>`
           : IC_WS)
       : "";
-    const withTarget = v => (targetName && v) ? `${targetMark}${esc(targetName)} · ${val(v)}` : val(v);
+    const withTarget = v => e.script === "자산 정보 수정: 메모 수정" ? (v ? window.AssetMemo.render(v) : "없음")
+      : (targetName && v) ? `${targetMark}${esc(targetName)} · ${val(v)}` : val(v);
     return `
       <div class="hcard">
         <div class="hcard-head">
@@ -1587,37 +1588,19 @@
       onDone();
     };
   }
-  // 메모 수정 — 바텀시트(2026-09-29, 센터 모달에서 전환). 메모는 길어질 수 있어 센터 모달보다 세로 공간이
-  // 넉넉한 시트가 유리 — 배정 추가/재배정 시트(.mapp-sheet, max-height:80vh)와 같은 컨테이너를 쓰되,
-  // 입력란만 있는 화면이라 텍스트영역에 넉넉한 최소 높이를 직접 줘서 그 시트들과 비슷한 체감 높이로 맞춤
+  // 메모 수정은 전체 화면 팝업. 내용·서식 변경 시 닫기 이탈 확인(2026-10-12).
   function openMemoEditModal(a, onDone) {
-    const before = a.note || "";
-    const back = mappOverlay("mapp-sheet-back", 90);
-    back.innerHTML = `
-      <div class="mapp-sheet">
-        <div class="mapp-sheet-head">메모 수정</div>
-        <div class="mapp-sheet-body" style="display:flex">
-          <textarea data-memo-input maxlength="500" placeholder="입력" style="width:100%;flex:1;min-height:280px;border:1px solid var(--line-strong);border-radius:8px;padding:10px;font:inherit;resize:none">${esc(before)}</textarea>
-        </div>
-        <div class="mapp-sheet-foot">
-          <button type="button" class="btn" data-cclose>취소</button>
-          <button type="button" class="btn primary" data-cok disabled>저장</button>
-        </div>
-      </div>`;
-    const input = back.querySelector("[data-memo-input]");
-    const saveBtn = back.querySelector("[data-cok]");
-    input.addEventListener("input", () => { saveBtn.disabled = input.value.trim() === before; });
-    back.addEventListener("click", e => { if (e.target === back) back.remove(); });
-    back.querySelector("[data-cclose]").onclick = () => back.remove();
-    saveBtn.onclick = () => {
-      if (saveBtn.disabled) return;
-      const after = input.value.trim();
-      back.remove();
-      a.note = after;
-      logActivity(a, { script: "자산 정보 수정: 메모 수정", before: before || "없음", after: after || "없음" });
-      toast("저장되었습니다.");
-      onDone();
-    };
+    const before = window.AssetMemo.normalize(a.note || "");
+    window.AssetMemo.open({ value: before, mobile: true,
+      back: mappOverlay("asset-memo-mobile", 90),
+      onSave: after => {
+        a.note = after;
+        a._noteFormat = "html";
+        logActivity(a, { script: "자산 정보 수정: 메모 수정", before: before || "", after: after || "" });
+        toast("저장되었습니다.");
+        onDone();
+      }
+    });
   }
   // 자산 사진 뷰어 — 조회 전용(편집은 "사진 관리" 액션에서), 조회 권한만 있어도 볼 수 있어야 해서 배정/보유
   // 변경 권한과 무관하게 항상 열 수 있음. 대시보드 detail.js의 openViewer를 단순화(줌·정보패널·수정메뉴 없이
@@ -1805,7 +1788,7 @@
       ["구매가격", a.price != null ? window.formatPrice(a.price) : "—", "purchasePrice"],
       ["자산 등록일", window.fmtDate(a.createdAt)],
       ["QR 라벨", `<button type="button" class="btn sm icon-only" data-qr-open aria-label="QR 라벨">${QR_ICON}</button>`],
-      ["메모", `<span class="mapp-leader-note">${esc(a.note || "—")}</span>${editable ? `<button type="button" class="icon-edit" data-memoedit aria-label="메모 수정">${IC_EDIT}</button>` : ""}`],
+      ["메모", `<div class="mapp-leader-note">${window.AssetMemo.render(a.note)}</div>${editable ? `<button type="button" class="icon-edit" data-memoedit aria-label="메모 수정">${IC_EDIT}</button>` : ""}`],
     ].filter(row => !row[2] || !hidden.includes(row[2])).map(([k,v]) => `<div><div class="k">${k}</div><div class="v">${v}</div></div>`).join("");
     const record = target ? findRecord(a, target) : null;
     const current = record && record.idx >= 0 ? record.list[record.idx] : null;
@@ -2197,6 +2180,7 @@
       if (state.screen === "asset-add") {
         const draft = state.addDraft;
         const field = key => root.querySelector(`[data-add-field="${key}"]`);
+        window.AssetMemo.mountTextarea(field("note"));
         function syncAddDraft() {
           ["product", "assetNo", "totalQty", "expiry", "serial", "imei", "manufactured", "purchaseDate", "purchasePrice", "note"].forEach(key => {
             const input = field(key);

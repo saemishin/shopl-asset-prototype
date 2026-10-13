@@ -173,8 +173,8 @@
     return `<div class="prodcell">${thumb(a)}<span class="pname">${a.product}</span></div>`;
   }
   function memoCell(a) {
-    if (!a.note) return "";
-    return `<span class="memo-flag" title="${String(a.note).replace(/"/g, '&quot;')}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M9 13h5M9 17h4"/></svg></span>`;
+    if (!window.AssetMemo.has(a.note)) return "";
+    return `<span class="memo-flag" title="${window.AssetMemo.plain(a.note).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M9 13h5M9 17h4"/></svg></span>`;
   }
   function labelsCell(labels) {
     if (!labels || !labels.length) return '<span class="muted">—</span>';
@@ -256,7 +256,7 @@
       if (f.expiry.length && !f.expiry.includes(expiryKey(a.expiry))) return false;
       if (f.depleted.length && !isDepleted(a)) return false;
       if (f.unheld.length && !hasUnheldHolder(a)) return false;
-      if (f.note.length && !f.note.includes(a.note ? "has" : "none")) return false;
+      if (f.note.length && !f.note.includes(window.AssetMemo.has(a.note) ? "has" : "none")) return false;
       if (f.labels.length) {
         const has = f.labels.filter(l => (a.labels || []).includes(l));
         if (has.length !== f.labels.length) return false;

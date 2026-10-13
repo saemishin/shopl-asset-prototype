@@ -481,6 +481,7 @@
     const purchasePriceInput = back.querySelector("#areg-purchaseprice-input");
     const noteField = back.querySelector("#areg-note-field");
     const noteInput = back.querySelector("#areg-note-input");
+    window.AssetMemo.mountTextarea(noteInput);
     const saveBtn = back.querySelector("#areg-save");
     let initialEditValues = null;
 
@@ -709,6 +710,7 @@
       imeiInput.value = "";
       purchasePriceInput.value = "";
       noteInput.value = "";
+      window.AssetMemo.syncTextarea(noteInput);
     }
     function selectCat(v) {
       const changed = v !== catValue;
@@ -752,6 +754,7 @@
       setDateInputs(purchaseDateField, asset.purchaseDate);
       purchasePriceInput.value = asset.price != null ? asset.price.toLocaleString() : "";
       noteInput.value = asset.note || "";
+      window.AssetMemo.syncTextarea(noteInput);
       checkValid();
     }
     catWrap.addEventListener("click", () => {

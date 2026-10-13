@@ -46,7 +46,7 @@
   function matches(asset, filters) {
     return (!filters.status.length || filters.status.includes(asset.status))
       && (!filters.expiry.length || filters.expiry.includes(expiryKey(asset.expiry)))
-      && (!filters.note.length || filters.note.includes(asset.note ? "has" : "none"))
+      && (!filters.note.length || filters.note.includes(window.AssetMemo.has(asset.note) ? "has" : "none"))
       && filters.labels.every(label => (asset.labels || []).includes(label));
   }
   function buttonHtml(filters) {

@@ -891,6 +891,62 @@ input.has-err, .cat-manage-input.has-err, .cat-manage-name-input.has-err { borde
   width: 100%; height: 34px; border: 1px solid var(--line-strong); border-radius: var(--radius); padding: 0 10px; background: var(--panel);
 }
 .field textarea { height: 66px; padding: 8px 10px; resize: vertical; }
+
+/* Memo editor: the same toolbar/HTML schema as the dashboard, with a 500-character counter. */
+textarea[data-asset-memo-source] { display: none !important; }
+.asset-memo-editor { width: 100%; min-width: 0; border: 1px solid var(--line-strong); border-radius: 8px; overflow: hidden; background: #fff; }
+.asset-memo-toolbar { display: flex; flex-wrap: wrap; gap: 4px 0; padding: 7px 6px; background: #fafafa; border-bottom: 1px solid var(--line); }
+.asset-memo-tools { display: flex; align-items: center; padding: 0 4px; border-right: 1px solid var(--line-strong); }
+.asset-memo-tools:last-child { border-right: 0; }
+.asset-memo-toolbar button { display: flex; align-items: center; justify-content: center; width: 29px; height: 29px; padding: 3px; border: 0; border-radius: 4px; background: transparent; color: var(--text); font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.asset-memo-toolbar button svg { width: 20px; height: 20px; }
+.asset-memo-toolbar button:hover:not(:disabled), .asset-memo-toolbar button.active { background: var(--primary-weak); color: var(--primary); }
+.asset-memo-toolbar button:disabled { color: #b5b5b5; cursor: default; }
+.asset-memo-body { min-height: 160px; max-height: 240px; overflow: auto; }
+.asset-memo-body .tiptap { min-height: 160px; padding: 14px; outline: none; font-size: 14px; line-height: 1.6; overflow-wrap: anywhere; }
+.asset-memo-body .tiptap p.is-editor-empty:first-child::before { content: attr(data-placeholder); float: left; height: 0; color: #a0a0a0; pointer-events: none; }
+.asset-memo-count { display: flex; justify-content: flex-end; gap: 3px; padding: 6px 12px 10px; font-size: 12px; color: #a0a0a0; }
+.asset-memo-editor :is(p,h1,h2,h3), .asset-memo-read :is(p,h1,h2,h3) { margin: 0 0 8px; }
+.asset-memo-editor h1, .asset-memo-read h1 { font-size: 1.75em; font-weight: 700; }
+.asset-memo-editor h2, .asset-memo-read h2 { font-size: 1.4em; font-weight: 700; }
+.asset-memo-editor h3, .asset-memo-read h3 { font-size: 1.2em; font-weight: 700; }
+.asset-memo-editor :is(ul,ol), .asset-memo-read :is(ul,ol) { margin: 8px 0; padding-left: 24px; }
+.asset-memo-editor ul, .asset-memo-read ul { list-style-type: disc; }
+.asset-memo-editor ol, .asset-memo-read ol { list-style-type: decimal; }
+.asset-memo-editor li, .asset-memo-read li { display: list-item; }
+.asset-memo-editor blockquote, .asset-memo-read blockquote { border-left: 3px solid #d6dce4; margin: 8px 0; padding-left: 12px; color: var(--text-sub); }
+.asset-memo-editor mark, .asset-memo-read mark { background: #fff3a3; color: inherit; }
+.asset-memo-editor a, .asset-memo-read a { color: var(--primary); text-decoration: underline; }
+.asset-memo-editor pre, .asset-memo-read pre { margin: 8px 0; padding: 10px; border-radius: 5px; background: #f3f4f6; white-space: pre-wrap; }
+.asset-memo-editor img, .asset-memo-read img { max-width: 100%; height: auto; }
+.asset-memo-editor ul[data-type=taskList], .asset-memo-read ul[data-type=taskList] { list-style: none; padding-left: 0; }
+.asset-memo-editor li[data-type=taskItem], .asset-memo-read li[data-type=taskItem] { display: flex; align-items: flex-start; gap: 8px; }
+.asset-memo-editor li[data-type=taskItem] > label, .asset-memo-read li[data-type=taskItem] > label { flex: 0 0 auto; margin-top: 3px; }
+.asset-memo-editor li[data-type=taskItem] > div, .asset-memo-read li[data-type=taskItem] > div { flex: 1; }
+.asset-memo-read { min-width: 0; width: 100%; overflow-wrap: anywhere; line-height: 1.6; white-space: normal; }
+.asset-memo-read > :last-child { margin-bottom: 0; }
+.asset-memo-back { position: fixed; inset: 0; background: rgba(0,0,0,.32); display: flex; align-items: center; justify-content: center; }
+.asset-memo-panel { display: flex; flex-direction: column; width: 760px; max-width: calc(100% - 32px); max-height: 90%; background: #fff; border-radius: 12px; overflow: hidden; }
+.asset-memo-panel > header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--line); }
+.asset-memo-panel h3 { margin: 0; font-size: 17px; }
+.asset-memo-close { display: flex; width: 32px; height: 32px; padding: 6px; border: 0; background: transparent; cursor: pointer; }
+.asset-memo-close svg { width: 20px; height: 20px; }
+.asset-memo-panel-body { padding: 20px; min-height: 0; overflow: auto; }
+.asset-memo-panel-body .asset-memo-body { max-height: 360px; min-height: 220px; }
+.asset-memo-panel-body .tiptap { min-height: 220px; }
+.asset-memo-panel > footer { display: flex; justify-content: flex-end; gap: 8px; padding: 14px 20px; border-top: 1px solid var(--line); }
+.asset-memo-mobile { align-items: stretch; }
+.asset-memo-mobile .asset-memo-panel { width: 100%; max-width: none; max-height: none; height: 100%; border-radius: 0; }
+.asset-memo-mobile .asset-memo-panel-body { display: flex; flex: 1; padding: 16px; }
+.asset-memo-mobile .asset-memo-editor { display: flex; flex: 1; flex-direction: column; }
+.asset-memo-mobile .asset-memo-body { flex: 1; min-height: 0; max-height: none; }
+.asset-memo-mobile .asset-memo-panel > footer .btn { flex: 1; }
+.asset-memo-discard { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 20px; background: rgba(0,0,0,.35); z-index: 2; }
+.asset-memo-discard .modal { width: 400px; max-width: 100%; }
+.asset-memo-discard .modal h3 { padding: 20px 20px 0; }
+.asset-memo-link-back { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; padding: 20px; background: rgba(0,0,0,.35); z-index: 420; }
+.asset-memo-link-back .modal { width: 420px; max-width: 100%; }
+.asset-memo-link-back .field-err[hidden] { display: none; }
 .hint { font-size: 11px; color: var(--text-mut); margin-top: 4px; }
 .seg { display: inline-flex; border: 1px solid var(--line-strong); border-radius: var(--radius); overflow: hidden; }
 .seg button { padding: 7px 14px; font-size: 12.5px; color: var(--text-sub); }

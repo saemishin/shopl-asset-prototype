@@ -22,8 +22,8 @@
   // (2026-09-30, assets.js의 자산 목록 일괄 삭제 기능과 함께 도입 — 개별/일괄 삭제 모두 이 함수로 통일)
   function canManageAssets() { return true; }
 
-  // 메모: 최대 500자(구조설계안 3.4), 화면엔 길이 제한 없이 전체 노출(말줄임·접기 없음)
-  const memoHtml = note => note ? `<span>${note}</span>` : '<span class="muted">—</span>';
+  // 메모: 본문 최대 500자. 저장한 서식을 유지해 전체 노출(말줄임·접기 없음).
+  const memoHtml = note => window.AssetMemo.render(note);
 
   const IC_EMP = `<svg class="hi" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5.5 20c0-4 3-6.5 6.5-6.5s6.5 2.5 6.5 6.5"/></svg>`;
   const IC_WS = `<svg class="hi" viewBox="0 0 24 24"><path d="M4 20V9.5L12 4l8 5.5V20"/><path d="M9.5 20v-5h5v5"/></svg>`;
@@ -257,33 +257,14 @@
   // 메모 전용 빠른 수정 — "자산 수정" 전체 폼(자산관리 권한)을 거치지 않고 메모만 단독으로 고침(배정/보유
   // 변경 권한 소관, 위 kv 렌더링의 주석 참조). 다른 필드 수정과 동일하게 필드별 활동 로그 1건 기록
   function openMemoQuickEditModal(a) {
-    const cb = document.createElement("div");
-    cb.className = "modal-back";
-    cb.style.zIndex = 340;
-    cb.innerHTML = `
-      <div class="modal" style="width:420px">
-        <h3>메모 수정</h3>
-        <div class="body">
-          <textarea data-memo-input maxlength="500" placeholder="메모를 입력하세요" style="width:100%;min-height:140px;border:1px solid var(--line-strong);border-radius:8px;padding:10px;font:inherit;resize:vertical">${a.note || ""}</textarea>
-        </div>
-        <div class="foot">
-          <button class="btn" data-cclose>취소</button>
-          <button class="btn primary" data-cok>저장</button>
-        </div>
-      </div>`;
-    document.body.appendChild(cb);
-    cb.addEventListener("click", e => { if (e.target === cb) cb.remove(); });
-    cb.querySelector("[data-cclose]").onclick = () => cb.remove();
-    cb.querySelector("[data-cok]").onclick = () => {
-      const before = a.note || "";
-      const after = cb.querySelector("[data-memo-input]").value.trim();
-      cb.remove();
-      if (after === before) return;
+    const before = window.AssetMemo.normalize(a.note || "");
+    window.AssetMemo.open({ value: before, onSave: after => {
       a.note = after;
-      logActivity(a, { script: "자산 정보 수정: 메모 수정", before: before || "없음", after: after || "없음" });
+      a._noteFormat = "html";
+      logActivity(a, { script: "자산 정보 수정: 메모 수정", before: before || "", after: after || "" });
       toast("저장되었습니다.");
       render();
-    };
+    }});
   }
   const WARN_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 9v4M12 16.5h.01M10.3 3.9 2.5 17.5a1.7 1.7 0 0 0 1.47 2.55h16.06a1.7 1.7 0 0 0 1.47-2.55L13.7 3.9a1.7 1.7 0 0 0-2.94 0z"/></svg>`;
   // 중요 데이터 삭제 확인 패턴 — 실수 방지를 위해 "DELETE"를 정확히 입력해야 삭제 버튼 활성화
@@ -493,7 +474,8 @@
     // 값이 "없음"인 쪽엔 대상 이름을 안 붙임 — 신규 배정의 "기존"처럼 그 시점엔 아직 이 대상과 실제
     // 관계(레코드)가 없었던 경우까지 이름을 붙이면 "이미 있었는데 비어있었다"로 오독됨. 값이 있는 쪽에만
     // "이름 · 값"으로 표기(반납의 "변경"·보유 대상 추가의 "기존" 등 반대 방향도 동일 규칙)
-    const withTarget = v => (targetName && v) ? `${targetMark}${targetName} · ${val(v)}` : val(v);
+    const withTarget = v => e.script === "자산 정보 수정: 메모 수정" ? (v ? window.AssetMemo.render(v) : "없음")
+      : (targetName && v) ? `${targetMark}${targetName} · ${val(v)}` : val(v);
     return `
       <div class="hcard">
         <div class="hcard-head">
