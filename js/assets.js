@@ -220,6 +220,26 @@
       default: return false;
     }
   }
+  // 일괄 배정은 자산 관리 권한 또는 소분류 배정/보유 변경 권한으로 제공한다.
+  // 비관리 리더의 변경 권한은 조회 범위 안에서만 인정하며, 등록 자산 수와는 무관하다.
+  function canAssignCategory(cat) {
+    if (!cat || !canViewCategory(cat)) return false;
+    if (canManageAssets()) return true;
+    switch (cat.assign) {
+      case "회사의 모든 구성원":
+      case "모든 관리자 및 리더": return true;
+      case "특정 관리자/리더": return (cat.assignTarget?.members || []).includes(DEMO_VIEWER_NAME);
+      case "특정 그룹 및 직무/직급": return window.matchesAssetGroupPositionTarget(
+        cat.assignTarget, MEMBER_INFO[DEMO_VIEWER_NAME]?.team, window.ASSET_MEMBER_JOB_TITLES[DEMO_VIEWER_NAME]);
+      default: return false;
+    }
+  }
+  function bulkActions() {
+    const actions = [];
+    if (canManageAssets()) actions.push("일괄 추가");
+    if (canManageAssets() || window.DATA.categories.some(canAssignCategory)) actions.push("일괄 배정");
+    return actions;
+  }
   function viewableCategories() { return window.DATA.categories.filter(canViewCategory); }
   function hasViewScope() { return viewableCategories().length > 0; }
   function viewableAssets() {
@@ -794,8 +814,8 @@
           .map(([k,t]) => `<button data-view="${k}" class="${state.view===k?'active':''}">${t}</button>`).join("")}
         ${state.view === "all" ? `
         <div class="sub-actions">
-          <button class="btn primary sm" id="btn-add">＋ 자산 추가 <span class="chev">▾</span></button>
-          <button class="btn sm" id="btn-bulk">일괄 작업 <span class="chev">▾</span></button>
+          ${canManageAssets() ? `<button class="btn primary sm" id="btn-add">＋ 자산 추가 <span class="chev">▾</span></button>` : ""}
+          ${bulkActions().length ? `<button class="btn sm" id="btn-bulk">일괄 작업 <span class="chev">▾</span></button>` : ""}
         </div>` : ""}
       </div>
 
@@ -927,8 +947,14 @@
     // QR 다운로드도 개별 유닛(고유관리번호) 단위 액션이라 전체 탭에서만 제공 — 자산 추가/일괄 작업과 동일한 이유
     if (state.view === "all") {
       document.getElementById("btn-qr-dl").onclick = openQrDownloadModal;
-      document.getElementById("btn-add").onclick = () => window.openAssetAddModal();
-      document.getElementById("btn-bulk").onclick = e => openBulkMenu(e.currentTarget);
+      // 자산 추가는 관리 권한이 있을 때만 노출하며, 클릭 진입 시에도 권한을 다시 확인한다.
+      const addButton = document.getElementById("btn-add");
+      if (addButton) addButton.onclick = () => {
+        if (!canManageAssets()) return;
+        window.openAssetAddModal();
+      };
+      const bulkButton = document.getElementById("btn-bulk");
+      if (bulkButton) bulkButton.onclick = e => openBulkMenu(e.currentTarget);
     }
     // 엑셀 다운로드 — 실제 파일 생성 대신 양식 정의가 완료된 구글시트로 연결(2026-09-24). 프로토타입 목적상
     // "실제 파일 다운로드"를 흉내낼 필요가 없어지고, 양식은 사용자가 구글시트에서 직접 계속 다듬는 게 더
@@ -1031,9 +1057,12 @@
   // 화면 밖으로 잘려 보였음)
   function openBulkMenu(anchor) {
     document.querySelectorAll(".dropdown-menu, .hover-tip").forEach(m => m.remove());
+    // 버튼 표시 후 권한이 바뀌어도 메뉴를 여는 시점의 허용 항목만 제공한다.
+    const actions = bulkActions();
+    if (!actions.length) return;
     const menu = document.createElement("div");
     menu.className = "dropdown-menu";
-    menu.innerHTML = ["일괄 추가", "일괄 배정"].map(label => `<button type="button" class="inert">${label}</button>`).join("");
+    menu.innerHTML = actions.map(label => `<button type="button" class="inert">${label}</button>`).join("");
     const r = anchor.getBoundingClientRect();
     menu.style.cssText = `position:fixed;top:${r.bottom + 4}px;right:${window.innerWidth - r.right}px;min-width:${Math.max(r.width, 160)}px`;
     document.body.appendChild(menu);
