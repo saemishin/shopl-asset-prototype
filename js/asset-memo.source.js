@@ -12,6 +12,8 @@
  * - 지원 서식 붙여넣기 및 HTML 저장/조회/이력 유지, 목록 툴팁은 본문 텍스트.
  * - 링크: 기본 URI 검증·자동 인식, 편집 중 이동 없음, 조회 시 새 탭.
  *   운영 웹 prompt 대신 미리보기 호환 URL 모달 사용(취소 유지, 빈 URL은 링크 해제).
+ * - 저장 콜백 성공 후에만 팝업을 닫음. 예외/Promise 거부/false는 실패로 보고 내용·서식을 보존해 재시도.
+ *   저장 중 중복 실행·닫기·추가 편집 방지. 실제 동시 저장은 마지막 성공값 우선(API 구현 계약).
  * - 정적 인메모리 프로토타입. 실제 API/DB·네이티브 키보드·엑셀 생성 구현을 뜻하지 않음.
  */
 import { Editor, generateHTML, generateJSON, getSchema } from '@tiptap/core';
@@ -173,17 +175,45 @@ function open({value='',back,mobile=false,onSave}) {
   overlay.classList.add('asset-memo-back');
   overlay.classList.toggle('asset-memo-mobile',mobile);
   if (!back) {overlay.style.zIndex=340;document.body.append(overlay);}
-  overlay.innerHTML=`<section class="asset-memo-panel" role="dialog" aria-modal="true" aria-label="메모 수정"><header><h3>메모 수정</h3><button type="button" class="asset-memo-close" aria-label="닫기">${icon('<path d="m6 6 12 12M18 6 6 18"/>')}</button></header><div class="asset-memo-panel-body"><textarea aria-label="메모 입력">${escape(value)}</textarea></div><footer><button type="button" class="btn" data-cancel>취소</button><button type="button" class="btn primary" data-save disabled>저장</button></footer></section>`;
+  overlay.innerHTML=`<section class="asset-memo-panel" role="dialog" aria-modal="true" aria-label="메모 수정"><header><h3>메모 수정</h3><button type="button" class="asset-memo-close" aria-label="닫기">${icon('<path d="m6 6 12 12M18 6 6 18"/>')}</button></header><div class="asset-memo-panel-body"><textarea aria-label="메모 입력">${escape(value)}</textarea><p class="muted" data-save-error role="alert" hidden></p></div><footer><button type="button" class="btn" data-cancel>취소</button><button type="button" class="btn primary" data-save disabled>저장</button></footer></section>`;
   const input=overlay.querySelector('textarea'), api=mountTextarea(input), initial=input.value, save=overlay.querySelector('[data-save]');
+  let saving=false;
+  const error=overlay.querySelector('[data-save-error]');
   const dirty=()=>normalize(input.value)!==initial;
   const close=()=>{document.removeEventListener('keydown',onKey,true);api.destroy();overlay.remove();};
-  const requestClose=()=>dirty()?confirmDiscard(overlay,close):close();
+  const requestClose=()=>{if(!saving)dirty()?confirmDiscard(overlay,close):close();};
   function onKey(event){if(event.key!=='Escape'||document.querySelector('.asset-memo-link-back'))return;event.preventDefault();event.stopImmediatePropagation();const confirm=overlay.querySelector('.asset-memo-discard');if(confirm)confirm.remove();else requestClose();}
-  input.addEventListener('input',()=>save.disabled=!dirty());
+  input.addEventListener('input',()=>save.disabled=saving||!dirty());
   overlay.querySelector('[data-cancel]').onclick=requestClose;
   overlay.querySelector('.asset-memo-close').onclick=requestClose;
   overlay.addEventListener('click',event=>{if(event.target===overlay)requestClose();});
-  save.onclick=()=>{if(save.disabled)return;const next=normalize(input.value);close();onSave(next);};
+  // onSave is a commit boundary: failure must not remove the editor or the draft.
+  // Current screens save in memory. Real API callers must reject/return false on failure,
+  // and update the asset/activity only after a confirmed successful save.
+  save.onclick=async()=>{
+    if(save.disabled||saving)return;
+    const next=normalize(input.value);
+    const controls=[...overlay.querySelectorAll('button')].map(button=>({button,disabled:button.disabled}));
+    saving=true;error.hidden=true;
+    overlay.setAttribute('aria-busy','true');
+    api.editor.setEditable(false);
+    overlay.querySelectorAll('button').forEach(button=>button.disabled=true);
+    try {
+      if(await onSave(next)===false)throw new Error('Memo save rejected');
+      close();
+    } catch {
+      // Reuse the existing app save-failure feedback; retain the same editor/undo state.
+      error.textContent='저장하지 못했습니다. 다시 시도해주세요.';error.hidden=false;
+    } finally {
+      saving=false;
+      if(overlay.isConnected&&!api.editor.isDestroyed){
+        overlay.removeAttribute('aria-busy');
+        api.editor.setEditable(true);
+        controls.forEach(({button,disabled})=>button.disabled=disabled);
+        save.disabled=!dirty();
+      }
+    }
+  };
   document.addEventListener('keydown',onKey,true);
   return overlay;
 }

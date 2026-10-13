@@ -230,11 +230,12 @@
   // 직원으로 취급) — 실제 서비스라면 이 두 값도 계정의 관리자/리더 여부로 판정됨.
   function hasAssignPermission(a) {
     const cat = window.DATA.categories.find(c => c.group === a.group && c.sub === a.sub);
-    if (!cat) return false;
+    // 변경 권한은 조회 범위 안에서만 적용한다. 본인 조회 예외는 변경 권한을 새로 부여하지 않는다.
+    if (!cat || !catViewPermission(cat)) return false;
     switch (cat.assign) {
       case "회사의 모든 구성원": return true;
       case "특정 관리자/리더": return (cat.assignTarget && cat.assignTarget.members || []).includes(ME);
-      case "특정 그룹 및 직무/직급": return (cat.assignTarget && cat.assignTarget.groups || []).includes(MEMBER_TEAM[ME]);
+      case "특정 그룹 및 직무/직급": return window.matchesAssetGroupPositionTarget(cat.assignTarget, MEMBER_TEAM[ME], window.ASSET_MEMBER_JOB_TITLES[ME]);
       default: return false; // 모든 관리자 및 리더 / 관리자만
     }
   }
@@ -247,7 +248,7 @@
     switch (cat.view) {
       case "회사의 모든 구성원": return true;
       case "특정 관리자/리더": return (cat.viewTarget && cat.viewTarget.members || []).includes(ME);
-      case "특정 그룹 및 직무/직급": return (cat.viewTarget && cat.viewTarget.groups || []).includes(MEMBER_TEAM[ME]);
+      case "특정 그룹 및 직무/직급": return window.matchesAssetGroupPositionTarget(cat.viewTarget, MEMBER_TEAM[ME], window.ASSET_MEMBER_JOB_TITLES[ME]);
       default: return false; // 모든 관리자 및 리더 / 관리자만
     }
   }
@@ -660,7 +661,9 @@
           ? `<span class="hval-avatar" style="background:${avatarColor(e.target.employee)}">${e.target.employee[0]}</span>`
           : IC_WS)
       : "";
-    const withTarget = v => e.script === "자산 정보 수정: 메모 수정" ? (v ? window.AssetMemo.render(v) : "없음")
+    // 사진 활동은 기존·변경 값이 사진 목록이라 썸네일로 표시(data.js assetPhotoThumbsHtml)
+    const withTarget = v => e.photoValue ? window.assetPhotoThumbsHtml(v)
+      : e.script === "자산 정보 수정: 메모 수정" ? (v ? window.AssetMemo.render(v) : "없음")
       : (targetName && v) ? `${targetMark}${targetName} · ${val(v)}` : val(v);
     return `
       <div class="hcard">
@@ -1158,7 +1161,7 @@
           ${i === primaryIdx ? '<span class="areg-photo-star">★</span>' : ""}
           <span class="areg-photo-del" data-photo-del="${i}" aria-label="삭제">${CLOSE_ICON_SM}</span>
         </button>`).join("");
-      const addTile = photos.length < 10 ? `<button type="button" class="areg-photo-add" data-photo-add aria-label="사진 추가">+</button>` : "";
+      const addTile = photos.length < window.ASSET_PHOTO_MAX_COUNT ? `<button type="button" class="areg-photo-add" data-photo-add aria-label="사진 추가">+</button>` : "";
       row.innerHTML = tiles + addTile;
       row.querySelectorAll("[data-photo-i]").forEach(b => b.onclick = e => {
         if (e.target.closest("[data-photo-del]")) return;
@@ -1181,7 +1184,7 @@
           { key: "camera", label: "카메라로 촬영하기" },
           { key: "gallery", label: "갤러리에서 불러오기" },
         ], () => {
-          photos.push({ color: PHOTO_COLORS[photos.length % PHOTO_COLORS.length], at: `${todayStr()} 00:00`, by: ME });
+          photos.push({ id: window.assetPhotoId(), color: PHOTO_COLORS[photos.length % PHOTO_COLORS.length], at: `${todayStr()} 00:00`, by: ME });
           if (photos.length === 1) primaryIdx = 0;
           renderPhotos();
         });
@@ -1193,6 +1196,7 @@
     saveBtn.onclick = () => {
       if (saveBtn.disabled) return;
       back.remove();
+      window.logAssetActivities(window.assetPhotoActivities(window.assetPhotos(a), a._primary || 0, photos, primaryIdx), e => logActivity(a, e));
       a._photos = photos;
       a._primary = primaryIdx;
       toast("저장되었습니다.");
@@ -1342,7 +1346,7 @@
       isIndiv ? { k: "IMEI", field: "imei", v: a.imei || '<span class="muted">—</span>' } : null,
       { k: "제조연월", field: "manufactured", v: a.manufactured ? window.fmtMonth(a.manufactured) : '<span class="muted">—</span>' },
       { k: "구매연월", field: "purchaseDate", v: a.purchaseDate ? window.fmtMonth(a.purchaseDate) : "—" },
-      { k: "구매가격", field: "purchasePrice", v: a.price ? window.formatPrice(a.price) : "—" },
+      { k: "구매가격", field: "purchasePrice", v: a.price != null ? window.formatPrice(a.price) : "—" },
       { k: "자산 등록일", v: window.fmtDate(a.createdAt) },
       // 메모만 값 옆에 편집 아이콘을 붙여 별도 액션(더보기 메뉴가 아니라 바로 수정) — 대시보드 detail.js와
       // 동일한 구조·아이콘(.icon-edit는 전역 css/app.css 공용 클래스)
@@ -1426,7 +1430,7 @@
       </div></div>`;
   }
   // 상세 자체의 조회 권한은 기존 구성원/근무지 기능의 책임이다. 자산은 기존 소분류 조회 판정을
-  // 재사용하며 본인 배정·보유 예외를 유지한다. 기능 설정 관리자 데모 가정으로 자산 권한을 확대하지 않는다.
+  // 재사용한다. 본인 프로필도 같은 소분류 조회 권한을 따르며 본인 예외는 직원 내 자산·QR에만 적용한다.
   function directoryEsc(value) {
     return String(value ?? "").replace(/[&<>"']/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]));
   }
@@ -1434,12 +1438,12 @@
     return { type: kind === "member" ? "employee" : "worksite", value: kind === "member" ? DEMO_DIRECTORY_MEMBER : DEMO_DIRECTORY_WORKSITE };
   }
   function directoryCanViewAsset(a, kind) {
-    return (kind === "member" && DEMO_DIRECTORY_MEMBER === ME) || hasViewPermission(a);
+    return hasViewPermission(a);
   }
   function directoryAssetAvailable(kind) {
     if (!assetMgmtEnabled()) return false;
     // 자산 0건도 분류 조회 권한으로 노출. 메뉴/부모 탭은 데이터 건수로 숨기지 않는다.
-    return (kind === "member" && DEMO_DIRECTORY_MEMBER === ME) || window.DATA.categories.some(cat => catViewPermission(cat));
+    return window.DATA.categories.some(cat => catViewPermission(cat));
   }
   function directoryItems(kind) {
     const target = directoryTarget(kind), result = [];

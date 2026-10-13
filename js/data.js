@@ -220,7 +220,10 @@ window.DATA = (function () {
   // 자산 삭제는 상세 → 목록으로 실제 페이지 이동(location.href)이 뒤따르는데, 이 앱은 인메모리 전용이라
   // 이동한 페이지에서 이 스크립트가 처음부터 다시 실행되며 방금 한 splice가 무효화됨 — 그래서 삭제 직전에
   // sessionStorage에 남겨둔 id를 여기서 한 번 더 적용해 페이지가 바뀌어도 삭제가 유지되게 함
+  const deletedAssets = [];
   try {
+    const saved = sessionStorage.getItem("justDeletedAssetRecord");
+    if (saved) { deletedAssets.push(JSON.parse(saved)); sessionStorage.removeItem("justDeletedAssetRecord"); }
     const delId = sessionStorage.getItem("justDeletedAssetId");
     if (delId) {
       sessionStorage.removeItem("justDeletedAssetId");
@@ -234,7 +237,7 @@ window.DATA = (function () {
   // 실제 앱에서는 이름 키 대신 기존 대상 ID/상태 응답을 사용하며, 자산 상태와 혼동하지 않는다.
   // 상태가 바뀌어도 기존 배정/보유 레코드나 수량은 여기서 자동 변경하지 않는다.
   const targetStatuses = { employee: {}, worksite: {} };
-  return { categories, assets, emptyGroups, tags, targetStatuses };
+  return { categories, assets, deletedAssets, emptyGroups, tags, targetStatuses };
 })();
 
 /* 자산 관리 공통 날짜 표기: yyyy.mm.dd(요일) hh:mm / 날짜만: yyyy.mm.dd(요일) */
@@ -248,6 +251,31 @@ window.DATA = (function () {
   window.fmtMonth = s => { if (!s) return "—"; const d = parse(s); return `${d.getFullYear()}.${p(d.getMonth() + 1)}`; };
 })();
 
+/* 그룹·직무/직급 권한 판정(2026-10-13): 기존 Shopl 그룹/직무 대상 선택 기준을 준용한다.
+   같은 축의 여러 선택은 OR, 그룹과 직무/직급 사이에는 AND. 한 축만 지정하면 다른 축은 전체이며
+   양쪽 모두 미선택은 미설정(조회 허용 아님). 하위 그룹은 선택기에서 함께 선택한 실제 목록으로 판정한다.
+   아래 직무/직급은 기존 데모 구성원을 위한 샘플일 뿐, 직무명으로 관리자/리더 역할을 추정하지 않는다.
+   실 서비스는 그룹 ID·직무/직급 ID와 명시적 전체 플래그를 사용하고 회사 권한/조회 예외를 별도 판정한다. */
+window.ASSET_MEMBER_JOB_TITLES = {
+  "김민수": "팀장", "이서연": "매니저", "박지훈": "매니저", "정우성": "사원",
+  "김철수": "팀장", "최유진": "주임", "한소희": "사원", "장민호": "매니저",
+  "오세훈": "주임", "배수지": "사원", "윤재현": "매니저", "임하늘": null,
+};
+window.matchesAssetGroupPositionTarget = function (target, group, jobTitle) {
+  const groups = target?.groups || [], jobs = target?.jobTitles || [];
+  if (!groups.length && !jobs.length) return false;
+  const matchesGroup = !groups.length || groups.includes(group);
+  const matchesJob = !jobs.length || (jobTitle !== undefined && jobs.includes(jobTitle || "직무/직급 없음"));
+  return matchesGroup && matchesJob;
+};
+window.isAssetGroupPositionSubset = function (target, viewTarget) {
+  const groups = target?.groups || [], jobs = target?.jobTitles || [];
+  const viewGroups = viewTarget?.groups || [], viewJobs = viewTarget?.jobTitles || [];
+  if ((!groups.length && !jobs.length) || (!viewGroups.length && !viewJobs.length)) return false;
+  return [[groups, viewGroups], [jobs, viewJobs]]
+    .every(([selected, allowed]) => !allowed.length || (selected.length > 0 && selected.every(value => allowed.includes(value))));
+};
+
 /* 구매가격 통화 표기 — 자산마다 다른 게 아니라 클라이언트(회사) 단위로 하나만 설정되는 전역 값(구조설계안 3.4).
    통화 코드마다 기호 위치(접두/접미)가 달라서 표시 로직을 한 곳에 모아둠 — CLIENT_CURRENCY만 바꾸면
    화면·엑셀 전체의 구매가격 표기가 같이 바뀜. 지금은 회사 설정 화면이 없어 상수로 고정(기본값 KRW) */
@@ -259,13 +287,60 @@ window.DATA = (function () {
     EUR: { symbol: "€", position: "prefix" },
   };
   window.CLIENT_CURRENCY = "KRW";
+  // 구매가격 공통 정책(2026-10-13): 구분자를 제외한 정수부 12자리, 소수부 5자리.
+  // 정수 표시의 15자에 소수점/소수부는 별도로 더해진다. 숫자로 변환하면 큰 소수 금액의
+  // 끝자리가 반올림되므로 편집·저장·표시는 십진 문자열로 처리한다(기존 숫자 시드도 호환).
+  const PRICE_INTEGER_DIGITS = 12;
+  const PRICE_FRACTION_DIGITS = 5;
+  function priceInputText(value) {
+    const raw = String(value ?? "").replace(/,/g, "").replace(/[^0-9.]/g, "");
+    if (!raw) return "";
+    const [integer, ...fractions] = raw.split(".");
+    const whole = integer.replace(/^0+(?=\d)/, "").slice(0, PRICE_INTEGER_DIGITS) || "0";
+    return whole + (fractions.length ? "." + fractions.join("").slice(0, PRICE_FRACTION_DIGITS) : "");
+  }
+  window.normalizePurchasePrice = function (value) {
+    const raw = priceInputText(value);
+    if (!raw) return "";
+    const [integer, fraction = ""] = raw.split(".");
+    const significantFraction = fraction.replace(/0+$/, "");
+    return integer + (significantFraction ? "." + significantFraction : "");
+  };
+  window.formatPurchasePriceInput = function (value) {
+    const raw = priceInputText(value);
+    if (!raw) return "";
+    const [integer, fraction] = raw.split(".");
+    return integer.replace(/\B(?=(\d{3})+(?!\d))/g, ",") + (fraction !== undefined ? "." + fraction : "");
+  };
+  window.bindPurchasePriceInput = function (input) {
+    input.addEventListener("input", () => {
+      const position = input.selectionStart;
+      const charactersBefore = input.value.slice(0, position).replace(/[^0-9.]/g, "").length;
+      input.value = window.formatPurchasePriceInput(input.value);
+      if (position != null) {
+        let cursor = 0, seen = 0;
+        while (cursor < input.value.length && seen < charactersBefore) {
+          if (/[0-9.]/.test(input.value[cursor])) seen++;
+          cursor++;
+        }
+        input.setSelectionRange(cursor, cursor);
+      }
+    });
+  };
   window.formatPrice = function (amount) {
-    if (amount == null) return "";
+    if (amount == null || amount === "") return "";
     const fmt = CURRENCY_FORMATS[window.CLIENT_CURRENCY] || CURRENCY_FORMATS.KRW;
-    const n = amount.toLocaleString();
+    const n = window.formatPurchasePriceInput(window.normalizePurchasePrice(amount));
     return fmt.position === "prefix" ? `${fmt.symbol}${n}` : `${n}${fmt.symbol}`;
   };
 })();
+
+/* 자산 사진 정책(2026-10-13): 사진당 20MB 수준의 기존 Shopl 공통 첨부 정책을 준용한다.
+   대시보드 직접 파일은 JPEG/JPG·PNG 및 디코딩 검증, 앱은 공통 카메라/갤러리·변환/축소 경로를 사용한다.
+   바이트 계산과 용량 검사 시점·변환 품질은 플랫폼 공통 코드에 위임하며 PSID의 10MB 예외는 가져오지 않는다.
+   현재 사진 첨부는 색상 스와치 목업으로 실 파일 선택·용량 검사·압축·서버 업로드를 수행하지 않는다.
+   실 서비스 구현에서 아래 장수 제한과 공통 첨부 검증/전처리를 함께 적용해야 한다. */
+window.ASSET_PHOTO_MAX_COUNT = 10;
 
 /* 공통 사진 헬퍼 — 목록·상세가 같은 대표 사진을 쓰도록 공유 */
 window.tintHex = function (hex, amt) {
@@ -283,8 +358,90 @@ window.assetPhotos = (function () {
     if (!a.photo) return (a._photos = []);
     a._primary = 0;
     return (a._photos = TINTS.slice(0, a.photoCount || 5).map((t, i) => ({
+      id: `${a.id}-p${i + 1}`,
       color: t === 0 ? a.photo : window.tintHex(a.photo, t),
       at: DATES[i], by: BY[i],
     })));
   };
 })();
+
+/* 사진 활동 이력(2026-10-13 확정, 설계 기록 D-20261013-34 · 활동 이력 정책 2절)
+ * - 사진 추가·삭제는 저장 1회당 "자산 사진 관리: 사진 변경" 1건. 추가와 삭제가 섞여도 1건이며
+ *   기존 = 저장 전 목록 전체, 변경 = 저장 후 목록 전체(0장이면 "없음").
+ * - "자산 사진 관리: 대표 사진 변경"은 저장 전후 대표가 다르고 양쪽 모두 대표가 있을 때만 기록한다.
+ *   직접 지정과 대표 삭제에 따른 승계를 같게 다룬다. 0장에서 첫 추가·전부 삭제는 사진 변경만 남는다.
+ * - 둘 다 해당하면 사진 변경 → 대표 사진 변경 순서로 기록한다. 원복해 전후가 같으면 아무것도 남기지 않는다.
+ * - 자산 추가 때 첨부한 사진은 "자산 등록"에 포함하므로 추가 저장에서는 이 헬퍼를 호출하지 않는다.
+ * 사진은 배열 위치가 아니라 id로 식별한다. 이력에는 복사본을 넣어 삭제된 사진도 계속 보여준다.
+ * 프로토타입 사진은 색상 목업이라 썸네일도 색상 칸으로 그린다. */
+window.assetPhotoId = (function () {
+  let seq = 0;
+  return () => `photo-${Date.now().toString(36)}-${++seq}`;
+})();
+window.assetPhotoActivities = function (beforePhotos, beforePrimary, afterPhotos, afterPrimary) {
+  const key = p => p.id || [p.color, p.at, p.by].join("|");
+  const copy = list => (list || []).map(p => ({ ...p }));
+  const before = copy(beforePhotos), after = copy(afterPhotos);
+  const entries = [];
+  const sameList = before.length === after.length && before.every((p, i) => key(p) === key(after[i]));
+  if (!sameList) entries.push({ script: "자산 사진 관리: 사진 변경", photoValue: true, before, after });
+  const beforeMain = before[beforePrimary || 0] || null, afterMain = after[afterPrimary || 0] || null;
+  if (beforeMain && afterMain && key(beforeMain) !== key(afterMain)) {
+    entries.push({ script: "자산 사진 관리: 대표 사진 변경", photoValue: true, before: [beforeMain], after: [afterMain] });
+  }
+  return entries;
+};
+window.assetPhotoThumbsHtml = function (list) {
+  if (!list || !list.length) return "없음";
+  return `<span class="hval-photos">${list.map(p => `<span class="hval-photo" style="background:${p.color}"></span>`).join("")}</span>`;
+};
+
+/* 같은 저장에서 생긴 여러 활동의 표시 순서(2026-10-13 확정, 설계 기록 D-20261013-35 · 활동 이력 정책 4.1)
+ * 이력은 최신이 위이고, 한 번의 저장으로 생긴 활동들은 자산 수정 입력 항목 순서대로 위에서 아래로 보여준다.
+ * 사진만 저장한 경우도 사진 변경 → 대표 사진 변경 순서이다.
+ * 각 화면의 logActivity는 새 항목을 맨 위에 넣으므로, 표시 순서의 역순으로 기록해야 화면에서 순서대로 보인다. */
+window.ASSET_ACTIVITY_ORDER = [
+  "자산 정보 수정: 소분류 이동", "자산 정보 수정: 품목명 수정",
+  "자산 사진 관리: 사진 변경", "자산 사진 관리: 대표 사진 변경",
+  "자산 정보 수정: 고유관리번호 수정", "자산 정보 수정: 전체 수량 변경",
+  "자산 정보 수정: 유효기한 변경", "자산 정보 수정: 태그 수정",
+  "자산 정보 수정: S/N 수정", "자산 정보 수정: IMEI 수정",
+  "자산 정보 수정: 제조연월 변경", "자산 정보 수정: 구매연월 변경",
+  "자산 정보 수정: 구매가격 변경", "자산 정보 수정: 메모 수정",
+];
+window.logAssetActivities = function (entries, log) {
+  const rank = e => { const i = window.ASSET_ACTIVITY_ORDER.indexOf(e.script); return i < 0 ? window.ASSET_ACTIVITY_ORDER.length : i; };
+  entries.map((e, i) => ({ e, i })).sort((x, y) => rank(x.e) - rank(y.e) || x.i - y.i).reverse().forEach(x => log(x.e));
+};
+
+/* 다운로드 파일명 계약(2026-10-13): 품목명 원문은 유지하고 파일명에만 적용한다.
+ * 부적합 문자는 _, 같은 묶음의 동명 파일은 확장자 앞 (2), (3)...로 구분한다.
+ * 실제 ZIP/엑셀 생성은 별도 개발 대상이며 현재 다운로드 버튼은 토스트 목업이다.
+ */
+window.assetDownloadFileName = function (value) {
+  let name = String(value ?? '').replace(/[<>:"/\\|?*\u0000-\u001f]/g, '_').replace(/[. ]+$/g, '_');
+  if (/^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\.|$)/i.test(name)) name = '_' + name;
+  return name || '_';
+};
+window.assetDownloadFileNames = function (values) {
+  const used = new Set();
+  return values.map(value => {
+    const name = window.assetDownloadFileName(value);
+    const dot = name.lastIndexOf('.'), stem = dot > 0 ? name.slice(0, dot) : name;
+    const extension = dot > 0 ? name.slice(dot) : '';
+    let next = name, number = 2;
+    while (used.has(next.toLowerCase())) next = `${stem} (${number++})${extension}`;
+    used.add(next.toLowerCase());
+    return next;
+  });
+};
+// 삭제 이력은 사용자 화면에 별도 표시하지 않는다. 원본·활동·수행자·시점은 내부 보존한다.
+// 정적 데모에서는 활성 배열에서 제외하고 별도 인메모리 기록으로 보존(API의 soft-delete 구현 아님).
+window.archiveDeletedAsset = function (asset, actor) {
+  const record = JSON.parse(JSON.stringify(asset));
+  record.deleted_at = new Date().toISOString(); record.deleted_by = actor;
+  window.DATA.deletedAssets.push(record);
+  const index = window.DATA.assets.indexOf(asset);
+  if (index > -1) window.DATA.assets.splice(index, 1);
+  return record;
+};

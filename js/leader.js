@@ -180,8 +180,7 @@
     });
   }
   function formatAddPrice(value) {
-    const digits = value.replace(/[^0-9]/g, "").slice(0, 12);
-    return digits ? Number(digits).toLocaleString("ko-KR") : "";
+    return window.formatPurchasePriceInput(value);
   }
   const CLOSE_ICON_SM = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>`;
   const CAL_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>`;
@@ -295,7 +294,7 @@
       case "회사의 모든 구성원": return true;
       case "모든 관리자 및 리더": return true; // 현재 페르소나는 리더 김민수
       case "특정 관리자/리더": return (cat.viewTarget && cat.viewTarget.members || []).includes(ME);
-      case "특정 그룹 및 직무/직급": return (cat.viewTarget && cat.viewTarget.groups || []).includes(MEMBER_TEAM[ME]);
+      case "특정 그룹 및 직무/직급": return window.matchesAssetGroupPositionTarget(cat.viewTarget, MEMBER_TEAM[ME], window.ASSET_MEMBER_JOB_TITLES[ME]);
       default: return false; // 관리자만: 관리권한 예외가 없으면 리더는 접근 불가
     }
   }
@@ -513,8 +512,8 @@
         </div>
         ${addProductFieldHtml(draft)}
         ${cat ? `
-          <div class="mapp-add-field"><label>사진</label><div class="mapp-add-photos">${photoTiles}${draft.photos.length < 10 ? '<button type="button" class="mapp-add-photo-plus" data-add-photo aria-label="사진 추가">+</button>' : ""}</div></div>
-          ${cat.type === "individual" ? addInputHtml("고유관리번호", "assetNo", draft, { required: true, maxlength: 30, error: "동일한 고유관리번호가 존재합니다." }) : addInputHtml("총 수량", "totalQty", draft, { required: true, inputmode: "numeric", maxlength: 6 })}${draft.editingId && cat.type === "quantity" ? '<p class="field-err" data-edit-qty-error hidden>배분 수량보다 적게 입력할 수 없습니다.</p>' : ""}
+          <div class="mapp-add-field"><label>사진</label><div class="mapp-add-photos">${photoTiles}${draft.photos.length < window.ASSET_PHOTO_MAX_COUNT ? '<button type="button" class="mapp-add-photo-plus" data-add-photo aria-label="사진 추가">+</button>' : ""}</div></div>
+          ${cat.type === "individual" ? addInputHtml("고유관리번호", "assetNo", draft, { required: true, maxlength: 30, error: "동일한 고유관리번호가 존재합니다." }) : addInputHtml("전체 수량", "totalQty", draft, { required: true, inputmode: "numeric", maxlength: 6 })}${draft.editingId && cat.type === "quantity" ? '<p class="field-err" data-edit-qty-error hidden>배분 수량보다 적게 입력할 수 없습니다.</p>' : ""}
           ${!hidden.includes("expiry") ? addExpiryFieldHtml(draft) : ""}
           <div class="mapp-add-field"><div class="mapp-add-field-label"><label>태그</label><button type="button" data-add-tag-manage>태그 관리</button></div><p class="hint mapp-add-tag-hint">최대 5개까지 선택할 수 있습니다.</p>
             <div class="mapp-add-tag-picker"><div class="tag-input-wrap"><div class="tag-chips" data-add-tag-chips>${addTagChipsHtml(draft.labels)}</div><input type="text" data-add-tag-search placeholder="${draft.labels.length ? "" : "검색"}" autocomplete="off"${draft.labels.length >= 5 ? " disabled" : ""}></div><div class="mapp-add-suggest" data-add-tag-menu hidden></div></div></div>
@@ -522,7 +521,7 @@
           ${cat.type === "individual" && !hidden.includes("imei") ? addInputHtml("IMEI", "imei", draft, { maxlength: 40 }) : ""}
           ${!hidden.includes("manufactured") ? addDateSelectHtml("제조연월", "manufactured", draft, "month") : ""}
           ${!hidden.includes("purchaseDate") ? addDateSelectHtml("구매연월", "purchaseDate", draft, "month") : ""}
-          ${!hidden.includes("purchasePrice") ? addInputHtml("구매가격", "purchasePrice", draft, { inputmode: "numeric", maxlength: 15 }) : ""}
+          ${!hidden.includes("purchasePrice") ? addInputHtml("구매가격", "purchasePrice", draft, { inputmode: "decimal", maxlength: 21 }) : ""}
           ${addInputHtml("메모", "note", draft, { textarea: true, maxlength: 500 })}` : ""}
       </div>
       <div class="mapp-add-foot"><button type="button" class="btn primary" data-add-save${addDraftValid(draft) && editDirty(draft) ? "" : " disabled"}>저장</button></div>`;
@@ -571,7 +570,7 @@
       </div></div>`;
   }
   // 상세 자체의 조회 권한은 기존 구성원/근무지 기능의 책임이다. 자산은 기존 소분류 조회 판정을
-  // 재사용하며 본인 배정·보유 예외를 유지한다. 기능 설정 관리자 데모 가정으로 자산 권한을 확대하지 않는다.
+  // 재사용한다. 본인 프로필도 같은 소분류 조회 권한을 따르며 본인 예외는 직원 내 자산·QR에만 적용한다.
   function directoryEsc(value) {
     return String(value ?? "").replace(/[&<>"']/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]));
   }
@@ -579,12 +578,12 @@
     return { type: kind === "member" ? "employee" : "worksite", value: kind === "member" ? DEMO_DIRECTORY_MEMBER : DEMO_DIRECTORY_WORKSITE };
   }
   function directoryCanViewAsset(a, kind) {
-    return false || hasViewPermission(a);
+    return hasViewPermission(a);
   }
   function directoryAssetAvailable(kind) {
     if (!assetMgmtEnabled()) return false;
     // 자산 0건도 분류 조회 권한으로 노출. 메뉴/부모 탭은 데이터 건수로 숨기지 않는다.
-    return false || window.DATA.categories.some(cat => catViewPermission(cat));
+    return window.DATA.categories.some(cat => catViewPermission(cat));
   }
   function directoryItems(kind) {
     const target = directoryTarget(kind), result = [];
@@ -797,8 +796,8 @@
   // 대시보드 통계 카드의 "?" 도움말 툴팁과 동일 문구(assets.js statHelp) — 소진·미보유대상은 라벨만으론
   // 뜻이 안 잡히는 파생 개념이라, 앱에선 툴팁 대신 필터 적용 시 그 아래 항상 문구로 노출(2026-09-30)
   const STATUS_HELP = {
-    depleted: "전체 수량을 모두 배분해 남은 잔여 수량이 없는 품목의 수입니다.",
-    unheld: "보유 수량이 0개인 보유 대상의 수입니다.",
+    depleted: "소진은 전체 수량을 모두 배분해 잔여 수량이 없는 품목을 의미합니다.",
+    unheld: "미보유대상은 보유 수량이 0개인 보유 대상을 의미합니다.",
   };
   function matchesStatus(a, type, statusFilter) {
     if (statusFilter === "all") return true;
@@ -851,7 +850,7 @@
     switch (cat && cat.assign) {
       case "회사의 모든 구성원": case "모든 관리자 및 리더": return true;
       case "특정 관리자/리더": return (cat.assignTarget && cat.assignTarget.members || []).includes(ME);
-      case "특정 그룹 및 직무/직급": return (cat.assignTarget && cat.assignTarget.groups || []).includes(MEMBER_TEAM[ME]);
+      case "특정 그룹 및 직무/직급": return window.matchesAssetGroupPositionTarget(cat.assignTarget, MEMBER_TEAM[ME], window.ASSET_MEMBER_JOB_TITLES[ME]);
       default: return false;
     }
   }
@@ -870,7 +869,7 @@
     return JSON.stringify({ category: draft.category, product: draft.product.trim(), assetNo: draft.assetNo.trim(),
       totalQty: Number(draft.totalQty), photos: draft.photos, primaryPhoto: draft.primaryPhoto, expiry: parseAddExpiry(draft.expiry) ?? draft.expiry.trim(),
       labels: [...draft.labels].sort(), serial: draft.serial.trim(), imei: draft.imei.trim(), manufactured: draft.manufactured,
-      purchaseDate: draft.purchaseDate, purchasePrice: draft.purchasePrice.replace(/[^0-9]/g, ""), note: draft.note.trim() });
+      purchaseDate: draft.purchaseDate, purchasePrice: window.normalizePurchasePrice(draft.purchasePrice), note: draft.note.trim() });
   }
   function editDirty(draft) {
     return !draft.editingId || draftSnapshot(draft) !== draftSnapshot(editDraftFor(assets.find(a => a.id === draft.editingId)));
@@ -878,22 +877,24 @@
   function applyAssetEdit(a, draft) {
     activityLog(a);
     const cat = addCategory(draft);
+    // 한 번의 저장에서 생긴 활동을 모았다가 정해진 표시 순서로 한꺼번에 기록(data.js logAssetActivities)
+    const pending = [];
     const set = (key, value, script, format = v => v || "") => {
-      if ((a[key] ?? "") === (value ?? "")) return;
-      logActivity(a, { script: `자산 정보 수정: ${script}`, before: format(a[key]), after: format(value) });
+      if (key === "price" ? window.normalizePurchasePrice(a[key]) === window.normalizePurchasePrice(value) : (a[key] ?? "") === (value ?? "")) return;
+      pending.push({ script: `자산 정보 수정: ${script}`, before: format(a[key]), after: format(value) });
       a[key] = value;
     };
     if (a.group !== cat.group || a.sub !== cat.sub) {
-      logActivity(a, { script: "자산 정보 수정: 소분류 이동", before: `${a.group} › ${a.sub}`, after: `${cat.group} › ${cat.sub}` });
+      pending.push({ script: "자산 정보 수정: 소분류 이동", before: `${a.group} › ${a.sub}`, after: `${cat.group} › ${cat.sub}` });
       a.group = cat.group; a.sub = cat.sub;
     }
     set("product", draft.product.trim(), "품목명 수정");
     if (a.type === "individual") {
       set("assetNo", draft.assetNo.trim(), "고유관리번호 수정");
       set("serial", draft.serial.trim() || undefined, "S/N 수정"); set("imei", draft.imei.trim() || undefined, "IMEI 수정");
-    } else set("totalQty", Number(draft.totalQty), "총 수량 변경", v => `${v}개`);
+    } else set("totalQty", Number(draft.totalQty), "전체 수량 변경", v => `${v}개`);
     if (JSON.stringify(a.labels || []) !== JSON.stringify(draft.labels)) {
-      logActivity(a, { script: "자산 정보 수정: 태그 수정", before: (a.labels || []).join(", "), after: draft.labels.join(", ") });
+      pending.push({ script: "자산 정보 수정: 태그 수정", before: (a.labels || []).join(", "), after: draft.labels.join(", ") });
       a.labels = [...draft.labels];
     }
     const expiry = parseAddExpiry(draft.expiry);
@@ -901,8 +902,10 @@
     for (const [key, script] of [["manufactured", "제조연월 변경"], ["purchaseDate", "구매연월 변경"]]) {
       if ((a[key] || "").slice(0, 7) !== draft[key]) set(key, draft[key] ? `${draft[key]}-01` : undefined, script, v => v ? window.fmtMonth(v) : "");
     }
-    set("price", draft.purchasePrice ? Number(draft.purchasePrice.replace(/[^0-9]/g, "")) : undefined, "구매가격 변경", v => v == null ? "" : window.formatPrice(v));
+    set("price", window.normalizePurchasePrice(draft.purchasePrice) || undefined, "구매가격 변경", v => v == null ? "" : window.formatPrice(v));
     set("note", draft.note.trim() || undefined, "메모 수정");
+    pending.push(...window.assetPhotoActivities(window.assetPhotos(a), a._primary || 0, draft.photos, draft.primaryPhoto));
+    window.logAssetActivities(pending, e => logActivity(a, e));
     a._photos = draft.photos.map(p => ({ ...p })); a._primary = draft.primaryPhoto;
     a.photo = draft.photos[draft.primaryPhoto]?.color || null; a.photoCount = draft.photos.length;
   }
@@ -1079,7 +1082,9 @@
           ? `<span class="hval-avatar" style="background:${avatarColor(e.target.employee)}">${e.target.employee[0]}</span>`
           : IC_WS)
       : "";
-    const withTarget = v => e.script === "자산 정보 수정: 메모 수정" ? (v ? window.AssetMemo.render(v) : "없음")
+    // 사진 활동은 기존·변경 값이 사진 목록이라 썸네일로 표시(data.js assetPhotoThumbsHtml)
+    const withTarget = v => e.photoValue ? window.assetPhotoThumbsHtml(v)
+      : e.script === "자산 정보 수정: 메모 수정" ? (v ? window.AssetMemo.render(v) : "없음")
       : (targetName && v) ? `${targetMark}${esc(targetName)} · ${val(v)}` : val(v);
     return `
       <div class="hcard">
@@ -1547,7 +1552,7 @@
           ${i === primaryIdx ? '<span class="areg-photo-star">★</span>' : ""}
           <span class="areg-photo-del" data-photo-del="${i}" aria-label="삭제">${CLOSE_ICON_SM}</span>
         </button>`).join("");
-      const addTile = photos.length < 10 ? `<button type="button" class="areg-photo-add" data-photo-add aria-label="사진 추가">+</button>` : "";
+      const addTile = photos.length < window.ASSET_PHOTO_MAX_COUNT ? `<button type="button" class="areg-photo-add" data-photo-add aria-label="사진 추가">+</button>` : "";
       row.innerHTML = tiles + addTile;
       row.querySelectorAll("[data-photo-i]").forEach(b => b.onclick = e => {
         if (e.target.closest("[data-photo-del]")) return;
@@ -1570,7 +1575,7 @@
           { key: "camera", label: "카메라로 촬영하기" },
           { key: "gallery", label: "갤러리에서 불러오기" },
         ], () => {
-          photos.push({ color: PHOTO_COLORS[photos.length % PHOTO_COLORS.length], at: `${todayStr()} 00:00`, by: ME });
+          photos.push({ id: window.assetPhotoId(), color: PHOTO_COLORS[photos.length % PHOTO_COLORS.length], at: `${todayStr()} 00:00`, by: ME });
           if (photos.length === 1) primaryIdx = 0;
           renderPhotos();
         });
@@ -1582,6 +1587,7 @@
     saveBtn.onclick = () => {
       if (saveBtn.disabled) return;
       back.remove();
+      window.logAssetActivities(window.assetPhotoActivities(window.assetPhotos(a), a._primary || 0, photos, primaryIdx), e => logActivity(a, e));
       a._photos = photos;
       a._primary = primaryIdx;
       toast("저장되었습니다.");
@@ -1825,8 +1831,9 @@
     back.onclick = e => { if (e.target === back) back.remove(); };
     back.querySelector('[data-qr-download]').onclick = () => {
       const now = new Date(), pad = n => String(n).padStart(2,"0");
-      const stamp = `${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
-      toast(`"QR_${a.type === "individual" ? a.assetNo : a.product}_${stamp}.png" 다운로드 (프로토타입 — 반영 없음)`); back.remove();
+      const stamp = `${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+      const fileName = window.assetDownloadFileName(`QR_${a.type === "individual" ? a.assetNo : a.product}_${stamp}.png`);
+      toast(`"${fileName}" 다운로드 (프로토타입 — 반영 없음)`); back.remove();
     };
   }
 
@@ -1857,7 +1864,7 @@
     input.addEventListener("input", () => { okBtn.disabled = !confirmed(); });
     okBtn.onclick = () => {
       if (!confirmed()) return;
-      assets.splice(assets.indexOf(a), 1);
+      window.archiveDeletedAsset(a, ME);
       cb.remove(); onDone(); toast("삭제되었습니다.");
     };
     document.body.appendChild(cb);
@@ -2213,6 +2220,9 @@
           if (qtyError) qtyError.hidden = Number(draft.totalQty) >= (assets.find(a => a.id === draft.editingId).stocks || []).reduce((sum,x) => sum + x.qty,0);
         }
         root.querySelector("[data-add-category]").onclick = () => { syncAddDraft(); state.screen = "asset-add-category"; draw(); };
+        // 공통 가격 헬퍼를 먼저 연결하고 정수 12자리·소수 5자리로 정리한 값을 폼에 반영한다.
+        const priceInput = root.querySelector('[data-add-field="purchasePrice"]');
+        if (priceInput) window.bindPurchasePriceInput(priceInput);
         root.querySelectorAll("[data-add-field]").forEach(input => input.addEventListener("input", () => {
           if (input.dataset.addField === "assetNo") {
             const pos = input.selectionStart;
@@ -2222,20 +2232,6 @@
           }
           if (input.dataset.addField === "expiry") input.value = formatAddExpiry(input.value);
           if (input.dataset.addField === "totalQty") input.value = input.value.replace(/[^0-9]/g, "");
-          if (input.dataset.addField === "purchasePrice") {
-            // 콤마는 표시용이며 숫자는 기존처럼 최대 12자리. 중간 편집 시 커서도 입력 위치를 유지한다.
-            const position = input.selectionStart;
-            const digitsBefore = input.value.slice(0, position).replace(/[^0-9]/g, "").length;
-            input.value = formatAddPrice(input.value);
-            if (position != null) {
-              let cursor = 0, digitsSeen = 0;
-              while (cursor < input.value.length && digitsSeen < digitsBefore) {
-                if (/[0-9]/.test(input.value[cursor])) digitsSeen++;
-                cursor++;
-              }
-              input.setSelectionRange(cursor, cursor);
-            }
-          }
           updateAddValidity();
         }));
         const expiryInput = field("expiry");
@@ -2330,7 +2326,7 @@
           openAddDropdown(addPhoto, [
             { key: "camera", label: "카메라로 촬영하기" },
             { key: "gallery", label: "갤러리에서 불러오기" },
-          ], () => { draft.photos.push({ color: PHOTO_COLORS[draft.photos.length % PHOTO_COLORS.length], at: `${todayStr()} 00:00`, by: ME }); draw(); });
+          ], () => { draft.photos.push({ id: window.assetPhotoId(), color: PHOTO_COLORS[draft.photos.length % PHOTO_COLORS.length], at: `${todayStr()} 00:00`, by: ME }); draw(); });
         };
         const save = root.querySelector("[data-add-save]");
         if (save) save.onclick = () => {
@@ -2361,7 +2357,7 @@
           if (cat.type === "individual" && draft.imei.trim()) asset.imei = draft.imei.trim();
           if (draft.manufactured) asset.manufactured = `${draft.manufactured}-01`;
           if (draft.purchaseDate) asset.purchaseDate = `${draft.purchaseDate}-01`;
-          if (draft.purchasePrice) asset.price = Number(draft.purchasePrice.replace(/[^0-9]/g, ""));
+          if (draft.purchasePrice) asset.price = window.normalizePurchasePrice(draft.purchasePrice);
           if (draft.note.trim()) asset.note = draft.note.trim();
           if (draft.photos.length) {
             asset._photos = draft.photos.map(p => ({ ...p }));

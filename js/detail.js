@@ -85,7 +85,7 @@
     const d = new Date(), p = n => String(n).padStart(2, "0");
     return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
   }
-  const zipName = a => `${(a.assetNo || a.product).replace(/[\\/:*?"<>|\s]+/g, "_")}_Photos_${tsNow()}.zip`;
+  const zipName = a => window.assetDownloadFileName(`${a.assetNo || a.product}_Photos_${tsNow()}.zip`);
 
   function toast(msg) {
     const t = document.createElement("div");
@@ -295,9 +295,10 @@
     input.addEventListener("input", () => { okBtn.disabled = !confirmed(); });
     okBtn.onclick = () => {
       if (!confirmed()) return;
-      assets.splice(assets.indexOf(a), 1);
+      const deleted = window.archiveDeletedAsset(a, "dana");
+      sessionStorage.setItem("justDeletedAssetRecord", JSON.stringify(deleted));
       // 상세 → 목록 이동이 즉시 일어나서 이 페이지에서 토스트를 띄우면 거의 안 보임 — 목록 페이지 첫 렌더에서 대신 띄움.
-      // 이동한 페이지에서 data.js가 처음부터 재실행되며 위 splice가 무효화되는 것도 같은 이유로 justDeletedAssetId로 별도 전달(data.js 참조)
+      // 이동한 페이지에서 data.js가 처음부터 재실행되며 인메모리 삭제가 무효화되는 것도 같은 이유로 식별값·내부 기록을 별도 전달(data.js 참조)
       sessionStorage.setItem("justDeletedAssetId", a.id);
       sessionStorage.setItem("pendingToast", "삭제되었습니다.");
       location.href = "assets.html";
@@ -411,9 +412,10 @@
     // 구조설계안 5.4 사진 다운로드와 동일한 식별 라벨 규칙(개별=고유관리번호, 수량=품목명) + QR 접두어
     pop.querySelector("[data-dl]").onclick = () => {
       const d = new Date(), p2 = n => String(n).padStart(2, "0");
-      const ts = `${d.getFullYear()}${p2(d.getMonth() + 1)}${p2(d.getDate())}${p2(d.getHours())}${p2(d.getMinutes())}${p2(d.getSeconds())}`;
+      const ts = `${d.getFullYear()}${p2(d.getMonth() + 1)}${p2(d.getDate())}_${p2(d.getHours())}${p2(d.getMinutes())}${p2(d.getSeconds())}`;
       const label = a.type === "individual" ? (a.assetNo || a.id) : a.product;
-      toast(`"QR_${label}_${ts}.png" 다운로드 (프로토타입 — 반영 없음)`);
+      const fileName = window.assetDownloadFileName(`QR_${label}_${ts}.png`);
+      toast(`"${fileName}" 다운로드 (프로토타입 — 반영 없음)`);
       pop.remove();
     };
     setTimeout(() => {
@@ -426,7 +428,7 @@
    * 엔트리 스키마: { d(수정한 일시), script(스크립트), target?(수정 대상 — 구성원/근무지 객체, 없으면 자산 자체),
    *                 before?/after?(기존값/변경값 — 두 키가 아예 없으면 값 블록 자체를 생략, "" 이면 "없음"으로 표시), who(수정한 사람) }
    * 유형별 스크립트 정의는 구조설계안 5.5 참조. "그룹: 세부" 형식으로 그룹핑(예: "상태 변경: 분실 신고")
-   * — 아직 트리거할 UI가 없는 유형(사진)만 그 기능을 만들 때 추가. */
+   * 사진 활동(자산 사진 관리)은 기존·변경 값이 문자열이 아니라 사진 목록 — data.js assetPhotoActivities 참조. */
   // 초기 스냅샷(합성 데이터) — 세션 시작 시 자산의 현재 상태로부터 한 번만 만들어지는 베이스라인
   function activityOf(a) {
     const ev = [{ d: `${a.createdAt || a.purchaseDate || "2024-01-01"} 09:00`, script: "자산 등록", who: "dana" }];
@@ -474,7 +476,9 @@
     // 값이 "없음"인 쪽엔 대상 이름을 안 붙임 — 신규 배정의 "기존"처럼 그 시점엔 아직 이 대상과 실제
     // 관계(레코드)가 없었던 경우까지 이름을 붙이면 "이미 있었는데 비어있었다"로 오독됨. 값이 있는 쪽에만
     // "이름 · 값"으로 표기(반납의 "변경"·보유 대상 추가의 "기존" 등 반대 방향도 동일 규칙)
-    const withTarget = v => e.script === "자산 정보 수정: 메모 수정" ? (v ? window.AssetMemo.render(v) : "없음")
+    // 사진 활동은 기존·변경 값이 사진 목록이라 썸네일로 표시(data.js assetPhotoThumbsHtml)
+    const withTarget = v => e.photoValue ? window.assetPhotoThumbsHtml(v)
+      : e.script === "자산 정보 수정: 메모 수정" ? (v ? window.AssetMemo.render(v) : "없음")
       : (targetName && v) ? `${targetMark}${targetName} · ${val(v)}` : val(v);
     return `
       <div class="hcard">
@@ -1255,6 +1259,8 @@
       document.querySelectorAll(".dropdown-menu").forEach(m => m.remove());
       const list = [];
       if (cur !== a._primary) list.push({ t: "대표 사진으로 지정", fn: () => confirmModal("자산 대표 사진으로 지정하시겠습니까?", () => {
+        // 뷰어는 액션마다 바로 저장되므로 액션 1회가 사진 활동의 저장 1회이다
+        window.logAssetActivities(window.assetPhotoActivities(items, a._primary || 0, items, cur), e => logActivity(a, e));
         a._primary = cur; toast("자산 대표 사진으로 지정되었습니다."); draw();
       }) });
       list.push({ t: "다운로드", fn: () => toast("다운로드 — 원본 파일명 그대로 (프로토타입)") });
@@ -1275,10 +1281,13 @@
     }
     function delCur() {
       const wasPrimary = cur === a._primary;
+      const beforeItems = items.map(p => ({ ...p })), beforePrimary = a._primary || 0;
       items.splice(cur, 1);
-      if (!items.length) { close(); toast("자산 사진이 삭제되었습니다."); DetailScreen.render(); return; }
       if (wasPrimary) a._primary = 0;
       else if (a._primary > cur) a._primary -= 1;
+      // 삭제 1회 = 저장 1회. 대표를 삭제해 다음 사진이 승계하면 사진 변경과 대표 사진 변경이 함께 남는다
+      window.logAssetActivities(window.assetPhotoActivities(beforeItems, beforePrimary, items, a._primary || 0), e => logActivity(a, e));
+      if (!items.length) { close(); toast("자산 사진이 삭제되었습니다."); DetailScreen.render(); return; }
       if (cur >= items.length) cur = items.length - 1;
       zoom = 1; draw();
       toast("자산 사진이 삭제되었습니다.");
@@ -1380,7 +1389,7 @@
       { k: "제조연월", field: "manufactured", v: a.manufactured ? window.fmtMonth(a.manufactured) : '<span class="muted">—</span>' },
       { k: "구매연월", field: "purchaseDate", v: a.purchaseDate ? window.fmtMonth(a.purchaseDate) : "—" },
       // 통화 표기는 클라이언트 단위 전역 설정 — window.formatPrice 참조(구조설계안 3.4, data.js)
-      { k: "구매가격", field: "purchasePrice", v: a.price ? window.formatPrice(a.price) : "—" },
+      { k: "구매가격", field: "purchasePrice", v: a.price != null ? window.formatPrice(a.price) : "—" },
       { k: "자산 등록일", v: window.fmtDate(a.createdAt) },
       { k: "QR 라벨", v: qrBtn },
       // 메모는 다른 필드와 달리 "자산 수정" 폼(자산관리 권한) 없이도 배정/보유 변경 권한만 있으면 옆의

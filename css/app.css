@@ -1177,6 +1177,9 @@ button.dthumb:hover { filter: brightness(0.94); }
    전환(대시보드 이력 탭은 폭이 넉넉해 원래 한 줄 구조 그대로 유지 — .mapp-body로 앱만 스코프, 2026-09-29) */
 .mapp-body .hcard-diff { gap: 10px; }
 .mapp-body .hcard-row { flex-direction: column; align-items: flex-start; gap: 4px; }
+/* 사진 활동(자산 사진 관리)의 기존·변경 값 — 사진 목록을 썸네일로 나열. 최대 10장이라 폭이 모자라면 줄바꿈 */
+.hval-photos { display: flex; flex-wrap: wrap; gap: 4px; }
+.hval-photo { width: 28px; height: 28px; border-radius: 4px; border: 1px solid rgba(0, 0, 0, .08); flex-shrink: 0; }
 .hval-avatar {
   display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
   width: 16px; height: 16px; border-radius: 50%;

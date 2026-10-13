@@ -2,6 +2,10 @@
 (function () {
   const TODAY = new Date("2026-09-04");
   const { assets } = window.DATA;
+  // 대시보드는 자산 관리 권한 보유 관리자 가정. false인 확인용 사본은 관리 권한 없는 리더를 재현한다.
+  // 실제 서비스에서는 현재 계정의 관리 권한·이름/그룹/직무 ID 응답으로 대체한다(인증 API 목업 아님).
+  const DEMO_ASSUME_ASSET_MANAGE_PERMISSION = true;
+  const DEMO_VIEWER_NAME = "김민수";
 
   // held(보유 중)는 수량형 전용 — 개별형의 배정중처럼 "활성 상태"라 배지 색은 assigned를 그대로 재사용(구조설계안
   // 3.4: status는 개별형·수량형 둘 다 필수, 값 범위만 다름 — 수량형은 stock·held 2종만)
@@ -186,7 +190,7 @@
   const ALL_LABELS = [...new Set(assets.flatMap(a => a.labels || []))].sort();
   const CAT_GROUPS = (() => {
     const m = new Map();
-    window.DATA.categories.forEach(c => {
+    viewableCategories().forEach(c => {
       if (!m.has(c.group)) m.set(c.group, []);
       m.get(c.group).push(c.sub);
     });
@@ -200,9 +204,28 @@
   // 자산 삭제 권한 — 전역 "자산 관리 권한"(구조설계안 4.1 manage_permission_type: 관리자만(기본값)/관리자
   // 및 모든 리더/관리자 및 특정 리더). 소분류별 view/assign과 달리 클라이언트 전체에 하나만 적용되는 값이라
   // 여러 소분류 자산을 섞어 선택해도 권한 불일치가 생기지 않음. 대시보드엔 구성원 role 개념이 아직 없어
-  // 실제 판정 로직은 없고, 대시보드는 관리자가 본다고 가정해 항상 true — 권한 체크 지점만 코드상에 명시해둠
+  // 현재 데모에서는 관리 권한 보유를 true로 가정하고, 조회 검증용 사본에서 false로 전환할 수 있음
   // (2026-09-30, detail.js의 개별 삭제와 동일한 함수로 통일)
-  function canManageAssets() { return true; }
+  function canManageAssets() { return DEMO_ASSUME_ASSET_MANAGE_PERMISSION; }
+  function canViewCategory(cat) {
+    if (!cat) return false;
+    if (canManageAssets()) return true;
+    // 관리 권한이 없는 리더에게는 본인 배정 여부가 아니라 소분류 조회 설정을 적용한다.
+    switch (cat.view) {
+      case "회사의 모든 구성원":
+      case "모든 관리자 및 리더": return true;
+      case "특정 관리자/리더": return (cat.viewTarget?.members || []).includes(DEMO_VIEWER_NAME);
+      case "특정 그룹 및 직무/직급": return window.matchesAssetGroupPositionTarget(
+        cat.viewTarget, MEMBER_INFO[DEMO_VIEWER_NAME]?.team, window.ASSET_MEMBER_JOB_TITLES[DEMO_VIEWER_NAME]);
+      default: return false;
+    }
+  }
+  function viewableCategories() { return window.DATA.categories.filter(canViewCategory); }
+  function hasViewScope() { return viewableCategories().length > 0; }
+  function viewableAssets() {
+    const categories = new Set(viewableCategories().map(cat => JSON.stringify([cat.group, cat.sub])));
+    return assets.filter(a => !a.deleted_at && categories.has(JSON.stringify([a.group, a.sub])));
+  }
   // 전체 탭 체크박스 선택 — 현재 페이지 안에서만 유지되는 휘발성 상태(state에 안 넣음). 정렬·필터·검색·
   // 페이지 이동 등 render()를 다시 부르는 모든 조작에서 자동으로 비워짐(render() 맨 앞에서 항상 clear).
   // 체크박스 자체를 토글하는 것만으로는 render()를 다시 부르지 않고 DOM을 직접 건드려서 선택을 유지함
@@ -246,7 +269,7 @@
   function getFiltered() {
     const f = state.filters;
     const q = state.search.trim().toLowerCase();
-    return assets.filter(a => {
+    return viewableAssets().filter(a => {
       // 분류 필터 항목은 "대분류"(부모 체크 시 자체로도 들어감) 또는 "대분류/소분류"(leaf) 둘 다 올 수 있음
       if (f.category.length && !f.category.some(c => c === a.group || c === `${a.group}/${a.sub}`)) return false;
       if (f.type.length && !f.type.includes(a.type)) return false;
@@ -646,9 +669,11 @@
   }
 
   function tableInner(v) {
-    // 필터·검색 조건 때문에 0건인 것과 애초에 등록된 자산 자체가 없는 것을 구분
+    // 조회 가능한 소분류 없음 → 등록 자산 없음 → 검색/필터 결과 없음의 조건을 구분한다.
+    // 조회 범위가 없으면 입력 조건과 무관하게 조회 불가 빈 상태를 우선한다.
     const filtering = activeFilterCount() > 0 || !!state.search.trim();
-    const emptyMsg = filtering ? "결과가 없습니다." : "등록된 자산이 없습니다.";
+    const emptyMsg = !hasViewScope() ? "조회 가능한 자산이 없습니다."
+      : filtering ? "결과가 없습니다." : "등록된 자산이 없습니다.";
     const colspan = state.view === "product" ? (state.productType === "quantity" ? 7 : 8)
       : state.view === "employee" ? 4 : state.view === "worksite" ? 3 : (canManageAssets() ? 11 : 10);
     const empty = `<tr><td colspan="${colspan}" style="text-align:center;color:var(--text-mut);padding:32px">${emptyMsg}</td></tr>`;
@@ -701,7 +726,7 @@
     deleteBtn.onclick = () => {
       if (!selected.size) return;
       openBulkDeleteAssetModal(() => {
-        assets.filter(a => selected.has(a.id)).forEach(a => assets.splice(assets.indexOf(a), 1));
+        assets.filter(a => selected.has(a.id)).forEach(a => window.archiveDeletedAsset(a, "dana"));
         selected.clear();
         toast("삭제되었습니다.");
         render();
@@ -917,7 +942,8 @@
   /* ---------- stats (분류 필터까지만 반영) ---------- */
   function catScoped() {
     const cat = state.filters.category;
-    return cat.length ? assets.filter(a => cat.some(c => c === a.group || c === `${a.group}/${a.sub}`)) : assets;
+    const list = viewableAssets();
+    return cat.length ? list.filter(a => cat.some(c => c === a.group || c === `${a.group}/${a.sub}`)) : list;
   }
   function computeStats() {
     const list = catScoped();
@@ -987,11 +1013,11 @@
         }),
         statCol({ k: "재고", v: s.qtyStock, filter: { type: ["quantity"], status: ["stock"] } }),
         statCol({
-          k: `소진 ${statHelp("전체 수량을 모두 배분해 남은 잔여 수량이 없는 품목의 수입니다.")}`,
+          k: `소진 ${statHelp("소진은 전체 수량을 모두 배분해 잔여 수량이 없는 품목을 의미합니다.")}`,
           v: s.qtyDepleted, cls: "warn", filter: { depleted: ["yes"] },
         }),
         statCol({
-          k: `미보유대상 ${statHelp("보유 수량이 0개인 보유 대상의 수입니다.")}`,
+          k: `미보유대상 ${statHelp("미보유대상은 보유 수량이 0개인 보유 대상을 의미합니다.")}`,
           v: s.qtyUnheld, cls: "warn", filter: { unheld: ["yes"] },
         }),
       ])}
@@ -1487,12 +1513,13 @@
     m.querySelector("#qr-go").onclick = () => {
       const items = list.filter(a => sel.has(a.id));
       const d = new Date(), p2 = n => String(n).padStart(2, "0");
-      const ts = `${d.getFullYear()}${p2(d.getMonth() + 1)}${p2(d.getDate())}${p2(d.getHours())}${p2(d.getMinutes())}${p2(d.getSeconds())}`;
+      const ts = `${d.getFullYear()}${p2(d.getMonth() + 1)}${p2(d.getDate())}_${p2(d.getHours())}${p2(d.getMinutes())}${p2(d.getSeconds())}`;
       if (items.length === 1) {
         const a = items[0];
         // 구조설계안 5.4 사진 다운로드와 동일한 식별 라벨 규칙(개별=고유관리번호, 수량=품목명) + QR 접두어
         const label = a.type === "individual" ? (a.assetNo || a.id) : a.product;
-        toast(`"QR_${label}_${ts}.png" 다운로드 (프로토타입 — 반영 없음)`);
+        const fileName = window.assetDownloadFileName(`QR_${label}_${ts}.png`);
+        toast(`"${fileName}" 다운로드 (프로토타입 — 반영 없음)`);
       } else {
         toast(`"Asset_QR_${ts}.zip" (${items.length}건) 다운로드 (프로토타입 — 반영 없음)`);
       }

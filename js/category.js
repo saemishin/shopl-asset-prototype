@@ -412,7 +412,11 @@
     // "특정 그룹 및 직무/직급"과 "특정 관리자/리더"는 서로 다른 대상 종류라 draftTarget 안에서도 완전히 독립적으로 관리 —
     // 라디오를 이리저리 바꿔도 각자 골라둔 내용이 안 섞이고 그대로 남아있어야 함
     function isTargetSetFor(v) {
-      if (v === "특정 그룹 및 직무/직급") return draftTarget.groups.length > 0 || draftTarget.jobTitles.length > 0;
+      if (v === "특정 그룹 및 직무/직급") {
+        if (!draftTarget.groups.length && !draftTarget.jobTitles.length) return false;
+        // 비어 있는 축은 전체다. 조회에서 제한한 축을 비워 변경 범위가 넓어지는 경우를 막는다.
+        return isView || state.view !== v || window.isAssetGroupPositionSubset(draftTarget, state.viewTarget);
+      }
       if (v === "특정 관리자/리더") return draftTarget.members.length > 0;
       return false;
     }
@@ -455,7 +459,7 @@
         // 조회 권한에서 고른 대상 밖은 선택 못 하게 제한(조회 권한이 회사 전체/관리자 전체처럼 넓으면 제한 없음)
         const isNarrowedView = !isView && state.view === picked;
         if (picked === "특정 그룹 및 직무/직급") {
-          const restrict = isNarrowedView ? { groups: new Set(state.viewTarget.groups), jobTitles: new Set(state.viewTarget.jobTitles) } : null;
+          const restrict = isNarrowedView ? { groups: state.viewTarget.groups.length ? new Set(state.viewTarget.groups) : null, jobTitles: state.viewTarget.jobTitles.length ? new Set(state.viewTarget.jobTitles) : null } : null;
           openGroupJobPicker({ groups: draftTarget.groups, jobTitles: draftTarget.jobTitles }, res => {
             draftTarget.groups = res.groups; draftTarget.jobTitles = res.jobTitles;
             render();
@@ -512,7 +516,7 @@
 
     const flatten = nodes => nodes.reduce((out, n) => out.concat(n.name, n.children ? flatten(n.children) : []), []);
     const ALL_GROUP_NAMES = flatten(GROUP_TREE);
-    const selectableGroupNames = restrict ? ALL_GROUP_NAMES.filter(n => restrict.groups.has(n)) : ALL_GROUP_NAMES;
+    const selectableGroupNames = restrict?.groups ? ALL_GROUP_NAMES.filter(n => restrict.groups.has(n)) : ALL_GROUP_NAMES;
     function findNode(nodes, name) {
       for (const n of nodes) {
         if (n.name === name) return n;
@@ -521,6 +525,7 @@
       return null;
     }
     function setChecked(node, checked, withCascade) {
+      if (restrict?.groups && !restrict.groups.has(node.name)) return;
       checked ? selGroups.add(node.name) : selGroups.delete(node.name);
       if (withCascade && node.children) node.children.forEach(c => setChecked(c, checked, true));
     }
@@ -533,7 +538,7 @@
       if (!matches(node)) return "";
       const hasChildren = node.children && node.children.length;
       const isCollapsed = collapsed.has(node.name);
-      const isDisabled = restrict && !restrict.groups.has(node.name);
+      const isDisabled = restrict?.groups && !restrict.groups.has(node.name);
       return `
         <div class="picker-tree-row" style="padding-left:${depth * 20}px">
           ${hasChildren ? `<button type="button" class="picker-tree-toggle" data-toggle-group="${node.name}">${isCollapsed ? "▸" : "▾"}</button>` : `<span class="picker-tree-toggle"></span>`}
@@ -593,7 +598,7 @@
           <input type="text" class="picker-search" placeholder="검색어를 입력하세요" value="${query}">
           <div class="picker-flatlist">
             ${filtered.map(t => {
-              const isDisabled = restrict && !restrict.jobTitles.has(t);
+              const isDisabled = restrict?.jobTitles && !restrict.jobTitles.has(t);
               return `<label class="picker-check row${isDisabled ? " is-disabled" : ""}"${isDisabled ? ` data-tip="${RESTRICT_TIP}"` : ""}><input type="checkbox" data-jobtitle="${t}"${selJobTitles.has(t) ? " checked" : ""}${isDisabled ? " disabled" : ""}><span>${t}</span></label>`;
             }).join("")}
           </div>`;

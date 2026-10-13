@@ -422,7 +422,7 @@
             <div class="field" id="areg-assetno"><label>고유관리번호 <span class="req">*</span></label><input type="text" id="areg-assetno-input" placeholder="입력" maxlength="30">
               <p class="field-err" data-assetno-err hidden>동일한 명칭이 존재합니다.</p>
             </div>
-            <div class="field" id="areg-totalqty-field"><label>총 수량 <span class="req">*</span></label><input type="text" inputmode="numeric" id="areg-totalqty-input" placeholder="입력" maxlength="6"></div>
+            <div class="field" id="areg-totalqty-field"><label>전체 수량 <span class="req">*</span></label><input type="text" inputmode="numeric" id="areg-totalqty-input" placeholder="입력" maxlength="6"></div>
             <div class="field" id="areg-expiry-field"><label>유효기한</label>${dateFieldHtml()}
               <p class="field-err" data-date-err hidden>유효한 날짜가 아닙니다.</p>
             </div>
@@ -445,7 +445,7 @@
             <div class="field" id="areg-purchasedate-field"><label>구매연월</label>${monthFieldHtml()}
               <p class="field-err" data-date-err hidden>유효한 날짜가 아닙니다.</p>
             </div>
-            <div class="field" id="areg-purchaseprice-field"><label>구매가격</label><input type="text" inputmode="numeric" id="areg-purchaseprice-input" placeholder="입력" maxlength="12"></div>
+            <div class="field" id="areg-purchaseprice-field"><label>구매가격</label><input type="text" inputmode="decimal" id="areg-purchaseprice-input" placeholder="입력" maxlength="21"></div>
             <div class="field" id="areg-note-field"><label>메모</label><textarea id="areg-note-input" placeholder="입력" maxlength="500"></textarea></div>
           </div>
         </div>
@@ -519,12 +519,12 @@
     function editValues() {
       // 표기 차이·태그 순서만으로는 변경으로 보지 않는다. 연월은 저장할 때와 같은 단위로 비교한다.
       const dateValue = (field, getValue) => getValue() === null ? field.querySelector("[data-dtext]").value : getValue();
-      const digits = purchasePriceInput.value.replace(/[^0-9]/g, "");
+      const price = window.normalizePurchasePrice(purchasePriceInput.value);
       return {
         category: catValue, name: nameInput.value.trim(), assetNo: assetNoInput.value.trim(),
         totalQty: totalQtyInput.value ? Number(totalQtyInput.value) : "",
         expiry: dateValue(expiryField, getExpiry), manufactured: dateValue(manufacturedField, getManufactured),
-        purchaseDate: dateValue(purchaseDateField, getPurchaseDate), price: digits ? Number(digits) : "",
+        purchaseDate: dateValue(purchaseDateField, getPurchaseDate), price,
         serial: serialInput.value.trim(), imei: imeiInput.value.trim(), note: noteInput.value.trim(),
         tags: [...tags].sort(), photos: photos.map(photo => ({ ...photo })), primary: primaryIdx,
       };
@@ -650,11 +650,8 @@
       totalQtyInput.value = totalQtyInput.value.replace(/[^0-9]/g, "");
       checkValid();
     });
-    // 구매가격은 숫자 전용이라 천단위 콤마를 붙여 표시(저장 시엔 콤마를 떼고 숫자로 파싱)
-    purchasePriceInput.addEventListener("input", () => {
-      const digits = purchasePriceInput.value.replace(/[^0-9]/g, "");
-      purchasePriceInput.value = digits ? Number(digits).toLocaleString() : "";
-    });
+    // 정수부 12자리·소수부 5자리 및 콤마 표시는 앱과 공통 처리한다.
+    window.bindPurchasePriceInput(purchasePriceInput);
 
     // 소분류 — 검색 + 대분류/소분류 트리 모달(openCategoryPickModal)에서 단일 선택.
     // 기본은 비워둔 상태(자동 첫 항목 선택 없음) — 미선택 상태에선 소분류 필드만 보이고 나머지는 아예 숨김
@@ -752,7 +749,7 @@
       }
       setDateInputs(manufacturedField, asset.manufactured);
       setDateInputs(purchaseDateField, asset.purchaseDate);
-      purchasePriceInput.value = asset.price != null ? asset.price.toLocaleString() : "";
+      purchasePriceInput.value = window.formatPurchasePriceInput(asset.price);
       noteInput.value = asset.note || "";
       window.AssetMemo.syncTextarea(noteInput);
       checkValid();
@@ -850,7 +847,7 @@
           ${i === primaryIdx ? '<span class="areg-photo-star">★</span>' : ""}
           <span class="areg-photo-del" data-photo-del="${i}" aria-label="삭제">${CLOSE_ICON_SM}</span>
         </button>`).join("");
-      const addTile = photos.length < 10
+      const addTile = photos.length < window.ASSET_PHOTO_MAX_COUNT
         ? `<button type="button" class="areg-photo-add" id="areg-photo-add-btn" aria-label="사진 추가">+</button>` : "";
       photoRow.innerHTML = tiles + addTile;
       photoRow.querySelectorAll("[data-photo-i]").forEach(b => b.onclick = e => {
@@ -869,7 +866,7 @@
       });
       const addBtn = photoRow.querySelector("#areg-photo-add-btn");
       if (addBtn) addBtn.onclick = () => {
-        photos.push({ color: PHOTO_COLORS[photos.length % PHOTO_COLORS.length], at: `${todayStr()} 00:00`, by: "dana" });
+        photos.push({ id: window.assetPhotoId(), color: PHOTO_COLORS[photos.length % PHOTO_COLORS.length], at: `${todayStr()} 00:00`, by: "dana" });
         if (photos.length === 1) primaryIdx = 0;
         renderPhotos();
       };
@@ -913,8 +910,10 @@
       closeMenu();
       if (opts.asset) {
         const asset = opts.asset;
+        // 한 번의 저장에서 생긴 활동을 모았다가 정해진 표시 순서로 한꺼번에 기록(data.js logAssetActivities)
+        const pending = [];
         const logChange = (script, before, after) => {
-          if (opts.logActivity) opts.logActivity({ script: `자산 정보 수정: ${script}`, before, after });
+          pending.push({ script: `자산 정보 수정: ${script}`, before, after });
         };
         const cat = findCat(catValue);
         if (cat && (cat.group !== asset.group || cat.sub !== asset.sub)) {
@@ -925,14 +924,14 @@
         }
         const dateFmt = d => d ? window.fmtDate(d) : "";
         const setIf = (script, key, val, format) => {
-          if (asset[key] === val) return;
+          if (key === "price" ? window.normalizePurchasePrice(asset[key]) === window.normalizePurchasePrice(val) : asset[key] === val) return;
           const fmt = format || (v => v || "");
           logChange(script, fmt(asset[key]), fmt(val));
           asset[key] = val;
         };
         setIf("품목명 수정", "product", nameInput.value.trim());
         if (type !== "quantity") setIf("고유관리번호 수정", "assetNo", assetNoInput.value.trim());
-        if (type !== "individual") setIf("총 수량 변경", "totalQty", parseInt(totalQtyInput.value, 10) || 0, v => v ? `${v}개` : "");
+        if (type !== "individual") setIf("전체 수량 변경", "totalQty", parseInt(totalQtyInput.value, 10) || 0, v => v ? `${v}개` : "");
         const newTags = [...tags];
         if (JSON.stringify(newTags) !== JSON.stringify(asset.labels || [])) {
           logChange("태그 수정", (asset.labels || []).join(", "), newTags.join(", "));
@@ -959,10 +958,12 @@
           asset.purchaseDate = purchaseDate || undefined;
         }
         // 통화 표기는 클라이언트 단위 전역 설정 — window.formatPrice 참조(구조설계안 3.4, data.js)
-        const priceDigits = purchasePriceInput.value.replace(/[^0-9]/g, "");
-        setIf("구매가격 변경", "price", priceDigits ? parseInt(priceDigits, 10) : undefined, v => (v != null ? window.formatPrice(v) : ""));
+        const price = window.normalizePurchasePrice(purchasePriceInput.value);
+        setIf("구매가격 변경", "price", price || undefined, v => (v != null ? window.formatPrice(v) : ""));
         setIf("메모 수정", "note", noteInput.value.trim() || undefined);
-        // 사진은 detail.js의 뷰어 액션(추가·삭제·대표 지정)도 활동 이력을 안 남기는 것과 동일하게 로그 없이 반영
+        // 사진은 저장 전후 목록·대표를 비교해 "자산 사진 관리" 활동으로 기록(data.js assetPhotoActivities)
+        pending.push(...window.assetPhotoActivities(window.assetPhotos(asset), asset._primary || 0, photos, primaryIdx));
+        if (opts.logActivity) window.logAssetActivities(pending, e => opts.logActivity(e));
         asset._photos = photos;
         asset._primary = primaryIdx;
         back.remove();
