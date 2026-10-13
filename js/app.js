@@ -1430,20 +1430,28 @@
       </div></div>`;
   }
   // 상세 자체의 조회 권한은 기존 구성원/근무지 기능의 책임이다. 자산은 기존 소분류 조회 판정을
-  // 재사용한다. 본인 프로필도 같은 소분류 조회 권한을 따르며 본인 예외는 직원 내 자산·QR에만 적용한다.
+  // 재사용한다. 본인의 구성원 상세에는 본인 조회 예외를 적용하며 변경 권한을 추가하지 않는다.
   function directoryEsc(value) {
     return String(value ?? "").replace(/[&<>"']/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]));
   }
   function directoryTarget(kind) {
     return { type: kind === "member" ? "employee" : "worksite", value: kind === "member" ? DEMO_DIRECTORY_MEMBER : DEMO_DIRECTORY_WORKSITE };
   }
+  // 본인의 구성원 상세에 한해 현재 본인 배정·보유 자산을 조회 예외로 제공한다.
+  function directorySelfAsset(a, kind) {
+    if (!a || a.deleted_at || kind !== "member" || DEMO_DIRECTORY_MEMBER !== ME) return false;
+    const records = a.type === "individual" ? a.assignments || [] : a.stocks || [];
+    return records.some(record => record.employee === ME); // 보유0도 현재 관계에 포함한다.
+  }
   function directoryCanViewAsset(a, kind) {
-    return hasViewPermission(a);
+    if (!a || a.deleted_at) return false;
+    return hasViewPermission(a) || directorySelfAsset(a, kind);
   }
   function directoryAssetAvailable(kind) {
     if (!assetMgmtEnabled()) return false;
-    // 자산 0건도 분류 조회 권한으로 노출. 메뉴/부모 탭은 데이터 건수로 숨기지 않는다.
-    return window.DATA.categories.some(cat => catViewPermission(cat));
+    // 분류 조회 범위 또는 본인 상세의 본인 자산이 있으면 카드·부모 업무 탭을 제공한다.
+    // 분류 조회 범위가 있으면 해당 대상의 자산이0건이어도 기존 빈 상태를 유지한다.
+    return window.DATA.categories.some(cat => catViewPermission(cat)) || assets.some(a => directorySelfAsset(a, kind));
   }
   function directoryItems(kind) {
     const target = directoryTarget(kind), result = [];
