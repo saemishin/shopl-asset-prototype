@@ -515,8 +515,8 @@
           <div class="mapp-add-field"><label>사진</label><div class="mapp-add-photos">${photoTiles}${draft.photos.length < window.ASSET_PHOTO_MAX_COUNT ? '<button type="button" class="mapp-add-photo-plus" data-add-photo aria-label="사진 추가">+</button>' : ""}</div></div>
           ${cat.type === "individual" ? addInputHtml("고유관리번호", "assetNo", draft, { required: true, maxlength: 30, error: "동일한 고유관리번호가 존재합니다." }) : addInputHtml("전체 수량", "totalQty", draft, { required: true, inputmode: "numeric", maxlength: 6 })}${draft.editingId && cat.type === "quantity" ? '<p class="field-err" data-edit-qty-error hidden>배분 수량보다 적게 입력할 수 없습니다.</p>' : ""}
           ${!hidden.includes("expiry") ? addExpiryFieldHtml(draft) : ""}
-          <div class="mapp-add-field"><div class="mapp-add-field-label"><label>태그</label><button type="button" data-add-tag-manage>태그 관리</button></div><p class="hint mapp-add-tag-hint">최대 5개까지 선택할 수 있습니다.</p>
-            <div class="mapp-add-tag-picker"><div class="tag-input-wrap"><div class="tag-chips" data-add-tag-chips>${addTagChipsHtml(draft.labels)}</div><input type="text" data-add-tag-search placeholder="${draft.labels.length ? "" : "검색"}" autocomplete="off"${draft.labels.length >= 5 ? " disabled" : ""}></div><div class="mapp-add-suggest" data-add-tag-menu hidden></div></div></div>
+          <div class="mapp-add-field"><div class="mapp-add-field-label"><label>태그</label><button type="button" data-add-tag-manage>태그 관리</button></div><p class="hint mapp-add-tag-hint">최대 10개까지 선택할 수 있습니다.</p>
+            <div class="mapp-add-tag-picker"><div class="tag-input-wrap"><div class="tag-chips" data-add-tag-chips>${addTagChipsHtml(draft.labels)}</div><input type="text" data-add-tag-search placeholder="${draft.labels.length ? "" : "검색"}" autocomplete="off"${draft.labels.length >= window.ASSET_TAG_MAX_COUNT ? " disabled" : ""}></div><div class="mapp-add-suggest" data-add-tag-menu hidden></div></div></div>
           ${cat.type === "individual" && !hidden.includes("serial") ? addInputHtml("S/N", "serial", draft, { maxlength: 40 }) : ""}
           ${cat.type === "individual" && !hidden.includes("imei") ? addInputHtml("IMEI", "imei", draft, { maxlength: 40 }) : ""}
           ${!hidden.includes("manufactured") ? addDateSelectHtml("제조연월", "manufactured", draft, "month") : ""}
@@ -2264,14 +2264,14 @@
         productInput.addEventListener("focus", renderProductMenu);
         productInput.addEventListener("input", renderProductMenu);
         productInput.addEventListener("blur", () => setTimeout(() => { productMenu.hidden = true; }, 120));
-        // 앱 태그도 대시보드와 같은 검색형 선택을 사용한다. 선택된 값만 칩으로 남고 최대 5개에서 입력을 잠근다.
+        // 앱 태그도 대시보드와 같은 검색형 선택을 사용한다. 선택된 값만 칩으로 남고 최대 개수에서 입력을 잠근다.
         const tagSearch = root.querySelector("[data-add-tag-search]");
         const tagMenu = root.querySelector("[data-add-tag-menu]");
         const tagChips = root.querySelector("[data-add-tag-chips]");
         function renderSelectedTags() {
           if (!tagChips || !tagSearch) return;
           tagChips.innerHTML = addTagChipsHtml(draft.labels);
-          tagSearch.disabled = draft.labels.length >= 5;
+          tagSearch.disabled = draft.labels.length >= window.ASSET_TAG_MAX_COUNT;
           tagSearch.placeholder = draft.labels.length ? "" : "검색";
           tagChips.querySelectorAll("[data-add-tag-remove]").forEach(button => button.onclick = () => {
             draft.labels = draft.labels.filter(tag => tag !== button.dataset.addTagRemove);
@@ -2280,13 +2280,13 @@
           });
         }
         function renderTagMenu() {
-          if (!tagSearch || draft.labels.length >= 5) { if (tagMenu) tagMenu.hidden = true; return; }
+          if (!tagSearch || draft.labels.length >= window.ASSET_TAG_MAX_COUNT) { if (tagMenu) tagMenu.hidden = true; return; }
           const query = tagSearch.value.trim().toLowerCase();
           const options = (window.DATA.tags || []).filter(tag => !draft.labels.includes(tag) && (!query || tag.toLowerCase().includes(query)));
           tagMenu.innerHTML = options.length ? options.map(tag => `<button type="button" data-add-tag-pick="${esc(tag)}">${esc(tag)}</button>`).join("") : '<div class="mapp-add-suggest-empty">결과가 없습니다.</div>';
           tagMenu.hidden = false;
           tagMenu.querySelectorAll("[data-add-tag-pick]").forEach(button => button.onclick = () => {
-            if (draft.labels.length < 5) draft.labels.push(button.dataset.addTagPick);
+            if (draft.labels.length < window.ASSET_TAG_MAX_COUNT) draft.labels.push(button.dataset.addTagPick);
             tagSearch.value = "";
             tagMenu.hidden = true;
             renderSelectedTags(); updateAddValidity();

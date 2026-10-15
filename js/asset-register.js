@@ -431,7 +431,7 @@
                 <label>태그</label>
                 <button type="button" class="btn sm" id="areg-tag-manage">태그 관리</button>
               </div>
-              <p class="hint areg-tag-hint">최대 5개까지 선택할 수 있습니다.</p>
+              <p class="hint areg-tag-hint">최대 10개까지 선택할 수 있습니다.</p>
               <div class="tag-input-wrap" id="areg-tagwrap">
                 <div class="tag-chips" data-chips></div>
                 <input type="text" data-taginput placeholder="검색" autocomplete="off">
@@ -787,7 +787,7 @@
       checkValid();
     }
     function addTag(v) {
-      if (!v || tags.includes(v) || tags.length >= 5) return;
+      if (!v || tags.includes(v) || tags.length >= window.ASSET_TAG_MAX_COUNT) return;
       tags.push(v);
       tagInput.value = "";
       renderChips();
@@ -799,7 +799,7 @@
       return source.filter(l => l.toLowerCase().includes(q) && !tags.includes(l));
     }
     function openMenu() {
-      if (tags.length >= 5) return; // 최대 5개 다 찼으면 더 고를 필요 없음
+      if (tags.length >= window.ASSET_TAG_MAX_COUNT) return; // 최대 개수에 도달하면 더 고를 필요 없음
       const opts = tagOptions();
       closeMenu();
       menu = document.createElement("div");

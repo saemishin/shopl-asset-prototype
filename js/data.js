@@ -341,6 +341,7 @@ window.isAssetGroupPositionSubset = function (target, viewTarget) {
    현재 사진 첨부는 색상 스와치 목업으로 실 파일 선택·용량 검사·압축·서버 업로드를 수행하지 않는다.
    실 서비스 구현에서 아래 장수 제한과 공통 첨부 검증/전처리를 함께 적용해야 한다. */
 window.ASSET_PHOTO_MAX_COUNT = 10;
+window.ASSET_TAG_MAX_COUNT = 10;
 
 /* 공통 사진 헬퍼 — 목록·상세가 같은 대표 사진을 쓰도록 공유 */
 window.tintHex = function (hex, amt) {
