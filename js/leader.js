@@ -395,8 +395,9 @@
     };
   }
   function hasAddInput(draft) {
-    // 분류 선택·지워진 값·단순 태그 검색어는 이탈 확인에서 제외한다.
-    return ["product", "assetNo", "totalQty", "expiry", "serial", "imei", "manufactured", "purchaseDate", "purchasePrice", "note"]
+    // 분류를 포함해 실제 선택·입력값이 하나라도 남아 있으면 이탈 확인한다. 지워진 값과 저장되지 않는
+    // 자동완성·태그 후보 검색어는 제외한다.
+    return !!draft.category || ["product", "assetNo", "totalQty", "expiry", "serial", "imei", "manufactured", "purchaseDate", "purchasePrice", "note"]
       .some(key => String(draft[key] || "").trim()) || draft.photos.length > 0 || draft.labels.length > 0;
   }
   function confirmAddExit(onLeave, editing = false) {
@@ -505,6 +506,7 @@
       <div class="mapp-topbar mapp-add-topbar">
         <button type="button" class="mapp-back" data-mapp-back aria-label="뒤로">←</button>
         <span class="mapp-topbar-title">${draft.editingId ? "자산 수정" : "자산 추가"}</span>
+        ${draft.editingId ? "" : '<button type="button" class="mapp-add-ai-trigger" data-add-ai>AI로 입력</button>'}
       </div>
       <div class="mapp-add-body">
         <div class="mapp-add-field"><label>분류 <span class="req">*</span></label>
@@ -547,6 +549,142 @@
         </section>`).join("")}</div>
       </div>
       </div>`;
+  }
+
+  function mobileAiDraft(partial) {
+    return partial ? {
+      product: "MacBook Pro 14", serial: "C02AI2026", manufactured: "2026-01",
+    } : {
+      product: "MacBook Pro 14", assetNo: "AI-2026-0001", totalQty: "10", serial: "C02AI2026",
+      manufactured: "2026-01", purchaseDate: "2026-02", purchasePrice: "2500000",
+    };
+  }
+  function applyMobileAiDraft(draft, values) {
+    const cat = addCategory(draft);
+    if (!cat || !values) return;
+    const hidden = cat.hiddenFields || [];
+    const fill = key => { if (!String(draft[key] || "").trim() && values[key] != null && values[key] !== "") draft[key] = String(values[key]); };
+    fill("product");
+    if (cat.type === "individual") { fill("assetNo"); if (!hidden.includes("serial")) fill("serial"); if (!hidden.includes("imei")) fill("imei"); }
+    else fill("totalQty");
+    if (!hidden.includes("expiry")) fill("expiry");
+    if (!hidden.includes("manufactured")) fill("manufactured");
+    if (!hidden.includes("purchaseDate")) fill("purchaseDate");
+    if (!hidden.includes("purchasePrice") && !String(draft.purchasePrice || "").trim()
+      && values.purchasePrice != null && values.purchasePrice !== "") {
+      // AI가 채운 값도 직접 입력과 동일하게 천 단위 콤마를 적용한다.
+      draft.purchasePrice = window.formatPurchasePriceInput(values.purchasePrice);
+    }
+  }
+  function recommendedMobileAiCategory() {
+    return window.DATA.categories.find(cat => cat.group === "전자기기류" && cat.sub === "노트북")
+      || window.DATA.categories.find(cat => catViewPermission(cat)) || null;
+  }
+  function confirmMobileAiExit(onLeave) {
+    const cb = document.createElement("div");
+    cb.className = "modal-back";
+    cb.style.zIndex = 340;
+    cb.innerHTML = `<div class="modal sm" style="width:340px" role="dialog" aria-modal="true" aria-label="AI 입력을 중단하시겠습니까?">
+      <h3>AI 입력을 중단하시겠습니까?</h3>
+      <div class="body" style="font-size:14px">첨부한 사진과 분석 결과는 저장되지 않습니다.</div>
+      <div class="foot"><button type="button" class="btn" data-ai-stay>취소</button><button type="button" class="btn primary" data-ai-leave>확인</button></div>
+    </div>`;
+    document.body.appendChild(cb);
+    cb.querySelector("[data-ai-stay]").onclick = () => cb.remove();
+    cb.querySelector("[data-ai-leave]").onclick = () => { cb.remove(); onLeave(); };
+    cb.onclick = event => { if (event.target === cb) cb.remove(); };
+  }
+  function openMobileAiInput(draft, onApplied, onChooseCategory) {
+    const back = mappOverlay("mapp-ai-back", 130);
+    back.innerHTML = `<div class="mapp-ai-dialog" role="dialog" aria-modal="true" aria-label="AI로 입력">
+      <div class="mapp-ai-head"><h2>AI로 입력</h2><button type="button" data-ai-close aria-label="닫기">${CLOSE_ICON_SM}</button></div>
+      <div class="mapp-ai-body">
+        <p class="mapp-ai-guide">자산 사진을 첨부하면 AI가 자산 정보를 분석해 입력합니다.</p>
+        <div class="mapp-ai-photos" data-ai-photos></div>
+        <div class="mapp-ai-state" data-ai-state></div>
+        <button type="button" class="btn primary mapp-ai-analyze" data-ai-analyze>분석하기</button>
+      </div>
+    </div>`;
+    const newPhotos = [];
+    const photosEl = back.querySelector("[data-ai-photos]");
+    const stateEl = back.querySelector("[data-ai-state]");
+    const analyze = back.querySelector("[data-ai-analyze]");
+    let analyzing = false;
+
+    function close() {
+      // 운영에서는 진행 중 요청을 취소할 수 있으면 중단하고, 취소할 수 없으면 닫힌 팝업의 늦은 응답을
+      // 자산 추가 폼에 반영하지 않는다. 프로토타입은 실제 요청이 없어 팝업만 닫는다.
+      back.remove();
+    }
+    function requestClose() {
+      if (draft.photos.length + newPhotos.length) confirmMobileAiExit(close);
+      else close();
+    }
+    function renderPhotos() {
+      const existing = draft.photos.map((photo, index) => `<span class="mapp-ai-photo" style="background:${photo.color}" aria-label="사진 ${index + 1}">${index === draft.primaryPhoto ? '<span class="mapp-ai-star">★</span>' : ""}</span>`).join("");
+      const added = newPhotos.map((photo, index) => `<span class="mapp-ai-photo" style="background:${photo.color}" aria-label="새 사진 ${index + 1}">${analyzing ? "" : `<button type="button" data-ai-photo-delete="${index}" aria-label="새 사진 삭제">×</button>`}</span>`).join("");
+      const total = draft.photos.length + newPhotos.length;
+      const add = !analyzing && total < window.ASSET_PHOTO_MAX_COUNT ? '<button type="button" class="mapp-ai-photo-add" data-ai-photo-add aria-label="사진 추가">+</button>' : "";
+      photosEl.innerHTML = existing + added + add;
+      analyze.disabled = !total || analyzing;
+      photosEl.querySelectorAll("[data-ai-photo-delete]").forEach(button => button.onclick = () => {
+        newPhotos.splice(+button.dataset.aiPhotoDelete, 1); renderPhotos();
+      });
+      const addButton = photosEl.querySelector("[data-ai-photo-add]");
+      if (addButton) addButton.onclick = () => openAddDropdown(addButton, [
+        { key: "camera", label: "카메라로 촬영하기" }, { key: "gallery", label: "갤러리에서 불러오기" },
+      ], () => {
+        newPhotos.push({ id: window.assetPhotoId(), color: PHOTO_COLORS[(draft.photos.length + newPhotos.length) % PHOTO_COLORS.length], at: `${todayStr()} 00:00`, by: ME });
+        renderPhotos();
+      });
+    }
+    function appendPhotos() {
+      const room = Math.max(0, window.ASSET_PHOTO_MAX_COUNT - draft.photos.length);
+      newPhotos.slice(0, room).forEach(photo => draft.photos.push({ ...photo }));
+      if (draft.photos.length && draft.primaryPhoto >= draft.photos.length) draft.primaryPhoto = 0;
+    }
+    function applyResult(values, recommend) {
+      draft._aiDraft = values;
+      if (!draft.category && recommend) {
+        const cat = recommendedMobileAiCategory();
+        if (cat) draft.category = `${cat.group}|${cat.sub}`;
+      }
+      applyMobileAiDraft(draft, values);
+      appendPhotos();
+      close(); onApplied();
+    }
+    function direct(values) {
+      draft._aiDraft = values;
+      if (draft.category) {
+        applyMobileAiDraft(draft, values); appendPhotos(); close(); onApplied(); return;
+      }
+      draft._aiPendingPhotos = newPhotos.map(photo => ({ ...photo }));
+      close(); onChooseCategory();
+    }
+    function renderLoading() {
+      analyzing = true; analyze.hidden = true;
+      stateEl.innerHTML = `<div class="mapp-ai-loading"><span class="mapp-ai-spinner" aria-hidden="true"></span><b>AI가 자산 정보를 분석하고 있습니다.</b></div>
+        <div class="mapp-ai-test-actions"><button type="button" class="btn" data-ai-result="success">성공</button><button type="button" class="btn" data-ai-result="insufficient">정보 부족</button><button type="button" class="btn" data-ai-result="error">분석 오류</button></div>`;
+      stateEl.querySelector('[data-ai-result="success"]').onclick = () => applyResult(mobileAiDraft(false), true);
+      stateEl.querySelector('[data-ai-result="insufficient"]').onclick = () => renderFailure("insufficient");
+      stateEl.querySelector('[data-ai-result="error"]').onclick = () => renderFailure("error");
+      renderPhotos();
+    }
+    function renderFailure(kind) {
+      analyzing = false; analyze.hidden = true;
+      const insufficient = kind === "insufficient";
+      stateEl.innerHTML = `<div class="mapp-ai-result"><b>${insufficient ? "AI가 자산 정보를 충분히 확인하지 못했습니다." : "AI 분석을 완료하지 못했습니다."}</b>
+        <p>${insufficient ? "다시 시도하거나 직접 입력해 주세요." : "잠시 후 다시 시도하거나 직접 입력해 주세요."}</p>
+        <p>직접 입력을 선택해도 첨부한 사진과 ${insufficient ? "확인된 정보는" : "확인된 정보가 있으면"} 유지됩니다.</p></div>
+        <div class="mapp-ai-result-actions"><button type="button" class="btn" data-ai-retry>다시 시도</button><button type="button" class="btn primary" data-ai-direct>직접 입력</button></div>`;
+      stateEl.querySelector("[data-ai-retry]").onclick = renderLoading;
+      stateEl.querySelector("[data-ai-direct]").onclick = () => direct(insufficient ? mobileAiDraft(true) : {});
+      renderPhotos();
+    }
+    renderPhotos();
+    analyze.onclick = renderLoading;
+    back.querySelector("[data-ai-close]").onclick = requestClose;
+    back.onclick = event => { if (event.target === back) requestClose(); };
   }
 
   // 메뉴 화면 — 실 앱 스크린샷 참고(직원모드와 달리 "비용" 섹션 없음, 맨 위에 "승인" 섹션 추가, 관리
@@ -2228,6 +2366,11 @@
           if (qtyError) qtyError.hidden = Number(draft.totalQty) >= (assets.find(a => a.id === draft.editingId).stocks || []).reduce((sum,x) => sum + x.qty,0);
         }
         root.querySelector("[data-add-category]").onclick = () => { syncAddDraft(); state.screen = "asset-add-category"; draw(); };
+        const aiInput = root.querySelector("[data-add-ai]");
+        if (aiInput) aiInput.onclick = () => {
+          syncAddDraft();
+          openMobileAiInput(draft, draw, () => { state.screen = "asset-add-category"; draw(); });
+        };
         // 공통 가격 헬퍼를 먼저 연결하고 정수 12자리·소수 5자리로 정리한 값을 폼에 반영한다.
         const priceInput = root.querySelector('[data-add-field="purchasePrice"]');
         if (priceInput) window.bindPurchasePriceInput(priceInput);
@@ -2395,14 +2538,25 @@
         root.querySelector("[data-add-category-close]").onclick = () => { state.screen = "asset-add"; draw(); };
         const rows = [...root.querySelectorAll("[data-add-category-pick]")];
         rows.forEach(row => row.onclick = () => {
-          const product = state.addDraft.product;
+          const previous = state.addDraft;
+          const product = previous.product;
           const category = addCategory({ category: row.dataset.addCategoryPick });
           if (!catViewPermission(category)) return;
           // 현재 분류를 다시 선택하면 입력을 유지하고 팝업만 닫는다(대시보드와 동일).
-          if (state.addDraft.editingId) state.addDraft.category = row.dataset.addCategoryPick;
-          else if (row.dataset.addCategoryPick !== state.addDraft.category) {
+          if (previous.editingId) previous.category = row.dataset.addCategoryPick;
+          else if (row.dataset.addCategoryPick !== previous.category) {
             state.addDraft = emptyAddDraft(category);
             state.addDraft.product = product;
+            // AI가 분류를 찾지 못해 직접 선택으로 이어진 경우, 선택한 분류의 유형·노출 설정에 맞는
+            // 추출값과 팝업 사진을 이 시점에 적용한다. 일반 분류 변경도 AI 원본값은 가능한 빈 필드에 유지한다.
+            if (previous._aiDraft) {
+              state.addDraft._aiDraft = previous._aiDraft;
+              applyMobileAiDraft(state.addDraft, previous._aiDraft);
+            }
+            if (previous._aiPendingPhotos && previous._aiPendingPhotos.length) {
+              state.addDraft.photos = previous._aiPendingPhotos.slice(0, window.ASSET_PHOTO_MAX_COUNT).map(photo => ({ ...photo }));
+              state.addDraft.primaryPhoto = 0;
+            }
           }
           state.screen = "asset-add";
           draw();

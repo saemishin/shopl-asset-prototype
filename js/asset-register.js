@@ -403,7 +403,10 @@
     back.className = "modal-back";
     back.innerHTML = `
       <div class="modal scroll-body areg">
-        <h3>${opts.asset ? "자산 수정" : "자산 추가"}</h3>
+        <div class="areg-head">
+          <h3>${opts.asset ? "자산 수정" : "자산 추가"}</h3>
+          ${opts.asset ? "" : '<button type="button" class="areg-ai-trigger" data-ai-input>AI로 입력</button>'}
+        </div>
         <div class="body">
           <div class="areg-col-left">
             <div class="field"><label>분류 <span class="req">*</span></label>
@@ -533,10 +536,11 @@
       return !!initialEditValues && JSON.stringify(editValues()) !== JSON.stringify(initialEditValues);
     }
     function hasAddInput() {
-      // 분류·후보 검색어는 제외. 공백만 있거나 모두 지운 값도 제외한다.
+      // 분류를 포함해 실제 선택·입력값이 하나라도 남아 있으면 이탈 확인한다. 공백만 있거나 모두 지운 값,
+      // 자동완성·태그 후보 검색어처럼 저장되지 않는 임시 검색어는 제외한다.
       const inputs = [nameInput, assetNoInput, totalQtyInput, serialInput, imeiInput, purchasePriceInput, noteInput,
         ...[expiryField, manufacturedField, purchaseDateField].map(field => field.querySelector("[data-dtext]"))];
-      return inputs.some(input => input.value.trim()) || tags.length > 0 || photos.length > 0;
+      return !!catValue || inputs.some(input => input.value.trim()) || tags.length > 0 || photos.length > 0;
     }
     function requestClose() {
       closeMenu(); closeProdMenu();
@@ -659,6 +663,9 @@
     const catWrap = back.querySelector("#areg-catwrap");
     const catDisplay = back.querySelector("#areg-cat-display");
     let catValue = null;
+    // AI 분석 원본은 현재 등록 모달이 열려 있는 동안만 보관한다. 추천 분류를 사용자가 바꾸더라도
+    // 새 분류에 노출되는 빈 필드는 이 초안에서 다시 채울 수 있고, 저장·취소 시 함께 폐기된다.
+    let activeAiDraft = null;
 
     function catLabel(v) { const c = findCat(v); return c ? `${c.group} › ${c.sub}` : ""; }
     // 소분류별 필드 노출 설정(구조설계안 3.3 hiddenFields) 반영 — S/N·IMEI는 개별형 전용이라 유형 조건과 같이 봄.
@@ -717,6 +724,7 @@
       renderCatDisplay();
       applyFieldVisibility();
       if (changed && !opts.asset) resetOtherFields();
+      if (changed && !opts.asset && activeAiDraft) applyAiValues(activeAiDraft);
       checkValid();
     }
     function setDateInputs(fieldEl, iso) {
@@ -873,6 +881,212 @@
       checkValid();
     }
     renderPhotos();
+
+    function aiPhoto(offset) {
+      return {
+        id: window.assetPhotoId(),
+        color: PHOTO_COLORS[(photos.length + offset) % PHOTO_COLORS.length],
+        at: `${todayStr()} 00:00`,
+        by: "dana",
+      };
+    }
+    function fieldIsShown(field) { return field.style.display !== "none"; }
+    function setIfEmpty(input, value) {
+      if (!input.value.trim() && value != null && value !== "") input.value = String(value);
+    }
+    function setDateIfEmpty(field, value) {
+      if (fieldIsShown(field) && !field.querySelector("[data-dtext]").value.trim() && value) setDateInputs(field, value);
+    }
+    function applyAiValues(draft) {
+      if (!draft) return;
+      setIfEmpty(nameInput, draft.name);
+      if (fieldIsShown(assetNoField)) setIfEmpty(assetNoInput, draft.assetNo);
+      if (fieldIsShown(totalQtyField)) setIfEmpty(totalQtyInput, draft.totalQty);
+      if (fieldIsShown(serialField)) setIfEmpty(serialInput, draft.serial);
+      if (fieldIsShown(imeiField)) setIfEmpty(imeiInput, draft.imei);
+      if (fieldIsShown(purchasePriceField)) setIfEmpty(purchasePriceInput, window.formatPurchasePriceInput(draft.price));
+      if (fieldIsShown(noteField) && !noteInput.value.trim() && draft.note) {
+        noteInput.value = draft.note;
+        window.AssetMemo.syncTextarea(noteInput);
+      }
+      setDateIfEmpty(expiryField, draft.expiry);
+      setDateIfEmpty(manufacturedField, draft.manufactured);
+      setDateIfEmpty(purchaseDateField, draft.purchaseDate);
+      checkValid();
+    }
+    function appendAiPhotos(newPhotos) {
+      const room = Math.max(0, window.ASSET_PHOTO_MAX_COUNT - photos.length);
+      newPhotos.slice(0, room).forEach(photo => photos.push({ ...photo }));
+      if (photos.length && primaryIdx >= photos.length) primaryIdx = 0;
+      renderPhotos();
+    }
+    function recommendedCategory() {
+      return categories.find(c => c.group === "전자기기류" && c.sub === "노트북") || categories[0] || null;
+    }
+    function mockAiDraft(partial) {
+      return partial ? {
+        name: "MacBook Pro 14",
+        serial: "C02AI2026",
+        manufactured: "2026-01-01",
+      } : {
+        name: "MacBook Pro 14",
+        assetNo: "AI-2026-0001",
+        serial: "C02AI2026",
+        manufactured: "2026-01-01",
+        purchaseDate: "2026-02-01",
+        price: "2500000",
+        totalQty: "10",
+      };
+    }
+    function applyAiResult(draft, newPhotos, recommend) {
+      activeAiDraft = draft;
+      if (!catValue && recommend) {
+        const cat = recommendedCategory();
+        if (cat) selectCat(`${cat.group}|${cat.sub}`);
+      } else {
+        applyAiValues(activeAiDraft);
+      }
+      appendAiPhotos(newPhotos);
+    }
+    function continueAiDirectly(draft, newPhotos) {
+      activeAiDraft = draft;
+      if (catValue) {
+        applyAiValues(activeAiDraft);
+        appendAiPhotos(newPhotos);
+        return;
+      }
+      // 분류를 확인하지 못한 경우 기존 분류 선택 화면으로 이어간다. 분류가 정해진 뒤에만
+      // 해당 유형·노출 설정에 맞는 추출값과 사진을 부모 폼에 반영한다.
+      openCategoryPickModal(categories, catValue, v => {
+        selectCat(v);
+        appendAiPhotos(newPhotos);
+      });
+    }
+    function openAiInputModal() {
+      closeMenu();
+      closeProdMenu();
+      const aiBack = document.createElement("div");
+      aiBack.className = "modal-back areg-ai-back";
+      aiBack.innerHTML = `
+        <div class="modal areg-ai-modal" role="dialog" aria-modal="true" aria-label="AI로 입력">
+          <div class="areg-ai-head">
+            <h3>AI로 입력</h3>
+            <button type="button" class="areg-ai-close" data-ai-cancel aria-label="닫기">${CLOSE_ICON_SM}</button>
+          </div>
+          <div class="body">
+            <p class="areg-ai-guide">자산 사진을 첨부하면 AI가 자산 정보를 분석해 입력합니다.</p>
+            <div class="areg-ai-photos" data-ai-photos></div>
+            <div class="areg-ai-state" data-ai-state></div>
+            <button type="button" class="btn primary areg-ai-analyze" data-ai-analyze>분석하기</button>
+          </div>
+        </div>`;
+      document.body.appendChild(aiBack);
+
+      const newPhotos = [];
+      const photosEl = aiBack.querySelector("[data-ai-photos]");
+      const stateEl = aiBack.querySelector("[data-ai-state]");
+      const analyzeBtn = aiBack.querySelector("[data-ai-analyze]");
+      let analyzing = false;
+
+      function closeAi() {
+        // 운영에서는 진행 중 요청을 취소할 수 있으면 중단하고, 취소할 수 없으면 닫힌 팝업의 늦은 응답을
+        // 부모 폼에 반영하지 않는다. 프로토타입은 실제 요청이 없어 팝업만 닫는다.
+        aiBack.remove();
+      }
+      function requestAiClose() {
+        if (photos.length + newPhotos.length === 0) { closeAi(); return; }
+        if (document.querySelector("[data-ai-exit]")) return;
+        const confirmBack = document.createElement("div");
+        confirmBack.className = "modal-back";
+        confirmBack.style.zIndex = 340;
+        confirmBack.innerHTML = `<div class="modal sm" data-ai-exit role="dialog" aria-modal="true" aria-label="AI 입력을 중단하시겠습니까?">
+          <h3>AI 입력을 중단하시겠습니까?</h3>
+          <div class="body" style="font-size:14px">첨부한 사진과 분석 결과는 저장되지 않습니다.</div>
+          <div class="foot"><button type="button" class="btn" data-ai-stay>취소</button><button type="button" class="btn primary" data-ai-leave>확인</button></div>
+        </div>`;
+        document.body.appendChild(confirmBack);
+        confirmBack.querySelector("[data-ai-stay]").onclick = () => confirmBack.remove();
+        confirmBack.querySelector("[data-ai-leave]").onclick = () => { confirmBack.remove(); closeAi(); };
+        confirmBack.onclick = event => { if (event.target === confirmBack) confirmBack.remove(); };
+      }
+      function renderAiPhotos() {
+        const existingTiles = photos.map((photo, i) => `
+          <span class="areg-ai-photo" style="background:${photo.color}" aria-label="사진 ${i + 1}">
+            ${i === primaryIdx ? '<span class="areg-photo-star">★</span>' : ""}
+          </span>`).join("");
+        const newTiles = newPhotos.map((photo, i) => `
+          <span class="areg-ai-photo" style="background:${photo.color}" aria-label="새 사진 ${i + 1}">
+            ${analyzing ? "" : `<button type="button" class="areg-ai-photo-del" data-ai-photo-del="${i}" aria-label="새 사진 삭제">${CLOSE_ICON_SM}</button>`}
+          </span>`).join("");
+        const total = photos.length + newPhotos.length;
+        const add = !analyzing && total < window.ASSET_PHOTO_MAX_COUNT
+          ? '<button type="button" class="areg-photo-add" data-ai-photo-add aria-label="사진 추가">+</button>' : "";
+        photosEl.innerHTML = existingTiles + newTiles + add;
+        analyzeBtn.disabled = total === 0 || analyzing;
+        photosEl.querySelectorAll("[data-ai-photo-del]").forEach(button => button.onclick = () => {
+          newPhotos.splice(+button.dataset.aiPhotoDel, 1);
+          renderAiPhotos();
+        });
+        const addBtn = photosEl.querySelector("[data-ai-photo-add]");
+        if (addBtn) addBtn.onclick = () => {
+          newPhotos.push(aiPhoto(newPhotos.length));
+          renderAiPhotos();
+        };
+      }
+      function renderInitial() {
+        analyzing = false;
+        stateEl.innerHTML = "";
+        analyzeBtn.hidden = false;
+        renderAiPhotos();
+      }
+      function renderLoading() {
+        analyzing = true;
+        analyzeBtn.hidden = true;
+        stateEl.innerHTML = `
+          <div class="areg-ai-loading"><span class="areg-ai-spinner" aria-hidden="true"></span><b>AI가 자산 정보를 분석하고 있습니다.</b></div>
+          <div class="areg-ai-test-actions">
+            <button type="button" class="btn" data-ai-outcome="success">성공</button>
+            <button type="button" class="btn" data-ai-outcome="insufficient">정보 부족</button>
+            <button type="button" class="btn" data-ai-outcome="error">분석 오류</button>
+          </div>`;
+        stateEl.querySelector('[data-ai-outcome="success"]').onclick = () => {
+          applyAiResult(mockAiDraft(false), newPhotos, true);
+          aiBack.remove();
+        };
+        stateEl.querySelector('[data-ai-outcome="insufficient"]').onclick = () => renderFailure("insufficient");
+        stateEl.querySelector('[data-ai-outcome="error"]').onclick = () => renderFailure("error");
+        renderAiPhotos();
+      }
+      function renderFailure(kind) {
+        analyzing = false;
+        analyzeBtn.hidden = true;
+        const insufficient = kind === "insufficient";
+        stateEl.innerHTML = `
+          <div class="areg-ai-result is-error">
+            <b>${insufficient ? "AI가 자산 정보를 충분히 확인하지 못했습니다." : "AI 분석을 완료하지 못했습니다."}</b>
+            <p>${insufficient ? "다시 시도하거나 직접 입력해 주세요." : "잠시 후 다시 시도하거나 직접 입력해 주세요."}</p>
+            <p>직접 입력을 선택해도 첨부한 사진과 ${insufficient ? "확인된 정보는" : "확인된 정보가 있으면"} 유지됩니다.</p>
+          </div>
+          <div class="areg-ai-result-actions">
+            <button type="button" class="btn" data-ai-retry>다시 시도</button>
+            <button type="button" class="btn primary" data-ai-direct>직접 입력</button>
+          </div>`;
+        stateEl.querySelector("[data-ai-retry]").onclick = renderLoading;
+        stateEl.querySelector("[data-ai-direct]").onclick = () => {
+          aiBack.remove();
+          continueAiDirectly(insufficient ? mockAiDraft(true) : {}, newPhotos);
+        };
+        renderAiPhotos();
+      }
+
+      renderInitial();
+      analyzeBtn.onclick = renderLoading;
+      aiBack.querySelector("[data-ai-cancel]").onclick = requestAiClose;
+      aiBack.addEventListener("click", event => { if (event.target === aiBack) requestAiClose(); });
+    }
+
+    const aiInputBtn = back.querySelector("[data-ai-input]");
+    if (aiInputBtn) aiInputBtn.onclick = openAiInputModal;
 
     renderChips();
     checkValid();

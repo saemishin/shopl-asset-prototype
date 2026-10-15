@@ -643,6 +643,13 @@ button.usebullet { background: var(--panel); font: inherit; cursor: pointer; }
    너비만 transition을 걸어 그 확장이 애니메이션되게 함(참고 이미지: 필수 필드=왼쪽 고정, 나머지=오른쪽) */
 .modal.areg { width: 460px; transition: width .22s ease; }
 .modal.areg.wide { width: 760px; }
+.areg-head {
+  min-height: 55px; padding: 0 20px; border-bottom: 1px solid var(--line);
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+}
+.modal .areg-head h3 { padding: 0; border: 0; }
+.areg-ai-trigger { color: var(--primary); font-size: 12.5px; font-weight: 600; padding: 6px 0; }
+.areg-ai-trigger:hover { color: var(--primary-press); }
 .modal.areg .body { display: flex; gap: 28px; align-items: flex-start; }
 /* 양쪽 다 flex:1 — 오른쪽이 나타나면 정확히 반반, 소분류 미선택으로 오른쪽이 숨겨지면(display:none) 왼쪽
    혼자 남아 모달 너비를 꽉 채움(1단일 때 필드가 어중간하게 좁아 보이지 않게) */
@@ -667,6 +674,47 @@ button.usebullet { background: var(--panel); font: inherit; cursor: pointer; }
 /* 앱의 자산 사진 팝업은 터치 환경이라 호버가 없어, 원본(.areg-photo-tile:hover)과 달리 삭제 버튼을
    항상 노출(2026-09-30, .mapp-photo-modal로 스코프해 데스크톱 등록 폼 쪽은 그대로 둠) */
 .mapp-photo-modal .areg-photo-del { opacity: 1; }
+
+/* 자산 등록의 AI 사진 입력. 2차 팝업에서 추가한 사진은 성공/직접 입력 전까지 부모 폼에 반영하지 않는다. */
+.areg-ai-back { z-index: 320; }
+.modal.areg-ai-modal { width: 400px; }
+.areg-ai-modal [hidden] { display: none !important; }
+.areg-ai-head {
+  min-height: 55px; padding: 0 16px 0 20px; border-bottom: 1px solid var(--line);
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+}
+.modal .areg-ai-head h3 { padding: 0; border: 0; }
+.areg-ai-close {
+  width: 28px; height: 28px; border-radius: 7px; color: var(--text-sub);
+  display: flex; align-items: center; justify-content: center;
+}
+.areg-ai-close:hover { background: #f1f3f5; color: var(--text); }
+.areg-ai-close svg { width: 13px; height: 13px; }
+.areg-ai-guide { font-size: 13px; color: var(--text-sub); margin-bottom: 16px; }
+.areg-ai-photos { display: flex; flex-wrap: wrap; gap: 8px; min-height: 52px; }
+.areg-ai-photo {
+  position: relative; width: 52px; height: 52px; border-radius: 8px; flex-shrink: 0;
+  box-shadow: inset 0 0 0 1px rgba(17,19,21,.08);
+}
+.areg-ai-photo-del {
+  position: absolute; top: -6px; right: -6px; width: 18px; height: 18px; border-radius: 50%;
+  background: #1b1d1f; color: #fff; display: flex; align-items: center; justify-content: center;
+}
+.areg-ai-photo-del svg { width: 10px; height: 10px; }
+.areg-ai-state:empty { display: none; }
+.areg-ai-state { margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--line); }
+.areg-ai-analyze { width: 100%; justify-content: center; margin-top: 20px; }
+.areg-ai-loading { display: flex; align-items: center; gap: 10px; min-height: 32px; }
+.areg-ai-loading b { font-size: 13px; }
+.areg-ai-spinner {
+  width: 20px; height: 20px; border: 2px solid var(--line-strong); border-top-color: var(--primary);
+  border-radius: 50%; animation: areg-ai-spin .8s linear infinite;
+}
+@keyframes areg-ai-spin { to { transform: rotate(360deg); } }
+.areg-ai-test-actions, .areg-ai-result-actions { display: flex; gap: 8px; margin-top: 16px; }
+.areg-ai-result { display: flex; flex-direction: column; gap: 6px; }
+.areg-ai-result b { font-size: 13.5px; }
+.areg-ai-result p { font-size: 12.5px; color: var(--text-sub); }
 
 /* 소분류 이동 모달 — 분류 관리 모달과 같은 대분류/소분류 트리를 라디오 단일선택으로 재구성 */
 .submove-group { margin-bottom: 16px; }
@@ -1631,6 +1679,7 @@ button.dthumb:hover { filter: brightness(0.94); }
 }
 .mapp-asset-add-fab:active { transform: scale(.96); }
 .mapp-add-topbar { border-bottom: 1px solid var(--line); }
+.mapp-add-ai-trigger { margin-left: auto; color: var(--primary); font-size: 13px; font-weight: 700; }
 .mapp-add-body, .mapp-add-category-body { flex: 1; min-height: 0; overflow-y: auto; padding: 18px 16px 28px; }
 .mapp-add-field { margin-bottom: 18px; }
 .mapp-add-field > label { display: block; margin-bottom: 7px; font-size: 12px; font-weight: 600; color: var(--text-sub); }
@@ -1704,6 +1753,33 @@ button.dthumb:hover { filter: brightness(0.94); }
 .mapp-add-category-group h2 { padding: 8px 4px; font-size: 12px; color: var(--text-mut); }
 .mapp-add-category-group button { display: flex; align-items: center; width: 100%; min-height: 48px; border-bottom: 1px solid #f0f1f2; text-align: left; }
 .mapp-add-category-group button span { flex: 1; font-size: 14px; font-weight: 600; }
+.mapp-ai-back {
+  display: flex; align-items: center; justify-content: center; padding: 16px;
+  background: rgba(17,19,21,.42); overflow: hidden; border-radius: 0 0 37px 37px;
+}
+.mapp-ai-dialog { width: 100%; max-height: 78%; display: flex; flex-direction: column; overflow: hidden; border-radius: 16px; background: #fff; box-shadow: 0 18px 50px rgba(0,0,0,.22); }
+.mapp-ai-dialog [hidden] { display: none !important; }
+.mapp-ai-head { min-height: 54px; padding: 0 14px 0 18px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); }
+.mapp-ai-head h2 { font-size: 17px; }
+.mapp-ai-head button { width: 34px; height: 34px; color: var(--text-sub); display: flex; align-items: center; justify-content: center; }
+.mapp-ai-head button svg { width: 18px; height: 18px; }
+.mapp-ai-body { padding: 18px; overflow-y: auto; }
+.mapp-ai-guide { color: var(--text-sub); font-size: 13px; line-height: 1.5; }
+.mapp-ai-photos { display: flex; flex-wrap: wrap; gap: 9px; min-height: 58px; margin-top: 16px; }
+.mapp-ai-photo, .mapp-ai-photo-add { position: relative; width: 58px; height: 58px; border-radius: 9px; flex-shrink: 0; }
+.mapp-ai-photo { box-shadow: inset 0 0 0 1px rgba(17,19,21,.08); }
+.mapp-ai-star { position: absolute; left: 6px; top: 4px; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.4); }
+.mapp-ai-photo > button { position: absolute; top: -7px; right: -7px; width: 20px; height: 20px; border-radius: 50%; background: #fff; border: 1px solid var(--line-strong); color: var(--text-sub); }
+.mapp-ai-photo-add { border: 1px dashed var(--line-strong); background: #fafafa; color: var(--text-mut); font-size: 24px; }
+.mapp-ai-state:empty { display: none; }
+.mapp-ai-state { margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--line); }
+.mapp-ai-analyze { width: 100%; min-height: 46px; justify-content: center; margin-top: 20px; border-radius: 10px; }
+.mapp-ai-loading { display: flex; align-items: center; gap: 9px; font-size: 12.5px; }
+.mapp-ai-spinner { width: 20px; height: 20px; border: 2px solid var(--line-strong); border-top-color: var(--primary); border-radius: 50%; animation: areg-ai-spin .8s linear infinite; }
+.mapp-ai-test-actions, .mapp-ai-result-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 16px; }
+.mapp-ai-result { display: flex; flex-direction: column; gap: 6px; }
+.mapp-ai-result b { font-size: 13px; }
+.mapp-ai-result p { color: var(--text-sub); font-size: 12px; line-height: 1.45; }
 .mapp-add-tag-manage-body { flex: 1; min-height: 0; overflow-y: auto; padding: 18px 16px 28px; }
 .mapp-add-tag-create { display: flex; gap: 8px; }
 .mapp-add-tag-create input { flex: 1; min-width: 0; height: 42px; padding: 0 11px; border: 1px solid var(--line-strong); border-radius: 8px; font-size: 13px; }
