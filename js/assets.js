@@ -2,9 +2,9 @@
 (function () {
   const TODAY = new Date("2026-09-04");
   const { assets } = window.DATA;
-  // 대시보드는 자산 관리 권한 보유 관리자 가정. false인 확인용 사본은 관리 권한 없는 리더를 재현한다.
+  // 대시보드는 자산 관리 권한 보유 관리자 가정. 권한 QA 모드에서만 비관리 리더를 재현한다.
   // 실제 서비스에서는 현재 계정의 관리 권한·이름/그룹/직무 ID 응답으로 대체한다(인증 API 목업 아님).
-  const DEMO_ASSUME_ASSET_MANAGE_PERMISSION = true;
+  const DEMO_ASSUME_ASSET_MANAGE_PERMISSION = window.AssetPermissionQa?.managePermission ?? true;
   const DEMO_VIEWER_NAME = "김민수";
 
   // held(보유 중)는 수량형 전용 — 개별형의 배정중처럼 "활성 상태"라 배지 색은 assigned를 그대로 재사용(구조설계안

@@ -1965,4 +1965,13 @@ button.dthumb:hover { filter: brightness(0.94); }
 .mapp-party-header .mapp-party-head { margin:0; min-width:0; }
 .mapp-party-header > button { flex-shrink:0; }
 .mapp-party-empty { margin:0; padding:12px 0; color:var(--text-mut); font-size:13px; }
+
+/* ?qa=permission에서만 삽입되는 권한 시나리오 전환 패널. 일반 화면에는 DOM 자체가 없다. */
+.permission-qa-panel { position:fixed; right:14px; bottom:14px; z-index:10000; width:188px; padding:12px; border:1px solid #cbd5e1; border-radius:14px; background:#fff; box-shadow:0 8px 28px #0f172a24; font-size:12px; }
+.permission-qa-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+.permission-qa-head strong { font-size:13px; }
+.permission-qa-head button { width:24px; height:24px; border-radius:7px; color:#64748b; font-size:18px; line-height:1; }
+.permission-qa-actions { display:grid; gap:6px; }
+.permission-qa-actions button { padding:8px 10px; border:1px solid #dbe2ea; border-radius:8px; background:#f8fafc; color:#334155; text-align:left; }
+.permission-qa-actions button[aria-pressed="true"] { border-color:#3298f5; background:#eaf4ff; color:#1677d2; font-weight:700; }
 /* 구성원 업무 자산 카드: 내 자산과 같은 소분류별 접기/펼치기 목록. */

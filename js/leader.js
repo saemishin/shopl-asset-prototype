@@ -272,8 +272,8 @@
   // "나" 페르소나 — 리더 1명(김민수)을 고정. 앱 직원모드의 ?me= 같은 전환 기능은 이번 러프 스코프에 없음
   const ME = "김민수";
   // 실제 서비스에서는 전역 manage_permission_type(관리자만/관리자 및 모든 리더/관리자 및 특정 리더)과
-  // manage_permission_targets를 판정한다. 프로토타입의 김민수 계정은 자산 관리 권한 보유자로 고정한다.
-  const DEMO_ASSUME_ASSET_MANAGE_PERMISSION = true;
+  // manage_permission_targets를 판정한다. 기본 김민수 계정은 관리 권한 보유자이며 권한 QA 모드에서만 전환한다.
+  const DEMO_ASSUME_ASSET_MANAGE_PERMISSION = window.AssetPermissionQa?.managePermission ?? true;
   function hasAssetManagePermission() {
     return DEMO_ASSUME_ASSET_MANAGE_PERMISSION;
   }
