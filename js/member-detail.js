@@ -7,7 +7,7 @@
 
   // 자산 배지 색상 — assets.js의 STATUS_LABEL과 동일(개별형 행에만 필요한 부분만 발췌)
   const STATUS_LABEL = {
-    stock: ["재고", "stock"], assigned: ["배정 중", "assigned"], repair: ["수리 중", "repair"],
+    stock: ["재고", "stock"], assigned: ["배정 중", "assigned"], repair: ["수리/점검 중", "repair"],
     lost: ["분실", "lost"], disposed: ["폐기", "disposed"],
   };
   // assets.js의 MEMBER_INFO와 동일 값(이 파일은 자기 완결적이라 재사용 대신 중복 유지 — 이 프로토타입 전반의 컨벤션)

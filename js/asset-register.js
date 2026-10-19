@@ -572,7 +572,13 @@
       assetNoErr.hidden = !dup;
       assetNoInput.classList.toggle("has-err", dup);
       const noOk = type === "quantity" ? true : (noVal.length > 0 && !dup);
-      const totalQtyOk = type === "quantity" ? /^[1-9][0-9]*$/.test(totalQtyInput.value.trim()) : true;
+      const totalQtyValue = totalQtyInput.value.trim();
+      const heldQty = opts.asset && type === "quantity"
+        ? (opts.asset.stocks || []).reduce((sum, stock) => sum + stock.qty, 0)
+        : 0;
+      const totalQtyOk = type === "quantity"
+        ? /^(0|[1-9][0-9]*)$/.test(totalQtyValue) && Number(totalQtyValue) >= heldQty
+        : true;
       const expiryOk = dateFieldValid(expiryField, getExpiry);
       const manufacturedOk = dateFieldValid(manufacturedField, getManufactured);
       const purchaseDateOk = dateFieldValid(purchaseDateField, getPurchaseDate);
@@ -1145,7 +1151,7 @@
         };
         setIf("품목명 수정", "product", nameInput.value.trim());
         if (type !== "quantity") setIf("고유관리번호 수정", "assetNo", assetNoInput.value.trim());
-        if (type !== "individual") setIf("전체 수량 변경", "totalQty", parseInt(totalQtyInput.value, 10) || 0, v => v ? `${v}개` : "");
+        if (type !== "individual") setIf("전체 수량 변경", "totalQty", parseInt(totalQtyInput.value, 10) || 0, v => `${v}개`);
         const newTags = [...tags];
         if (JSON.stringify(newTags) !== JSON.stringify(asset.labels || [])) {
           logChange("태그 수정", (asset.labels || []).join(", "), newTags.join(", "));

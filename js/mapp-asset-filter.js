@@ -2,7 +2,7 @@
    목록 수집·권한·화면 상태는 각 화면에 유지한다. */
 (function () {
   const KEYS = ["status", "expiry", "labels", "note"];
-  const STATUS = { stock: "재고", assigned: "배정 중", lost: "분실", repair: "수리 중", disposed: "폐기", held: "보유 중" };
+  const STATUS = { stock: "재고", assigned: "배정 중", lost: "분실", repair: "수리/점검 중", disposed: "폐기", held: "보유 중" };
   const EXPIRY = { valid: "유효", soon: "만료 예정", over: "만료", none: "미설정" };
   // 대시보드와 같은 고정 데모 기준일. 실제 현재 날짜로 바꾸지 않는다.
   const TODAY = new Date("2026-09-04");

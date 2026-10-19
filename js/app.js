@@ -1,7 +1,7 @@
 /* 앱 직원모드 — 화면 중앙에 폰 프레임으로 띄우는 목업. 메뉴 화면(관리 섹션 마지막에 자산 추가) + 자산 화면
    (내 자산·근무지 자산 탭) + 근무지 카드 "전체보기"의 목적지 화면 + 카드 클릭 시 진입하는 자산 상세까지 구현.
    자산 상세는 배정/보유 변경 권한(assign_permission_type, category.js에 저장된 소분류별 값으로 실제 판정)이
-   있는 자산에 한해 재배정·배정 추가·반납·분실 신고/회수·수리 접수/완료·폐기·보유 대상 추가/변경/해제·사진
+   있는 자산에 한해 재배정·배정 추가·반납·분실 신고/회수·수리/점검 접수/완료·폐기·보유 대상 추가/변경/해제·사진
    관리 액션을 제공(자산 관리 권한 소관인 필드 수정·소분류 이동 등은 스코프 밖). 배정 추가·재배정·보유 대상
    추가는 대시보드 모달과 동일한 구성의 전체 화면 페이지(openFormPage, 2026-09-29 — 바텀시트였다가, 대상
    선택 피커·날짜 선택이 각각 풀페이지·캘린더 시트로 커지면서 폼 자체도 페이지인 쪽이 자연스러워져 다시 전환),
@@ -165,7 +165,7 @@
     document.body.appendChild(t); setTimeout(() => t.remove(), 1800);
   }
   const STATUS_LABEL = {
-    stock: ["재고", "stock"], assigned: ["배정 중", "assigned"], repair: ["수리 중", "repair"],
+    stock: ["재고", "stock"], assigned: ["배정 중", "assigned"], repair: ["수리/점검 중", "repair"],
     lost: ["분실", "lost"], disposed: ["폐기", "disposed"], held: ["보유 중", "assigned"],
   };
   // assets.js/detail.js와 동일한 기준일(이 프로토타입 전역에서 "오늘"로 취급하는 고정 날짜) — 유효기한
@@ -419,10 +419,12 @@
         ${isIndiv ? `<span class="mapp-party-date">${window.fmtDate(x.since)}</span>` : `<span class="badge stock">${x.qty}개</span>`}
       </div>`;
   }
-  // 재고⟷배정중/보유중⟷재고는 배정·보유 레코드 존재 여부로 자동 파생(구조설계안 3.3) — 분실 회수·수리
-  // 완료 시 되돌아갈 상태, 보유 변경·해제 후 상태 재계산에 공용으로 씀
+  // 재고⟷배정 중/보유 중⟷재고는 배정·보유 레코드 존재 여부로 자동 파생(설계기록 3.3) — 분실 회수·
+  // 수리/점검 완료 시 되돌아갈 상태, 보유 변경·해제 후 상태 재계산에 공용으로 씀
   function derivedActiveStatus(a) { return (a.assignments || []).length > 0 ? "assigned" : "stock"; }
-  function derivedHeldStatus(a) { return (a.stocks || []).reduce((s, x) => s + x.qty, 0) > 0 ? "held" : "stock"; }
+  // 수량형은 보유 수량 합계가 아니라 현재 보유 관계 존재 여부로 상태를 파생한다.
+  // 수량 0인 대상도 관계가 남아 있으면 보유 중이고, 마지막 관계를 해제해야 재고가 된다.
+  function derivedHeldStatus(a) { return (a.stocks || []).length ? "held" : "stock"; }
 
   // 상단 탭 UI — 실 서비스 패턴(선택된 탭은 라벨이 있는 넓은 필, 비선택 탭은 아이콘만 있는 작은 정사각형)
   function assetTabsHtml(active) {
@@ -577,8 +579,8 @@
     cb.querySelector("[data-cok]").onclick = () => { cb.remove(); onOk(); };
     document.body.appendChild(cb);
   }
-  function openStatusChangeConfirm(a, title, body, apply, onDone, danger) {
-    confirmModal(title, body, () => { apply(); toast("상태가 변경되었습니다."); onDone(); }, danger);
+  function openStatusChangeConfirm(a, title, body, apply, onDone, danger, successMessage) {
+    confirmModal(title, body, () => { apply(); toast(successMessage || "상태가 변경되었습니다."); onDone(); }, danger);
   }
   // 폐기 처리 — 대시보드 detail.js의 openDisposeModal과 동일(되돌릴 수 없는 최종 상태라 자산 삭제와 같은
   // DELETE 입력 확인 패턴). 문구·필드 구성 전부 대시보드와 통일(2026-09-28)
@@ -633,7 +635,7 @@
     (a.stocks || []).forEach(x => ev.push({
       d: `${a.purchaseDate || "2025-01-01"} 09:00`, script: "보유 관리: 보유 대상 추가", target: x, before: "", after: `${x.qty}개`, who: "dana",
     }));
-    if (a.status === "repair") ev.push({ d: "2026-08-14 09:00", script: "상태 변경: 수리 접수", before: "배정 중", after: "수리 중", who: "dana" });
+    if (a.status === "repair") ev.push({ d: "2026-08-14 09:00", script: "상태 변경: 수리/점검 접수", before: "배정 중", after: "수리/점검 중", who: "dana" });
     if (a.status === "lost") ev.push({ d: "2026-07-21 09:00", script: "상태 변경: 분실 신고", before: "배정 중", after: "분실", who: "정우성" });
     if (a.status === "disposed") ev.push({ d: "2025-12-30 09:00", script: "상태 변경: 폐기 처리", before: "배정 중", after: "폐기", who: "dana" });
     if (a.note) ev.push({ d: "2026-06-02 09:00", script: "자산 정보 수정: 메모 수정", before: "", after: a.note, who: "dana" });
@@ -1000,7 +1002,7 @@
         confirmModal(cfg.confirm, "", () => {
           back.remove();
           (a.assignments || (a.assignments = [])).push(record);
-          // 재고⟷배정중만 배정/반납으로 자동 파생(수리중·분실·폐기는 배정 여부와 무관하게 별도 관리)
+          // 재고⟷배정중만 배정/반납으로 자동 파생(수리/점검 중·분실·폐기는 배정 여부와 무관하게 별도 관리)
           if (a.status === "stock") a.status = "assigned";
           logActivity(a, { script: "배정 관리: 신규 배정", target: record, before: "", after: window.fmtDate(d) });
           toast("추가되었습니다.");
@@ -1074,6 +1076,7 @@
             <button type="button" class="qty-step" data-qplus aria-label="수량 증가">＋</button>
           </div>
           <p class="hint" style="margin-top:6px">${decreaseOnly ? `변경 가능 수량: 0~${max}개` : `잔여 수량: ${max}개`}</p>
+          <p class="hint" style="margin-top:6px">보유 수량을 변경하면 잔여 수량도 변경됩니다.</p>
         </div>
         <div class="foot">
           <button class="btn" data-cclose>취소</button>
@@ -1106,11 +1109,76 @@
         rec.qty = qty;
         a.status = derivedHeldStatus(a);
         logActivity(a, { script: "보유 관리: 보유 수량 변경", target: rec, before: `${cur}개`, after: `${qty}개` });
-        toast("변경되었습니다.");
+        toast("수량이 변경되었습니다.");
         onDone();
       });
     };
     sync();
+  }
+  // 수량 차감은 보유 수량과 전체 수량을 같은 값만큼 함께 줄이고 잔여 수량은 유지한다.
+  // 실제 저장 API도 최신 보유 수량·권한 재검증, 두 수량 변경, 단일 활동 기록을 원자적으로 처리해야 한다.
+  function openQtyDeductModal(a, idx, onDone) {
+    const rec = a.stocks[idx];
+    const back = document.createElement("div");
+    back.className = "modal-back";
+    back.innerHTML = `
+      <div class="modal" style="width:340px">
+        <div class="body" style="padding-top:20px">
+          <p style="font-size:14px;font-weight:700;margin-bottom:14px">수량 차감</p>
+          <div class="mapp-add-field"><label>차감 수량</label><input type="text" inputmode="numeric" data-deduct-input placeholder="입력"></div>
+          <p class="hint" data-held-qty style="margin-top:8px">보유 수량: ${rec.qty}개</p>
+          <p class="hint" style="margin-top:6px">차감한 수량만큼 전체 수량도 함께 줄어듭니다.</p>
+          <p class="field-err" data-deduct-error hidden>현재 보유 수량 이하로 입력해 주세요.</p>
+        </div>
+        <div class="foot"><button class="btn" data-cclose>취소</button><button class="btn primary" data-cok disabled>저장</button></div>
+      </div>`;
+    document.body.appendChild(back);
+    const input = back.querySelector("[data-deduct-input]");
+    const held = back.querySelector("[data-held-qty]");
+    const error = back.querySelector("[data-deduct-error]");
+    const save = back.querySelector("[data-cok]");
+    let accepted = "";
+    const currentQty = () => a.stocks[idx] ? a.stocks[idx].qty : 0;
+    const value = () => input.value ? Number(input.value) : null;
+    const sync = () => { const v = value(); save.disabled = v === null || v < 1 || v > currentQty(); };
+    input.addEventListener("beforeinput", e => {
+      if (e.inputType === "insertText" && e.data && !/^[0-9]+$/.test(e.data)) e.preventDefault();
+    });
+    input.addEventListener("paste", e => {
+      const text = e.clipboardData.getData("text").trim();
+      if (!/^[1-9][0-9]*$/.test(text)) e.preventDefault();
+    });
+    input.addEventListener("input", () => {
+      if (input.value === "" || /^[1-9][0-9]*$/.test(input.value)) accepted = input.value;
+      else input.value = accepted;
+      input.classList.remove("is-error"); error.hidden = true; sync();
+    });
+    back.addEventListener("click", e => { if (e.target === back) back.remove(); });
+    back.querySelector("[data-cclose]").onclick = () => back.remove();
+    save.onclick = () => {
+      if (!canManage(a)) return;
+      const amount = value();
+      const latest = currentQty();
+      held.textContent = `보유 수량: ${latest}개`;
+      if (!(amount >= 1 && amount <= latest)) {
+        input.classList.add("is-error"); error.hidden = false; save.disabled = true; return;
+      }
+      const beforeHeld = rec.qty;
+      const beforeTotal = a.totalQty;
+      back.remove();
+      confirmModal("수량을 변경하시겠습니까?", "", () => {
+        rec.qty = beforeHeld - amount;
+        a.totalQty = beforeTotal - amount;
+        a.status = derivedHeldStatus(a);
+        logActivity(a, {
+          script: "보유 관리: 보유 수량 차감", target: rec,
+          before: `보유 수량 ${beforeHeld}개 · 전체 수량 ${beforeTotal}개`,
+          after: `보유 수량 ${rec.qty}개 · 전체 수량 ${a.totalQty}개`,
+        });
+        toast("수량이 변경되었습니다."); onDone();
+      });
+    };
+    input.focus(); sync();
   }
   function openHoldReleaseConfirm(a, idx, onDone) {
     confirmModal("보유 대상에서 해제하시겠습니까?", "해제된 수량은 잔여 수량으로 돌아갑니다.", () => {
@@ -1259,9 +1327,9 @@
   // 레코드 존재 여부로 자동 파생돼 수동 상태 변경 액션 자체가 없음, 구조설계안 3.3). 대시보드 detail.js의
   // STATUS_TRANSITIONS과 동일하게 현재 상태에서 갈 수 있는 전이만 노출
   const STATUS_TRANSITIONS = {
-    stock: [["repair-start", "수리 접수"], ["lost-report", "분실 신고"], ["dispose", "폐기 처리"]],
-    assigned: [["repair-start", "수리 접수"], ["lost-report", "분실 신고"], ["dispose", "폐기 처리"]],
-    repair: [["repair-done", "수리 완료"], ["lost-report", "분실 신고"], ["dispose", "폐기 처리"]],
+    stock: [["repair-start", "수리/점검 접수"], ["lost-report", "분실 신고"], ["dispose", "폐기 처리"]],
+    assigned: [["repair-start", "수리/점검 접수"], ["lost-report", "분실 신고"], ["dispose", "폐기 처리"]],
+    repair: [["repair-done", "수리/점검 완료"], ["lost-report", "분실 신고"], ["dispose", "폐기 처리"]],
     lost: [["lost-recover", "분실 회수"], ["dispose", "폐기 처리"]],
     disposed: [],
   };
@@ -1287,7 +1355,7 @@
       if (idx >= 0) acts.push({ key: "return", label: "반납", danger: true });
     } else {
       const { idx } = findRecord(a, target);
-      if (idx >= 0) acts.push({ key: "qty-change", label: "수량 변경" });
+      if (idx >= 0) acts.push({ key: "qty-change", label: "수량 변경" }, { key: "qty-deduct", label: "수량 차감" });
       if (idx >= 0) acts.push({ key: "hold-release", label: "보유 해제", danger: true });
     }
     return acts;
@@ -1782,10 +1850,14 @@
           else if (key === "return") openReturnConfirm(a, idx, afterMutate);
           else if (key === "lost-report") openStatusChangeConfirm(a, "분실 신고하시겠습니까?", "분실 신고 시 기존 배정은 유지된 채 상태만 분실로 변경됩니다.", setStatus("상태 변경: 분실 신고", () => "lost"), afterMutate);
           else if (key === "lost-recover") openStatusChangeConfirm(a, "분실 회수 처리하시겠습니까?", "분실 회수 시 배정 여부에 따라 배정 중 또는 재고 상태로 돌아갑니다.", setStatus("상태 변경: 분실 회수", () => derivedActiveStatus(a)), afterMutate);
-          else if (key === "repair-start") openStatusChangeConfirm(a, "수리 접수하시겠습니까?", "수리 접수 시 기존 배정은 유지된 채 상태만 수리 중으로 변경됩니다.", setStatus("상태 변경: 수리 접수", () => "repair"), afterMutate);
-          else if (key === "repair-done") openStatusChangeConfirm(a, "수리 완료 처리하시겠습니까?", "수리 완료 시 배정 여부에 따라 배정 중 또는 재고 상태로 돌아갑니다.", setStatus("상태 변경: 수리 완료", () => derivedActiveStatus(a)), afterMutate);
+          else if (key === "repair-start") openStatusChangeConfirm(a, "수리/점검을 접수하시겠습니까?", "수리/점검을 접수하면 기존 배정은 유지되고 자산 상태가 수리/점검 중으로 변경됩니다.", setStatus("상태 변경: 수리/점검 접수", () => "repair"), afterMutate, false, "수리/점검이 접수되었습니다.");
+          else if (key === "repair-done") openStatusChangeConfirm(a, "수리/점검을 완료하시겠습니까?", "수리/점검을 완료하면 현재 배정 여부에 따라 자산 상태가 배정 중 또는 재고로 변경됩니다.", setStatus("상태 변경: 수리/점검 완료", () => derivedActiveStatus(a)), afterMutate, false, "수리/점검이 완료되었습니다.");
           else if (key === "dispose") openDisposeConfirmModal(a, afterMutate);
           else if (key === "qty-change") openQtyChangeModal(a, idx, afterMutate);
+          else if (key === "qty-deduct") {
+            if (a.stocks[idx].qty <= 0) toast("차감할 보유 수량이 없습니다.");
+            else openQtyDeductModal(a, idx, afterMutate);
+          }
           else if (key === "hold-release") openHoldReleaseConfirm(a, idx, afterMutate);
         }
         // 상태 뱃지 → 상태 변경 드롭다운, 상단바 "더보기" → 배정/보유 관리 드롭다운(대시보드와 동일한

@@ -2,7 +2,7 @@
    product(품목명 문자열)와 items(그 품목에 속한 개별 자산 배열)만 받아서 뜨는, 두 화면 어디에도 종속되지 않는 컴포넌트. */
 window.openProductUnitsModal = function (product, items) {
   const CLOSE_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg>`;
-  const STATUS_LABEL = { assigned: "배정 중", stock: "재고", repair: "수리 중", lost: "분실", disposed: "폐기" };
+  const STATUS_LABEL = { assigned: "배정 중", stock: "재고", repair: "수리/점검 중", lost: "분실", disposed: "폐기" };
   // 현황/분류의 thumb()와 동일 — 대표 사진(window.assetPhotos, data.js 공유), 대표로 items[0] 사용
   function thumb(a) {
     const ph = window.assetPhotos(a);
@@ -14,7 +14,7 @@ window.openProductUnitsModal = function (product, items) {
   }
   // 상태 5개를 가로 5열로 고정 배치 — 열 타이틀이 이미 상태를 말해줘서 행마다 뱃지를 또 붙일 필요가 없고(고유관리번호만 표시),
   // 개수가 0인 상태도 열 자체는 항상 유지(빈 채로 둠, 별도 문구 없음)해서 품목이 달라져도 열 배치가 흔들리지 않게 함.
-  // 컬럼 순서는 테이블과 동일(배정중/재고/수리중/분실/폐기), 열 안은 고유관리번호 오름차순.
+  // 컬럼 순서는 테이블과 동일(배정 중·재고·수리/점검 중·분실·폐기), 열 안은 고유관리번호 오름차순.
   const groups = Object.keys(STATUS_LABEL).map(k => ({
     key: k, label: STATUS_LABEL[k],
     list: items.filter(a => a.status === k).sort((a, b) => (a.assetNo || "").localeCompare(b.assetNo || "", "ko")),

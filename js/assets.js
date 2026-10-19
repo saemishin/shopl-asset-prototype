@@ -10,7 +10,7 @@
   // held(보유 중)는 수량형 전용 — 개별형의 배정중처럼 "활성 상태"라 배지 색은 assigned를 그대로 재사용(구조설계안
   // 3.4: status는 개별형·수량형 둘 다 필수, 값 범위만 다름 — 수량형은 stock·held 2종만)
   const STATUS_LABEL = {
-    stock: ["재고", "stock"], assigned: ["배정 중", "assigned"], repair: ["수리 중", "repair"],
+    stock: ["재고", "stock"], assigned: ["배정 중", "assigned"], repair: ["수리/점검 중", "repair"],
     lost: ["분실", "lost"], disposed: ["폐기", "disposed"], held: ["보유 중", "assigned"],
   };
   // 개별형 상태값들(기존 순서 유지) → 수량형(보유중) → 공통(재고). 재고가 맨 위였던 걸 맨 아래로 내림(사용자 피드백)
@@ -405,7 +405,7 @@
 
   function view_product_individual(list) {
     const head = `<tr><th>분류</th><th>품목명</th><th class="num">자산 수</th>
-      <th class="num">배정 중</th><th class="num">재고</th><th class="num">수리 중</th><th class="num">분실</th><th class="num">폐기</th></tr>`;
+      <th class="num">배정 중</th><th class="num">재고</th><th class="num">수리/점검 중</th><th class="num">분실</th><th class="num">폐기</th></tr>`;
     const groups = groupByProduct(list.filter(a => a.type === "individual"));
     const sorted = sortList(groups);
     const paged = pageSlice(sorted);
@@ -493,7 +493,7 @@
           <span class="badge ${STATUS_LABEL[a.status][1]}">${STATUS_LABEL[a.status][0]}</span>
         </a>`;
       }
-      // 개별형의 상태 뱃지와 시각적으로 짝이 맞도록 뱃지 형태 유지, 다만 배정중/수리중/분실 등 상태색과
+      // 개별형의 상태 뱃지와 시각적으로 짝이 맞도록 뱃지 형태 유지, 다만 배정 중·수리/점검 중·분실 등 상태색과
       // 혼동되지 않게 무채색(.badge.stock의 회색 톤)만 재사용 — 수량은 상태가 아니라 그냥 수치라서
       return `<a class="assign-row" href="asset-detail.html?id=${a.id}" target="_blank" rel="noopener">
         <span>${a.product}</span>
@@ -1030,7 +1030,7 @@
         }),
         statCol({ k: "재고", v: s.stock, filter: { type: ["individual"], status: ["stock"] } }),
         statCol({ k: "분실", v: s.lost, cls: "alert", filter: { status: ["lost"] } }),
-        statCol({ k: "수리 중", v: s.repair, cls: "warn", filter: { status: ["repair"] } }),
+        statCol({ k: "수리/점검 중", v: s.repair, cls: "warn", filter: { status: ["repair"] } }),
       ])}
       ${statCard("수량 자산 요약", [
         statCol({
@@ -1054,7 +1054,9 @@
   // 일괄 작업 메뉴 — "일괄 추가"/"일괄 배정" 둘 다 공통 포맷이 있는 화면이라 프로토타입에 별도 구현하지
   // 않고, 클릭 이벤트 없이 호버 시 안내 툴팁만 노출(2026-09-30, batch-register.html/batch-assign.html
   // 페이지 삭제와 함께). 버튼이 화면 우측에 있어 메뉴도 버튼 우측 끝에 맞춰 펼침(기존엔 좌측 정렬이라
-  // 화면 밖으로 잘려 보였음)
+  // 화면 밖으로 잘려 보였음). 일괄 배정·보유 변경에서 보유 수량 감소는 잔여 수량을 조정하는 "수량 변경"이며,
+  // 전체 수량도 함께 줄이는 "수량 차감"은 단건에서만 제공한다. 실제 일괄 화면에는
+  // "보유 수량을 변경하면 잔여 수량도 변경됩니다." 안내를 고정 노출한다.
   function openBulkMenu(anchor) {
     document.querySelectorAll(".dropdown-menu, .hover-tip").forEach(m => m.remove());
     // 버튼 표시 후 권한이 바뀌어도 메뉴를 여는 시점의 허용 항목만 제공한다.

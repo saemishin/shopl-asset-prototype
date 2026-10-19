@@ -4,7 +4,7 @@
   const { assets } = window.DATA;
   // held(보유 중)는 수량형 전용 — assets.js STATUS_LABEL과 동일하게 유지(파일별 로컬 상수, 공용 모듈 아님)
   const STATUS_LABEL = {
-    stock: ["재고", "stock"], assigned: ["배정 중", "assigned"], repair: ["수리 중", "repair"],
+    stock: ["재고", "stock"], assigned: ["배정 중", "assigned"], repair: ["수리/점검 중", "repair"],
     lost: ["분실", "lost"], disposed: ["폐기", "disposed"], held: ["보유 중", "assigned"],
   };
 
@@ -93,7 +93,7 @@
     t.style.cssText = "position:fixed;left:50%;bottom:32px;transform:translateX(-50%);background:#1b1d1f;color:#fff;padding:10px 16px;border-radius:8px;font-size:12.5px;z-index:300";
     document.body.appendChild(t); setTimeout(() => t.remove(), 1800);
   }
-  // 되돌릴 수 있는 상태 전이(수리 접수/분실 신고/수리 완료/분실 회수) 공용 확인 모달 — 재배정 모달과 같은
+  // 되돌릴 수 있는 상태 전이(수리/점검 접수/분실 신고/수리/점검 완료/분실 회수) 공용 확인 모달 — 재배정 모달과 같은
   // 회색 안내 박스(perm-info-note)로 뭐가 바뀌는지 미리 알려줌. 입력값 없음(반납과 동일한 이유 — 구조설계안에
   // 상태 변경 자체에 별도 입력 필드가 정의돼 있지 않음)
   function openStatusConfirmModal(title, note, onConfirm) {
@@ -114,28 +114,28 @@
     cb.querySelector("[data-cok]").onclick = () => { cb.remove(); onConfirm(); };
     document.body.appendChild(cb);
   }
-  // script는 활동 이력용 "그룹: 세부" 전체 이름("상태 변경: 수리 접수" 등) — 토스트는 그룹 접두어 없이
+  // script는 활동 이력용 "그룹: 세부" 전체 이름("상태 변경: 수리/점검 접수" 등) — 토스트는 그룹 접두어 없이
   // 세부 동작명만 써야 자연스러워서 ": " 뒤쪽만 잘라 씀
-  function applyStatusChange(a, script, newStatus) {
+  function applyStatusChange(a, script, newStatus, successMessage) {
     const before = STATUS_LABEL[a.status][0];
     a.status = newStatus;
     logActivity(a, { script, before, after: STATUS_LABEL[a.status][0] });
-    toast(`${script.split(": ").pop()}되었습니다.`);
+    toast(successMessage || `${script.split(": ").pop()}되었습니다.`);
     render();
   }
-  // 수리 완료·분실 회수는 고정 목적지가 없음 — 반납과 동일한 파생 규칙(활성 배정 유무)으로 배정중/재고 복귀
+  // 수리/점검 완료·분실 회수는 고정 목적지가 없음 — 반납과 동일한 파생 규칙(활성 배정 유무)으로 배정중/재고 복귀
   const deriveReturnStatus = a => ((a.assignments || []).length > 0 ? "assigned" : "stock");
   function handleRepairStart(a) {
-    openStatusConfirmModal("수리 접수하시겠습니까?", "수리 접수 시 기존 배정은 유지된 채 상태만 수리 중으로 변경됩니다.",
-      () => applyStatusChange(a, "상태 변경: 수리 접수", "repair"));
+    openStatusConfirmModal("수리/점검을 접수하시겠습니까?", "수리/점검을 접수하면 기존 배정은 유지되고 자산 상태가 수리/점검 중으로 변경됩니다.",
+      () => applyStatusChange(a, "상태 변경: 수리/점검 접수", "repair", "수리/점검이 접수되었습니다."));
   }
   function handleLostReport(a) {
     openStatusConfirmModal("분실 신고하시겠습니까?", "분실 신고 시 기존 배정은 유지된 채 상태만 분실로 변경됩니다.",
       () => applyStatusChange(a, "상태 변경: 분실 신고", "lost"));
   }
   function handleRepairDone(a) {
-    openStatusConfirmModal("수리 완료 처리하시겠습니까?", "수리 완료 시 배정 여부에 따라 배정 중 또는 재고 상태로 돌아갑니다.",
-      () => applyStatusChange(a, "상태 변경: 수리 완료", deriveReturnStatus(a)));
+    openStatusConfirmModal("수리/점검을 완료하시겠습니까?", "수리/점검을 완료하면 현재 배정 여부에 따라 자산 상태가 배정 중 또는 재고로 변경됩니다.",
+      () => applyStatusChange(a, "상태 변경: 수리/점검 완료", deriveReturnStatus(a), "수리/점검이 완료되었습니다."));
   }
   function handleLostRecover(a) {
     openStatusConfirmModal("분실 회수 처리하시겠습니까?", "분실 회수 시 배정 여부에 따라 배정 중 또는 재고 상태로 돌아갑니다.",
@@ -184,9 +184,9 @@
     input.focus();
   }
   const STATUS_ACTION_HANDLERS = {
-    "수리 접수": handleRepairStart,
+    "수리/점검 접수": handleRepairStart,
     "분실 신고": handleLostReport,
-    "수리 완료": handleRepairDone,
+    "수리/점검 완료": handleRepairDone,
     "분실 회수": handleLostRecover,
     "폐기 처리": openDisposeModal,
   };
@@ -438,7 +438,7 @@
     (a.stocks || []).forEach(x => ev.push({
       d: `${a.purchaseDate || "2025-01-01"} 09:00`, script: "보유 관리: 보유 대상 추가", target: x, before: "", after: `${x.qty}개`, who: "dana",
     }));
-    if (a.status === "repair") ev.push({ d: "2026-08-14 09:00", script: "상태 변경: 수리 접수", before: "배정 중", after: "수리 중", who: "dana" });
+    if (a.status === "repair") ev.push({ d: "2026-08-14 09:00", script: "상태 변경: 수리/점검 접수", before: "배정 중", after: "수리/점검 중", who: "dana" });
     if (a.status === "lost") ev.push({ d: "2026-07-21 09:00", script: "상태 변경: 분실 신고", before: "배정 중", after: "분실", who: "정우성" });
     if (a.status === "disposed") ev.push({ d: "2025-12-30 09:00", script: "상태 변경: 폐기 처리", before: "배정 중", after: "폐기", who: "dana" });
     if (a.note) ev.push({ d: "2026-06-02 09:00", script: "자산 정보 수정: 메모 수정", before: "", after: a.note, who: "dana" });
@@ -511,11 +511,10 @@
   // 모달과 동일한 고정 20 방식). 검색/카테고리 전환 시 1페이지로 리셋(render() 안에서 처리)
   const STOCK_PAGE_SIZE = 20;
   let stockPage = 1;
-  // 수량형 상태 파생 — 레코드 존재 여부가 아니라 배분합계(모든 보유자 quantity의 합) 기준(구조설계안 3.4).
-  // 배분합계가 0이면 quantity 0인 레코드가 남아있어도 재고(그 경우 total_qty 전체가 잔여 수량)
+  // 수량형 상태 파생 — 보유 수량 합계가 아니라 현재 보유 관계의 존재 여부가 기준이다.
+  // 보유 수량이 모두 0이어도 관계가 남아 있으면 보유 중이며, 마지막 관계를 해제해야 재고가 된다.
   function deriveQtyStatus(a) {
-    const sum = (a.stocks || []).reduce((s, x) => s + x.qty, 0);
-    a.status = sum > 0 ? "held" : "stock";
+    a.status = (a.stocks || []).length ? "held" : "stock";
   }
   // 정렬: 이름 가나다순(배정일처럼 시간 기준으로 정렬할 값이 없어서 — 최근 변경은 이력 탭 검색으로 확인)
   function stockCards(a, query, cat) {
@@ -561,6 +560,7 @@
           <span class="acard-date">보유 수량 <b class="qty">${x.qty}개</b></span>
           <div class="acard-actions">
             <button class="btn sm" data-qtyedit>수량 변경</button>
+            <button class="btn sm" data-qtydeduct ${x.qty <= 0 ? "disabled" : ""}>수량 차감</button>
             <button class="btn sm" data-release>보유 해제</button>
           </div>
         </div>
@@ -594,6 +594,7 @@
         <button type="button" class="qty-step" data-qplus aria-label="수량 증가">＋</button>
       </div>
       <div class="qty-pop-remain">${decreaseOnly ? `변경 가능 수량: 0~${max}개` : `잔여 수량: ${max}개`}</div>
+      <div class="qty-pop-help">보유 수량을 변경하면 잔여 수량도 변경됩니다.</div>
       <div class="qty-pop-acts">
         <button class="btn sm" data-qcancel>취소</button>
         <button class="btn sm primary" data-qsave>저장</button>
@@ -640,6 +641,83 @@
       document.addEventListener("click", close);
     });
   }
+  // 수량 차감은 선택 대상의 보유 수량과 자산 전체 수량을 같은 값만큼 함께 줄이고 잔여 수량은 유지한다.
+  // 실제 저장 API도 두 수량과 활동 이력을 한 트랜잭션으로 반영하고, 저장 직전에 최신 보유 수량·권한을 재검증해야 한다.
+  function openQtyDeductPopover(anchor, a, idx) {
+    document.querySelectorAll(".qty-popover").forEach(m => m.remove());
+    const pop = document.createElement("div");
+    pop.className = "qty-popover qty-deduct-popover";
+    pop.innerHTML = `
+      <div class="qty-pop-title">수량 차감</div>
+      <label class="qty-pop-label">차감 수량</label>
+      <input class="qty-deduct-input" type="text" inputmode="numeric" data-deduct-input placeholder="입력">
+      <div class="qty-pop-remain" data-held-qty>보유 수량: ${a.stocks[idx].qty}개</div>
+      <div class="qty-pop-help">차감한 수량만큼 전체 수량도 함께 줄어듭니다.</div>
+      <div class="field-err qty-deduct-error" data-deduct-error hidden>현재 보유 수량 이하로 입력해 주세요.</div>
+      <div class="qty-pop-acts">
+        <button class="btn sm" data-qcancel>취소</button>
+        <button class="btn sm primary" data-qsave disabled>저장</button>
+      </div>`;
+    const r = anchor.getBoundingClientRect();
+    pop.style.cssText = `position:fixed;top:${r.bottom + 6}px;left:${Math.max(8, r.right - 260)}px`;
+    document.body.appendChild(pop);
+
+    const input = pop.querySelector("[data-deduct-input]");
+    const save = pop.querySelector("[data-qsave]");
+    const held = pop.querySelector("[data-held-qty]");
+    const error = pop.querySelector("[data-deduct-error]");
+    let accepted = "";
+    const currentQty = () => a.stocks[idx] ? a.stocks[idx].qty : 0;
+    const value = () => input.value ? Number(input.value) : null;
+    const clearStaleError = () => { input.classList.remove("is-error"); error.hidden = true; };
+    const sync = () => {
+      const v = value();
+      save.disabled = v === null || v < 1 || v > currentQty();
+    };
+    input.addEventListener("beforeinput", e => {
+      if (e.inputType === "insertText" && e.data && !/^[0-9]+$/.test(e.data)) e.preventDefault();
+    });
+    input.addEventListener("paste", e => {
+      const text = e.clipboardData.getData("text").trim();
+      if (!/^[1-9][0-9]*$/.test(text)) e.preventDefault();
+    });
+    input.addEventListener("input", () => {
+      if (input.value === "" || /^[1-9][0-9]*$/.test(input.value)) accepted = input.value;
+      else input.value = accepted;
+      clearStaleError(); sync();
+    });
+    save.onclick = () => {
+      if (!canManageAssets()) return;
+      const amount = value();
+      const latest = currentQty();
+      held.textContent = `보유 수량: ${latest}개`;
+      // 화면을 연 뒤 다른 변경으로 보유 수량이 줄었다면 값은 보존하고 최신 상한 오류만 이 시점에 표시한다.
+      if (!(amount >= 1 && amount <= latest)) {
+        input.classList.add("is-error"); error.hidden = false; save.disabled = true; return;
+      }
+      const record = a.stocks[idx];
+      const beforeHeld = record.qty;
+      const beforeTotal = a.totalQty;
+      pop.remove();
+      confirmModal("수량을 변경하시겠습니까?", () => {
+        record.qty = beforeHeld - amount;
+        a.totalQty = beforeTotal - amount;
+        deriveQtyStatus(a);
+        logActivity(a, {
+          script: "보유 관리: 보유 수량 차감", target: record,
+          before: `보유 수량 ${beforeHeld}개 · 전체 수량 ${beforeTotal}개`,
+          after: `보유 수량 ${record.qty}개 · 전체 수량 ${a.totalQty}개`,
+        });
+        toast("수량이 변경되었습니다."); render();
+      });
+    };
+    pop.querySelector("[data-qcancel]").onclick = () => pop.remove();
+    input.focus();
+    setTimeout(() => {
+      const close = e => { if (!pop.contains(e.target) && e.target !== anchor) { pop.remove(); document.removeEventListener("click", close); } };
+      document.addEventListener("click", close);
+    });
+  }
   function wireStockCards(scope, a) {
     scope.querySelectorAll("[data-release]").forEach(b => b.onclick = () => {
       const row = b.closest(".acard");
@@ -657,6 +735,10 @@
     scope.querySelectorAll("[data-qtyedit]").forEach(b => b.onclick = () => {
       const row = b.closest(".acard");
       openQtyPopover(b, a, +row.dataset.idx);
+    });
+    scope.querySelectorAll("[data-qtydeduct]").forEach(b => b.onclick = () => {
+      const row = b.closest(".acard");
+      openQtyDeductPopover(b, a, +row.dataset.idx);
     });
   }
   // 정렬: 배정일 내림차순(최신 배정이 위로)
@@ -872,7 +954,7 @@
       confirmModal("배정을 추가하시겠습니까?", () => {
         back.remove();
         (a.assignments || (a.assignments = [])).push(record);
-        // 재고⟷배정중만 배정/반납으로 자동 파생(수리중·분실·폐기는 배정 여부와 무관하게 별도 관리 — 상태 변경 드롭다운 참조)
+        // 재고⟷배정중만 배정/반납으로 자동 파생(수리/점검 중·분실·폐기는 배정 여부와 무관하게 별도 관리 — 상태 변경 드롭다운 참조)
         if (a.status === "stock") a.status = "assigned";
         logActivity(a, { script: "배정 관리: 신규 배정", target: record, before: "", after: window.fmtDate(d) });
         toast("추가되었습니다.");
@@ -976,7 +1058,7 @@
         back.remove();
         // 반납+신규배정 조합이 아니라 기존 활성 레코드의 대상 자체를 그 자리에서 교체(레코드는 종료되지 않음,
         // 구조설계안 2.3 — 재배정은 반납·신규배정과 구분되는 독립 액션). target을 특정 한쪽으로 고정할 수
-        // 없어(대상 자체가 바뀌는 게 요지) 상태 변경류 로그(수리 접수 등)와 동일하게 target 없이 before/after
+        // 없어(대상 자체가 바뀌는 게 요지) 상태 변경류 로그(수리/점검 접수 등)와 동일하게 target 없이 before/after
         // 텍스트로 표현
         const beforeLabel = `${old.employee || old.worksite} · ${window.fmtDate(old.since)}`;
         const afterLabel = `${record.employee || record.worksite} · ${window.fmtDate(d)}`;
@@ -1342,9 +1424,9 @@
 
     // 상태 변경으로 이동 가능한 전이만 노출. 재고⟷배정중은 배정/반납으로 자동 파생되므로 이 메뉴엔 없음. 폐기는 최종 상태라 뱃지가 클릭 불가.
     const STATUS_TRANSITIONS = {
-      stock: ["수리 접수", "분실 신고", "폐기 처리"],
-      assigned: ["수리 접수", "분실 신고", "폐기 처리"],
-      repair: ["수리 완료", "분실 신고", "폐기 처리"],
+      stock: ["수리/점검 접수", "분실 신고", "폐기 처리"],
+      assigned: ["수리/점검 접수", "분실 신고", "폐기 처리"],
+      repair: ["수리/점검 완료", "분실 신고", "폐기 처리"],
       lost: ["분실 회수", "폐기 처리"],
       disposed: [],
     };

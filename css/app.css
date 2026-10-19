@@ -321,7 +321,7 @@ table { width: 100%; border-collapse: collapse; font-size: 12.5px; min-width: 88
 .tbl-product { table-layout: fixed; }
 /* 자산 수 등 숫자 컬럼은 폭이 넓어서 우측 정렬하면 옆 칸과 붙어 보임 — 왼쪽 정렬이 더 보기 편함(분류 화면의 품목 테이블과 동일한 이유) */
 .tbl-product .num { text-align: left; }
-/* 개별 자산: 품목명·분류·자산 수·배정중·재고·수리중·분실·폐기 (8컬럼) — 분류 화면 품목 목록 표와 동일 컬럼 구성 + 분류 컬럼만 추가 */
+/* 개별 자산: 품목명·분류·자산 수·배정 중·재고·수리/점검 중·분실·폐기 (8컬럼) — 분류 화면 품목 목록 표와 동일 컬럼 구성 + 분류 컬럼만 추가 */
 .tbl-product-individual th:nth-child(1), .tbl-product-individual td:nth-child(1) { width: 18%; }
 .tbl-product-individual th:nth-child(2), .tbl-product-individual td:nth-child(2) { width: 24%; }
 .tbl-product-individual th:nth-child(3), .tbl-product-individual td:nth-child(3) { width: 9%; }
@@ -1136,6 +1136,16 @@ button.dthumb:hover { filter: brightness(0.94); }
    뒤에 숨어야 할 네이티브 입력이 일반 인라인 요소로 그대로 드러나 보임) */
 .dfield-pick input[type="date"], .dfield-pick input[type="month"] { position: absolute; inset: -8px; width: 32px; height: 32px; opacity: 0; cursor: pointer; pointer-events: auto; }
 .qty-pop-remain { margin-top: 6px; font-size: 11.5px; color: var(--text-mut); }
+.qty-pop-title { margin-bottom: 12px; font-size: 13px; font-weight: 700; }
+.qty-pop-label { display: block; margin-bottom: 6px; font-size: 11.5px; font-weight: 600; color: var(--text-sub); }
+.qty-deduct-input {
+  width: 100%; height: 32px; border: 1px solid var(--line-strong); border-radius: 6px;
+  padding: 0 9px; font-size: 12.5px; font-variant-numeric: tabular-nums;
+}
+.qty-deduct-input.is-error { border-color: #e05555; }
+.mapp-add-field input.is-error { border-color: #e05555; }
+.qty-pop-help { margin-top: 8px; max-width: 230px; color: var(--text-sub); font-size: 11.5px; line-height: 1.45; }
+.qty-deduct-error { margin-top: 6px; font-size: 11.5px; color: #e05555; }
 .qty-pop-acts { display: flex; justify-content: flex-end; gap: 6px; margin-top: 8px; }
 .btn:disabled { opacity: .45; pointer-events: none; }
 

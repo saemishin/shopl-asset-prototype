@@ -231,7 +231,7 @@
         ${products.length ? `
           <div class="table-wrap">
             <table class="cat-asset-table">
-              <thead><tr><th>품목명</th><th class="num">자산 수</th><th class="num">배정 중</th><th class="num">재고</th><th class="num">수리 중</th><th class="num">분실</th><th class="num">폐기</th></tr></thead>
+              <thead><tr><th>품목명</th><th class="num">자산 수</th><th class="num">배정 중</th><th class="num">재고</th><th class="num">수리/점검 중</th><th class="num">분실</th><th class="num">폐기</th></tr></thead>
               <tbody>${products.map(productRowHtml).join("")}</tbody>
             </table>
           </div>
@@ -371,7 +371,7 @@
           <button type="button" class="btn icon-only sm" data-close aria-label="닫기">${CLOSE_ICON}</button>
         </div>
         <div class="body">
-          <p><b>개별 자산</b><br>노트북, 책상처럼 실물 하나하나를 구분해서 관리하는 자산입니다. 자산마다 별도의 배정 정보와 상태(배정 중·재고·수리 중·분실·폐기)를 가지며, 필요한 경우 S/N·IMEI 같은 개체 식별 정보도 함께 관리할 수 있습니다.</p>
+          <p><b>개별 자산</b><br>노트북, 책상처럼 실물 하나하나를 구분해서 관리하는 자산입니다. 자산마다 별도의 배정 정보와 상태(배정 중·재고·수리/점검 중·분실·폐기)를 가지며, 필요한 경우 S/N·IMEI 같은 개체 식별 정보도 함께 관리할 수 있습니다.</p>
           <p><b>수량 자산</b><br>유니폼, 사무용품처럼 개별 식별 없이 수량으로만 관리하는 자산입니다. 근무지·구성원별 보유 수량을 기록하고, 잔여 수량을 확인할 수 있습니다.</p>
         </div>
       </div>`;
