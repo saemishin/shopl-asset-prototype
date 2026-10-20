@@ -184,6 +184,9 @@
     return back;
   }
 
+  // 일괄 등록 확인 테이블도 단건 등록과 같은 태그 마스터 관리 모달을 재사용한다.
+  window.openAssetTagManageModal = openTagManageModal;
+
   // 소분류 선택 모달 — 검색 + 대분류/소분류 트리, 단일 선택, 푸터 [취소]/[적용]. 필터 모달의 분류 트리 구조를 단일 선택용으로 단순화.
   function openCategoryPickModal(categories, currentValue, onApply) {
     let selected = currentValue;
@@ -672,6 +675,7 @@
     // AI 분석 원본은 현재 등록 모달이 열려 있는 동안만 보관한다. 추천 분류를 사용자가 바꾸더라도
     // 새 분류에 노출되는 빈 필드는 이 초안에서 다시 채울 수 있고, 저장·취소 시 함께 폐기된다.
     let activeAiDraft = null;
+    let hasSuccessfulAiResult = false;
 
     function catLabel(v) { const c = findCat(v); return c ? `${c.group} › ${c.sub}` : ""; }
     // 소분류별 필드 노출 설정(구조설계안 3.3 hiddenFields) 반영 — S/N·IMEI는 개별형 전용이라 유형 조건과 같이 봄.
@@ -897,27 +901,29 @@
       };
     }
     function fieldIsShown(field) { return field.style.display !== "none"; }
-    function setIfEmpty(input, value) {
-      if (!input.value.trim() && value != null && value !== "") input.value = String(value);
+    function setAiValue(input, value, replace) {
+      if (replace) input.value = value == null ? "" : String(value);
+      else if (!input.value.trim() && value != null && value !== "") input.value = String(value);
     }
-    function setDateIfEmpty(field, value) {
-      if (fieldIsShown(field) && !field.querySelector("[data-dtext]").value.trim() && value) setDateInputs(field, value);
+    function setAiDate(field, value, replace) {
+      if (!fieldIsShown(field)) return;
+      if (replace || !field.querySelector("[data-dtext]").value.trim()) setDateInputs(field, value || "");
     }
-    function applyAiValues(draft) {
+    function applyAiValues(draft, { replace = false } = {}) {
       if (!draft) return;
-      setIfEmpty(nameInput, draft.name);
-      if (fieldIsShown(assetNoField)) setIfEmpty(assetNoInput, draft.assetNo);
-      if (fieldIsShown(totalQtyField)) setIfEmpty(totalQtyInput, draft.totalQty);
-      if (fieldIsShown(serialField)) setIfEmpty(serialInput, draft.serial);
-      if (fieldIsShown(imeiField)) setIfEmpty(imeiInput, draft.imei);
-      if (fieldIsShown(purchasePriceField)) setIfEmpty(purchasePriceInput, window.formatPurchasePriceInput(draft.price));
-      if (fieldIsShown(noteField) && !noteInput.value.trim() && draft.note) {
-        noteInput.value = draft.note;
+      setAiValue(nameInput, draft.name, replace);
+      if (fieldIsShown(assetNoField)) setAiValue(assetNoInput, draft.assetNo, replace);
+      if (fieldIsShown(totalQtyField)) setAiValue(totalQtyInput, draft.totalQty, replace);
+      if (fieldIsShown(serialField)) setAiValue(serialInput, draft.serial, replace);
+      if (fieldIsShown(imeiField)) setAiValue(imeiInput, draft.imei, replace);
+      if (fieldIsShown(purchasePriceField)) setAiValue(purchasePriceInput, draft.price == null ? "" : window.formatPurchasePriceInput(draft.price), replace);
+      if (fieldIsShown(noteField) && (replace || (!noteInput.value.trim() && draft.note))) {
+        noteInput.value = draft.note || "";
         window.AssetMemo.syncTextarea(noteInput);
       }
-      setDateIfEmpty(expiryField, draft.expiry);
-      setDateIfEmpty(manufacturedField, draft.manufactured);
-      setDateIfEmpty(purchaseDateField, draft.purchaseDate);
+      setAiDate(expiryField, draft.expiry, replace);
+      setAiDate(manufacturedField, draft.manufactured, replace);
+      setAiDate(purchaseDateField, draft.purchaseDate, replace);
       checkValid();
     }
     function appendAiPhotos(newPhotos) {
@@ -945,12 +951,15 @@
       };
     }
     function applyAiResult(draft, newPhotos, recommend) {
+      const replace = hasSuccessfulAiResult;
       activeAiDraft = draft;
+      hasSuccessfulAiResult = true;
       if (!catValue && recommend) {
         const cat = recommendedCategory();
         if (cat) selectCat(`${cat.group}|${cat.sub}`);
+        if (replace) applyAiValues(activeAiDraft, { replace: true });
       } else {
-        applyAiValues(activeAiDraft);
+        applyAiValues(activeAiDraft, { replace });
       }
       appendAiPhotos(newPhotos);
     }

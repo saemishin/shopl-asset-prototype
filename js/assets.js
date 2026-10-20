@@ -28,6 +28,13 @@
     employee: "https://docs.google.com/spreadsheets/d/1pj6N07JExX6p1AqFCahJ9DvxMVcKzgdhS3-J6asFSWE/edit?usp=drive_link",
     worksite: "https://docs.google.com/spreadsheets/d/10rbRIp_DL3FS-VrtHjV2HXU7VjeQtJilBbHiUFNQkos/edit?usp=drive_link",
   };
+  // 일괄 등록 Shopl 양식. 수량형/개별형은 필수 필드가 달라 각각 확정된 Google Sheet를 연다.
+  const BULK_REGISTER_SHEET_LINKS = {
+    individual: "https://docs.google.com/spreadsheets/d/1bmjjq4zuGAcxDv80f03V52GbNEs6y05nIwzei9boABc/edit?usp=drive_link",
+    quantity: "https://docs.google.com/spreadsheets/d/1wfm4lLSqZE2nrnAOj2zC1Pfjl3EAneVGIGhXbDbd5Mk/edit?usp=drive_link",
+  };
+  const BULK_AI_MAX_PHOTOS = 100;
+  const BULK_AI_MAX_GROUP_PHOTOS = window.ASSET_PHOTO_MAX_COUNT || 10;
   // 근무지 코드는 구조설계안에 없는 필드 — 근무지가 "기존 재사용" 엔티티라 여기선 프로토타입 데모용 샘플값만 매핑(detail.js의 WS_CODE와 동일)
   const WS_CODE = { "강남점": "GN-01", "판교점": "PG-01", "본사": "HQ-01", "역삼점": "YS-01" };
   // 근무지별 엑셀 다운로드(아이데이션 중)용 주소 — 실 서비스 DB엔 근무지마다 이미 주소값이 있어서 프로토타입엔 더미로만 시드(detail.js의 WS_ADDRESS와 동일)
@@ -250,6 +257,23 @@
   // 페이지 이동 등 render()를 다시 부르는 모든 조작에서 자동으로 비워짐(render() 맨 앞에서 항상 clear).
   // 체크박스 자체를 토글하는 것만으로는 render()를 다시 부르지 않고 DOM을 직접 건드려서 선택을 유지함
   let selected = new Set();
+  let activeScreen = "list";
+  let bulkAnalyzeTimer = null;
+  let bulkPhotoSeq = 0;
+  let bulkGroupSeq = 0;
+  const bulkRegister = {
+    method: "company",
+    type: "individual",
+    fileName: "",
+    groups: [],
+    selectedPhotos: new Set(),
+    lastSelectedPhoto: null,
+    results: new Map(),
+    dirtyGroups: new Set(),
+    attempts: new Map(),
+    errorsOnly: false,
+    duplicateErrors: new Map(), // group ID → 오류 필드 Set. 중복은 [저장]을 누를 때 검사한다.
+  };
 
   const state = {
     view: "all",
@@ -795,6 +819,10 @@
     // 다른 화면(자산 삭제 등)에서 이동해온 직후 띄울 토스트 — sessionStorage에 있으면 최초 1회만 소비
     const pendingToast = sessionStorage.getItem("pendingToast");
     if (pendingToast) { sessionStorage.removeItem("pendingToast"); toast(pendingToast); }
+    if (activeScreen === "bulk-register") {
+      renderBulkRegister();
+      return;
+    }
     // 체크박스 선택은 render()를 다시 부르는 모든 조작(정렬·필터·검색·페이지 이동 등)에서 항상 초기화 —
     // 체크박스 자체를 토글하는 건 render()를 안 부르고 DOM만 직접 바꾸므로 이 시점엔 영향 없음
     selected.clear();
@@ -1051,12 +1079,756 @@
     return `<div class="statwrap">${row1}${row2}</div>`;
   }
 
-  // 일괄 작업 메뉴 — "일괄 추가"/"일괄 배정" 둘 다 공통 포맷이 있는 화면이라 프로토타입에 별도 구현하지
-  // 않고, 클릭 이벤트 없이 호버 시 안내 툴팁만 노출(2026-09-30, batch-register.html/batch-assign.html
-  // 페이지 삭제와 함께). 버튼이 화면 우측에 있어 메뉴도 버튼 우측 끝에 맞춰 펼침(기존엔 좌측 정렬이라
-  // 화면 밖으로 잘려 보였음). 일괄 배정·보유 변경에서 보유 수량 감소는 잔여 수량을 조정하는 "수량 변경"이며,
-  // 전체 수량도 함께 줄이는 "수량 차감"은 단건에서만 제공한다. 실제 일괄 화면에는
-  // "보유 수량을 변경하면 잔여 수량도 변경됩니다." 안내를 고정 노출한다.
+  /* ---------- 일괄 자산 추가 ---------- */
+  function bulkEsc(value) {
+    return String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  }
+
+  function resetBulkRegister() {
+    bulkRegister.groups.flatMap(g => g.photos).forEach(p => {
+      if (p.url?.startsWith("blob:")) URL.revokeObjectURL(p.url);
+    });
+    bulkRegister.method = "company";
+    bulkRegister.type = "individual";
+    bulkRegister.fileName = "";
+    bulkRegister.groups = [];
+    bulkRegister.selectedPhotos.clear();
+    bulkRegister.lastSelectedPhoto = null;
+    bulkRegister.results.clear();
+    bulkRegister.dirtyGroups.clear();
+    bulkRegister.attempts.clear();
+    bulkRegister.errorsOnly = false;
+    bulkRegister.duplicateErrors.clear();
+  }
+
+  function bulkHasDraft() {
+    return !!bulkRegister.fileName || bulkRegister.groups.length > 0 || bulkRegister.results.size > 0;
+  }
+
+  function openBulkDiscardConfirm(onConfirm, { title = "작성을 중단하시겠습니까?", body = "지금까지 작성한 내용은 저장되지 않습니다." } = {}) {
+    const back = document.createElement("div");
+    back.className = "modal-back";
+    back.style.zIndex = 340;
+    back.innerHTML = `<div class="modal sm" role="dialog" aria-modal="true" aria-label="${title}">
+      <h3>${title}</h3><div class="body">${body}</div>
+      <div class="foot"><button class="btn" data-cancel>취소</button><button class="btn primary" data-confirm>확인</button></div>
+    </div>`;
+    back.querySelector("[data-cancel]").onclick = () => back.remove();
+    back.querySelector("[data-confirm]").onclick = () => { back.remove(); onConfirm(); };
+    document.body.appendChild(back);
+  }
+
+  function leaveBulkRegister() {
+    const leave = () => { resetBulkRegister(); activeScreen = "list"; render(); };
+    if (bulkHasDraft()) openBulkDiscardConfirm(leave);
+    else leave();
+  }
+
+  function bulkPhotoCount() {
+    return bulkRegister.groups.reduce((sum, group) => sum + group.photos.length, 0);
+  }
+
+  function validBulkImageFiles(fileList) {
+    const files = [...fileList];
+    const valid = files.filter(file => ["image/jpeg", "image/png"].includes(file.type) && file.size <= 20 * 1024 * 1024);
+    if (valid.length !== files.length) toast("20MB 이하의 JPG, JPEG, PNG 파일만 첨부할 수 있습니다.");
+    return valid;
+  }
+
+  function newBulkPhoto(file) {
+    return { id: `bulk-photo-${++bulkPhotoSeq}`, name: file.name, url: URL.createObjectURL(file), file };
+  }
+
+  function addBulkQaPhotos() {
+    const colors = ["#5b8def", "#8f6ef0", "#26a69a"];
+    if (bulkPhotoCount() + colors.length > BULK_AI_MAX_PHOTOS || bulkRegister.groups.length + colors.length > BULK_AI_MAX_PHOTOS) {
+      toast(`한 번에 사진은 최대 ${BULK_AI_MAX_PHOTOS}장까지 첨부할 수 있습니다.`);
+      return;
+    }
+    colors.forEach((color, index) => {
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="240" height="240"><rect width="240" height="240" fill="${color}"/><rect x="46" y="62" width="148" height="104" rx="12" fill="white" fill-opacity=".82"/><circle cx="88" cy="104" r="15" fill="${color}"/><path d="M56 150l42-35 31 24 25-21 30 32" fill="none" stroke="${color}" stroke-width="10"/></svg>`;
+      newBulkGroup([{ id: `bulk-photo-${++bulkPhotoSeq}`, name: `샘플 자산 ${index + 1}.png`, url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`, file: null }]);
+    });
+    renderBulkRegister();
+  }
+
+  function newBulkGroup(photos) {
+    const group = { id: `bulk-group-${++bulkGroupSeq}`, photos, primaryPhotoId: photos[0]?.id || null };
+    bulkRegister.groups.push(group);
+    bulkRegister.dirtyGroups.add(group.id);
+    return group;
+  }
+
+  function addBulkPhotosAsGroups(fileList) {
+    const files = validBulkImageFiles(fileList);
+    if (!files.length) return;
+    if (bulkPhotoCount() + files.length > BULK_AI_MAX_PHOTOS || bulkRegister.groups.length + files.length > BULK_AI_MAX_PHOTOS) {
+      toast(`한 번에 사진은 최대 ${BULK_AI_MAX_PHOTOS}장까지 첨부할 수 있습니다.`);
+      return;
+    }
+    files.forEach(file => newBulkGroup([newBulkPhoto(file)]));
+    renderBulkRegister();
+  }
+
+  function addBulkPhotosToGroup(groupId, fileList) {
+    const group = bulkRegister.groups.find(g => g.id === groupId);
+    if (!group) return;
+    const files = validBulkImageFiles(fileList);
+    if (!files.length) return;
+    if (group.photos.length + files.length > BULK_AI_MAX_GROUP_PHOTOS) {
+      toast("자산 1개당 사진은 최대 10장까지 첨부할 수 있습니다.");
+      return;
+    }
+    if (bulkPhotoCount() + files.length > BULK_AI_MAX_PHOTOS) {
+      toast(`한 번에 사진은 최대 ${BULK_AI_MAX_PHOTOS}장까지 첨부할 수 있습니다.`);
+      return;
+    }
+    group.photos.push(...files.map(newBulkPhoto));
+    bulkRegister.dirtyGroups.add(groupId);
+    renderBulkRegister();
+  }
+
+  function removeBulkPhoto(photoId) {
+    const group = bulkRegister.groups.find(g => g.photos.some(p => p.id === photoId));
+    if (!group) return;
+    const photo = group.photos.find(p => p.id === photoId);
+    if (photo?.url?.startsWith("blob:")) URL.revokeObjectURL(photo.url);
+    group.photos = group.photos.filter(p => p.id !== photoId);
+    if (group.primaryPhotoId === photoId) group.primaryPhotoId = group.photos[0]?.id || null;
+    bulkRegister.selectedPhotos.delete(photoId);
+    bulkRegister.lastSelectedPhoto = null;
+    if (!group.photos.length) {
+      bulkRegister.groups = bulkRegister.groups.filter(g => g.id !== group.id);
+      bulkRegister.results.delete(group.id);
+      bulkRegister.dirtyGroups.delete(group.id);
+      bulkRegister.attempts.delete(group.id);
+    } else {
+      bulkRegister.dirtyGroups.add(group.id);
+    }
+    renderBulkRegister();
+  }
+
+  function flatBulkPhotoIds() {
+    return bulkRegister.groups.flatMap(group => group.photos.map(photo => photo.id));
+  }
+
+  function selectBulkPhoto(photoId, event) {
+    const ids = flatBulkPhotoIds();
+    if (event.shiftKey && bulkRegister.lastSelectedPhoto && ids.includes(bulkRegister.lastSelectedPhoto)) {
+      const from = ids.indexOf(bulkRegister.lastSelectedPhoto);
+      const to = ids.indexOf(photoId);
+      const range = ids.slice(Math.min(from, to), Math.max(from, to) + 1);
+      if (!(event.metaKey || event.ctrlKey)) bulkRegister.selectedPhotos.clear();
+      range.forEach(id => bulkRegister.selectedPhotos.add(id));
+    } else if (event.metaKey || event.ctrlKey) {
+      if (bulkRegister.selectedPhotos.has(photoId)) bulkRegister.selectedPhotos.delete(photoId);
+      else bulkRegister.selectedPhotos.add(photoId);
+      bulkRegister.lastSelectedPhoto = photoId;
+    } else {
+      bulkRegister.selectedPhotos.clear();
+      bulkRegister.selectedPhotos.add(photoId);
+      bulkRegister.lastSelectedPhoto = photoId;
+    }
+    renderBulkRegister();
+  }
+
+  function moveSelectedBulkPhotos(targetGroupId, beforePhotoId = null) {
+    const selectedIds = flatBulkPhotoIds().filter(id => bulkRegister.selectedPhotos.has(id));
+    if (!selectedIds.length) return;
+    const target = bulkRegister.groups.find(group => group.id === targetGroupId);
+    if (!target) return;
+    const selectedSet = new Set(selectedIds);
+    const moving = [];
+    bulkRegister.groups.forEach(group => group.photos.forEach(photo => {
+      if (selectedSet.has(photo.id)) moving.push(photo);
+    }));
+    const targetRemaining = target.photos.filter(photo => !selectedSet.has(photo.id));
+    if (targetRemaining.length + moving.length > BULK_AI_MAX_GROUP_PHOTOS) {
+      toast("자산 1개당 사진은 최대 10장까지 첨부할 수 있습니다.");
+      return;
+    }
+    const affected = new Set([targetGroupId]);
+    bulkRegister.groups.forEach(group => {
+      if (group.photos.some(photo => selectedSet.has(photo.id))) affected.add(group.id);
+      group.photos = group.photos.filter(photo => !selectedSet.has(photo.id));
+    });
+    let insertAt = beforePhotoId ? targetRemaining.findIndex(photo => photo.id === beforePhotoId) : -1;
+    if (insertAt < 0) insertAt = targetRemaining.length;
+    target.photos = [...targetRemaining.slice(0, insertAt), ...moving, ...targetRemaining.slice(insertAt)];
+    bulkRegister.groups.forEach(group => {
+      if (!group.photos.some(photo => photo.id === group.primaryPhotoId)) group.primaryPhotoId = group.photos[0]?.id || null;
+    });
+    bulkRegister.groups.filter(group => !group.photos.length).forEach(group => {
+      bulkRegister.results.delete(group.id);
+      bulkRegister.attempts.delete(group.id);
+      bulkRegister.dirtyGroups.delete(group.id);
+    });
+    bulkRegister.groups = bulkRegister.groups.filter(group => group.photos.length);
+    affected.forEach(groupId => {
+      if (bulkRegister.groups.some(group => group.id === groupId)) bulkRegister.dirtyGroups.add(groupId);
+    });
+    bulkRegister.selectedPhotos.clear();
+    bulkRegister.lastSelectedPhoto = null;
+    renderBulkRegister();
+  }
+
+  function bulkTags(result) {
+    return [...new Set(String(result?.tags || "").split("|").map(tag => tag.trim().replace(/\s+/g, " ")).filter(Boolean))].slice(0, window.ASSET_TAG_MAX_COUNT || 10);
+  }
+
+  function bulkUnknownTags(result) {
+    const known = new Set(window.DATA.tags || []);
+    return bulkTags(result).filter(tag => !known.has(tag));
+  }
+
+  function bulkCategoryIsValid(value) {
+    return !!value && viewableCategories().some(category =>
+      category.type === bulkRegister.type && `${category.group}/${category.sub}` === value);
+  }
+
+  function updateBulkResult(groupId, field, value) {
+    const result = bulkRegister.results.get(groupId);
+    if (!result) return;
+    result[field] = value;
+    if (field === "category") bulkRegister.duplicateErrors.clear();
+    if (result.status === "review" && !bulkResultHasError(result)) result.status = "success";
+    renderBulkRegister();
+  }
+
+  // 단건 등록의 분류 선택 모달과 같은 대분류/소분류 트리·검색·적용 흐름.
+  function openBulkCategoryModal(groupId) {
+    const result = bulkRegister.results.get(groupId);
+    if (!result) return;
+    const categories = viewableCategories().filter(category => category.type === bulkRegister.type);
+    let selected = result.category;
+    const back = document.createElement("div");
+    back.className = "modal-back";
+    back.innerHTML = `<div class="modal sm" role="dialog" aria-modal="true" aria-label="분류">
+      <h3>분류</h3><div class="body"><input type="text" class="picker-search" data-search placeholder="검색" autocomplete="off"><div class="catpick-list" data-list></div></div>
+      <div class="foot"><button class="btn" type="button" data-cancel>취소</button><button class="btn primary" type="button" data-apply>적용</button></div>
+    </div>`;
+    document.body.appendChild(back);
+    const list = back.querySelector("[data-list]");
+    const renderList = () => {
+      const query = back.querySelector("[data-search]").value.trim().toLowerCase();
+      const groups = new Map();
+      categories.forEach(category => {
+        if (!groups.has(category.group)) groups.set(category.group, []);
+        groups.get(category.group).push(category);
+      });
+      list.innerHTML = [...groups].map(([group, subs]) => {
+        const shown = subs.filter(category => !query || group.toLowerCase().includes(query) || category.sub.toLowerCase().includes(query));
+        return shown.length ? `<div class="catpick-group"><div class="catpick-group-name">${bulkEsc(group)}</div>${shown.map(category => {
+          const index = categories.indexOf(category);
+          return `<button type="button" class="catpick-row${selected === `${category.group}/${category.sub}` ? " active" : ""}" data-category-index="${index}">${bulkEsc(category.sub)}</button>`;
+        }).join("")}</div>` : "";
+      }).join("") || '<p class="tag-manage-empty">결과가 없습니다.</p>';
+      list.querySelectorAll("[data-category-index]").forEach(button => button.onclick = () => {
+        const category = categories[Number(button.dataset.categoryIndex)];
+        selected = `${category.group}/${category.sub}`;
+        renderList();
+      });
+    };
+    renderList();
+    back.querySelector("[data-search]").oninput = renderList;
+    back.querySelector("[data-cancel]").onclick = () => back.remove();
+    back.querySelector("[data-apply]").onclick = () => { back.remove(); updateBulkResult(groupId, "category", selected); };
+  }
+
+  // 일괄 작업 확인 테이블에서 사용하던 체크박스형 태그 선택 모달을 사용한다.
+  function openBulkTagModal(groupId) {
+    const result = bulkRegister.results.get(groupId);
+    if (!result) return;
+    const selected = new Set(bulkTags(result));
+    const back = document.createElement("div");
+    back.className = "modal-back";
+    back.innerHTML = `<div class="modal sm" role="dialog" aria-modal="true" aria-label="태그">
+      <h3>태그</h3><div class="body"><p class="bulk-tag-limit">최대 ${window.ASSET_TAG_MAX_COUNT || 10}개까지 선택할 수 있습니다.</p><div class="bulk-tag-options" data-options></div></div>
+      <div class="foot"><button class="btn bulk-tag-manage-button" type="button" data-manage>태그 관리</button><button class="btn" type="button" data-cancel>취소</button><button class="btn primary" type="button" data-apply>적용</button></div>
+    </div>`;
+    document.body.appendChild(back);
+    const options = back.querySelector("[data-options]");
+    const renderOptions = () => {
+      const known = window.DATA.tags || [];
+      const unknown = [...selected].filter(tag => !known.includes(tag));
+      options.innerHTML = `${unknown.length ? `<div class="bulk-tag-unknown"><b>등록되지 않은 태그</b>${unknown.map(tag => `<button type="button" data-remove-unknown="${bulkEsc(tag)}">${bulkEsc(tag)} ×</button>`).join("")}</div>` : ""}
+        ${known.map((tag, index) => `<label><input type="checkbox" data-tag-index="${index}" ${selected.has(tag) ? "checked" : ""}>${bulkEsc(tag)}</label>`).join("")}`;
+      options.querySelectorAll("[data-tag-index]").forEach(input => input.onchange = () => {
+        const tag = known[Number(input.dataset.tagIndex)];
+        if (input.checked && selected.size >= (window.ASSET_TAG_MAX_COUNT || 10)) {
+          input.checked = false;
+          toast(`태그는 최대 ${window.ASSET_TAG_MAX_COUNT || 10}개까지 선택할 수 있습니다.`);
+          return;
+        }
+        if (input.checked) selected.add(tag);
+        else selected.delete(tag);
+      });
+      options.querySelectorAll("[data-remove-unknown]").forEach(button => button.onclick = () => {
+        selected.delete(button.dataset.removeUnknown);
+        renderOptions();
+      });
+    };
+    renderOptions();
+    back.querySelector("[data-manage]").onclick = () => {
+      if (window.openAssetTagManageModal) window.openAssetTagManageModal(({ renamed, deletedOrigs }) => {
+        const remap = tags => tags.filter(tag => !deletedOrigs.includes(tag))
+          .map(tag => renamed.find(item => item.from === tag)?.to || tag);
+        bulkRegister.results.forEach(item => { item.tags = [...new Set(remap(bulkTags(item)))].join("|"); });
+        const nextSelected = remap([...selected]);
+        selected.clear();
+        nextSelected.forEach(tag => selected.add(tag));
+        renderOptions();
+        renderBulkRegister(); // 동일한 미등록 태그를 사용한 모든 자산 행을 다시 검사한다.
+      });
+    };
+    back.querySelector("[data-cancel]").onclick = () => back.remove();
+    back.querySelector("[data-apply]").onclick = () => { back.remove(); updateBulkResult(groupId, "tags", [...selected].join("|")); };
+  }
+
+  function bulkFieldEnabled(result, field) {
+    const category = (window.DATA.categories || []).find(item =>
+      `${item.group}/${item.sub}` === result.category && item.type === bulkRegister.type);
+    return !category || !(category.hiddenFields || []).includes(field);
+  }
+
+  function bulkValidMonth(value) {
+    if (!value) return true;
+    const match = /^(\d{4})[.-](\d{2})$/.exec(value);
+    if (!match || Number(match[1]) < 1 || Number(match[2]) < 1 || Number(match[2]) > 12) return false;
+    const today = new Date();
+    return `${match[1]}-${match[2]}` <= `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
+  }
+
+  function bulkValidDate(value) {
+    if (!value) return true;
+    const match = /^(\d{4})[.-](\d{2})[.-](\d{2})$/.exec(value);
+    if (!match || Number(match[1]) < 1) return false;
+    const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+    return date.getFullYear() === Number(match[1]) && date.getMonth() + 1 === Number(match[2])
+      && date.getDate() === Number(match[3]);
+  }
+
+  function bulkInputErrors(result) {
+    if (!result || result.status === "technical") return { technical: true };
+    const errors = {};
+    if (!bulkCategoryIsValid(result.category)) errors.category = true;
+    const product = String(result.product || "").trim();
+    if (!product || product.length > 50) errors.product = true;
+    if (bulkRegister.type === "individual") {
+      const no = String(result.assetNo || "").trim();
+      if (!no || no.length > 30 || !/^[A-Za-z0-9_-]+$/.test(no)) errors.assetNo = true;
+      for (const field of ["serial", "imei"]) {
+        if (bulkFieldEnabled(result, field) && String(result[field] || "").length > 40) errors[field] = true;
+      }
+    } else if (!/^(0|[1-9]\d*)$/.test(String(result.totalQty ?? "")) || String(result.totalQty).length > 6) {
+      errors.totalQty = true;
+    }
+    for (const field of ["manufactured", "purchaseDate"]) {
+      if (bulkFieldEnabled(result, field) && !bulkValidMonth(String(result[field] || "").trim())) {
+        errors[field] = true;
+      }
+    }
+    if (bulkFieldEnabled(result, "expiry") && !bulkValidDate(String(result.expiry || "").trim())) {
+      errors.expiry = true;
+    }
+    if (bulkFieldEnabled(result, "purchasePrice")) {
+      const price = String(result.price || "").replace(/,/g, "").trim();
+      if (price && !/^(?:0|[1-9]\d{0,11})(?:\.\d{1,5})?$/.test(price)) errors.price = true;
+    }
+    if (bulkUnknownTags(result).length) errors.tags = true;
+    if (window.AssetMemo.count(result.note || "") > 500) errors.note = true;
+    return errors;
+  }
+
+  function bulkResultHasError(result, groupId) {
+    return Object.keys(bulkInputErrors(result)).length > 0 || !!bulkRegister.duplicateErrors.get(groupId)?.size;
+  }
+
+  function checkBulkDuplicates() {
+    bulkRegister.duplicateErrors.clear();
+    const byNumber = new Map(), byQuantityName = new Map();
+    const add = (groupId, field) => {
+      const errors = bulkRegister.duplicateErrors.get(groupId) || new Set();
+      errors.add(field);
+      bulkRegister.duplicateErrors.set(groupId, errors);
+    };
+    (window.DATA.assets || []).filter(asset => !asset.deleted_at).forEach(asset => {
+      if (asset.assetNo) byNumber.set(asset.assetNo, null);
+      if (asset.type === "quantity") byQuantityName.set(`${asset.group}/${asset.sub}\u0000${asset.product.trim()}`, null);
+    });
+    bulkRegister.groups.forEach(group => {
+      const result = bulkRegister.results.get(group.id);
+      if (!result || result.status === "technical") return;
+      if (bulkRegister.type === "individual") {
+        const key = String(result.assetNo || "").trim();
+        if (key) {
+          if (byNumber.has(key)) {
+            add(group.id, "assetNo");
+            const previous = byNumber.get(key);
+            if (previous) add(previous, "assetNo");
+          } else byNumber.set(key, group.id);
+        }
+      } else if (bulkCategoryIsValid(result.category)) {
+        const key = `${result.category}\u0000${String(result.product || "").trim()}`;
+        if (String(result.product || "").trim()) {
+          if (byQuantityName.has(key)) {
+            add(group.id, "product");
+            const previous = byQuantityName.get(key);
+            if (previous) add(previous, "product");
+          } else byQuantityName.set(key, group.id);
+        }
+      }
+    });
+    return bulkRegister.duplicateErrors.size === 0;
+  }
+
+  function bulkCanSave() {
+    if (!bulkRegister.groups.length || bulkRegister.results.size !== bulkRegister.groups.length || bulkRegister.dirtyGroups.size) return false;
+    return bulkRegister.groups.every(group => !bulkResultHasError(bulkRegister.results.get(group.id), group.id));
+  }
+
+  function bulkResultTableHtml() {
+    if (!bulkRegister.results.size) return "";
+    // Shopl 일괄 추가 양식의 컬럼 순서와 동일하게 제공한다. No.만 확인 테이블의 행 번호다.
+    const typeField = bulkRegister.type === "individual" ? "고유관리번호" : "총수량";
+    const columns = ["No.", "대분류 *", "소분류 *", "품목명 *", `${typeField} *`, "유효기한", "태그",
+      ...(bulkRegister.type === "individual" ? ["S/N", "IMEI"] : []), "제조연월", "구매연월", "구매가격", "메모"];
+    const rows = bulkRegister.groups.map((group, index) => {
+      const result = bulkRegister.results.get(group.id);
+      if (!result) return "";
+      if (bulkRegister.errorsOnly && !bulkResultHasError(result, group.id) && !bulkRegister.dirtyGroups.has(group.id)) return "";
+      if (result.status === "technical") {
+        return `<tr class="bulk-result-error"><td>${index + 1}</td>
+          <td colspan="${columns.length - 1}"><div class="bulk-analysis-error"><b>사진을 분석하지 못했습니다.</b><span>[적용]을 눌러 다시 분석해 주세요.</span></div></td></tr>`;
+      }
+      const errors = bulkInputErrors(result);
+      for (const field of bulkRegister.duplicateErrors.get(group.id) || []) errors[field] = true;
+      const tagNames = bulkTags(result);
+      const [categoryGroup = "", categorySub = ""] = String(result.category || "").split("/");
+      const inputCell = (field, { mode = "text", placeholder = "입력", max = "", value = result[field] || "" } = {}) => {
+        const setting = field === "price" ? "purchasePrice" : field;
+        const enabled = ["product", "assetNo", "totalQty"].includes(field) || bulkFieldEnabled(result, setting);
+        // OFF 필드는 확인 테이블의 같은 컬럼을 유지하되 빈 비활성 입력칸으로 표시한다.
+        // AI 원본값은 초안에 남아 있어도 등록값·검증 대상에는 포함하지 않는다.
+        return `<td><input data-result-field="${field}" data-gid="${group.id}" value="${enabled ? bulkEsc(value) : ""}" placeholder="${enabled ? placeholder : ""}" inputmode="${mode}" ${max ? `maxlength="${max}"` : ""} ${enabled ? "" : "disabled"} class="${enabled && errors[field] ? "is-error" : ""}" aria-invalid="${!!(enabled && errors[field])}"></td>`;
+      };
+      return `<tr class="${Object.keys(errors).length ? "bulk-result-error" : ""}" data-result-row="${group.id}">
+        <td>${index + 1}</td>
+        <td><button type="button" class="bulk-pick-field ${errors.category ? "is-error" : ""}" data-pick-category="${group.id}" aria-label="대분류 선택" aria-invalid="${!!errors.category}">${categoryGroup ? bulkEsc(categoryGroup) : "선택"}<span>›</span></button></td>
+        <td><button type="button" class="bulk-pick-field ${errors.category ? "is-error" : ""}" data-pick-category="${group.id}" aria-label="소분류 선택" aria-invalid="${!!errors.category}">${categorySub ? bulkEsc(categorySub) : "선택"}<span>›</span></button></td>
+        ${inputCell("product", { max: 50 })}
+        ${bulkRegister.type === "individual" ? inputCell("assetNo", { max: 30 }) : inputCell("totalQty", { mode: "numeric", max: 6 })}
+        ${inputCell("expiry", { placeholder: "YYYY.MM.DD", max: 10, mode: "numeric" })}
+        <td><button type="button" class="bulk-pick-field ${errors.tags ? "is-error" : ""}" data-pick-tags="${group.id}" aria-invalid="${!!errors.tags}">${tagNames.length ? `${bulkEsc(tagNames[0])}${tagNames.length > 1 ? ` +${tagNames.length - 1}` : ""}` : "선택"}<span>›</span></button></td>
+        ${bulkRegister.type === "individual" ? inputCell("serial", { max: 40 }) + inputCell("imei", { max: 40 }) : ""}
+        ${inputCell("manufactured", { placeholder: "YYYY.MM", max: 7, mode: "numeric" })}
+        ${inputCell("purchaseDate", { placeholder: "YYYY.MM", max: 7, mode: "numeric" })}
+        ${inputCell("price", { mode: "decimal", value: window.formatPurchasePriceInput(result.price) })}
+        <td><button type="button" class="bulk-pick-field bulk-note-button ${errors.note ? "is-error" : ""}" data-pick-note="${group.id}" aria-invalid="${!!errors.note}">${window.AssetMemo.has(result.note) ? bulkEsc(window.AssetMemo.plain(result.note).slice(0, 32)) : "입력"}<span>›</span></button></td>
+      </tr>`;
+    }).join("");
+    const errorCount = bulkRegister.groups.filter(group => {
+      const result = bulkRegister.results.get(group.id);
+      return result && (bulkResultHasError(result, group.id) || bulkRegister.dirtyGroups.has(group.id));
+    }).length;
+    return `<section class="bulk-results-card">
+      <div class="bulk-results-head"><div><h3>업로드한 자산</h3><p>전체 ${bulkRegister.groups.length}</p></div><div class="bulk-results-actions"><button type="button" class="btn" data-reset-analysis>분석 결과 초기화</button><label class="bulk-errors-toggle"><span>오류라인만 보기${errorCount ? ` (${errorCount})` : ""}</span><input type="checkbox" data-errors-only ${bulkRegister.errorsOnly ? "checked" : ""}><i aria-hidden="true"></i></label></div></div>
+      <div class="bulk-results-table-wrap"><table class="bulk-results-table"><thead><tr>${columns.map(label => `<th>${label}</th>`).join("")}</tr></thead><tbody>${rows || `<tr><td colspan="${columns.length}" class="bulk-no-errors">오류가 없습니다.</td></tr>`}</tbody></table></div>
+    </section>`;
+  }
+
+  function bulkMethodPanelHtml() {
+    if (bulkRegister.method !== "ai") {
+      const hasFile = !!bulkRegister.fileName;
+      return `<div class="bulk-step bulk-file-step">
+        <span class="bulk-step-label">STEP 2</span><h3>파일 선택</h3>
+        <p>${bulkRegister.method === "company" ? "회사에서 사용하던 자산 양식을 업로드해 주세요." : "Shopl 양식에 입력한 파일을 업로드해 주세요."}</p>
+        ${bulkRegister.method === "template" ? `<button class="btn" type="button" data-open-template>선택한 유형의 양식 열기 ↗</button>` : ""}
+        <label class="bulk-file-drop ${hasFile ? "has-file" : ""}" data-file-drop>
+          <input type="file" accept=".xlsx,.xls" data-bulk-file hidden>
+          ${hasFile ? `<b>✓ 파일 업로드가 완료되었습니다.</b><span>${bulkEsc(bulkRegister.fileName)}</span>` : '<b>파일을 끌어 넣거나 찾아보기로 선택해 주세요.</b><span>엑셀 XLSX, XLS 형식의 파일을 지원합니다.</span>'}
+        </label>
+        <div class="bulk-panel-actions"><button class="btn" type="button" data-find-file>찾아보기</button><button class="btn primary" type="button" data-apply-file ${hasFile ? "" : "disabled"}>적용</button></div>
+      </div>`;
+    }
+    const selected = bulkRegister.selectedPhotos.size;
+    const groupCards = bulkRegister.groups.map((group, groupIndex) => {
+      const result = bulkRegister.results.get(group.id);
+      const title = result?.product?.trim() ? `자산 ${groupIndex + 1} · ${bulkEsc(result.product.trim())}` : `자산 ${groupIndex + 1}`;
+      const photos = group.photos.map((photo, photoIndex) => `<div class="bulk-photo ${bulkRegister.selectedPhotos.has(photo.id) ? "selected" : ""}" draggable="true" data-photo-id="${photo.id}" data-group-id="${group.id}">
+        <img src="${photo.url}" alt="${bulkEsc(photo.name)}"><button type="button" class="bulk-photo-primary${group.primaryPhotoId === photo.id ? " active" : ""}" data-primary-photo="${photo.id}" aria-label="사진 ${photoIndex + 1}${group.primaryPhotoId === photo.id ? " 대표" : " 대표로 지정"}">${group.primaryPhotoId === photo.id ? "★" : "☆"}</button><button type="button" class="bulk-photo-remove" data-remove-photo="${photo.id}" aria-label="사진 삭제">×</button>
+      </div>`).join("");
+      return `<article class="bulk-photo-group" data-drop-group="${group.id}">
+        <header><b>${title}</b><span>${group.photos.length}/10</span></header>
+        <div class="bulk-photo-list">${photos}${group.photos.length < BULK_AI_MAX_GROUP_PHOTOS ? `<label class="bulk-group-add" aria-label="같은 자산 사진 추가">＋<input type="file" accept="image/jpeg,image/png" multiple data-group-file="${group.id}" hidden></label>` : ""}</div>
+      </article>`;
+    }).join("");
+    const canApply = bulkRegister.groups.length && (bulkRegister.results.size !== bulkRegister.groups.length || bulkRegister.dirtyGroups.size || [...bulkRegister.results.values()].some(result => result.status === "technical"));
+    return `<div class="bulk-step bulk-ai-step">
+      <span class="bulk-step-label">STEP 2</span><div class="bulk-ai-title"><div><h3>파일 선택</h3><p>사진을 자산별로 묶은 뒤 AI 분석을 적용해 주세요. AI가 입력한 값을 확인하고 필요한 내용을 수정해서 등록할 수 있습니다.</p></div></div>
+      ${selected ? `<div class="bulk-ai-toolbar"><span>${selected}장 선택</span><button type="button" data-clear-photo-selection>선택 해제</button></div>` : ""}
+      <div class="bulk-ai-drop" data-ai-drop>${groupCards || '<div class="bulk-ai-empty"><b>자산 사진을 추가해 주세요.</b><span>사진을 한 번에 여러 장 선택할 수 있으며, 처음에는 사진 1장당 자산 그룹 1개로 추가됩니다.</span></div>'}</div>
+      <div class="bulk-panel-actions">${new URLSearchParams(location.search).get("qa") === "bulk-ai" ? '<button class="btn" type="button" data-add-qa-photos>샘플 사진 3장 추가</button>' : ""}<label class="btn"><input type="file" accept="image/jpeg,image/png" multiple data-global-photo hidden>사진 추가</label><button class="btn primary" type="button" data-analyze ${canApply ? "" : "disabled"}>적용</button></div>
+    </div>`;
+  }
+
+  function renderBulkRegister() {
+    const content = document.getElementById("content");
+    const saveEnabled = bulkCanSave();
+    content.innerHTML = `<div class="bulk-page">
+      <div class="bulk-page-head"><div><button type="button" data-bulk-back aria-label="뒤로가기">‹</button><h2>자산 일괄 추가</h2></div><button class="btn primary" type="button" data-bulk-save ${saveEnabled ? "" : "disabled"}>저장</button></div>
+      <section class="bulk-upload-card">
+        <h3>파일 업로드</h3>
+        <div class="bulk-upload-grid">
+          <div class="bulk-step bulk-method-step">
+            <span class="bulk-step-label">STEP 1</span><h3>템플릿 다운로드</h3>
+            <div class="bulk-method-heading">업로드 방식</div>
+            <div class="bulk-method-list">
+              <div class="bulk-method-row"><label><input type="radio" name="bulk-method" value="company" ${bulkRegister.method === "company" ? "checked" : ""}><span>우리 회사의 기존 양식 그대로 업로드할게요.</span></label><button type="button" class="help-icon bulk-method-help" aria-label="회사 양식 등록 방식 도움말" data-tip="업로드한 파일을 AI가 분석해 자산 등록에 필요한 정보를 자동으로 매칭합니다. 일치하지 않거나 누락된 정보가 있으면 추가 입력 또는 재업로드가 필요할 수 있습니다.">?</button></div>
+              <div class="bulk-method-row"><label><input type="radio" name="bulk-method" value="template" ${bulkRegister.method === "template" ? "checked" : ""}><span>템플릿을 다운로드한 후, 형식에 맞게 입력하여 업로드할게요.</span></label><button type="button" class="help-icon bulk-method-help" aria-label="Shopl 양식 등록 방식 도움말" data-tip="템플릿에 맞춰 입력한 파일을 업로드하면 더 정확하고 빠르게 자산을 등록할 수 있습니다.">?</button></div>
+              <div class="bulk-method-row"><label><input type="radio" name="bulk-method" value="ai" ${bulkRegister.method === "ai" ? "checked" : ""}><span>AI로 자산 사진을 분석해 업로드할게요.</span></label><button type="button" class="help-icon bulk-method-help" aria-label="AI 사진 등록 방식 도움말" data-tip="자산 사진을 올리고 자산별로 묶으면 AI가 정보를 분석해 등록할 내용을 채웁니다. 결과를 확인하고 필요한 정보를 수정한 뒤 등록할 수 있습니다.">?</button></div>
+            </div>
+            <div class="bulk-type-box"><b>자산 유형</b><div><label><input type="radio" name="bulk-type" value="individual" ${bulkRegister.type === "individual" ? "checked" : ""}> 개별 자산</label><label><input type="radio" name="bulk-type" value="quantity" ${bulkRegister.type === "quantity" ? "checked" : ""}> 수량 자산</label></div></div>
+          </div>
+          ${bulkMethodPanelHtml()}
+        </div>
+      </section>
+      ${bulkRegister.method === "ai" ? bulkResultTableHtml() : ""}
+    </div>`;
+
+    content.querySelector("[data-bulk-back]").onclick = leaveBulkRegister;
+    const resetAnalysis = content.querySelector("[data-reset-analysis]");
+    if (resetAnalysis) resetAnalysis.onclick = () => openBulkDiscardConfirm(() => {
+      // 사진과 그룹은 유지하고 확인 테이블 전체를 비운다. 다음 [적용]은 모든 그룹을 다시 분석한다.
+      bulkRegister.results.clear();
+      bulkRegister.dirtyGroups = new Set(bulkRegister.groups.map(group => group.id));
+      bulkRegister.duplicateErrors.clear();
+      bulkRegister.errorsOnly = false;
+      renderBulkRegister();
+    }, { title: "분석 결과를 초기화하시겠습니까?", body: "입력한 내용은 저장되지 않습니다." });
+    content.querySelector("[data-bulk-save]").onclick = () => {
+      // 저장 직전 권한이 사라졌으면 더 이상 이 화면에서 할 수 있는 작업이 없으므로 초안을 닫고 현황으로 복귀한다.
+      // 실서비스 서버의 권한 상실 응답도 같은 화면 전이로 처리한다.
+      if (!canManageAssets()) {
+        resetBulkRegister();
+        activeScreen = "list";
+        render();
+        toast("자산을 등록할 권한이 없습니다.");
+        return;
+      }
+      if (!bulkCanSave()) return;
+      // 형식·필수값은 입력 중 즉시 확인하고, 중복은 저장 시점의 기존 자산과 현재 모든 행을 함께 검사한다.
+      // 실서비스에서는 서버가 현재 권한·중복·상한을 다시 검증하고 한 작업으로 저장해야 한다.
+      if (!checkBulkDuplicates()) {
+        renderBulkRegister();
+        content.querySelector(".bulk-result-error")?.scrollIntoView({ block: "center", behavior: "smooth" });
+        toast("입력 내용을 확인해 주세요.");
+        return;
+      }
+      toast("자산이 추가되었습니다.");
+      resetBulkRegister();
+      activeScreen = "list";
+      render();
+    };
+    content.querySelectorAll('input[name="bulk-method"]').forEach(input => input.onchange = () => {
+      if (!input.checked || input.value === bulkRegister.method) return;
+      const change = () => {
+        const type = bulkRegister.type;
+        if (bulkHasDraft()) resetBulkRegister();
+        bulkRegister.method = input.value;
+        bulkRegister.type = type;
+        renderBulkRegister();
+        if (input.value === "template") window.open(BULK_REGISTER_SHEET_LINKS[bulkRegister.type], "_blank", "noopener");
+      };
+      if (bulkHasDraft()) {
+        openBulkDiscardConfirm(change, { title: "등록 방식을 변경하시겠습니까?", body: "입력한 내용은 저장되지 않습니다." });
+        renderBulkRegister();
+      }
+      else change();
+    });
+    content.querySelectorAll('input[name="bulk-type"]').forEach(input => input.onchange = () => {
+      if (!input.checked || input.value === bulkRegister.type) return;
+      const change = () => {
+        const method = bulkRegister.method;
+        resetBulkRegister();
+        bulkRegister.method = method;
+        bulkRegister.type = input.value;
+        renderBulkRegister();
+        if (method === "template") window.open(BULK_REGISTER_SHEET_LINKS[input.value], "_blank", "noopener");
+      };
+      if (bulkHasDraft()) {
+        openBulkDiscardConfirm(change, { title: "자산 유형을 변경하시겠습니까?", body: "입력한 내용은 저장되지 않습니다." });
+        renderBulkRegister();
+      }
+      else change();
+    });
+
+    if (bulkRegister.method !== "ai") {
+      const fileInput = content.querySelector("[data-bulk-file]");
+      const applyFile = files => {
+        const file = [...files].find(item => /\.(xlsx?|XLSX?)$/.test(item.name));
+        if (!file) { toast("XLSX 또는 XLS 파일을 선택해 주세요."); return; }
+        bulkRegister.fileName = file.name;
+        renderBulkRegister();
+      };
+      content.querySelector("[data-find-file]").onclick = () => fileInput.click();
+      fileInput.onchange = () => applyFile(fileInput.files);
+      const drop = content.querySelector("[data-file-drop]");
+      drop.ondragover = event => { event.preventDefault(); drop.classList.add("dragover"); };
+      drop.ondragleave = () => drop.classList.remove("dragover");
+      drop.ondrop = event => { event.preventDefault(); drop.classList.remove("dragover"); applyFile(event.dataTransfer.files); };
+      content.querySelector("[data-apply-file]").onclick = () => toast("공통 일괄 등록 확인 화면으로 이동합니다.");
+      const templateButton = content.querySelector("[data-open-template]");
+      if (templateButton) templateButton.onclick = () => window.open(BULK_REGISTER_SHEET_LINKS[bulkRegister.type], "_blank", "noopener");
+      return;
+    }
+
+    content.querySelector("[data-global-photo]").onchange = event => addBulkPhotosAsGroups(event.target.files);
+    const qaPhotos = content.querySelector("[data-add-qa-photos]");
+    if (qaPhotos) qaPhotos.onclick = addBulkQaPhotos;
+    const aiDrop = content.querySelector("[data-ai-drop]");
+    aiDrop.ondragover = event => { if (event.dataTransfer.types.includes("Files")) { event.preventDefault(); aiDrop.classList.add("dragover"); } };
+    aiDrop.ondragleave = event => { if (event.target === aiDrop) aiDrop.classList.remove("dragover"); };
+    aiDrop.ondrop = event => {
+      if (!event.dataTransfer.files.length || event.target.closest("[data-drop-group]")) return;
+      event.preventDefault(); aiDrop.classList.remove("dragover"); addBulkPhotosAsGroups(event.dataTransfer.files);
+    };
+    content.querySelectorAll("[data-group-file]").forEach(input => input.onchange = () => addBulkPhotosToGroup(input.dataset.groupFile, input.files));
+    content.querySelectorAll("[data-remove-photo]").forEach(button => button.onclick = event => { event.stopPropagation(); removeBulkPhoto(button.dataset.removePhoto); });
+    content.querySelectorAll("[data-primary-photo]").forEach(button => button.onclick = event => {
+      event.stopPropagation();
+      const group = bulkRegister.groups.find(item => item.photos.some(photo => photo.id === button.dataset.primaryPhoto));
+      if (!group || group.primaryPhotoId === button.dataset.primaryPhoto) return;
+      group.primaryPhotoId = button.dataset.primaryPhoto;
+      bulkRegister.dirtyGroups.add(group.id);
+      renderBulkRegister();
+    });
+    content.querySelectorAll("[data-photo-id]").forEach(photo => {
+      photo.onclick = event => { if (!event.target.closest("button")) selectBulkPhoto(photo.dataset.photoId, event); };
+      photo.ondragstart = event => {
+        if (!bulkRegister.selectedPhotos.has(photo.dataset.photoId)) {
+          bulkRegister.selectedPhotos.clear();
+          bulkRegister.selectedPhotos.add(photo.dataset.photoId);
+          bulkRegister.lastSelectedPhoto = photo.dataset.photoId;
+        }
+        event.dataTransfer.setData("text/plain", [...bulkRegister.selectedPhotos].join(","));
+        event.dataTransfer.effectAllowed = "move";
+      };
+      photo.ondragover = event => { event.preventDefault(); event.stopPropagation(); };
+      photo.ondrop = event => { event.preventDefault(); event.stopPropagation(); moveSelectedBulkPhotos(photo.dataset.groupId, photo.dataset.photoId); };
+    });
+    content.querySelectorAll("[data-drop-group]").forEach(group => {
+      group.ondragover = event => { if (!event.dataTransfer.files.length) { event.preventDefault(); group.classList.add("dragover"); } };
+      group.ondragleave = () => group.classList.remove("dragover");
+      group.ondrop = event => {
+        event.preventDefault(); group.classList.remove("dragover");
+        if (event.dataTransfer.files.length) addBulkPhotosToGroup(group.dataset.dropGroup, event.dataTransfer.files);
+        else moveSelectedBulkPhotos(group.dataset.dropGroup);
+      };
+    });
+    const clearSelection = content.querySelector("[data-clear-photo-selection]");
+    if (clearSelection) clearSelection.onclick = () => { bulkRegister.selectedPhotos.clear(); bulkRegister.lastSelectedPhoto = null; renderBulkRegister(); };
+    content.querySelector("[data-analyze]").onclick = openBulkAnalyzeLoading;
+    bindBulkResultInputs(content);
+  }
+
+  function analyzedBulkValues(groupIndex) {
+    if (bulkRegister.type === "individual") return {
+      category: "전자기기류/노트북", product: ["MacBook Pro 14", "무선 키보드", "ThinkPad X1 Carbon"][groupIndex % 3],
+      assetNo: `AI-2026-${String(groupIndex + 1).padStart(4, "0")}`, totalQty: "", price: ["2690000", "89000", "1850000"][groupIndex % 3], tags: "본사|IT",
+    };
+    return {
+      category: "소모품/문구류", product: ["네임펜 세트", "A4 복사용지", "물티슈"][groupIndex % 3],
+      assetNo: "", totalQty: String([12, 20, 30][groupIndex % 3]), price: ["3500", "4200", "1800"][groupIndex % 3], tags: "소모품",
+    };
+  }
+
+  function openBulkAnalyzeLoading() {
+    const targets = bulkRegister.groups.filter(group => !bulkRegister.results.has(group.id) || bulkRegister.dirtyGroups.has(group.id) || bulkRegister.results.get(group.id)?.status === "technical");
+    if (!targets.length) return;
+    const back = document.createElement("div");
+    back.className = "modal-back";
+    back.style.zIndex = 340;
+    back.innerHTML = `<div class="modal sm bulk-ai-loading-modal" role="dialog" aria-modal="true" aria-label="AI 분석 중">
+      <button type="button" data-close aria-label="분석 취소">×</button><div><span class="areg-ai-spinner" aria-hidden="true"></span><b>AI가 자산 사진을 분석하고 있습니다.</b></div>
+    </div>`;
+    const cancel = () => { clearTimeout(bulkAnalyzeTimer); bulkAnalyzeTimer = null; back.remove(); };
+    back.querySelector("[data-close]").onclick = cancel;
+    document.body.appendChild(back);
+    bulkAnalyzeTimer = setTimeout(() => {
+      targets.forEach(group => {
+        const groupIndex = bulkRegister.groups.findIndex(item => item.id === group.id);
+        const attempt = (bulkRegister.attempts.get(group.id) || 0) + 1;
+        bulkRegister.attempts.set(group.id, attempt);
+        const ai = analyzedBulkValues(groupIndex);
+        // [적용]을 다시 실행한 그룹은 수동 수정값을 포함해 이전 결과 전체를 새 분석 결과로 교체한다.
+        // 새 결과에 없는 필드는 빈 값으로 남고, 사진이 바뀌지 않은 다른 그룹의 결과는 유지한다.
+        const technicalFailure = attempt === 1 && groupIndex === 2;
+        // 재분석 실패 시에는 이전 결과와 사진 변경 상태를 그대로 두어 다시 시도할 수 있게 한다.
+        if (technicalFailure && bulkRegister.results.has(group.id)) return;
+        const next = technicalFailure ? { status: "technical" } : { ...ai, status: "success" };
+        if (attempt === 1 && groupIndex === 1 && next.status === "success") {
+          next.category = "";
+          next.status = "review";
+        }
+        bulkRegister.results.set(group.id, next);
+        bulkRegister.dirtyGroups.delete(group.id);
+      });
+      bulkRegister.duplicateErrors.clear();
+      bulkAnalyzeTimer = null;
+      back.remove();
+      renderBulkRegister();
+    }, 1100);
+  }
+
+  function bindBulkResultInputs(content) {
+    const errorsOnly = content.querySelector("[data-errors-only]");
+    if (errorsOnly) errorsOnly.onchange = () => {
+      bulkRegister.errorsOnly = errorsOnly.checked;
+      renderBulkRegister();
+    };
+    content.querySelectorAll("[data-pick-category]").forEach(button => button.onclick = () => openBulkCategoryModal(button.dataset.pickCategory));
+    content.querySelectorAll("[data-pick-tags]").forEach(button => button.onclick = () => openBulkTagModal(button.dataset.pickTags));
+    content.querySelectorAll("[data-pick-note]").forEach(button => button.onclick = () => {
+      const result = bulkRegister.results.get(button.dataset.pickNote);
+      if (!result) return;
+      window.AssetMemo.open({ value: result.note || "", onSave: value => {
+        updateBulkResult(button.dataset.pickNote, "note", value);
+      } });
+    });
+    content.querySelectorAll("[data-result-field]").forEach(field => {
+      if (field.dataset.resultField === "price") window.bindPurchasePriceInput(field);
+      const update = () => {
+        const result = bulkRegister.results.get(field.dataset.gid);
+        if (!result) return;
+        const key = field.dataset.resultField;
+        if (key === "assetNo") field.value = field.value.replace(/[^A-Za-z0-9_-]/g, "");
+        if (key === "totalQty") field.value = field.value.replace(/[^0-9]/g, "");
+        if (key === "manufactured" || key === "purchaseDate" || key === "expiry") {
+          const digits = field.value.replace(/\D/g, "").slice(0, key === "expiry" ? 8 : 6);
+          field.value = key === "expiry"
+            ? (digits.length > 6 ? `${digits.slice(0, 4)}.${digits.slice(4, 6)}.${digits.slice(6)}` : digits.length > 4 ? `${digits.slice(0, 4)}.${digits.slice(4)}` : digits)
+            : (digits.length > 4 ? `${digits.slice(0, 4)}.${digits.slice(4)}` : digits);
+        }
+        result[key] = field.value;
+        if (key === "product" || key === "assetNo") bulkRegister.duplicateErrors.clear();
+        const invalid = !!bulkInputErrors(result)[key];
+        field.classList.toggle("is-error", invalid);
+        field.setAttribute("aria-invalid", String(invalid));
+        field.closest("tr")?.classList.toggle("bulk-result-error", bulkResultHasError(result, field.dataset.gid));
+        if (result.status === "review" && !bulkResultHasError(result, field.dataset.gid)) result.status = "success";
+        const save = content.querySelector("[data-bulk-save]");
+        if (save) save.disabled = !bulkCanSave();
+      };
+      field.oninput = update;
+      field.onchange = () => { update(); renderBulkRegister(); };
+    });
+  }
+
+  // 일괄 작업 메뉴. 일괄 추가는 자산 관리 권한을 다시 확인한 뒤 위 공통 업로드 화면으로 진입한다.
+  // 일괄 배정·보유 변경은 아직 별도 프로토타입을 만들지 않았고, 보유 수량 감소는 잔여 수량을 조정하는
+  // "수량 변경"으로 해석한다. 전체 수량도 함께 줄이는 "수량 차감"은 단건에서만 제공한다.
   function openBulkMenu(anchor) {
     document.querySelectorAll(".dropdown-menu, .hover-tip").forEach(m => m.remove());
     // 버튼 표시 후 권한이 바뀌어도 메뉴를 여는 시점의 허용 항목만 제공한다.
@@ -1064,13 +1836,26 @@
     if (!actions.length) return;
     const menu = document.createElement("div");
     menu.className = "dropdown-menu";
-    menu.innerHTML = actions.map(label => `<button type="button" class="inert">${label}</button>`).join("");
+    menu.innerHTML = actions.map(label => `<button type="button" data-bulk-action="${label}">${label}</button>`).join("");
     const r = anchor.getBoundingClientRect();
     menu.style.cssText = `position:fixed;top:${r.bottom + 4}px;right:${window.innerWidth - r.right}px;min-width:${Math.max(r.width, 160)}px`;
     document.body.appendChild(menu);
     let tip = null;
     menu.querySelectorAll("button").forEach(b => {
+      b.onclick = event => {
+        event.stopPropagation();
+        if (b.dataset.bulkAction === "일괄 추가") {
+          if (!canManageAssets()) return;
+          menu.remove();
+          resetBulkRegister();
+          activeScreen = "bulk-register";
+          render();
+        } else {
+          toast("일괄 배정 화면은 기획서에서 확인해 주세요.");
+        }
+      };
       b.addEventListener("mouseenter", () => {
+        if (b.dataset.bulkAction === "일괄 추가") return;
         tip = document.createElement("div");
         tip.className = "hover-tip";
         tip.textContent = "PM: 기획서에서 명세 확인";

@@ -559,21 +559,24 @@
       manufactured: "2026-01", purchaseDate: "2026-02", purchasePrice: "2500000",
     };
   }
-  function applyMobileAiDraft(draft, values) {
+  function applyMobileAiDraft(draft, values, { replace = false } = {}) {
     const cat = addCategory(draft);
     if (!cat || !values) return;
     const hidden = cat.hiddenFields || [];
-    const fill = key => { if (!String(draft[key] || "").trim() && values[key] != null && values[key] !== "") draft[key] = String(values[key]); };
+    const fill = key => {
+      if (replace) draft[key] = values[key] == null ? "" : String(values[key]);
+      else if (!String(draft[key] || "").trim() && values[key] != null && values[key] !== "") draft[key] = String(values[key]);
+    };
     fill("product");
     if (cat.type === "individual") { fill("assetNo"); if (!hidden.includes("serial")) fill("serial"); if (!hidden.includes("imei")) fill("imei"); }
     else fill("totalQty");
     if (!hidden.includes("expiry")) fill("expiry");
     if (!hidden.includes("manufactured")) fill("manufactured");
     if (!hidden.includes("purchaseDate")) fill("purchaseDate");
-    if (!hidden.includes("purchasePrice") && !String(draft.purchasePrice || "").trim()
-      && values.purchasePrice != null && values.purchasePrice !== "") {
+    if (!hidden.includes("purchasePrice") && (replace || !String(draft.purchasePrice || "").trim())) {
       // AI가 채운 값도 직접 입력과 동일하게 천 단위 콤마를 적용한다.
-      draft.purchasePrice = window.formatPurchasePriceInput(values.purchasePrice);
+      draft.purchasePrice = values.purchasePrice == null || values.purchasePrice === ""
+        ? "" : window.formatPurchasePriceInput(values.purchasePrice);
     }
   }
   function recommendedMobileAiCategory() {
@@ -644,12 +647,14 @@
       if (draft.photos.length && draft.primaryPhoto >= draft.photos.length) draft.primaryPhoto = 0;
     }
     function applyResult(values, recommend) {
+      const replace = !!draft._aiHasSuccessfulResult;
       draft._aiDraft = values;
+      draft._aiHasSuccessfulResult = true;
       if (!draft.category && recommend) {
         const cat = recommendedMobileAiCategory();
         if (cat) draft.category = `${cat.group}|${cat.sub}`;
       }
-      applyMobileAiDraft(draft, values);
+      applyMobileAiDraft(draft, values, { replace });
       appendPhotos();
       close(); onApplied();
     }
