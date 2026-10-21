@@ -923,6 +923,7 @@ button.usebullet { background: var(--panel); font: inherit; cursor: pointer; }
 .cat-manage-empty { flex: 1; display: flex; align-items: center; justify-content: center; color: var(--text-mut); font-size: 13px; }
 .cat-manage-group { margin-bottom: 16px; }
 .cat-manage-row { display: flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 6px; }
+.cat-manage-row.has-err { background: #fff3f3; }
 .cat-manage-row.dragging { opacity: .35; }
 .cat-manage-row.drag-over-top { box-shadow: inset 0 2px 0 var(--primary); }
 .cat-manage-row.drag-over-bottom { box-shadow: inset 0 -2px 0 var(--primary); }
@@ -942,8 +943,12 @@ button.usebullet { background: var(--panel); font: inherit; cursor: pointer; }
   background: #1b1d1f; color: #fff; font-size: 11px; padding: 4px 8px;
   border-radius: 6px; white-space: nowrap; z-index: 20;
 }
+.cat-manage-name-field { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.cat-manage-name-field .field-err { margin: 3px 0 1px; }
+.cat-manage-add-group .cat-manage-name-field { flex: 1; }
+.cat-manage-add-group .cat-manage-input { width: 100%; }
 .cat-manage-name-input {
-  flex: 1; min-width: 0; height: 28px; font-size: 12.5px; color: var(--text);
+  width: 100%; min-width: 0; height: 28px; font-size: 12.5px; color: var(--text);
   border: 1px solid var(--line-strong); border-radius: 6px; padding: 0 6px; background: var(--panel);
 }
 .cat-manage-name-input:focus { border-color: var(--primary); }

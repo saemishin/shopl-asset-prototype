@@ -815,6 +815,8 @@
     let dirty = false;
     let createGi = null; // 소분류 생성 모드일 때, 생성 대상 대분류의 draft 인덱스
     let createState = null;
+    const selectedCategory = sel ? categories.find(c => c.group === sel.group && c.sub === sel.sub) : null;
+    const normalizedName = value => value.trim().replace(/\s+/g, " ");
 
     const back = document.createElement("div");
     back.className = "modal-back";
@@ -825,12 +827,13 @@
           <h3 data-modal-title>분류 관리</h3>
         </div>
         <div class="cat-manage-add-group">
-          <input type="text" class="cat-manage-input" placeholder="입력" maxlength="30">
-          <button class="btn primary" data-add-group>+ 대분류 추가</button>
+          <div class="cat-manage-name-field">
+            <input type="text" class="cat-manage-input" placeholder="입력" maxlength="30">
+            <p class="field-err" data-addgroup-err hidden>동일한 명칭이 존재합니다.</p>
+          </div>
+          <button class="btn primary" data-add-group disabled>+ 대분류 추가</button>
         </div>
-        <p class="field-err" data-addgroup-err hidden style="margin:0 20px">동일한 명칭이 존재합니다.</p>
         <div class="body cat-manage-body"></div>
-        <p class="field-err" data-body-err hidden style="margin:0 20px 12px">동일한 명칭이 존재합니다.</p>
         <div class="cat-manage-create" hidden></div>
         <div class="foot">
           <button class="btn" data-cancel>취소</button>
@@ -848,16 +851,15 @@
     const confirmBtn = back.querySelector("[data-confirm]");
     const addInput = back.querySelector(".cat-manage-add-group input");
     const addGroupErr = back.querySelector("[data-addgroup-err]");
-    const bodyErr = back.querySelector("[data-body-err]");
     let currentMode = "list";
     // 대분류명은 전체 통틀어, 소분류명은 같은 대분류 안에서만 유일하면 됨(다른 대분류의 동명 소분류는 무관)
     function computeDups() {
-      const groupCounts = {};
-      draft.forEach(g => { const n = g.name.trim(); if (n) groupCounts[n] = (groupCounts[n] || 0) + 1; });
+      const groupCounts = Object.create(null);
+      draft.forEach(g => { const n = normalizedName(g.name); if (n) groupCounts[n] = (groupCounts[n] || 0) + 1; });
       const groupDups = new Set(Object.keys(groupCounts).filter(n => groupCounts[n] > 1));
       const subDupsByGi = draft.map(g => {
-        const counts = {};
-        g.subs.forEach(s => { const n = s.name.trim(); if (n) counts[n] = (counts[n] || 0) + 1; });
+        const counts = Object.create(null);
+        g.subs.forEach(s => { const n = normalizedName(s.name); if (n) counts[n] = (counts[n] || 0) + 1; });
         return new Set(Object.keys(counts).filter(n => counts[n] > 1));
       });
       return { groupDups, subDupsByGi };
@@ -865,21 +867,31 @@
     function updateValidity() {
       const { groupDups, subDupsByGi } = computeDups();
       let anyDup = groupDups.size > 0;
+      let anyEmpty = false;
       body.querySelectorAll("[data-rename-group]").forEach(inp => {
-        inp.classList.toggle("has-err", groupDups.has(inp.value.trim()));
+        const name = normalizedName(inp.value);
+        const dup = groupDups.has(name);
+        if (!name) anyEmpty = true;
+        inp.classList.toggle("has-err", dup);
+        inp.closest(".cat-manage-row").classList.toggle("has-err", dup);
+        inp.parentElement.querySelector("[data-name-err]").hidden = !dup;
       });
       body.querySelectorAll("[data-rename-sub]").forEach(inp => {
         const gi = +inp.dataset.renameSub.split("|")[0];
-        const dup = subDupsByGi[gi] && subDupsByGi[gi].has(inp.value.trim());
+        const name = normalizedName(inp.value);
+        const dup = subDupsByGi[gi] && subDupsByGi[gi].has(name);
+        if (!name) anyEmpty = true;
         inp.classList.toggle("has-err", !!dup);
+        inp.closest(".cat-manage-row").classList.toggle("has-err", !!dup);
+        inp.parentElement.querySelector("[data-name-err]").hidden = !dup;
         if (dup) anyDup = true;
       });
-      bodyErr.hidden = !anyDup;
-      const addDup = draft.some(g => g.name.trim() === addInput.value.trim());
-      addInput.classList.toggle("has-err", !!addInput.value.trim() && addDup);
-      addGroupErr.hidden = !(addInput.value.trim() && addDup);
-      back.querySelector("[data-add-group]").disabled = !!addInput.value.trim() && addDup;
-      if (currentMode === "list") confirmBtn.disabled = !dirty || anyDup;
+      const addName = normalizedName(addInput.value);
+      const addDup = !!addName && draft.some(g => normalizedName(g.name) === addName);
+      addInput.classList.toggle("has-err", addDup);
+      addGroupErr.hidden = !addDup;
+      back.querySelector("[data-add-group]").disabled = !addName || addDup;
+      if (currentMode === "list") confirmBtn.disabled = !dirty || anyDup || anyEmpty;
     }
     const markDirty = () => { dirty = true; updateValidity(); };
     const clearDragMarks = () => body.querySelectorAll(".drag-over-top,.drag-over-bottom")
@@ -920,9 +932,12 @@
         <div class="cat-manage-group">
           <div class="cat-manage-row cat-manage-group-row" draggable="true" data-drag="group" data-gi="${gi}">
             <span class="cat-manage-handle" data-tip="순서 변경">${HANDLE_ICON}</span>
-            <input type="text" class="cat-manage-name-input" data-rename-group="${gi}" value="${g.name}" maxlength="30">
+            <div class="cat-manage-name-field">
+              <input type="text" class="cat-manage-name-input" data-rename-group="${gi}" value="${g.name}" maxlength="30">
+              <p class="field-err" data-name-err hidden>동일한 명칭이 존재합니다.</p>
+            </div>
             <div class="cat-manage-row-acts">
-              <button class="cat-manage-icon${blocked ? " is-disabled" : ""}" data-del-group="${gi}" aria-label="삭제"
+              <button class="cat-manage-icon${blocked ? " is-disabled" : ""}" data-del-group="${gi}" aria-label="삭제" aria-disabled="${blocked}"
                 data-tip="${blocked ? "등록된 하위 소분류가 있어 삭제할 수 없습니다." : "삭제"}">${TRASH_ICON}</button>
             </div>
           </div>
@@ -932,9 +947,12 @@
               return `
               <div class="cat-manage-row cat-manage-sub-row" draggable="true" data-drag="sub" data-gi="${gi}" data-si="${si}">
                 <span class="cat-manage-handle" data-tip="순서 변경 및 대분류 이동">${HANDLE_ICON}</span>
-                <input type="text" class="cat-manage-name-input" data-rename-sub="${gi}|${si}" value="${s.name}" maxlength="30">
+                <div class="cat-manage-name-field">
+                  <input type="text" class="cat-manage-name-input" data-rename-sub="${gi}|${si}" value="${s.name}" maxlength="30">
+                  <p class="field-err" data-name-err hidden>동일한 명칭이 존재합니다.</p>
+                </div>
                 <div class="cat-manage-row-acts">
-                  <button class="cat-manage-icon${hasAssets ? " is-disabled" : ""}" data-del-sub="${gi}|${si}" aria-label="삭제"
+                  <button class="cat-manage-icon${hasAssets ? " is-disabled" : ""}" data-del-sub="${gi}|${si}" aria-label="삭제" aria-disabled="${hasAssets}"
                     data-tip="${hasAssets ? "등록된 자산이 있어 삭제할 수 없습니다." : "삭제"}">${TRASH_ICON}</button>
                 </div>
               </div>`;
@@ -949,8 +967,8 @@
     renderBody();
 
     function addGroup() {
-      const name = addInput.value.trim();
-      if (!name || draft.some(g => g.name.trim() === name)) { addInput.focus(); return; }
+      const name = normalizedName(addInput.value);
+      if (!name || draft.some(g => normalizedName(g.name) === name)) { addInput.focus(); return; }
       draft.unshift({ name, origName: null, subs: [] });
       addInput.value = "";
       markDirty(); renderBody();
@@ -1029,7 +1047,7 @@
           targetIndex = +subRow.dataset.si + (subRow.classList.contains("drag-over-top") ? 0 : 1);
         } else if (groupRow) {
           targetGi = +groupRow.dataset.gi;
-          targetIndex = 0;
+          targetIndex = draft[targetGi].subs.length;
         } else { dragging = null; clearDragMarks(); return; }
         const [moved] = draft[dragging.gi].subs.splice(dragging.si, 1);
         let insertAt = targetIndex;
@@ -1049,20 +1067,28 @@
     });
 
     function saveAll() {
+      // 운영 저장 계약: 저장 직전 자산 관리 권한을 재검증한다. 권한 상실이면 미반영·모달 종료 후
+      // 현재 분류 탭 접근 가능 여부에 따라 분류 화면 갱신/현황 > 전체 이동, 일시적 시스템 오류면
+      // 미반영·모달과 입력 초안 유지. 이 클릭 프로토타입에는 서버 저장/실패 응답이 없다.
       const dups = computeDups();
-      if (!dirty || dups.groupDups.size > 0 || dups.subDupsByGi.some(s => s.size > 0)) return;
+      const hasEmptyName = draft.some(g => !normalizedName(g.name) || g.subs.some(s => !normalizedName(s.name)));
+      if (!dirty || hasEmptyName || dups.groupDups.size > 0 || dups.subDupsByGi.some(s => s.size > 0)) return;
       const newCategories = [];
       const newEmptyGroups = [];
+      let nextSelection = null;
       draft.forEach(g => {
-        if (!g.subs.length) { newEmptyGroups.push(g.name); return; }
+        const groupName = normalizedName(g.name);
+        if (!g.subs.length) { newEmptyGroups.push(groupName); return; }
         g.subs.forEach(s => {
           // 이름변경·대분류이동으로 소속이 바뀐 소분류는, 거기 걸린 자산들의 group/sub도 같이 옮겨줘야
           // 자산 목록 조회(assetsOf)가 끊기지 않음 — 원래 소속(s.data.group/sub) 기준으로 자산을 찾아 갱신
           const oldGroup = s.data.group, oldSub = s.data.sub;
-          if (oldGroup !== g.name || oldSub !== s.name) {
-            assets.forEach(a => { if (a.group === oldGroup && a.sub === oldSub) { a.group = g.name; a.sub = s.name; } });
+          const subName = normalizedName(s.name);
+          if (oldGroup !== groupName || oldSub !== subName) {
+            assets.forEach(a => { if (a.group === oldGroup && a.sub === oldSub) { a.group = groupName; a.sub = subName; } });
           }
-          newCategories.push({ ...s.data, group: g.name, sub: s.name });
+          newCategories.push({ ...s.data, group: groupName, sub: subName });
+          if (s.data === selectedCategory) nextSelection = { group: groupName, sub: subName };
         });
       });
       categories.length = 0;
@@ -1070,7 +1096,8 @@
       window.DATA.emptyGroups = newEmptyGroups;
       back.remove();
       toast("저장되었습니다.");
-      render(null);
+      // 선택했던 소분류가 삭제됐다면 render가 저장 순서상 첫 소분류를 선택한다.
+      render(nextSelection);
     }
 
     // 소분류 생성 — 유형·권한까지 다 채우는 무거운 액션이라 여기서만 예외적으로 "추가"를 누르는 즉시 실제 데이터(categories)에 반영됨.
