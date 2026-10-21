@@ -269,6 +269,54 @@
         <p class="muted" data-search-empty hidden style="padding:12px 0">결과가 없습니다.</p>` : assetEmptyHtml()}`;
   }
 
+  // 권한 범위명 — 특정 그룹 및 직무/직급·특정 관리자/리더는 지정 대상이 있으니 범위명을 눌러 대상 조회 모달을 열 수 있게 함(수정은 [수정] 버튼에서만)
+  function permValueHtml(cat, kind) {
+    const value = cat[kind];
+    if (!TARGET_NEEDED.has(value) || !cat[kind + "Target"]) return value;
+    return `<button type="button" class="perm-value-link" data-perm-target="${kind}">${value}</button>`;
+  }
+
+  // 권한 대상 조회 모달 — 조회 전용(푸터 없음). 목록은 구성원·그룹·직무/직급 모두 이름 가나다순.
+  // 그룹·직무/직급 중 비어 있는 쪽은 제한하지 않은 축(전체)이라 "전체"로 표시
+  function openPermTargetModal(cat, kind) {
+    const target = cat[kind + "Target"] || { groups: [], jobTitles: [], members: [] };
+    const byName = list => [...list].sort((a, b) => a.localeCompare(b, "ko"));
+    let bodyHtml;
+    if (cat[kind] === "특정 관리자/리더") {
+      const names = byName(target.members);
+      bodyHtml = `
+        <p class="perm-target-count">전체 <b>${names.length}</b></p>
+        <div class="perm-target-list">${names.map(name => {
+          const m = MEMBERS.find(x => x.name === name);
+          return `
+            <div class="perm-target-row">
+              <span class="picker-avatar" style="background:${avatarColor(name)}">${name[0]}</span>
+              <span class="perm-target-info"><b>${name}</b>${m ? `<span>${m.team}</span>` : ""}</span>
+            </div>`;
+        }).join("")}</div>`;
+    } else {
+      const section = (label, list) => `
+        <div class="perm-target-section">
+          <p class="perm-target-label">${label}</p>
+          ${list.length ? list.map(n => `<div class="perm-target-row">${n}</div>`).join("") : '<div class="perm-target-row">전체</div>'}
+        </div>`;
+      bodyHtml = section("그룹", byName(target.groups)) + section("직무/직급", byName(target.jobTitles));
+    }
+    const m = document.createElement("div");
+    m.className = "modal-back";
+    m.innerHTML = `
+      <div class="modal help-modal perm-target-modal">
+        <div class="help-modal-head">
+          <h3>${kind === "view" ? "자산 조회 권한" : assignLabel(cat.type)}</h3>
+          <button type="button" class="btn icon-only sm" data-close aria-label="닫기">${CLOSE_ICON}</button>
+        </div>
+        <div class="body">${bodyHtml}</div>
+      </div>`;
+    document.body.appendChild(m);
+    m.addEventListener("click", e => { if (e.target === m) m.remove(); });
+    m.querySelector("[data-close]").onclick = () => m.remove();
+  }
+
   function detailHtml(cat) {
     return `
       <div class="cat-detail-head">
@@ -276,8 +324,8 @@
         <div class="cat-detail-acts"><button class="btn sm" data-edit-sub>수정</button></div>
       </div>
       <div class="kv2 cat-detail-kv">
-        <div><div class="k">자산 조회 권한</div><div class="v">${cat.view}</div></div>
-        <div><div class="k">${assignLabel(cat.type)}</div><div class="v">${cat.assign}</div></div>
+        <div><div class="k">자산 조회 권한</div><div class="v">${permValueHtml(cat, "view")}</div></div>
+        <div><div class="k">${assignLabel(cat.type)}</div><div class="v">${permValueHtml(cat, "assign")}</div></div>
       </div>
       <div class="cat-usage">
         <div class="k">관리 정보</div>
@@ -1222,6 +1270,7 @@
     c.querySelectorAll("[data-manage]").forEach(b => b.onclick = () => openManageModal(sel));
     const editBtn = c.querySelector("[data-edit-sub]");
     if (editBtn) editBtn.onclick = () => openSubEditModal(cat);
+    c.querySelectorAll("[data-perm-target]").forEach(b => b.onclick = () => openPermTargetModal(cat, b.dataset.permTarget));
     wireAssetSection(c, cat);
   }
 
