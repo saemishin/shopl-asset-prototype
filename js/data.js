@@ -9,8 +9,11 @@ window.DATA = (function () {
     // 서랍장: 등록된 자산이 아직 없는 소분류 샘플 — 분류 관리 모달에서 "활성 상태(삭제 가능)" 삭제 버튼을 보여주기 위한 용도
     { group: "가구류", sub: "서랍장", type: "individual", hiddenFields: ["expiry"], view: "회사의 모든 구성원", assign: "모든 관리자 및 리더" },
     { group: "전자기기류", sub: "노트북", type: "individual", view: "모든 관리자 및 리더", assign: "모든 관리자 및 리더" },
-    { group: "전자기기류", sub: "모니터", type: "individual", view: "모든 관리자 및 리더", assign: "특정 관리자/리더" },
-    { group: "전자기기류", sub: "케이블·액세서리", type: "quantity", view: "회사의 모든 구성원", assign: "모든 관리자 및 리더" },
+    { group: "전자기기류", sub: "모니터", type: "individual", view: "모든 관리자 및 리더", assign: "특정 관리자/리더",
+      assignTarget: { groups: [], jobTitles: [], members: ["이서연", "최유진"] } },
+    // 권한 대상 조회 모달 확인용 — 기본 데모 사용자(김민수, 개발팀·팀장)가 계속 대상에 포함되도록 지정
+    { group: "전자기기류", sub: "케이블·액세서리", type: "quantity", view: "회사의 모든 구성원", assign: "특정 그룹 및 직무/직급",
+      assignTarget: { groups: ["개발팀", "영업팀"], jobTitles: ["팀장"], members: [] } },
     { group: "소모품", sub: "유니폼", type: "quantity", view: "회사의 모든 구성원", assign: "특정 관리자/리더" },
     { group: "소모품", sub: "문구류", type: "quantity", view: "회사의 모든 구성원", assign: "회사의 모든 구성원" },
   ];
