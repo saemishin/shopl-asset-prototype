@@ -241,13 +241,14 @@
           ${products.length ? ASSET_SEARCH_HTML : ""}
         </div>
         ${products.length ? `
-          <div class="table-wrap">
+          <div class="table-wrap" data-asset-table>
             <table class="cat-asset-table">
               <thead><tr><th>품목명</th><th class="num">자산 수</th><th class="num">배정 중</th><th class="num">재고</th><th class="num">수리/점검 중</th><th class="num">분실</th><th class="num">폐기</th></tr></thead>
-              <tbody>${products.map(productRowHtml).join("")}</tbody>
+              <tbody data-asset-tbody></tbody>
             </table>
           </div>
-          <p class="muted" data-search-empty hidden style="padding:12px 0">결과가 없습니다.</p>` : assetEmptyHtml()}`;
+          <p class="muted" data-search-empty hidden style="padding:12px 0">결과가 없습니다.</p>
+          <div data-asset-pager></div>` : assetEmptyHtml()}`;
     }
     // 이미 소분류 하나로 좁혀진 목록이라 정렬은 품목명순만 적용(개별형 productsOf()와 동일 원칙)
     const list = [...assetsOf(cat.group, cat.sub)].sort((a, b) => a.product.localeCompare(b.product, "ko"));
@@ -260,13 +261,14 @@
         ${list.length ? ASSET_SEARCH_HTML : ""}
       </div>
       ${list.length ? `
-        <div class="table-wrap">
+        <div class="table-wrap" data-asset-table>
           <table class="cat-asset-table">
             <thead><tr><th>품목명</th><th class="num">전체 수량</th><th class="num">보유 수량</th><th class="num">잔여 수량</th><th class="num">보유 대상</th><th>유효기한</th></tr></thead>
-            <tbody>${list.map(stockRowHtml).join("")}</tbody>
+            <tbody data-asset-tbody></tbody>
           </table>
         </div>
-        <p class="muted" data-search-empty hidden style="padding:12px 0">결과가 없습니다.</p>` : assetEmptyHtml()}`;
+        <p class="muted" data-search-empty hidden style="padding:12px 0">결과가 없습니다.</p>
+        <div data-asset-pager></div>` : assetEmptyHtml()}`;
   }
 
   // 권한 범위명 — 특정 그룹 및 직무/직급·특정 관리자/리더는 지정 대상이 있으니 범위명을 눌러 대상 조회 모달을 열 수 있게 함(수정은 [수정] 버튼에서만)
@@ -1193,39 +1195,65 @@
     setMode("list");
   }
 
+  // 품목 목록 — 현황 화면과 같은 페이지네이션(20/50/100개). 검색은 품목명 기준으로 데이터를 거른 뒤 페이지를 나눠 다시 그리고,
+  // 검색어·페이지 크기를 바꾸면 1페이지로 돌아감. 전체 건수는 개별형=일치 품목의 자산 수 합계, 수량형=일치 자산 행 수
   function wireAssetSection(c, cat) {
-    c.querySelectorAll(".cat-prod-row").forEach(row => row.onclick = () => {
-      const p = productsOf(cat.group, cat.sub).find(x => x.product === row.dataset.product);
-      if (p) window.openProductUnitsModal(p.product, p.items);
-    });
-    c.querySelectorAll("[data-asset]").forEach(row => row.onclick = e => {
-      e.stopPropagation();
-      window.open(`asset-detail.html?id=${row.dataset.asset}`, "_blank", "noopener");
-    });
-    const searchInput = c.querySelector("[data-product-search]");
-    if (searchInput) {
+    const tbody = c.querySelector("[data-asset-tbody]");
+    if (tbody) {
+      const isIndividual = cat.type === "individual";
+      const items = isIndividual
+        ? productsOf(cat.group, cat.sub)
+        : [...assetsOf(cat.group, cat.sub)].sort((a, b) => a.product.localeCompare(b.product, "ko"));
+      const nameOf = it => it.product;
+      const st = { q: "", page: 1, size: 20 };
+      const searchInput = c.querySelector("[data-product-search]");
       const sbox = searchInput.closest(".searchbox");
-      const clearBtn = c.querySelector("[data-product-search-clear]");
-      const rows = [...c.querySelectorAll(".cat-asset-table tbody tr")];
+      const tableWrap = c.querySelector("[data-asset-table]");
       const emptyMsg = c.querySelector("[data-search-empty]");
-      const applyFilter = () => {
-        const q = searchInput.value.trim().toLowerCase();
-        let anyVisible = false;
-        rows.forEach(tr => {
-          const match = !q || tr.querySelector("td").textContent.toLowerCase().includes(q);
-          tr.hidden = !match;
-          if (match) anyVisible = true;
-        });
-        // 개별형은 검색된 품목들의 자산 수 합계, 수량형은 검색된 자산 행 수로 기존 기준 유지.
-        const count = rows.reduce((sum, row) => row.hidden ? sum : sum + Number(row.dataset.searchCount), 0);
-        c.querySelector("[data-product-result-count]").textContent = count;
-        if (emptyMsg) emptyMsg.hidden = anyVisible;
-        sbox.classList.toggle("has-term", !!searchInput.value);
+      const pagerEl = c.querySelector("[data-asset-pager]");
+      const countEl = c.querySelector("[data-product-result-count]");
+      const pagerHtml = totalPages => {
+        const p = st.page;
+        const winStart = Math.max(1, Math.min(p - 2, totalPages - 4));
+        const winEnd = Math.min(totalPages, Math.max(p + 2, winStart + 4));
+        const btn = (label, target, disabled, cls = "") => `<button data-page="${target}" ${disabled ? "disabled" : ""} class="${cls}">${label}</button>`;
+        const nums = [];
+        for (let i = winStart; i <= winEnd; i++) nums.push(btn(i, i, false, i === p ? "active" : ""));
+        return `
+          <div class="pager">
+            ${btn("«", 1, p === 1)}${btn("‹", p - 1, p === 1)}${nums.join("")}${btn("›", p + 1, p === totalPages)}${btn("»", totalPages, p === totalPages)}
+            <span class="pagesize"><select data-asset-pagesize>${[20, 50, 100].map(n => `<option value="${n}" ${st.size === n ? "selected" : ""}>${n}</option>`).join("")}</select></span>
+          </div>`;
       };
-      searchInput.addEventListener("input", applyFilter);
+      const refresh = () => {
+        const q = st.q.trim().toLowerCase();
+        const filtered = q ? items.filter(it => nameOf(it).toLowerCase().includes(q)) : items;
+        countEl.textContent = isIndividual ? filtered.reduce((sum, p) => sum + p.total, 0) : filtered.length;
+        const totalPages = Math.max(1, Math.ceil(filtered.length / st.size));
+        if (st.page > totalPages) st.page = totalPages;
+        const pageItems = filtered.slice((st.page - 1) * st.size, st.page * st.size);
+        tbody.innerHTML = pageItems.map(isIndividual ? productRowHtml : stockRowHtml).join("");
+        tableWrap.hidden = !filtered.length;
+        emptyMsg.hidden = !!filtered.length;
+        pagerEl.innerHTML = filtered.length ? pagerHtml(totalPages) : "";
+        tbody.querySelectorAll(".cat-prod-row").forEach(row => row.onclick = () => {
+          const p = items.find(x => x.product === row.dataset.product);
+          if (p) window.openProductUnitsModal(p.product, p.items);
+        });
+        tbody.querySelectorAll("[data-asset]").forEach(row => row.onclick = e => {
+          e.stopPropagation();
+          window.open(`asset-detail.html?id=${row.dataset.asset}`, "_blank", "noopener");
+        });
+        pagerEl.querySelectorAll("button[data-page]").forEach(b => b.onclick = () => { st.page = +b.dataset.page; refresh(); });
+        const sizeSel = pagerEl.querySelector("[data-asset-pagesize]");
+        if (sizeSel) sizeSel.onchange = () => { st.size = +sizeSel.value; st.page = 1; refresh(); };
+        sbox.classList.toggle("has-term", !!st.q);
+      };
+      searchInput.addEventListener("input", () => { st.q = searchInput.value; st.page = 1; refresh(); });
       searchInput.onfocus = () => { searchInput.classList.add("expanded"); searchInput.placeholder = "품목명"; };
       searchInput.onblur = () => { if (!searchInput.value) { searchInput.classList.remove("expanded"); searchInput.placeholder = "검색"; } };
-      clearBtn.onclick = () => { searchInput.value = ""; applyFilter(); searchInput.focus(); };
+      c.querySelector("[data-product-search-clear]").onclick = () => { searchInput.value = ""; st.q = ""; st.page = 1; refresh(); searchInput.focus(); };
+      refresh();
     }
     const addAssetBtn = c.querySelector("[data-add-asset]");
     if (addAssetBtn) addAssetBtn.onclick = () => window.openAssetAddModal({ type: cat.type, group: cat.group, sub: cat.sub });
