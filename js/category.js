@@ -1177,7 +1177,9 @@
         </div>` : `
         <div class="cat-layout">
           <nav class="cat-tree">${treeHtml(groups, sel)}</nav>
-          <div class="cat-detail${cat ? "" : " is-empty"}">${cat ? detailHtml(cat) : '<p class="cat-sub-empty">등록된 소분류가 없습니다.</p>'}</div>
+          <div class="cat-detail${cat ? "" : " is-empty"}">${cat ? detailHtml(cat) : `
+            <p class="cat-sub-empty">등록된 소분류가 없습니다.</p>
+            <button type="button" class="btn sm" data-manage>분류 관리</button>`}</div>
         </div>`}
     `;
     c.classList.add("cat-split");
@@ -1190,7 +1192,7 @@
       if (collapsedGroups.has(g)) collapsedGroups.delete(g); else collapsedGroups.add(g);
       render(sel);
     });
-    c.querySelector("[data-manage]").onclick = () => openManageModal(sel);
+    c.querySelectorAll("[data-manage]").forEach(b => b.onclick = () => openManageModal(sel));
     const editBtn = c.querySelector("[data-edit-sub]");
     if (editBtn) editBtn.onclick = () => openSubEditModal(cat);
     wireAssetSection(c, cat);
