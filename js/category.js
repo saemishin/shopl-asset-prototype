@@ -1,8 +1,14 @@
 /* 분류 관리 — 분류-1 메인 화면. 좌측 트리(대분류는 그룹 헤더, 소분류만 선택 가능) + 우측(선택된 소분류 정보 + 품목 목록) */
 (function () {
   const { categories, assets } = window.DATA;
-  // 분류와 자산이 전혀 없는 회사의 화면을 확인하는 QA 전용 상태. 일반 화면에는 영향을 주지 않는다.
-  if (new URLSearchParams(window.location.search).get("qa") === "empty-category") {
+  // 분류가 전혀 없거나 대분류만 남은 회사의 화면을 확인하는 QA 전용 상태.
+  const categoryQa = new URLSearchParams(window.location.search).get("qa");
+  if (categoryQa === "empty-subcategory") {
+    const groupNames = [...new Set(categories.map(c => c.group))].slice(0, 2);
+    categories.length = 0;
+    assets.length = 0;
+    window.DATA.emptyGroups.splice(0, window.DATA.emptyGroups.length, ...groupNames);
+  } else if (categoryQa === "empty-category") {
     categories.length = 0;
     assets.length = 0;
     window.DATA.emptyGroups.length = 0;
@@ -1162,7 +1168,7 @@
         <a class="active">분류</a>
         <a href="settings.html">설정</a>
       </div>
-      ${categories.length === 0 ? `
+      ${groups.length === 0 ? `
         <div class="cat-layout cat-layout-empty">
           <div class="cat-empty-page">
             <p>등록된 분류가 없습니다.</p>
@@ -1171,7 +1177,7 @@
         </div>` : `
         <div class="cat-layout">
           <nav class="cat-tree">${treeHtml(groups, sel)}</nav>
-          <div class="cat-detail">${cat ? detailHtml(cat) : ""}</div>
+          <div class="cat-detail${cat ? "" : " is-empty"}">${cat ? detailHtml(cat) : '<p class="cat-sub-empty">등록된 소분류가 없습니다.</p>'}</div>
         </div>`}
     `;
     c.classList.add("cat-split");

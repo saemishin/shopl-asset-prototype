@@ -581,6 +581,8 @@ th.c, td.c { text-align: center; width: 52px; }
 .cat-tree-empty { padding: 4px 8px; font-size: 12px; color: var(--text-mut); }
 
 .cat-detail { flex: 1; min-width: 0; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); padding: 20px; }
+.cat-detail.is-empty { display: flex; align-items: center; justify-content: center; min-height: 320px; }
+.cat-sub-empty { color: var(--text-mut); font-size: 13px; }
 .cat-layout.cat-layout-empty { align-items: stretch; }
 .cat-empty-page { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; }
 .cat-empty-page p { font-size: 15px; font-weight: 600; }
