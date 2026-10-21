@@ -581,6 +581,9 @@ th.c, td.c { text-align: center; width: 52px; }
 .cat-tree-empty { padding: 4px 8px; font-size: 12px; color: var(--text-mut); }
 
 .cat-detail { flex: 1; min-width: 0; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); padding: 20px; }
+.cat-layout.cat-layout-empty { align-items: stretch; }
+.cat-empty-page { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; }
+.cat-empty-page p { font-size: 15px; font-weight: 600; }
 .cat-detail-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .cat-detail-head h3 { font-size: 17px; font-weight: 700; }
 .cat-detail-acts { display: flex; gap: 6px; flex-shrink: 0; }
@@ -915,6 +918,7 @@ button.usebullet { background: var(--panel); font: inherit; cursor: pointer; }
 }
 .cat-manage-add-group .btn { flex-shrink: 0; }
 .cat-manage-body { display: flex; flex-direction: column; }
+.cat-manage-empty { flex: 1; display: flex; align-items: center; justify-content: center; color: var(--text-mut); font-size: 13px; }
 .cat-manage-group { margin-bottom: 16px; }
 .cat-manage-row { display: flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 6px; }
 .cat-manage-row.dragging { opacity: .35; }
@@ -1173,6 +1177,7 @@ textarea[data-asset-memo-source] { display: none !important; }
   .cat-layout { flex-direction: column; }
   .content.cat-split { height: auto; overflow: visible; display: block; }
   .cat-split .cat-layout { flex: none; }
+  .cat-split .cat-layout.cat-layout-empty { min-height: 60vh; }
   .cat-split .cat-layout > .cat-tree, .cat-split .cat-layout > .cat-detail { height: auto; overflow: visible; }
 }
 /* min-height: 이력 탭에서 우측 액션 버튼(hactions)이 hidden 처리될 때 행 높이가 줄어 탭 전환마다 덜컹거리는 것 방지 — 버튼 높이(.btn.sm = 28px)로 고정 */

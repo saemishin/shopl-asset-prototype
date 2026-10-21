@@ -1,6 +1,12 @@
 /* 분류 관리 — 분류-1 메인 화면. 좌측 트리(대분류는 그룹 헤더, 소분류만 선택 가능) + 우측(선택된 소분류 정보 + 품목 목록) */
 (function () {
   const { categories, assets } = window.DATA;
+  // 분류와 자산이 전혀 없는 회사의 화면을 확인하는 QA 전용 상태. 일반 화면에는 영향을 주지 않는다.
+  if (new URLSearchParams(window.location.search).get("qa") === "empty-category") {
+    categories.length = 0;
+    assets.length = 0;
+    window.DATA.emptyGroups.length = 0;
+  }
 
   function toast(msg) {
     const t = document.createElement("div");
@@ -902,7 +908,7 @@
     });
 
     function renderBody() {
-      body.innerHTML = draft.map((g, gi) => {
+      body.innerHTML = draft.length ? draft.map((g, gi) => {
         const blocked = g.subs.length > 0;
         return `
         <div class="cat-manage-group">
@@ -931,7 +937,7 @@
             <button class="btn sm cat-manage-add-sub" data-add-sub="${gi}">+ 소분류 추가</button>
           </div>
         </div>`;
-      }).join("");
+      }).join("") : '<p class="cat-manage-empty">등록된 분류가 없습니다.</p>';
       updateValidity();
     }
     renderBody();
@@ -1147,7 +1153,7 @@
   function render(sel) {
     const c = document.getElementById("content");
     const groups = groupsOf();
-    if (!sel) sel = firstSelectable(groups);
+    if (!sel || !categories.some(x => x.group === sel.group && x.sub === sel.sub)) sel = firstSelectable(groups);
     const cat = sel ? categories.find(x => x.group === sel.group && x.sub === sel.sub) : null;
 
     c.innerHTML = `
@@ -1156,10 +1162,17 @@
         <a class="active">분류</a>
         <a href="settings.html">설정</a>
       </div>
-      <div class="cat-layout">
-        <nav class="cat-tree">${treeHtml(groups, sel)}</nav>
-        <div class="cat-detail">${cat ? detailHtml(cat) : '<p class="muted" style="padding:20px 0">소분류를 선택하세요</p>'}</div>
-      </div>
+      ${categories.length === 0 ? `
+        <div class="cat-layout cat-layout-empty">
+          <div class="cat-empty-page">
+            <p>등록된 분류가 없습니다.</p>
+            <button type="button" class="btn sm" data-manage>분류 관리</button>
+          </div>
+        </div>` : `
+        <div class="cat-layout">
+          <nav class="cat-tree">${treeHtml(groups, sel)}</nav>
+          <div class="cat-detail">${cat ? detailHtml(cat) : ""}</div>
+        </div>`}
     `;
     c.classList.add("cat-split");
     c.querySelectorAll("[data-tree]").forEach(b => b.onclick = () => {
