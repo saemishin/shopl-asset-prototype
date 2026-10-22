@@ -858,7 +858,10 @@
     bindRows(c);
     bindBulkSelect(c);
     c.querySelectorAll("[data-ptype]").forEach(b => b.onclick = () => {
+      if (state.productType === b.dataset.ptype) return;
       state.productType = b.dataset.ptype;
+      // 유형을 바꾸면 이전 유형의 분류 조건을 해제한다. 검색어·정렬은 유지한다.
+      state.filters.category = [];
       state.page = 1;
       render();
     });
@@ -2034,6 +2037,13 @@
   // 품목별 전용 필터 — 이 뷰는 분류 하나만 필터로 의미가 있어서(자산 유형은 목록 위 유형 선택으로 구분),
   // 6개 그룹짜리 필터 모달 대신 분류 그룹 하나만 떼어낸 가벼운 팝업으로 제공
   function openCategoryFilterModal() {
+    // 등록 자산 수가 아니라 소분류의 유형·조회 권한으로 옵션을 제한한다.
+    // 같은 대분류에 다른 유형의 소분류가 있어도 선택한 유형의 하위 항목만 제공한다.
+    const groups = new Map();
+    viewableCategories().filter(cat => cat.type === state.productType).forEach(cat => {
+      if (!groups.has(cat.group)) groups.set(cat.group, []);
+      groups.get(cat.group).push(cat.sub);
+    });
     const draft = [...state.filters.category];
     let query = "";
 
@@ -2043,7 +2053,7 @@
     function visibleValues() {
       const q = query.trim().toLowerCase();
       const out = [];
-      CAT_GROUPS.forEach((subs, g) => {
+      groups.forEach((subs, g) => {
         const groupMatches = !q || g.toLowerCase().includes(q);
         const filtered = subs.filter(s => groupMatches || s.toLowerCase().includes(q));
         if (!filtered.length) return;
@@ -2067,7 +2077,7 @@
       </div>`);
 
     function renderList() {
-      let listHtml = [...CAT_GROUPS.entries()].map(([g, subs]) => {
+      let listHtml = [...groups.entries()].map(([g, subs]) => {
         const q = query.trim().toLowerCase();
         const groupMatches = !q || g.toLowerCase().includes(q);
         const filtered = subs.filter(s => groupMatches || s.toLowerCase().includes(q));
@@ -2102,7 +2112,7 @@
         if (v.startsWith("grp:")) {
           const g = v.slice(4);
           // 대분류를 체크하면 그 자체도 소분류들과 별개로 draft에 들어가서, 칩도 "대분류 + 소분류 N개"로 각각 따로 뜸(병합 안 함)
-          const keys = [g, ...CAT_GROUPS.get(g).map(s => `${g}/${s}`)];
+          const keys = [g, ...groups.get(g).map(s => `${g}/${s}`)];
           if (cb.checked) keys.forEach(k => { if (!draft.includes(k)) draft.push(k); });
           else keys.forEach(k => { const i = draft.indexOf(k); if (i > -1) draft.splice(i, 1); });
         } else if (cb.checked) draft.push(v);
