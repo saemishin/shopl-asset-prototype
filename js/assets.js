@@ -6,6 +6,14 @@
   // 실제 서비스에서는 현재 계정의 관리 권한·이름/그룹/직무 ID 응답으로 대체한다(인증 API 목업 아님).
   const DEMO_ASSUME_ASSET_MANAGE_PERMISSION = window.AssetPermissionQa?.managePermission ?? true;
   const DEMO_VIEWER_NAME = "김민수";
+  // 7-3의 동시 변경은 실제 서버 없이 QA URL에서만 재현한다. 일반 URL의 시드·조회 범위는 바꾸지 않는다.
+  const memberQaParams = new URLSearchParams(location.search);
+  const memberQaEnabled = memberQaParams.get("qa") === "member-unavailable";
+  const memberQaScenario = ["relation", "scope", "partial"].includes(memberQaParams.get("scenario"))
+    ? memberQaParams.get("scenario") : "relation";
+  const memberQaHiddenCategories = new Set();
+  let memberQaPending = memberQaEnabled;
+
 
   // held(보유 중)는 수량형 전용 — 개별형의 배정중처럼 "활성 상태"라 배지 색은 assigned를 그대로 재사용(구조설계안
   // 3.4: status는 개별형·수량형 둘 다 필수, 값 범위만 다름 — 수량형은 stock·held 2종만)
@@ -216,6 +224,7 @@
   function canManageAssets() { return DEMO_ASSUME_ASSET_MANAGE_PERMISSION; }
   function canViewCategory(cat) {
     if (!cat) return false;
+    if (memberQaHiddenCategories.has(JSON.stringify([cat.group, cat.sub]))) return false;
     if (canManageAssets()) return true;
     // 관리 권한이 없는 리더에게는 본인 배정 여부가 아니라 소분류 조회 설정을 적용한다.
     switch (cat.view) {
@@ -276,11 +285,11 @@
   };
 
   const state = {
-    view: "all",
+    view: memberQaEnabled ? "employee" : "all",
     search: "",
     page: 1,
     pageSize: 20,
-    sort: { key: "updatedAt", dir: "desc" },
+    sort: memberQaEnabled ? { key: "name", dir: "asc" } : { key: "updatedAt", dir: "desc" },
     filters: { category: [], type: [], status: [], expiry: [], labels: [], note: [], depleted: [], unheld: [] },
     // 품목별 탭 전용 — 개별 자산/수량 자산은 컬럼 구성·클릭 동작이 아예 달라서 한 테이블에 섞지 않고 토글로 구분
     productType: "individual",
@@ -524,6 +533,85 @@
     });
   }
 
+  // 7-3: 렌더링 캐시 대신 행을 여는 시점의 데이터로 현재 관계·삭제·소분류 조회 범위를 확인한다.
+  // 실제 연동에서는 구성원 ID와 최신 API 응답을 사용한다. 통신 실패를 관계 없음으로 취급하지 않는다.
+  function currentMemberItems(name) {
+    return viewableAssets().flatMap(asset => {
+      const relations = asset.type === "individual" ? asset.assignments || [] : asset.stocks || [];
+      return relations.filter(relation => relation.employee === name).map(relation => ({
+        sub: asset.sub, qty: asset.type === "individual" ? 1 : relation.qty, asset,
+      }));
+    });
+  }
+
+  function openMemberUnavailableModal() {
+    const back = modal(`
+      <div class="modal sm" role="dialog" aria-modal="true" aria-describedby="member-unavailable-body">
+        <div class="body" id="member-unavailable-body">설정이 변경되었습니다. 잠시 후 다시 시도해주세요.</div>
+        <div class="foot"><button type="button" class="btn primary" data-member-refresh>확인</button></div>
+      </div>`, { closeOnBackdrop: false });
+    const confirm = back.querySelector("[data-member-refresh]");
+    // 헤더·X·취소는 두지 않는다. 모달을 여는 시점에는 목록/건수를 갱신하지 않고 확인 후에만 갱신한다.
+    back.addEventListener("keydown", event => {
+      if (event.key === "Escape" || event.key === "Tab") {
+        event.preventDefault();
+        confirm.focus();
+      }
+    });
+    confirm.onclick = () => {
+      back.remove();
+      state.view = "employee";
+      state.search = "";
+      state.filters = emptyFilters();
+      state.sort = { key: "name", dir: "asc" };
+      state.pageSize = 20;
+      state.page = 1;
+      // 구성원 공통 필터 실제 연동 시 초안·적용값도 리더 포함/퇴사자 제외 기본값으로 초기화한다.
+      render();
+    };
+    confirm.focus();
+  }
+
+  function simulateMemberChange(name, items) {
+    if (!memberQaPending) return;
+    memberQaPending = false;
+    if (memberQaScenario === "scope") {
+      items.forEach(item => memberQaHiddenCategories.add(JSON.stringify([item.asset.group, item.asset.sub])));
+      return;
+    }
+    const retainedAsset = memberQaScenario === "partial" ? items[0]?.asset : null;
+    assets.forEach(asset => {
+      if (asset === retainedAsset) return;
+      const field = asset.type === "individual" ? "assignments" : "stocks";
+      asset[field] = (asset[field] || []).filter(relation => relation.employee !== name);
+      if (!asset[field].length && (asset.status === "assigned" || asset.status === "held")) asset.status = "stock";
+    });
+  }
+
+  function mountMemberQaPanel() {
+    if (!memberQaEnabled || document.getElementById("member-unavailable-qa")) return;
+    const panel = document.createElement("aside");
+    panel.id = "member-unavailable-qa";
+    panel.className = "permission-qa-panel";
+    panel.setAttribute("aria-label", "구성원별 7-3 QA");
+    const scenarios = [["relation", "배정·보유 관계 종료"], ["scope", "조회 범위 변경"], ["partial", "일부 관계 유지"]];
+    panel.innerHTML = `<div class="permission-qa-head"><strong>구성원별 7-3 QA</strong><button type="button" aria-label="QA 종료">×</button></div>
+      <p style="margin:0 0 8px">구성원 행을 눌러 확인하세요.</p>
+      <div class="permission-qa-actions">${scenarios.map(([key, label]) => `<button type="button" data-member-scenario="${key}" aria-pressed="${key === memberQaScenario}">${label}</button>`).join("")}</div>`;
+    panel.querySelectorAll("[data-member-scenario]").forEach(button => button.onclick = () => {
+      const url = new URL(location.href);
+      url.searchParams.set("scenario", button.dataset.memberScenario);
+      location.href = url.toString();
+    });
+    panel.querySelector("[aria-label='QA 종료']").onclick = () => {
+      const url = new URL(location.href);
+      url.searchParams.delete("qa");
+      url.searchParams.delete("scenario");
+      location.href = url.toString();
+    };
+    document.body.appendChild(panel);
+  }
+
   function view_employee(list) {
     const map = new Map();
     list.forEach(a => {
@@ -686,7 +774,8 @@
     // 조회 범위가 없으면 입력 조건과 무관하게 조회 불가 빈 상태를 우선한다.
     const filtering = activeFilterCount() > 0 || !!state.search.trim();
     const emptyMsg = !hasViewScope() ? "조회 가능한 자산이 없습니다."
-      : filtering ? "결과가 없습니다." : "등록된 자산이 없습니다.";
+      : filtering ? "결과가 없습니다."
+      : state.view === "employee" ? "표시할 목록이 없습니다." : "등록된 자산이 없습니다.";
     const colspan = state.view === "product" ? (state.productType === "quantity" ? 7 : 8)
       : state.view === "employee" ? 4 : state.view === "worksite" ? 3 : (canManageAssets() ? 11 : 10);
     const empty = `<tr><td colspan="${colspan}" style="text-align:center;color:var(--text-mut);padding:32px">${emptyMsg}</td></tr>`;
@@ -785,6 +874,7 @@
   }
 
   function render() {
+    mountMemberQaPanel();
     // 다른 화면(자산 삭제 등)에서 이동해온 직후 띄울 토스트 — sessionStorage에 있으면 최초 1회만 소비
     const pendingToast = sessionStorage.getItem("pendingToast");
     if (pendingToast) { sessionStorage.removeItem("pendingToast"); toast(pendingToast); }
@@ -876,7 +966,11 @@
     // (구성원=프로필+이름+그룹, memberIdentity() 재사용 / 근무지=근무지명+코드)
     c.querySelectorAll("tbody tr[data-mkey]").forEach(tr => tr.onclick = () => {
       const r = memberRowsByName.get(tr.dataset.mkey);
-      if (r) openAssignedAssetsModal(`<div class="acard-id">${memberIdentity(r.name)}</div>`, r.items);
+      if (!r) return;
+      simulateMemberChange(r.name, r.items);
+      const items = currentMemberItems(r.name);
+      if (!items.length) { openMemberUnavailableModal(); return; }
+      openAssignedAssetsModal(`<div class="acard-id">${memberIdentity(r.name)}</div>`, items);
     });
     c.querySelectorAll("tbody tr[data-wkey]").forEach(tr => tr.onclick = () => {
       const r = worksiteRowsByName.get(tr.dataset.wkey);
@@ -2233,11 +2327,11 @@
   }
 
   /* ---------- other modals ---------- */
-  function modal(html) {
+  function modal(html, { closeOnBackdrop = true } = {}) {
     const back = document.createElement("div");
     back.className = "modal-back";
     back.innerHTML = html;
-    back.addEventListener("click", e => { if (e.target === back) back.remove(); });
+    back.addEventListener("click", e => { if (closeOnBackdrop && e.target === back) back.remove(); });
     back.querySelectorAll("[data-close]").forEach(b => b.onclick = () => back.remove());
     document.body.appendChild(back);
     return back;
