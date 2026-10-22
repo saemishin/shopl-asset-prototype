@@ -484,9 +484,6 @@ thead th {
   text-align: left; padding: 10px 12px; background: #fafbfc; color: var(--text-sub);
   font-weight: 600; border-bottom: 1px solid var(--line); white-space: nowrap;
 }
-.th-filter { cursor: pointer; user-select: none; }
-.th-filter:hover { color: var(--text); }
-.th-filter.active { color: var(--primary); }
 .th-caret { width: 10px; height: 10px; vertical-align: -1px; margin-left: 2px; opacity: .6; }
 tbody td { padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: middle; }
 tbody tr:last-child td { border-bottom: none; }

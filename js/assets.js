@@ -305,7 +305,7 @@
     });
   }
   function emptyFilters() {
-    // depleted(소진)·unheld(미보유대상)는 상태값이 아니라 파생 조건이라 상태 필터 모달·헤더 필터엔
+    // depleted(소진)·unheld(미보유대상)는 상태값이 아니라 파생 조건이라 상태 필터 모달엔
     // 없음 — 전체 탭 통계 "수량 자산 요약" 카드 클릭으로만 켜고 끔
     return { category: [], type: [], status: [], expiry: [], labels: [], note: [], depleted: [], unheld: [] };
   }
@@ -347,47 +347,16 @@
     return arr.slice(start, start + state.pageSize);
   }
 
-  /* ---------- header filters ---------- */
+  // 정렬 메뉴의 펼침 아이콘. 2026-10-22: 테이블 헤더 필터는 제거하고 필터 팝업으로 통일한다.
   const CARET = `<svg class="th-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>`;
-  function thFilter(label, key, cls = "") {
-    const on = (state.filters[key] || []).length ? " active" : "";
-    return `<th class="th-filter${on} ${cls}" data-hf="${key}">${label}${CARET}</th>`;
-  }
-  function headerOptions(key) {
-    if (key === "type") return Object.entries(TYPE_LABEL).map(([v, l]) => ({ v, l }));
-    if (key === "status") return STATUS_ORDER.map(v => ({ v, l: STATUS_LABEL[v][0] }));
-    if (key === "expiry") return Object.entries(EXP_LABEL).map(([v, l]) => ({ v, l }));
-    if (key === "note") return [{ v: "has", l: "있음" }, { v: "none", l: "없음" }];
-  }
-  function openHeaderFilter(anchor, key) {
-    document.querySelectorAll(".dropdown-menu").forEach(m => m.remove());
-    const cur = (state.filters[key] || [])[0] || "";
-    const opts = headerOptions(key);
-    const menu = document.createElement("div");
-    menu.className = "dropdown-menu";
-    menu.innerHTML = opts.map(o => `<button data-v="${o.v}" class="${cur === o.v ? "active" : ""}">${o.l}</button>`).join("");
-    const r = anchor.getBoundingClientRect();
-    menu.style.cssText = `position:fixed;top:${r.bottom + 4}px;left:${r.left}px;min-width:${Math.max(r.width, 120)}px`;
-    document.body.appendChild(menu);
-    menu.querySelectorAll("button").forEach(b => b.onclick = () => {
-      menu.remove();
-      state.filters[key] = b.dataset.v ? [b.dataset.v] : [];
-      state.page = 1;
-      render();
-    });
-    setTimeout(() => {
-      const close = e => { if (!menu.contains(e.target)) { menu.remove(); document.removeEventListener("click", close); } };
-      document.addEventListener("click", close);
-    });
-  }
 
   /* ---------- views ---------- */
   function view_all(list) {
     const canDelete = canManageAssets();
     const head = `<tr>
       ${canDelete ? `<th class="td-check"><input type="checkbox" data-check-all aria-label="전체 선택"></th>` : ""}
-      ${thFilter("자산 유형", "type")}<th>분류</th><th>품목명</th><th>고유관리번호</th>${thFilter("상태", "status")}
-      <th>배정·보유 현황</th>${thFilter("유효기한", "expiry")}<th>태그</th>${thFilter("메모", "note", "c")}<th>등록일</th></tr>`;
+      <th>자산 유형</th><th>분류</th><th>품목명</th><th>고유관리번호</th><th>상태</th>
+      <th>배정·보유 현황</th><th>유효기한</th><th>태그</th><th class="c">메모</th><th>등록일</th></tr>`;
     const rows = pageSlice(sortList(list)).map(a => {
       const st = `<span class="badge ${STATUS_LABEL[a.status][1]}">${STATUS_LABEL[a.status][0]}</span>`;
       return `<tr class="clickable" data-id="${a.id}">
@@ -828,7 +797,7 @@
     selected.clear();
     const c = document.getElementById("content");
     const v = currentView();
-    // 품목별은 필터 범위가 분류 하나뿐(자산 유형은 헤더 필터로 별도 제공)이라 뱃지 카운트도 그 하나만 봄
+    // 품목별은 필터 범위가 분류 하나뿐(자산 유형은 목록 위 유형 선택으로 별도 제공)이라 뱃지 카운트도 그 하나만 봄
     const nAct = state.view === "product" ? state.filters.category.length : activeFilterCount();
     c.innerHTML = `
       <div class="tabs">
@@ -946,9 +915,6 @@
       state.page = 1;
       render();
     };
-
-    c.querySelectorAll(".th-filter").forEach(th =>
-      th.onclick = () => openHeaderFilter(th, th.dataset.hf));
 
     c.querySelectorAll(".pager button[data-page]").forEach(b =>
       b.onclick = () => { state.page = +b.dataset.page; render(); });
@@ -2065,7 +2031,7 @@
     drawOpts();
   }
 
-  // 품목별 전용 필터 — 이 뷰는 분류 하나만 필터로 의미가 있어서(자산 유형은 헤더 필터로 커버),
+  // 품목별 전용 필터 — 이 뷰는 분류 하나만 필터로 의미가 있어서(자산 유형은 목록 위 유형 선택으로 구분),
   // 6개 그룹짜리 필터 모달 대신 분류 그룹 하나만 떼어낸 가벼운 팝업으로 제공
   function openCategoryFilterModal() {
     const draft = [...state.filters.category];
