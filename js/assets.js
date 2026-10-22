@@ -2063,6 +2063,22 @@
       return out;
     }
 
+    // 선택한 유형에 조회 가능한 소분류가 하나도 없으면 검색·전체·초기화·목록 없이 빈 상태 안내만 두고 [적용]을 비활성화한다.
+    if (!groups.size) {
+      const emptyBack = modal(`
+        <div class="modal">
+          <h3>분류</h3>
+          <div class="body">
+            <p class="muted" style="padding:24px 2px;text-align:center">표시할 목록이 없습니다.</p>
+          </div>
+          <div class="foot">
+            <button class="btn" data-close>취소</button>
+            <button class="btn primary" id="cf-apply" disabled>적용</button>
+          </div>
+        </div>`);
+      return emptyBack;
+    }
+
     const back = modal(`
       <div class="modal">
         <h3>분류</h3>
