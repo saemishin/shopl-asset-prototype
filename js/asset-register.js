@@ -73,7 +73,6 @@
           </div>
           <p class="field-err" data-tm-add-err hidden>동일한 명칭이 존재합니다.</p>
           <div class="tag-manage-list" data-tm-list style="margin-top:14px"></div>
-          <p class="field-err" data-tm-list-err hidden>동일한 명칭이 존재합니다.</p>
         </div>
         <div class="foot">
           <button type="button" class="btn" data-tm-cancel>취소</button>
@@ -83,7 +82,6 @@
     document.body.appendChild(back);
 
     const listEl = back.querySelector("[data-tm-list]");
-    const listErr = back.querySelector("[data-tm-list-err]");
     const addInput = back.querySelector("[data-tm-input]");
     const addBtn = back.querySelector("[data-tm-add]");
     const addErr = back.querySelector("[data-tm-add-err]");
@@ -111,20 +109,21 @@
         inp.classList.toggle("has-err", invalid);
         inp.setAttribute("aria-invalid", String(invalid));
         listEl.querySelector(`[data-tm-required="${inp.dataset.tmRename}"]`).hidden = !!name;
+        listEl.querySelector(`[data-tm-duplicate="${inp.dataset.tmRename}"]`).hidden = !name || !dups.has(name);
       });
-      listErr.hidden = dups.size === 0;
       const addDup = draft.some(t => normalizeTagName(t.name) === normalizeTagName(addInput.value));
       addInput.classList.toggle("has-err", !!normalizeTagName(addInput.value) && addDup);
       addErr.hidden = !(normalizeTagName(addInput.value) && addDup);
-      addBtn.disabled = !!normalizeTagName(addInput.value) && addDup;
+      addBtn.disabled = !normalizeTagName(addInput.value) || addDup;
       saveBtn.disabled = !isDirty() || dups.size > 0 || draft.some(t => !normalizeTagName(t.name));
     }
     function renderList() {
       listEl.innerHTML = draft.length ? draft.map((t, i) => `
         <div class="cat-manage-row">
           <div class="tag-manage-name-field">
-            <input type="text" class="cat-manage-name-input" data-tm-rename="${i}" value="${t.name}" maxlength="20" aria-describedby="tm-name-required-${i}">
+            <input type="text" class="cat-manage-name-input" data-tm-rename="${i}" value="${t.name}" maxlength="20" aria-describedby="tm-name-required-${i} tm-name-duplicate-${i}">
             <p class="field-err" id="tm-name-required-${i}" data-tm-required="${i}" hidden>명칭은 필수로 입력해야 합니다.</p>
+            <p class="field-err" id="tm-name-duplicate-${i}" data-tm-duplicate="${i}" hidden>동일한 명칭이 존재합니다.</p>
           </div>
           <div class="cat-manage-row-acts">
             <button type="button" class="cat-manage-icon" data-tm-del="${i}" aria-label="삭제"
@@ -217,6 +216,13 @@
       return m;
     }
     function renderList() {
+      const hasOptions = categories.length > 0;
+      searchInput.hidden = !hasOptions;
+      back.querySelector("[data-cp-apply]").disabled = !categories.some(c => `${c.group}|${c.sub}` === selected);
+      if (!hasOptions) {
+        listEl.innerHTML = '<p class="tag-manage-empty">표시할 목록이 없습니다.</p>';
+        return;
+      }
       const q = query.trim().toLowerCase();
       let html = "";
       groupsOf().forEach((subs, g) => {
@@ -239,7 +245,11 @@
     searchInput.addEventListener("input", () => { query = searchInput.value; renderList(); });
     back.querySelector("[data-cp-cancel]").onclick = () => back.remove();
     back.addEventListener("click", e => { if (e.target === back) back.remove(); });
-    back.querySelector("[data-cp-apply]").onclick = () => { back.remove(); onApply(selected); };
+    back.querySelector("[data-cp-apply]").onclick = () => {
+      if (back.querySelector("[data-cp-apply]").disabled) return;
+      back.remove();
+      onApply(selected);
+    };
 
     return back;
   }
@@ -1206,4 +1216,63 @@
 
     return back;
   };
+})();
+
+/* 자산 추가 상태 확인 도구. 원본 화면을 복제하지 않고 ?qa=asset-add에서만 동작한다.
+   회사 데이터·태그 마스터의 빈 상태는 이 탭의 메모리에서만 재현한다. */
+(function () {
+  const params = new URLSearchParams(location.search);
+  if (params.get("qa") !== "asset-add") return;
+  const scenarios = [
+    ["default", "기본 입력"],
+    ["empty-category", "분류 없음"],
+    ["empty-tags", "태그 없음"],
+    ["tag-duplicate", "태그 수정 중복"],
+  ];
+  const scenario = scenarios.some(([key]) => key === params.get("scenario")) ? params.get("scenario") : "default";
+  if (scenario === "empty-category") {
+    window.DATA.categories = [];
+    window.DATA.assets = [];
+    window.DATA.emptyGroups = [];
+  } else if (scenario === "empty-tags") {
+    window.DATA.tags = [];
+    window.DATA.assets.forEach(asset => { asset.labels = []; });
+  }
+  function mount() {
+    const panel = document.createElement("aside");
+    panel.className = "permission-qa-panel";
+    panel.setAttribute("aria-label", "자산 추가 QA 시나리오");
+    panel.innerHTML = `<div class="permission-qa-head"><strong>자산 추가 QA</strong><button type="button" data-register-qa-close aria-label="QA 종료">×</button></div>
+      <div class="permission-qa-actions">${scenarios.map(([key, label]) => `<button type="button" data-register-scenario="${key}" aria-pressed="${key === scenario}">${label}</button>`).join("")}</div>`;
+    document.body.appendChild(panel);
+    panel.querySelectorAll("[data-register-scenario]").forEach(button => {
+      button.onclick = () => {
+        const next = new URL(location.href);
+        next.searchParams.set("scenario", button.dataset.registerScenario);
+        location.href = next.toString();
+      };
+    });
+    panel.querySelector("[data-register-qa-close]").onclick = () => {
+      const next = new URL(location.href);
+      next.searchParams.delete("qa");
+      next.searchParams.delete("scenario");
+      location.href = next.toString();
+    };
+    const cat = window.DATA.categories[0];
+    const parent = window.openAssetAddModal(cat ? { group: cat.group, sub: cat.sub } : {});
+    if (!parent) return;
+    if (scenario === "empty-category") parent.querySelector("#areg-catwrap").click();
+    if (scenario === "empty-tags" || scenario === "tag-duplicate") {
+      parent.querySelector("#areg-tag-manage").click();
+      if (scenario === "tag-duplicate") {
+        const inputs = document.querySelectorAll("[data-tm-rename]");
+        if (inputs.length >= 2) {
+          inputs[1].value = inputs[0].value;
+          inputs[1].dispatchEvent(new Event("input", { bubbles: true }));
+        }
+      }
+    }
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", mount, { once: true });
+  else mount();
 })();
