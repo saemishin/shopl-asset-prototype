@@ -1819,6 +1819,8 @@
     const cancel = () => { clearTimeout(bulkAnalyzeTimer); bulkAnalyzeTimer = null; back.remove(); };
     back.querySelector("[data-close]").onclick = cancel;
     document.body.appendChild(back);
+    // 캡처용(?hold=loading): 분석 중 모달을 자동으로 닫지 않고 [×]를 누를 때까지 유지한다.
+    if (new URLSearchParams(location.search).get("hold") === "loading") return;
     bulkAnalyzeTimer = setTimeout(() => {
       targets.forEach(group => {
         const groupIndex = bulkRegister.groups.findIndex(item => item.id === group.id);
