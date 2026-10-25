@@ -1596,7 +1596,7 @@
       return result && (bulkResultHasError(result, group.id) || bulkRegister.dirtyGroups.has(group.id));
     }).length;
     return `<section class="bulk-results-card">
-      <div class="bulk-results-head"><div><h3>업로드한 자산</h3><p>전체 ${bulkRegister.groups.length}</p></div><div class="bulk-results-actions"><button type="button" class="btn" data-reset-analysis>분석 결과 초기화</button><label class="bulk-errors-toggle"><span>오류라인만 보기${errorCount ? ` (${errorCount})` : ""}</span><input type="checkbox" data-errors-only ${bulkRegister.errorsOnly ? "checked" : ""}><i aria-hidden="true"></i></label></div></div>
+      <div class="bulk-results-head"><div><h3>업로드한 자산</h3><p>전체 ${bulkRegister.groups.length}</p></div><div class="bulk-results-actions"><label class="bulk-errors-toggle"><span>오류라인만 보기${errorCount ? ` (${errorCount})` : ""}</span><input type="checkbox" data-errors-only ${bulkRegister.errorsOnly ? "checked" : ""}><i aria-hidden="true"></i></label></div></div>
       <div class="bulk-results-table-wrap"><table class="bulk-results-table"><thead><tr>${columns.map(label => `<th>${label}</th>`).join("")}</tr></thead><tbody>${rows || `<tr><td colspan="${columns.length}" class="bulk-no-errors">오류가 없습니다.</td></tr>`}</tbody></table></div>
     </section>`;
   }
@@ -1632,7 +1632,7 @@
       <span class="bulk-step-label">STEP 2</span><div class="bulk-ai-title"><div><h3>파일 선택</h3><p>사진을 자산별로 묶은 뒤 AI 분석을 적용해 주세요. AI가 입력한 값을 확인하고 필요한 내용을 수정해서 등록할 수 있습니다.</p></div></div>
       ${selected ? `<div class="bulk-ai-toolbar"><span>${selected}장 선택</span><button type="button" data-clear-photo-selection>선택 해제</button></div>` : ""}
       <div class="bulk-ai-drop" data-ai-drop>${groupCards || '<div class="bulk-ai-empty"><b>자산 사진을 추가해 주세요.</b><span>사진을 한 번에 여러 장 선택할 수 있으며, 처음에는 사진 1장당 자산 그룹 1개로 추가됩니다.</span></div>'}</div>
-      <div class="bulk-panel-actions">${new URLSearchParams(location.search).get("qa") === "bulk-ai" ? '<button class="btn" type="button" data-add-qa-photos>샘플 사진 3장 추가</button>' : ""}<label class="btn"><input type="file" accept="image/jpeg,image/png" multiple data-global-photo hidden>사진 추가</label><button class="btn primary" type="button" data-analyze ${canApply ? "" : "disabled"}>적용</button></div>
+      <div class="bulk-panel-actions">${new URLSearchParams(location.search).get("qa") === "bulk-ai" ? '<button class="btn" type="button" data-add-qa-photos>샘플 사진 3장 추가</button>' : ""}<label class="btn"><input type="file" accept="image/jpeg,image/png" multiple data-global-photo hidden>사진 추가</label>${bulkRegister.results.size ? `<button type="button" class="btn" data-reset-analysis>분석 결과 초기화</button>` : ""}<button class="btn primary" type="button" data-analyze ${canApply ? "" : "disabled"}>적용</button></div>
     </div>`;
   }
 
