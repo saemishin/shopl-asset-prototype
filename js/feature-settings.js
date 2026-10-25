@@ -7,7 +7,10 @@
   const ASSET_MGMT_FLAG_KEY = "shopl_proto_assetMgmtUse";
   // 회사 사용값과 최소 요금제는 별개. 신규/출시 시 기존 Pro 이상은 최초 ON, 이후 저장한 OFF는 보존.
   const COMPANY_PLAN_KEY = "shopl_proto_companyPlan";
-  function assetPlanEligible() { return ["Pro", "Enterprise", "Trial"].includes(localStorage.getItem(COMPANY_PLAN_KEY) || "Enterprise"); }
+  // 캡처용(?plan=Standard 등): 이 화면에서만 회사 요금제를 바꿔 보여준다. 저장값은 바꾸지 않아 다른 화면에는 영향이 없다.
+  const QA_PLAN = new URLSearchParams(location.search).get("plan");
+  function companyPlan() { return QA_PLAN || localStorage.getItem(COMPANY_PLAN_KEY) || "Enterprise"; }
+  function assetPlanEligible() { return ["Pro", "Enterprise", "Trial"].includes(companyPlan()); }
   function assetMgmtOn() { return assetPlanEligible() && localStorage.getItem(ASSET_MGMT_FLAG_KEY) !== "0"; }
   function setAssetMgmtOn(v) { localStorage.setItem(ASSET_MGMT_FLAG_KEY, v ? "1" : "0"); }
 
@@ -58,6 +61,26 @@
     cb.querySelector("[data-goto-settings]").onclick = () => { location.href = "settings.html"; };
     document.body.appendChild(cb);
   }
+  // 요금제 미충족 시 토글 — 실 대시보드 공통 PaymentPlanUpgradeModal 구조(본문 제목+안내, 하단 [업그레이드 →] 하나, 바깥 클릭 닫힘).
+  // 프로토타입엔 결제 화면이 없어 [업그레이드]는 모달만 닫는다.
+  function openUpgradeModal() {
+    const cb = document.createElement("div");
+    cb.className = "modal-back";
+    cb.style.zIndex = 340;
+    cb.innerHTML = `
+      <div class="modal" style="width:380px">
+        <div class="body" style="padding-top:24px">
+          <p style="font-size:16px;font-weight:700;margin-bottom:24px">Pro 요금제부터 사용할 수 있습니다.</p>
+          <p class="hint" style="margin-top:0">자산 관리 기능을 사용하려면 요금제를 업그레이드해주세요.</p>
+        </div>
+        <div class="foot">
+          <button class="btn primary" data-cok>업그레이드 →</button>
+        </div>
+      </div>`;
+    cb.addEventListener("click", e => { if (e.target === cb) cb.remove(); });
+    cb.querySelector("[data-cok]").onclick = () => cb.remove();
+    document.body.appendChild(cb);
+  }
   const HELP_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 0 1 4.6-1.4c.6.9.3 1.7-.4 2.3-.7.6-1.2 1-1.2 2.1"/><path d="M12 17h.01"/></svg>`;
 
   const TABS = [
@@ -68,7 +91,7 @@
     { key: "mgmt", label: "관리" },
   ];
 
-  function cardHtml({ icon, color, title, help, detail, desc }, isOn, extraAttrs) {
+  function cardHtml({ icon, color, title, help, detail, planBadge, desc }, isOn, extraAttrs) {
     return `
       <div class="ufs-row"${extraAttrs || ""}>
         <div class="ufs-illust" style="background:${color}"><span>${icon}</span></div>
@@ -76,7 +99,8 @@
           <div class="ufs-title-row">
             <span class="ufs-title">${title}</span>
             ${help ? `<button type="button" class="ufs-help" data-tip="도움말" aria-label="도움말">${HELP_ICON}</button>` : ""}
-            ${detail ? `<button type="button" class="ufs-detail" data-detail>상세 설정 ↗</button>` : ""}
+            ${planBadge ? `<span class="ufs-plan-badge">${planBadge}</span>`
+              : detail ? `<button type="button" class="ufs-detail" data-detail>상세 설정 ↗</button>` : ""}
           </div>
           <ul class="ufs-desc">${desc.map(d => `<li>${d}</li>`).join("")}</ul>
         </div>
@@ -93,6 +117,7 @@
         const on = assetMgmtOn();
         return cardHtml({
           icon: "📦", color: "#eaf1ff", title: "자산 관리", help: false, detail: true,
+          planBadge: assetPlanEligible() ? "" : "Pro",
           desc: [
             "회사가 보유한 자산을 등록하고 배정·보유 현황을 관리하는 기능입니다.",
             "자산을 유형별로 분류하고, 구성원·근무지에 배정하거나 상태를 관리할 수 있습니다.",
@@ -116,7 +141,7 @@
       if (assetRow) {
         assetRow.querySelector("[data-toggle]").onclick = () => {
           if (!assetPlanEligible()) {
-            confirmModal("Pro 요금제부터 사용할 수 있습니다.", "자산 관리 기능을 사용하려면 요금제를 업그레이드해주세요.", () => {});
+            openUpgradeModal();
             return;
           }
           const on = assetMgmtOn();
@@ -139,7 +164,8 @@
             });
           }
         };
-        assetRow.querySelector("[data-detail]").onclick = () => { location.href = "settings.html"; };
+        const detailBtn = assetRow.querySelector("[data-detail]");
+        if (detailBtn) detailBtn.onclick = () => { location.href = "settings.html"; };
       }
     }
     draw();

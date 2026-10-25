@@ -1516,6 +1516,8 @@ button.dthumb:hover { filter: brightness(0.94); }
   border-radius: 6px; padding: 3px 8px;
 }
 .ufs-detail:hover { background: #f7f8f9; color: var(--text); }
+/* 요금제 미충족 시 [상세 설정] 대신 노출하는 필요 요금제 배지(실 RatePlanBadge의 PRO 색: shopl100 바탕·shopl300 글자) */
+.ufs-plan-badge { margin-left: 4px; font-size: 11.5px; line-height: 1; padding: 4px 6px; border-radius: 4px; background: #eaf1ff; color: #2f6bff; }
 .ufs-desc { font-size: 12.5px; color: var(--text-sub); line-height: 1.6; padding-left: 16px; }
 .ufs-desc li { list-style: disc; }
 .ufs-switch { flex-shrink: 0; }
