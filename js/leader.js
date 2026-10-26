@@ -435,12 +435,11 @@
     if (date.getFullYear() !== y || date.getMonth() !== m - 1 || date.getDate() !== day) return null;
     return `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6)}`;
   }
+  // 유효기한은 앱에서 숫자 직접 입력 대신 일 단위 캘린더 시트로 선택한다(2026-10-26). 선택 방식이라 형식·날짜
+  // 오류가 생기지 않으며, 값은 기존 저장 경로를 그대로 쓰도록 "YYYY.MM.DD"로 보관한다.
   function addExpiryFieldHtml(draft) {
-    const showError = draft.expiryTouched && parseAddExpiry(draft.expiry) === null;
-    return `<div class="mapp-add-field"><label for="mapp-add-expiry">유효기한</label>
-      <input id="mapp-add-expiry" data-add-field="expiry" type="text" inputmode="numeric" maxlength="10" placeholder="입력" value="${esc(draft.expiry)}" class="${showError ? "has-err" : ""}" aria-describedby="mapp-add-expiry-hint mapp-add-expiry-error" aria-invalid="${!!showError}">
-      <p id="mapp-add-expiry-hint" class="hint mapp-add-expiry-hint">*8자리 입력 (YYYY.MM.DD)</p>
-      <p id="mapp-add-expiry-error" class="field-err" data-add-expiry-error${showError ? "" : " hidden"}>유효한 날짜가 아닙니다.</p></div>`;
+    const value = draft.expiry || "";
+    return `<div class="mapp-add-field"><label>유효기한</label><button type="button" class="mapp-add-date${value ? " selected" : ""}" data-add-date="expiry" data-add-date-mode="day"><span>${value || "선택"}</span>${CAL_ICON}</button></div>`;
   }
   // 수량형만 동일 소분류의 품목명 중복을 차단한다. 대소문자는 저장 정책대로 구분한다.
   // 기존 자산 수정은 자기 자신을 제외하고, 소분류 이동 시에도 목적지의 중복을 검사한다.
@@ -531,7 +530,9 @@
   }
   function assetAddCategoryScreenHtml(draft) {
     // 자산 관리 권한은 분류·자산 CRUD 범위를 부여하므로 대시보드 등록 화면처럼 전체 소분류를 선택지로 제공한다.
-    const categories = window.DATA.categories.filter(cat => catViewPermission(cat) && (!draft.editingId || cat.type === assets.find(a => a.id === draft.editingId).type));
+    // ?qa=add-category-empty — 회사에 소분류가 하나도 없는 상태(Web_dc_13 Case 18-2)를 캡처하기 위한 QA 전용 분기
+    const categories = new URLSearchParams(location.search).get("qa") === "add-category-empty" ? []
+      : window.DATA.categories.filter(cat => catViewPermission(cat) && (!draft.editingId || cat.type === assets.find(a => a.id === draft.editingId).type));
     const groups = [];
     categories.forEach(cat => {
       let group = groups.find(g => g.name === cat.group);
@@ -1360,13 +1361,18 @@
   }
   // 날짜 선택 — 바텀시트 캘린더(2026-09-29, 텍스트 입력 필드에서 전환 — 구성원/근무지처럼 "선택"으로 제공).
   // 월 이동(‹/›)·오늘로 이동, 선택한 날짜는 파란 원 + 아래 텍스트로 표시. maxIso 초과 날짜는 비활성
-  function openDateSheet(initialIso, maxIso, onApply) {
-    const [by, bm] = (initialIso || maxIso).split("-").map(Number);
+  // maxIso가 없으면 상한 없이(유효기한) 연다. options.reset이면 기존 값이 있을 때 [초기화]로 값을 비운다.
+  // 상단 연월을 누르면 연도 선택으로 바뀌고, 연도를 고르면 같은 월의 달력으로 돌아온다(앱 공통 캘린더와 동일).
+  function openDateSheet(initialIso, maxIso, onApply, options = {}) {
+    const [by, bm] = (initialIso || maxIso || todayStr()).split("-").map(Number);
     let viewY = by, viewM = bm - 1;
-    let selected = initialIso || maxIso;
+    let selected = initialIso || maxIso || "";
+    let yearMode = false, yearStart = by - 3;
+    const maxY = maxIso ? Number(maxIso.slice(0, 4)) : Infinity;
     const back = mappOverlay("mapp-sheet-back", 110);
     back.innerHTML = `
       <div class="mapp-sheet">
+        ${options.reset && initialIso ? '<div class="mapp-add-month-reset"><button type="button" data-cal-reset>초기화</button></div>' : ""}
         <div class="mapp-sheet-body" data-cal-body style="padding-top:16px"></div>
         <div class="mapp-sheet-foot">
           <button type="button" class="btn" data-cal-cancel>취소</button>
@@ -1378,7 +1384,21 @@
     const WD = ["일", "월", "화", "수", "목", "금", "토"];
     const pad = n => String(n).padStart(2, "0");
     const isoOf = (y, m, d) => `${y}-${pad(m + 1)}-${pad(d)}`;
+    function drawYears() {
+      body.innerHTML = `
+        <div class="mapp-cal-head">
+          <button type="button" data-year-prev aria-label="이전 연도 목록">‹</button>
+          <span class="mapp-cal-ym">${yearStart} - ${yearStart + 11}</span>
+          <button type="button" data-year-next aria-label="다음 연도 목록"${yearStart + 12 > maxY ? " disabled" : ""}>›</button>
+        </div>
+        <div class="mapp-add-month-grid mapp-cal-year-grid">${Array.from({ length: 12 }, (_, i) => yearStart + i).map(y =>
+          `<button type="button" data-cal-year="${y}" class="${y === viewY ? "sel" : ""}"${y > maxY ? " disabled" : ""}><span>${y}</span></button>`).join("")}</div>`;
+      body.querySelector("[data-year-prev]").onclick = () => { yearStart -= 12; drawYears(); };
+      body.querySelector("[data-year-next]").onclick = () => { if (yearStart + 12 <= maxY) { yearStart += 12; drawYears(); } };
+      body.querySelectorAll("[data-cal-year]").forEach(b => b.onclick = () => { viewY = Number(b.dataset.calYear); yearMode = false; drawCal(); });
+    }
     function drawCal() {
+      if (yearMode) return drawYears();
       const startDow = new Date(viewY, viewM, 1).getDay();
       const daysInMonth = new Date(viewY, viewM + 1, 0).getDate();
       const cells = Array(startDow).fill(null).concat(Array.from({ length: daysInMonth }, (_, i) => i + 1));
@@ -1387,7 +1407,7 @@
       body.innerHTML = `
         <div class="mapp-cal-head">
           <button type="button" data-cal-prev aria-label="이전 달">‹</button>
-          <span class="mapp-cal-ym">${viewY}.${pad(viewM + 1)}</span>
+          <button type="button" class="mapp-cal-ym" data-cal-ym aria-label="연도 선택">${viewY}.${pad(viewM + 1)}</button>
           <button type="button" data-cal-next aria-label="다음 달">›</button>
           <button type="button" class="mapp-cal-today" data-cal-today>오늘</button>
         </div>
@@ -1398,9 +1418,10 @@
           const cls = ["mapp-cal-cell"];
           if (iso === selected) cls.push("sel");
           else if (iso === todayStr()) cls.push("today");
-          return `<button type="button" class="${cls.join(" ")}" data-cal-day="${iso}"${iso > maxIso ? " disabled" : ""}>${d}</button>`;
+          return `<button type="button" class="${cls.join(" ")}" data-cal-day="${iso}"${maxIso && iso > maxIso ? " disabled" : ""}>${d}</button>`;
         }).join("")).join("")}</div>
         <div class="mapp-cal-sel">${selected ? window.fmtDate(selected) : ""}</div>`;
+      body.querySelector("[data-cal-ym]").onclick = () => { yearMode = true; yearStart = viewY - 3; drawCal(); };
       body.querySelector("[data-cal-prev]").onclick = () => { viewM--; if (viewM < 0) { viewM = 11; viewY--; } drawCal(); };
       body.querySelector("[data-cal-next]").onclick = () => { viewM++; if (viewM > 11) { viewM = 0; viewY++; } drawCal(); };
       body.querySelector("[data-cal-today]").onclick = () => {
@@ -1413,6 +1434,8 @@
     drawCal();
     back.addEventListener("click", e => { if (e.target === back) back.remove(); });
     back.querySelector("[data-cal-cancel]").onclick = () => back.remove();
+    const calReset = back.querySelector("[data-cal-reset]");
+    if (calReset) calReset.onclick = () => { back.remove(); onApply(""); };
     okBtn.onclick = () => { if (!selected) return; back.remove(); onApply(selected); };
   }
 
@@ -2538,12 +2561,13 @@
           syncAddDraft();
           const key = button.dataset.addDate;
           const apply = value => {
-            draft[key] = value; updateAddValidity();
-            const shown = value ? (button.dataset.addDateMode === "month" ? value.replace("-", ".") : window.fmtDate(value)) : "선택";
+            draft[key] = key === "expiry" ? value.replaceAll("-", ".") : value; updateAddValidity();
+            const shown = value ? (button.dataset.addDateMode === "month" ? value.replace("-", ".") : value.replaceAll("-", ".")) : "선택";
             button.classList.toggle("selected", !!value);
             button.innerHTML = `<span>${shown}</span>${CAL_ICON}`;
           };
-          openAddMonthSheet(key === "manufactured" ? "제조연월" : "구매연월", draft[key], apply);
+          if (key === "expiry") openDateSheet(parseAddExpiry(draft.expiry) || "", null, apply, { reset: true });
+          else openAddMonthSheet(key === "manufactured" ? "제조연월" : "구매연월", draft[key], apply);
         });
         root.querySelectorAll("[data-add-photo-primary]").forEach(button => button.onclick = () => {
           syncAddDraft(); draft.primaryPhoto = +button.dataset.addPhotoPrimary; draw();

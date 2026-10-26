@@ -1626,6 +1626,9 @@ button.dthumb:hover { filter: brightness(0.94); }
 .mapp-cal-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
 .mapp-cal-head button[data-cal-prev], .mapp-cal-head button[data-cal-next] { width: 26px; height: 26px; font-size: 16px; color: var(--text-sub); }
 .mapp-cal-ym { flex: 1; text-align: center; font-size: 15px; font-weight: 700; }
+.mapp-cal-head button:disabled { opacity: .3; }
+.mapp-cal-year-grid button { height: 56px; font-size: 15px; }
+.mapp-cal-year-grid button span { width: 64px; height: 44px; border-radius: 22px; }
 .mapp-cal-today { font-size: 12.5px; color: var(--primary); font-weight: 600; }
 .mapp-cal-wd { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; font-size: 11.5px; color: var(--text-mut); margin-bottom: 4px; }
 .mapp-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); row-gap: 4px; }
