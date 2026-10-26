@@ -332,7 +332,8 @@
   // 허브 화면용 — 대시보드 분류 관리 화면의 트리와 동일하게, 자산 보유 여부와 무관하게 조회 권한을 가진
   // 소분류를 전부 대분류별로 묶어서 보여줌(2026-09-30 — 유형 칩 제거하면서 "허브는 순수 카테고리 트리"로 단순화).
   // 대분류만 있고 소분류가 아직 없는 경우(window.DATA.emptyGroups, data.js "비품" 샘플)도 대시보드와 동일하게
-  // 그 대분류는 노출하고 "소분류 없음"으로 표시(2026-09-30) — 소분류가 없어 권한 체크 대상 자체가 없으니 숨길 이유가 없음
+  // 그 대분류는 노출하고 "소분류 없음"으로 표시(2026-09-30). 정책 03 §5에 따라 자산 관리 권한자에게만 노출하고,
+  // 권한이 없으면 조회 가능한 소분류가 있는 대분류만 보여준다(2026-10-26).
   function categoryTree() {
     const order = [];
     const map = {};
@@ -341,7 +342,7 @@
       if (!map[c.group]) { map[c.group] = []; order.push(c.group); }
       map[c.group].push(c.sub);
     });
-    (window.DATA.emptyGroups || []).forEach(group => {
+    if (hasAssetManagePermission()) (window.DATA.emptyGroups || []).forEach(group => {
       if (!map[group]) { map[group] = []; order.push(group); }
     });
     return order.map(group => ({ group, subs: map[group] }));
