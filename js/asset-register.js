@@ -263,10 +263,12 @@
   }
 
   // 소분류 이동 트리 — 자산 수정에서 소분류를 바꿀 때 사용(자산 삭제와 마찬가지로 detail.js의 "···" 메뉴에
-  // 있던 "소분류 이동"을 여기 자산 수정 폼으로 흡수). 현재 소분류는 설명 없이 비활성화만(재배정 모달이 현재
-  // 대상을 그냥 빼는 것과 같은 원칙), 다른 자산 유형의 소분류는 구조설계안 6장 제약이라 비활성화+툴팁으로 안내
+  // 있던 "소분류 이동"을 여기 자산 수정 폼으로 흡수). 현재 소분류를 선택한 상태로 열고(Web_dc_22 16번), 자산
+  // 추가 분류 선택과 같은 검색(대분류명이 맞으면 그 대분류의 소분류 전체, 아니면 소분류명 부분 일치)을 제공한다.
+  // 다른 자산 유형의 소분류는 구조설계안 6장 제약이라 비활성화+툴팁으로 안내
   function openCategoryMoveModal(categories, currentGroup, currentSub, currentType, onApply) {
-    let picked = null;
+    let picked = { group: currentGroup, sub: currentSub };
+    let query = "";
     const groupMap = {}, order = [];
     categories.forEach(c => {
       if (!groupMap[c.group]) { groupMap[c.group] = []; order.push(c.group); }
@@ -279,40 +281,51 @@
     back.innerHTML = `
       <div class="modal picker-modal">
         <h3>분류</h3>
-        <div class="body" data-body></div>
+        <div class="body" style="display:flex;flex-direction:column;max-height:60vh">
+          <input type="text" class="picker-search" data-move-search placeholder="검색" autocomplete="off">
+          <div data-body style="flex:1;min-height:0;overflow-y:auto;margin-top:8px"></div>
+        </div>
         <div class="foot">
           <button type="button" class="btn" data-cancel>취소</button>
-          <button type="button" class="btn primary" data-apply disabled>적용</button>
+          <button type="button" class="btn primary" data-apply>적용</button>
         </div>
       </div>`;
     document.body.appendChild(back);
     const body = back.querySelector("[data-body]");
     const applyBtn = back.querySelector("[data-apply]");
+    const searchInput = back.querySelector("[data-move-search]");
 
     function draw() {
-      body.innerHTML = groups.map(g => `
+      const q = query.trim().toLowerCase();
+      const html = groups.map(g => {
+        const groupMatches = !q || g.group.toLowerCase().includes(q);
+        const subs = g.subs.filter(c => groupMatches || c.sub.toLowerCase().includes(q));
+        if (!subs.length) return "";
+        return `
         <div class="submove-group">
           <div class="submove-group-name">${g.group}</div>
-          ${g.subs.map(c => {
-            const isCurrent = c.group === currentGroup && c.sub === currentSub;
+          ${subs.map(c => {
             const isOtherType = c.type !== currentType;
-            const disabled = isCurrent || isOtherType;
-            const tip = !isCurrent && isOtherType ? "다른 자산 유형으로는 이동할 수 없습니다." : "";
+            const tip = isOtherType ? "다른 자산 유형으로는 이동할 수 없습니다." : "";
             const checked = picked && picked.group === g.group && picked.sub === c.sub;
             return `
-            <label class="radio-row${disabled ? " is-disabled" : ""}"${tip ? ` data-tip="${tip}"` : ""}>
-              <input type="radio" name="catmove" data-group="${g.group}" data-sub="${c.sub}"${disabled ? " disabled" : ""}${checked ? " checked" : ""}>
+            <label class="radio-row${isOtherType ? " is-disabled" : ""}"${tip ? ` data-tip="${tip}"` : ""}>
+              <input type="radio" name="catmove" data-group="${g.group}" data-sub="${c.sub}"${isOtherType ? " disabled" : ""}${checked ? " checked" : ""}>
               <span>${c.sub}</span>
             </label>`;
           }).join("")}
-        </div>`).join("");
+        </div>`;
+      }).join("");
+      body.innerHTML = html || '<p class="tag-manage-empty">결과가 없습니다.</p>';
       body.querySelectorAll('input[name="catmove"]').forEach(r => r.onchange = () => {
         picked = { group: r.dataset.group, sub: r.dataset.sub };
         applyBtn.disabled = false;
       });
+      applyBtn.disabled = !picked;
     }
     draw();
 
+    searchInput.addEventListener("input", () => { query = searchInput.value; draw(); });
     back.addEventListener("click", e => { if (e.target === back) back.remove(); });
     back.querySelector("[data-cancel]").onclick = () => back.remove();
     applyBtn.onclick = () => { if (!picked) return; back.remove(); onApply(picked); };
