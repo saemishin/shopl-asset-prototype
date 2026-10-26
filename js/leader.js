@@ -545,9 +545,12 @@
         <button type="button" class="mapp-add-category-close" data-add-category-close aria-label="닫기">×</button>
       </div>
       <div class="mapp-add-category-body">
-        <div data-add-category-list>${groups.map(group => `<section class="mapp-add-category-group" data-add-category-group>
-          <h2>${esc(group.name)}</h2>${group.items.map(cat => `<button type="button" data-add-category-pick="${esc(`${cat.group}|${cat.sub}`)}"><span>${esc(cat.sub)}</span></button>`).join("")}
+        ${groups.length ? `<div class="mapp-directory-search"><input type="search" data-add-category-search placeholder="검색" aria-label="분류 검색" autocomplete="off"></div>
+        <div data-add-category-list>${groups.map(group => `<section class="mapp-add-category-group" data-add-category-group data-group-name="${esc(group.name)}">
+          <h2>${esc(group.name)}</h2>${group.items.map(cat => `<button type="button" data-add-category-pick="${esc(`${cat.group}|${cat.sub}`)}" data-sub-name="${esc(cat.sub)}"><span>${esc(cat.sub)}</span></button>`).join("")}
         </section>`).join("")}</div>
+        <p class="mapp-ws-empty" data-add-category-empty hidden>결과가 없습니다.</p>`
+          : `<p class="mapp-ws-empty">표시할 목록이 없습니다.</p>`}
       </div>
       </div>`;
   }
@@ -2619,6 +2622,24 @@
       }
       if (state.screen === "asset-add-category") {
         root.querySelector("[data-add-category-close]").onclick = () => { state.screen = "asset-add"; draw(); };
+        // 대시보드 분류 선택(Web_dc_13 18번)과 같은 검색 — 대분류명·소분류명 부분 일치, 대소문자 무시,
+        // 대분류명이 맞으면 그 대분류의 소분류를 모두 표시(2026-10-26 앱·대시보드 검색 제공 통일)
+        const categorySearch = root.querySelector("[data-add-category-search]");
+        if (categorySearch) categorySearch.addEventListener("input", () => {
+          const q = categorySearch.value.trim().toLowerCase();
+          let shown = 0;
+          root.querySelectorAll("[data-add-category-group]").forEach(group => {
+            const groupMatches = !q || group.dataset.groupName.toLowerCase().includes(q);
+            let visible = 0;
+            group.querySelectorAll("[data-add-category-pick]").forEach(row => {
+              row.hidden = !(groupMatches || row.dataset.subName.toLowerCase().includes(q));
+              if (!row.hidden) visible++;
+            });
+            group.hidden = !visible;
+            shown += visible;
+          });
+          root.querySelector("[data-add-category-empty]").hidden = shown > 0;
+        });
         const rows = [...root.querySelectorAll("[data-add-category-pick]")];
         rows.forEach(row => row.onclick = () => {
           const previous = state.addDraft;
