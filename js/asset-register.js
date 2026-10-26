@@ -617,7 +617,8 @@
     function productOptions() {
       if (!catValue) return [];
       const cat = findCat(catValue);
-      if (!cat) return [];
+      // 개별형 소분류에서만 제안한다. 수량형은 기존 품목명을 고르면 곧바로 중복이라 제안하지 않는다(D-20261023-09).
+      if (!cat || cat.type !== "individual") return [];
       const q = nameInput.value.trim().toLowerCase();
       const names = [...new Set((window.DATA.assets || [])
         .filter(a => a.group === cat.group && a.sub === cat.sub)

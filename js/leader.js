@@ -443,6 +443,8 @@
   }
   // 수량형만 동일 소분류의 품목명 중복을 차단한다. 대소문자는 저장 정책대로 구분한다.
   // 기존 자산 수정은 자기 자신을 제외하고, 소분류 이동 시에도 목적지의 중복을 검사한다.
+  // 입력 중에는 검사하지 않고 [저장] 시점에 서버 검증을 흉내 내어 검사한다(D-20261024-01).
+  // 오류가 나면 그때의 소분류·품목명 조합을 draft.nameDupKey로 기억하고, 둘 중 하나가 바뀌면 오류를 해제한다.
   function quantityNameDup(draft) {
     const cat = addCategory(draft);
     const name = draft.product.trim();
@@ -451,7 +453,7 @@
   }
   function addDraftValid(draft) {
     const cat = addCategory(draft);
-    if (!cat || !catViewPermission(cat) || !draft.product.trim() || quantityNameDup(draft)) return false;
+    if (!cat || !catViewPermission(cat) || !draft.product.trim() || draft.nameDupKey) return false;
     if (!(cat.hiddenFields || []).includes("expiry") && parseAddExpiry(draft.expiry) === null) return false;
     if (draft.editingId) {
       const asset = assets.find(a => a.id === draft.editingId);
@@ -2452,7 +2454,8 @@
         function updateAddValidity() {
           syncAddDraft();
           const cat = addCategory(draft);
-          const nameDuplicate = quantityNameDup(draft);
+          if (draft.nameDupKey && draft.nameDupKey !== `${draft.category}|${draft.product.trim()}`) draft.nameDupKey = null;
+          const nameDuplicate = !!draft.nameDupKey;
           const nameInput = field("product");
           root.querySelector("[data-add-product-error]").hidden = !nameDuplicate;
           nameInput.classList.toggle("has-err", nameDuplicate);
@@ -2497,10 +2500,11 @@
         const expiryInput = field("expiry");
         if (expiryInput) expiryInput.addEventListener("blur", () => { draft.expiryTouched = true; updateAddValidity(); });
         // 품목명은 새 값 직접 입력을 허용하면서, 같은 분류의 기존 품목만 필드 아래 자체 메뉴로 제안한다.
+        // 제안은 개별형 소분류에서만 제공한다. 수량형은 기존 품목명을 고르면 곧바로 중복이라 제안하지 않는다(D-20261023-09).
         const productInput = field("product");
         const productMenu = root.querySelector("[data-add-product-menu]");
         const currentCat = addCategory(draft);
-        const productNames = currentCat ? [...new Set(assets.filter(asset => asset.group === currentCat.group && asset.sub === currentCat.sub).map(asset => asset.product).filter(Boolean))] : [];
+        const productNames = currentCat && currentCat.type === "individual" ? [...new Set(assets.filter(asset => asset.group === currentCat.group && asset.sub === currentCat.sub).map(asset => asset.product).filter(Boolean))] : [];
         function renderProductMenu() {
           const query = productInput.value.trim().toLowerCase();
           const options = query ? productNames.filter(name => name.toLowerCase().includes(query)) : productNames;
@@ -2593,6 +2597,7 @@
         if (save) save.onclick = () => {
           updateAddValidity();
           if (!addDraftValid(draft) || !editDirty(draft)) return;
+          if (quantityNameDup(draft)) { draft.nameDupKey = `${draft.category}|${draft.product.trim()}`; updateAddValidity(); return; }
           if (draft.editingId) {
             const asset = assets.find(a => a.id === draft.editingId);
             const moved = asset.group + "|" + asset.sub !== draft.category;
