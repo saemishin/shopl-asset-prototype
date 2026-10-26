@@ -17,8 +17,10 @@
   const ASSET_MGMT_FLAG_KEY = "shopl_proto_assetMgmtUse";
   const COMPANY_PLAN_KEY = "shopl_proto_companyPlan";
   const PLAN_RANK = { Lite: 0, Standard: 1, Pro: 2, Enterprise: 3, Trial: 2 };
+  // 캡처용(?plan=Standard 등): 대시보드 기능 설정과 같은 QA 파라미터. 저장값은 바꾸지 않고 이 페이지에서만 요금제를 바꿔 보여준다.
+  const QA_PLAN = new URLSearchParams(location.search).get("plan");
   function companyPlan() {
-    const plan = localStorage.getItem(COMPANY_PLAN_KEY) || "Enterprise";
+    const plan = QA_PLAN || localStorage.getItem(COMPANY_PLAN_KEY) || "Enterprise";
     return Object.hasOwn(PLAN_RANK, plan) ? plan : "Lite";
   }
   function planAllows(minimum) { return PLAN_RANK[companyPlan()] >= PLAN_RANK[minimum]; }
