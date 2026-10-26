@@ -769,7 +769,8 @@
       <div class="dfield">
         <input type="text" inputmode="numeric" data-dtext placeholder="YYYY.MM.DD" maxlength="10" value="${disp}">
         <span class="dfield-pick">${IC_CAL}<input type="date" data-dnative tabindex="-1"></span>
-      </div>`;
+      </div>
+      <p class="field-err" data-date-err hidden>유효한 날짜가 아닙니다.</p>`;
   }
   // scope 안의 .dfield를 마스킹·검증 로직과 연결하고, 유효한 값을 읽어오는 getter를 반환
   function wireDateField(scope, maxIso, onChange) {
@@ -787,12 +788,21 @@
       if (+y < curYear - 100 || +y > curYear) return null;       // 연도 범위
       if (+m < 1 || +m > 12) return null;                        // 월 범위
       if (+dd < 1 || +dd > 31) return null;                      // 일 범위
+      const dt = new Date(+y, +m - 1, +dd);                      // 실제 달력에 있는 날짜(2월 30일 등 제외)
+      if (dt.getMonth() !== +m - 1 || dt.getDate() !== +dd) return null;
       const iso = `${y}-${m}-${dd}`;
       return iso > maxIso ? null : iso;                          // 미래 날짜
     };
-    text.addEventListener("input", () => { text.value = format(digitsOf(text.value)); onChange(); });
+    // 오류 표시는 자산 추가 유효기한과 같은 기준(Web_dc_23 2-1): 입력·수정 중에는 숨기고, 포커스가 빠진 뒤에도
+    // 유효하지 않으면 필드 오류 테두리와 문구를 보여준다. 빈 값은 필수 미입력이라 [저장] 비활성만 적용한다.
+    const errEl = scope.querySelector("[data-date-err]");
+    const showError = on => { text.classList.toggle("has-err", on); if (errEl) errEl.hidden = !on; };
+    const checkError = () => showError(!!text.value && !getValue());
+    text.addEventListener("input", () => { text.value = format(digitsOf(text.value)); showError(false); onChange(); });
+    text.addEventListener("blur", checkError);
     native.addEventListener("change", () => {
       if (native.value) text.value = native.value.replace(/-/g, ".");
+      checkError();
       onChange();
     });
     return getValue;
