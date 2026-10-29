@@ -1687,6 +1687,7 @@
       if (!(qty !== null && qty >= 0 && qty <= stockChangeLimit(a, idx).max) || qty === cur) return;
       back.remove();
       confirmModal("수량을 변경하시겠습니까?", "", () => {
+        if(!canManage(a) || !a.stocks.includes(rec) || qty>stockChangeLimit(a,a.stocks.indexOf(rec)).max){toast("설정이 변경되었습니다. 잠시 후 다시 시도해주세요.");onDone();return;}
         rec.qty = qty;
         a.status = derivedHeldStatus(a);
         logActivity(a, { script: "보유 관리: 보유 수량 변경", target: rec, before: `${window.AssetQuantity.format(cur)}개`, after: `${window.AssetQuantity.format(qty)}개` });
@@ -1719,7 +1720,7 @@
     const error = back.querySelector("[data-deduct-error]");
     const save = back.querySelector("[data-cok]");
     let accepted = "";
-    const currentQty = () => a.stocks[idx] ? a.stocks[idx].qty : 0;
+    const currentQty = () => a.stocks.includes(rec) ? rec.qty : 0;
     const value = () => input.value ? window.AssetQuantity.parse(input.value) : null;
     const sync = () => { const v = value(); save.disabled = v === null || v < 1 || v > currentQty(); };
     input.addEventListener("beforeinput", e => {
@@ -1744,11 +1745,10 @@
       if (!(amount >= 1 && amount <= latest)) {
         error.hidden = true; sync(); toast("현재 보유 수량 이하로 입력해 주세요."); return;
       }
-      // Keep the quantity editor mounted until the final confirmation succeeds.
+      back.remove();
       confirmModal("수량을 변경하시겠습니까?", "", () => {
         if (!canManage(a) || !a.stocks.includes(rec) || amount > rec.qty) {
-          back.style.display = ""; held.textContent = `보유 수량: ${window.AssetQuantity.format(currentQty())}개`;
-          sync(); toast("현재 보유 수량 이하로 입력해 주세요."); return;
+          toast("현재 보유 수량 이하로 입력해 주세요."); onDone(); return;
         }
         const beforeHeld = rec.qty, beforeTotal = a.totalQty;
         back.remove();

@@ -754,7 +754,7 @@
     }
     p.querySelector(".picker-search").addEventListener("input", e => { query = e.target.value; renderList(); });
     renderList();
-    p.addEventListener("click", e => { if (e.target === p) p.remove(); });
+    // Selection modal: backdrop clicks do not dismiss.
     p.querySelector("[data-picker-close]").onclick = () => p.remove();
   }
   function openWorksitePickerPage(initial, onApply, exclude) {
@@ -794,7 +794,7 @@
     }
     p.querySelector(".picker-search").addEventListener("input", e => { query = e.target.value; renderList(); });
     renderList();
-    p.addEventListener("click", e => { if (e.target === p) p.remove(); });
+    // Selection modal: backdrop clicks do not dismiss.
     p.querySelector("[data-picker-close]").onclick = () => p.remove();
   }
   // 날짜 선택 — 바텀시트 캘린더(2026-09-29, 텍스트 입력 필드에서 전환 — 구성원/근무지처럼 "선택"으로 제공).
@@ -1108,6 +1108,7 @@
       if (!(qty !== null && qty >= 0 && qty <= stockChangeLimit(a, idx).max) || qty === cur) return;
       back.remove();
       confirmModal("수량을 변경하시겠습니까?", "", () => {
+        if(!canManage(a) || !a.stocks.includes(rec) || qty>stockChangeLimit(a,a.stocks.indexOf(rec)).max){toast("설정이 변경되었습니다. 잠시 후 다시 시도해주세요.");onDone();return;}
         rec.qty = qty;
         a.status = derivedHeldStatus(a);
         logActivity(a, { script: "보유 관리: 보유 수량 변경", target: rec, before: `${window.AssetQuantity.format(cur)}개`, after: `${window.AssetQuantity.format(qty)}개` });
@@ -1140,7 +1141,7 @@
     const error = back.querySelector("[data-deduct-error]");
     const save = back.querySelector("[data-cok]");
     let accepted = "";
-    const currentQty = () => a.stocks[idx] ? a.stocks[idx].qty : 0;
+    const currentQty = () => a.stocks.includes(rec) ? rec.qty : 0;
     const value = () => input.value ? window.AssetQuantity.parse(input.value) : null;
     const sync = () => { const v = value(); save.disabled = v === null || v < 1 || v > currentQty(); };
     input.addEventListener("beforeinput", e => {
@@ -1165,11 +1166,10 @@
       if (!(amount >= 1 && amount <= latest)) {
         error.hidden = true; sync(); toast("현재 보유 수량 이하로 입력해 주세요."); return;
       }
-      // Keep the quantity editor mounted until the final confirmation succeeds.
+      back.remove();
       confirmModal("수량을 변경하시겠습니까?", "", () => {
         if (!canManage(a) || !a.stocks.includes(rec) || amount > rec.qty) {
-          back.style.display = ""; held.textContent = `보유 수량: ${window.AssetQuantity.format(currentQty())}개`;
-          sync(); toast("현재 보유 수량 이하로 입력해 주세요."); return;
+          toast("현재 보유 수량 이하로 입력해 주세요."); onDone(); return;
         }
         const beforeHeld = rec.qty, beforeTotal = a.totalQty;
         back.remove();
@@ -1705,14 +1705,8 @@
     function draw() {
       const featureScreens = ["plan-features", "asset-feature"];
       if (featureScreens.includes(state.screen) && !canConfigureFeatures()) state.screen = "menu";
-      if (!["menu", "member-profile", "worksite-profile", ...featureScreens].includes(state.screen) && !assetMgmtEnabled()) {
-        // 회사 기능 OFF/요금제 미충족이면 이미 열려 있던 상세·편집 페이지도 접근을 차단한다.
-        const filterCancel = document.querySelector(".mapp-asset-filter [data-filter-cancel]");
-        if (filterCancel) filterCancel.click(); // 공용 필터의 포커스/스크롤 이벤트도 정상 해제.
-        document.querySelectorAll(".mapp-fullpage-back, .mapp-sheet-back, .mapp-viewer-back, .dropdown-menu, .modal-back").forEach(node => node.remove());
-        delete state.detailFrom;
-        state.screen = "menu";
-      }
+      // A profile refresh updates menu availability; open feature screens stay
+      // in place. Server rejection is handled as a failed action, not forced exit.
       // 배정/보유 변경 액션이 window.DATA.assets를 직접 mutate하므로, 목록은 렌더마다 새로 집계
       // (한 번만 계산해 두면 재배정·반납 등으로 바뀐 내용이 목록 화면에 반영되지 않음)
       const items = sortItems(collectMyItems(ME));
@@ -1898,7 +1892,8 @@
         const a = assets.find(x => x.id === state.detailAssetId);
         const q = root.querySelector("[data-history-q]");
         const list = root.querySelector("[data-history-list]");
-        if (q) q.addEventListener("input", () => { list.innerHTML = timelineHtml(a, q.value); });
+        if(q){q.value=a._prototypeHistoryQuery || "";list.innerHTML=timelineHtml(a,q.value);
+          q.addEventListener("input",()=>{a._prototypeHistoryQuery=q.value;list.innerHTML=timelineHtml(a,q.value);});}
       }
       const gotoAssets = root.querySelector('[data-mapp-goto="assets"]');
       if (gotoAssets) gotoAssets.onclick = () => { state.screen = "assets"; state.assetTab = "mine"; draw(); };

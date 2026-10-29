@@ -627,7 +627,8 @@
       const x = a.stocks[idx];
       pop.remove();
       confirmModal("수량을 변경하시겠습니까?", () => {
-        a.stocks[idx].qty = v;
+        if(!canManageAssets() || !a.stocks.includes(x) || v>stockChangeLimit(a,a.stocks.indexOf(x)).max){toast("설정이 변경되었습니다. 잠시 후 다시 시도해주세요.");render();return;}
+        x.qty = v;
         deriveQtyStatus(a);
         logActivity(a, { script: "보유 관리: 보유 수량 변경", target: x, before: `${window.AssetQuantity.format(cur)}개`, after: `${window.AssetQuantity.format(v)}개` });
         toast("수량이 변경되었습니다.");
@@ -645,6 +646,7 @@
   // 수량 차감은 선택 대상의 보유 수량과 자산 전체 수량을 같은 값만큼 함께 줄이고 잔여 수량은 유지한다.
   // 실제 저장 API도 두 수량과 활동 이력을 한 트랜잭션으로 반영하고, 저장 직전에 최신 보유 수량·권한을 재검증해야 한다.
   function openQtyDeductPopover(anchor, a, idx) {
+    const originalRecord=a.stocks[idx];
     document.querySelectorAll(".qty-popover").forEach(m => m.remove());
     const pop = document.createElement("div");
     pop.className = "qty-popover qty-deduct-popover";
@@ -668,7 +670,7 @@
     const held = pop.querySelector("[data-held-qty]");
     const error = pop.querySelector("[data-deduct-error]");
     let accepted = "";
-    const currentQty = () => a.stocks[idx] ? a.stocks[idx].qty : 0;
+    const currentQty = () => a.stocks.includes(originalRecord) ? originalRecord.qty : 0;
     const value = () => input.value ? window.AssetQuantity.parse(input.value) : null;
     const clearStaleError = () => { input.classList.remove("is-error"); error.hidden = true; };
     const sync = () => {
@@ -696,11 +698,11 @@
       if (!(amount >= 1 && amount <= latest)) {
         error.hidden = true; sync(); toast("현재 보유 수량 이하로 입력해 주세요."); return;
       }
-      const record = a.stocks[idx];
+      const record = originalRecord;
+      pop.remove();
       confirmModal("수량을 변경하시겠습니까?", () => {
         if (!canManageAssets() || !a.stocks.includes(record) || amount > record.qty) {
-          held.textContent = `보유 수량: ${window.AssetQuantity.format(currentQty())}개`;
-          sync(); toast("현재 보유 수량 이하로 입력해 주세요."); return;
+          toast("현재 보유 수량 이하로 입력해 주세요."); render(); return;
         }
         const beforeHeld = record.qty, beforeTotal = a.totalQty;
         pop.remove();
