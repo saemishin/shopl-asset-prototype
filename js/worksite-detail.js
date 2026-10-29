@@ -51,7 +51,7 @@
   }
   function assetSectionHtml(items) {
   window.__targetAssetItems=items;
-  return '<section class="target-assets"><h3>자산</h3><div data-target-tools></div><div data-target-table></div><div data-target-pager></div></section>';
+  return '<section class="target-assets" aria-label="배정 자산"><div data-target-tools></div><div data-target-table></div><div data-target-pager></div></section>';
 }
   function wireAssetSearch(c) {
   const host=c.querySelector('.target-assets');if(!host)return;
@@ -61,72 +61,24 @@
 
   function render() {
     const name = new URLSearchParams(location.search).get("name") || Object.keys(WS_CODE)[0],
-      items = collectItems(name),
-      c = document.getElementById("content"),
-      TABS = [{
-        key: "shift",
-        label: "근무"
-      }, {
-        key: "work",
-        label: "업무"
-      }, {
-        key: "info",
-        label: "정보"
-      }],
-      WORK_SUBTABS = [{
-        key: "tam",
-        label: "판매 목표"
-      }, {
-        key: "report",
-        label: "보고서",
-        dropdown: !0
-      }, {
-        key: "board",
-        label: "게시판",
-        dropdown: !0
-      }],
-      state = {
-        tab: "info",
-        subtab: "asset",
-        openDropdown: null
-      };
-    function bodyHtml(){return state.tab==='info'?assetSectionHtml(items):'<div class="mdetail-placeholder">이 항목은 자산관리 기능 스코프 밖입니다.</div>';}
-    function draw() {
-      c.innerHTML = `
-        <div class="detail-topbar"><a href="assets.html" class="backbtn" aria-label="뒤로">←</a></div>
-        <div class="mdetail-head">
-          <span class="mdetail-avatar ws">${AVATAR_WS_ICON}</span>
-          <div>
-            <h1>${name}</h1>
-            <div class="mdetail-sub">${WS_CODE[name] || '<span class="muted">—</span>'} · ${WS_ADDRESS[name] || '<span class="muted">주소 없음</span>'}</div>
-          </div>
-        </div>
-        <div class="mdetail-tabs">
-          ${TABS.map(t => `<button class="mdetail-tab ${state.tab === t.key ? "active" : ""}" data-tab="${t.key}">${t.label}</button>`).join("")}
-        </div>
-        ${state.tab === "work" ? `<div class="mdetail-panel">
-          <div class="mdetail-subtabs">
-            ${WORK_SUBTABS.map(t => t.dropdown ? `<span class="mdetail-subtab-wrap">
-                <button class="mdetail-subtab" data-dropdown="${t.key}">${t.label} <span class="bchev">▾</span></button>
-                ${state.openDropdown === t.key ? `<div class="mdetail-group-dropdown">
-                  ${WORK_GROUPS.map(g => `<button class="mdetail-group-item" data-group="${g}">${g}</button>`).join("")}
-                </div>` : ""}
-              </span>` : `<button class="mdetail-subtab ${state.subtab === t.key ? "active" : ""}" data-subtab="${t.key}">${t.label}</button>`).join("")}
-          </div>
-          <div class="mdetail-body">${bodyHtml()}</div>
-        </div>` : `<div class="mdetail-body">${bodyHtml()}</div>`}`, c.querySelectorAll("[data-tab]").forEach(b => b.onclick = () => {
-        state.tab = b.dataset.tab, state.tab === "work" && !state.subtab && (state.subtab = "todo"), state.openDropdown = null, draw();
-      }), c.querySelectorAll("[data-subtab]").forEach(b => b.onclick = () => {
-        state.subtab = b.dataset.subtab, state.openDropdown = null, draw();
-      }), c.querySelectorAll("[data-dropdown]").forEach(b => b.onclick = e => {
-        e.stopPropagation(), state.openDropdown = state.openDropdown === b.dataset.dropdown ? null : b.dataset.dropdown, draw();
-      }), c.querySelectorAll("[data-group]").forEach(b => b.onclick = e => {
-        e.stopPropagation(), toast(`"${b.dataset.group}" 그룹 선택 — 실제 이동은 이 프로토타입 범위 밖입니다`), state.openDropdown = null, draw();
-      }), wireAssetSearch(c);
-    }
-    document.addEventListener("click", () => {
-      state.openDropdown && (state.openDropdown = null, draw());
-    }), draw();
+      items = collectItems(name), c = document.getElementById("content"),
+      infoTabs = ["기본 정보", "추가 정보", "고급 정보", "자산"];
+    c.classList.add("directory-detail");
+    c.innerHTML = `
+      <div class="detail-topbar"><a href="assets.html" class="backbtn" aria-label="뒤로">←</a></div>
+      <div class="mdetail-head">
+        <span class="mdetail-avatar ws">${AVATAR_WS_ICON}</span>
+        <div><h1>${name}</h1><div class="mdetail-sub">${WS_CODE[name] || '<span class="muted">—</span>'} · ${WS_ADDRESS[name] || '<span class="muted">주소 없음</span>'}</div></div>
+      </div>
+      <nav class="mdetail-tabs" aria-label="근무지 상세 메뉴">
+        <span class="mdetail-tab">근무</span><span class="mdetail-tab">업무</span>
+        <span class="mdetail-tab active" aria-current="page">정보</span>
+      </nav>
+      <section class="mdetail-panel">
+        <nav class="mdetail-info-tabs" aria-label="근무지 정보 항목">${infoTabs.map(label => `<span class="mdetail-info-tab${label === '자산' ? ' active' : ''}"${label === '자산' ? ' aria-current="page"' : ''}>${label}</span>`).join('')}</nav>
+        <div class="mdetail-body">${assetSectionHtml(items)}</div>
+      </section>`;
+    wireAssetSearch(c);
   }
   window.WorksiteDetailScreen = {
     render

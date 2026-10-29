@@ -2176,3 +2176,14 @@ fieldset.extra-info-section{border:0;border-top:1px solid var(--line);margin:16p
 /* D-20261029-45: 정보 탭의 기본 정보 카드 아래 자산 카드는 같은 카드 규격·간격으로 */
 .mapp-directory-info + .mapp-directory-task-card{margin-top:12px;border-radius:16px;}
 .memo-view-btn{border:0;background:none;padding:2px;cursor:pointer;color:inherit;}
+
+/* Dashboard directory Info subnavigation follows the supplied service screenshots.
+   Only the asset pane is interactive in this prototype; other tabs are context. */
+.directory-detail .mdetail-tabs{border-bottom:0;gap:28px;margin:28px 0 24px;}
+.directory-detail .mdetail-tab{display:inline-flex;align-items:center;gap:8px;padding:0;border:0;font-size:18px;font-weight:700;color:var(--text-mut);cursor:default;}
+.directory-detail .mdetail-tab.active{color:var(--text);}
+.directory-detail .mdetail-panel{border:0;border-radius:16px;overflow:hidden;min-width:0;}
+.directory-detail .mdetail-info-tabs{display:flex;gap:24px;align-items:stretch;padding:0 24px;border-bottom:1px solid var(--line);overflow-x:auto;white-space:nowrap;}
+.directory-detail .mdetail-info-tab{display:inline-flex;align-items:center;flex-shrink:0;min-height:64px;font-size:14px;font-weight:600;color:var(--text-sub);border-bottom:2px solid transparent;cursor:default;}
+.directory-detail .mdetail-info-tab.active{color:var(--text);border-bottom-color:var(--text);}
+.directory-detail .mdetail-panel>.mdetail-body{padding:20px 24px;}
