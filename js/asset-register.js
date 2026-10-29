@@ -380,7 +380,7 @@
         return maxIso && iso > maxIso ? null : iso;
       };
       getValue.touched = false;
-      text.addEventListener("input", () => { text.value = format(digitsOf(text.value)); checkValid(); });
+      text.addEventListener("input", () => { text.value = format(digitsOf(text.value)); getValue.touched = false; checkValid(); });
       text.addEventListener("blur", () => { getValue.touched = true; checkValid(); });
       native.addEventListener("change", () => { if (native.value) text.value = native.value.replace(/-/g, "."); getValue.touched = true; checkValid(); });
       return getValue;
@@ -412,7 +412,7 @@
         return maxMonth && ym > maxMonth ? null : `${ym}-01`;
       };
       getValue.touched = false;
-      text.addEventListener("input", () => { text.value = format(digitsOf(text.value)); checkValid(); });
+      text.addEventListener("input", () => { text.value = format(digitsOf(text.value)); getValue.touched = false; checkValid(); });
       text.addEventListener("blur", () => { getValue.touched = true; checkValid(); });
       native.addEventListener("change", () => { if (native.value) text.value = native.value.replace("-", "."); getValue.touched = true; checkValid(); });
       return getValue;
@@ -701,10 +701,9 @@
     const catWrap = back.querySelector("#areg-catwrap");
     const catDisplay = back.querySelector("#areg-cat-display");
     let catValue = null;
-    // AI 분석 원본은 현재 등록 모달이 열려 있는 동안만 보관한다. 추천 분류를 사용자가 바꾸더라도
-    // 새 분류에 노출되는 빈 필드는 이 초안에서 다시 채울 수 있고, 저장·취소 시 함께 폐기된다.
+    // 분류 미선택 직접 입력에서만 추출값을 일회 보관한다. 일반 분류 변경에는 재사용하지 않는다.
     let activeAiDraft = null;
-    let hasSuccessfulAiResult = false;
+    const categoryDrafts = new Map();
 
     function catLabel(v) { const c = findCat(v); return c ? `${c.group} › ${c.sub}` : ""; }
     // 소분류별 필드 노출 설정(구조설계안 3.3 hiddenFields) 반영 — S/N·IMEI는 개별형 전용이라 유형 조건과 같이 봄.
@@ -755,15 +754,36 @@
       noteInput.value = "";
       window.AssetMemo.syncTextarea(noteInput);
     }
+    // Each subcategory owns its unsaved fields. Product is shared; returning to
+    // a visited subcategory restores its own draft, never an old AI extraction.
+    function captureCategoryDraft() {
+      return { fields: [assetNoInput,totalQtyInput,serialInput,imeiInput,purchasePriceInput,noteInput].map(el => el.value),
+        dates: [expiryField,manufacturedField,purchaseDateField].map(el => el.querySelector("[data-dtext]").value),
+        tags: tags.slice(), photos: photos.map(p => ({...p})), primaryIdx };
+    }
+    function restoreCategoryDraft(saved) {
+      [assetNoInput,totalQtyInput,serialInput,imeiInput,purchasePriceInput,noteInput].forEach((el,i) => el.value=saved.fields[i]);
+      [expiryField,manufacturedField,purchaseDateField].forEach((el,i) => {
+        el.querySelector("[data-dtext]").value=saved.dates[i];
+        el.querySelector("[data-dnative]").value=saved.dates[i].replaceAll(".","-");
+      });
+      tags.splice(0,tags.length,...saved.tags); photos=saved.photos.map(p=>({...p})); primaryIdx=saved.primaryIdx;
+      window.AssetMemo.syncTextarea(noteInput); renderChips(); renderPhotos();
+    }
     function selectCat(v) {
       const changed = v !== catValue;
+      const uncategorizedPhotos = !catValue ? photos.map(p=>({...p})) : null;
+      if (changed && !opts.asset && catValue) categoryDrafts.set(catValue,captureCategoryDraft());
       catValue = v;
       const cat = findCat(v);
       type = (cat && cat.type) || "individual";
-      renderCatDisplay();
-      applyFieldVisibility();
-      if (changed && !opts.asset) resetOtherFields();
-      if (changed && !opts.asset && activeAiDraft) applyAiValues(activeAiDraft);
+      renderCatDisplay(); applyFieldVisibility();
+      if (changed && !opts.asset) {
+        resetOtherFields();
+        if (categoryDrafts.has(v)) restoreCategoryDraft(categoryDrafts.get(v));
+        else if (uncategorizedPhotos?.length) { photos=uncategorizedPhotos; renderPhotos(); }
+        if (activeAiDraft) { const pending=activeAiDraft; activeAiDraft=null; applyAiValues(pending,{replace:true}); }
+      }
       checkValid();
     }
     function setDateInputs(fieldEl, iso) {
@@ -887,7 +907,7 @@
       if (menu && !menu.contains(e.target) && e.target !== tagInput) closeMenu();
     });
     // 사진 — 타일 클릭 시 대표 지정(뷰어처럼 별도 메뉴를 띄우지 않고 폼 안에서 가볍게), 각 타일 우상단
-    // 호버 시 삭제(×), 마지막에 "+" 추가 타일(10장 도달 시 자동으로 사라짐)
+    // 호버 시 삭제(×), 마지막에 "+" 추가 타일(10장 도달 시 비활성)
     function renderPhotos() {
       const tiles = photos.map((p, i) => `
         <button type="button" class="areg-photo-tile${i === primaryIdx ? " primary" : ""}" data-photo-i="${i}" style="background:${p.color}" aria-label="사진 ${i + 1}${i === primaryIdx ? " (대표)" : ""}">
@@ -937,9 +957,11 @@
       if (!fieldIsShown(field)) return;
       if (replace || !field.querySelector("[data-dtext]").value.trim()) setDateInputs(field, value || "");
     }
-    function applyAiValues(draft, { replace = false } = {}) {
+    function applyAiValues(draft, { replace = true } = {}) {
       if (!draft) return;
       setAiValue(nameInput, draft.name, replace);
+      tags.splice(0,tags.length,...(draft.tags || []).filter(tag => window.DATA.tags.includes(tag)).slice(0,window.ASSET_TAG_MAX_COUNT));
+      renderChips();
       if (fieldIsShown(assetNoField)) setAiValue(assetNoInput, draft.assetNo, replace);
       if (fieldIsShown(totalQtyField)) setAiValue(totalQtyInput, draft.totalQty, replace);
       if (fieldIsShown(serialField)) setAiValue(serialInput, draft.serial, replace);
@@ -976,34 +998,28 @@
         purchaseDate: "2026-02-01",
         price: "2500000",
         totalQty: "10",
+        tags: (window.DATA.tags || []).slice(0,2),
       };
     }
     function applyAiResult(draft, newPhotos, recommend) {
-      const replace = hasSuccessfulAiResult;
-      activeAiDraft = draft;
-      hasSuccessfulAiResult = true;
-      if (!catValue && recommend) {
-        const cat = recommendedCategory();
-        if (cat) selectCat(`${cat.group}|${cat.sub}`);
-        if (replace) applyAiValues(activeAiDraft, { replace: true });
-      } else {
-        applyAiValues(activeAiDraft, { replace });
+      const previousPhotos=photos.map(p=>({...p})), previousPrimary=primaryIdx;
+      if (recommend) {
+        const cat=recommendedCategory();
+        if(cat) selectCat(`${cat.group}|${cat.sub}`);
       }
-      appendAiPhotos(newPhotos);
+      // Full replacement applies on both the first analysis and reanalysis.
+      // Photos are the sole exception: existing originals remain, new ones append.
+      activeAiDraft=null; applyAiValues(draft,{replace:true});
+      photos=previousPhotos; primaryIdx=previousPrimary; appendAiPhotos(newPhotos);
+      if(catValue) categoryDrafts.set(catValue,captureCategoryDraft());
     }
     function continueAiDirectly(draft, newPhotos) {
-      activeAiDraft = draft;
+      appendAiPhotos(newPhotos);
       if (catValue) {
-        applyAiValues(activeAiDraft);
-        appendAiPhotos(newPhotos);
-        return;
-      }
-      // 분류를 확인하지 못한 경우 기존 분류 선택 화면으로 이어간다. 분류가 정해진 뒤에만
-      // 해당 유형·노출 설정에 맞는 추출값과 사진을 부모 폼에 반영한다.
-      openCategoryPickModal(categories, catValue, v => {
-        selectCat(v);
-        appendAiPhotos(newPhotos);
-      });
+        if(Object.keys(draft).length) applyAiValues(draft,{replace:true});
+      } else activeAiDraft=Object.keys(draft).length ? draft : null;
+      // No category opens the normal, unselected parent form. Apply pending
+      // extraction once after the user explicitly chooses the first category.
     }
     function openAiInputModal() {
       closeMenu();
@@ -1037,7 +1053,7 @@
         aiBack.remove();
       }
       function requestAiClose() {
-        if (photos.length + newPhotos.length === 0) { closeAi(); return; }
+        if (newPhotos.length === 0) { closeAi(); return; }
         if (document.querySelector("[data-ai-exit]")) return;
         const confirmBack = document.createElement("div");
         confirmBack.className = "modal-back";

@@ -121,8 +121,8 @@
   ];
   function sortFieldsFor(view) {
     if (view === "product") return SORT_FIELDS_PRODUCT;
-    if (view === "employee") return SORT_FIELDS_MEMBER;
-    if (view === "worksite") return SORT_FIELDS_WORKSITE;
+    if (view === "employee") return SORT_FIELDS_MEMBER.filter(f=>f.k!=="empNo" || window.ASSET_MEMBER_NUMBER_ENABLED!==false);
+    if (view === "worksite") return SORT_FIELDS_WORKSITE.filter(f=>f.k!=="code" || window.ASSET_WORKSITE_CODE_ENABLED!==false);
     return SORT_FIELDS;
   }
 
@@ -194,14 +194,25 @@
   }
   function memoCell(a) {
     if (!window.AssetMemo.has(a.note)) return "";
-    return `<span class="memo-flag" title="${window.AssetMemo.plain(a.note).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M9 13h5M9 17h4"/></svg></span>`;
+    return `<span class="memo-flag"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M9 13h5M9 17h4"/></svg></span>`;
   }
   function labelsCell(labels) {
     if (!labels || !labels.length) return '<span class="muted">—</span>';
-    const show = labels.slice(0, 2).map(l => `<span class="tag">${l}</span>`).join("");
-    return show + (labels.length > 2 ? `<span class="muted">+${labels.length - 2}</span>` : "");
+    return `<span class="asset-fit-chips">${labels.map(l=>`<span class="tag">${l}</span>`).join("")}<span class="muted" data-chip-rest hidden></span></span>`;
   }
 
+  function fitSummaryChips(scope) {
+    scope.querySelectorAll(".asset-fit-chips").forEach(box=>{
+      const fit=()=>{
+        const rest=box.querySelector("[data-chip-rest]"), chips=[...box.children].filter(x=>x!==rest);
+        chips.forEach(x=>x.hidden=false);rest.hidden=true;
+        for(let visible=chips.length; visible>0 && box.scrollWidth>box.clientWidth;visible--){
+          chips[visible-1].hidden=true;rest.hidden=false;rest.textContent=`+${chips.length-visible+1}`;
+        }
+      };
+      fit();const observer=new ResizeObserver(fit);observer.observe(box);
+    });
+  }
   /* ---------- state & filtering ---------- */
   const ALL_LABELS = [...new Set(assets.flatMap(a => a.labels || []))].sort();
   const CAT_GROUPS = (() => {
@@ -282,12 +293,14 @@
     dirtyGroups: new Set(),
     attempts: new Map(),
     errorsOnly: false,
+    excluded: new Set(), selectedRows: new Set(), page: 1, pageSize: 300,
     duplicateErrors: new Map(), // group ID → 오류 필드 Set. 중복은 [저장]을 누를 때 검사한다.
   };
 
   const state = {
     view: memberQaEnabled ? "employee" : "all",
     search: "",
+    statFilter: null,
     page: 1,
     pageSize: 20,
     sort: memberQaEnabled ? { key: "name", dir: "asc" } : { key: "updatedAt", dir: "desc" },
@@ -307,10 +320,15 @@
     return [...list].sort((a, b) => {
       const va = val(a), vb = val(b);
       // 값이 없는 항목은 정렬 방향과 무관하게 항상 맨 뒤로
-      if (!va && !vb) return 0;
+      if (!va && !vb) return (a.name || a.product || "").localeCompare(b.name || b.product || "","ko");
       if (!va) return 1;
       if (!vb) return -1;
-      if (key === "product" || key === "assetNo" || key === "name" || key === "empNo" || key === "code") return va.localeCompare(vb, "ko") * mul;
+      if (key === "product" || key === "assetNo" || key === "name" || key === "empNo" || key === "code") {
+        const primary=va.localeCompare(vb,"ko")*mul;if(primary)return primary;
+        const tie=state.view==="employee" && window.ASSET_MEMBER_NUMBER_ENABLED!==false ? "empNo" : state.view==="worksite" && window.ASSET_WORKSITE_CODE_ENABLED!==false ? "code" : "name";
+        if(!a[tie] && b[tie])return 1;if(a[tie] && !b[tie])return -1;
+        return String(a[tie] || a.name || "").localeCompare(String(b[tie] || b.name || ""),"ko");
+      }
       return (va < vb ? -1 : va > vb ? 1 : 0) * mul;
     });
   }
@@ -320,10 +338,18 @@
     return { category: [], type: [], status: [], expiry: [], labels: [], note: [], depleted: [], unheld: [] };
   }
 
-  function getFiltered() {
+  function getFiltered(forStats=false) {
     const f = state.filters;
-    const q = state.search.trim().toLowerCase();
+    const q = forStats ? "" : state.search.trim().toLowerCase();
     return viewableAssets().filter(a => {
+      if (!forStats && state.statFilter) {
+        const p=state.statFilter;
+        if(p.type && !p.type.includes(a.type)) return false;
+        if(p.status && !p.status.includes(a.status)) return false;
+        if(p.expiry && !p.expiry.includes(expiryKey(a.expiry))) return false;
+        if(p.depleted && !isDepleted(a)) return false;
+        if(p.unheld && !hasUnheldHolder(a)) return false;
+      }
       // 분류 필터 항목은 "대분류"(부모 체크 시 자체로도 들어감) 또는 "대분류/소분류"(leaf) 둘 다 올 수 있음
       if (f.category.length && !f.category.some(c => c === a.group || c === `${a.group}/${a.sub}`)) return false;
       if (f.type.length && !f.type.includes(a.type)) return false;
@@ -463,11 +489,9 @@
   function assetsSummaryCell(items) {
     if (!items.length) return '<span class="muted">—</span>';
     const bySub = new Map();
-    items.forEach(x => bySub.set(x.sub, (bySub.get(x.sub) || 0) + x.qty));
+    items.forEach(x => bySub.set(x.sub, (bySub.get(x.sub) || 0) + 1));
     const sorted = [...bySub.entries()].sort((a, b) => subOrder(a[0]) - subOrder(b[0]));
-    const shown = sorted.slice(0, 5).map(([sub, n]) => `<span class="chip">${sub} ${n}</span>`).join("");
-    const rest = sorted.length > 5 ? `<span class="chip">+${sorted.length - 5}</span>` : "";
-    return `<span class="chip-row">${shown}${rest}</span>`;
+    return `<span class="asset-fit-chips">${sorted.map(([sub,n])=>`<span class="chip">${sub} ${n}</span>`).join("")}<span class="chip" data-chip-rest hidden></span></span>`;
   }
 
   // 구성원별·근무지별 행 클릭 — 배정된 자산 전체 목록. 품목 모달(product-units-modal.js)과 시각 언어는
@@ -563,7 +587,7 @@
       back.remove();
       state.view = "employee";
       state.search = "";
-      state.filters = emptyFilters();
+      state.filters = emptyFilters(); state.statFilter=null;
       state.sort = { key: "name", dir: "asc" };
       state.pageSize = 20;
       state.page = 1;
@@ -630,7 +654,7 @@
         });
       }
     });
-    const head = `<tr><th>이름</th><th>사번</th><th>휴대폰번호</th><th class="num">배정·보유 자산 수</th><th>배정·보유 자산</th></tr>`;
+    const head = `<tr><th>이름</th>${window.ASSET_MEMBER_NUMBER_ENABLED!==false ? "<th>사번</th>" : ""}<th>휴대폰번호</th><th class="num">배정·보유 자산 수</th><th>배정·보유 자산</th></tr>`;
     const q = state.search.trim().toLowerCase();
     const rowsArr = [...map.values()].filter(r => {
       if (!q) return true;
@@ -644,7 +668,7 @@
       const info = MEMBER_INFO[r.name] || {};
       return `<tr class="clickable" data-mkey="${r.name}">
         <td><div class="acard-id">${memberIdentity(r.name)}</div></td>
-        <td>${info.empNo || '<span class="muted">—</span>'}</td>
+        ${window.ASSET_MEMBER_NUMBER_ENABLED!==false ? `<td>${info.empNo || '<span class="muted">—</span>'}</td>` : ""}
         <td>${info.phone || '<span class="muted">—</span>'}</td>
         <td class="num">${r.items.length}</td>
         <td>${assetsSummaryCell(r.items)}</td>
@@ -671,7 +695,7 @@
         });
       }
     });
-    const head = `<tr><th>근무지명</th><th>근무지 코드</th><th class="num">배정·보유 자산 수</th><th>배정·보유 자산</th></tr>`;
+    const head = `<tr><th>근무지명</th>${window.ASSET_WORKSITE_CODE_ENABLED!==false ? "<th>근무지 코드</th>" : ""}<th class="num">배정·보유 자산 수</th><th>배정·보유 자산</th></tr>`;
     const q = state.search.trim().toLowerCase();
     const rowsArr = [...map.values()].filter(r => {
       if (!q) return true;
@@ -681,8 +705,8 @@
     const paged = pageSlice(sorted);
     worksiteRowsByName = new Map(paged.map(r => [r.name, r]));
     const rows = paged.map(r => `<tr class="clickable" data-wkey="${r.name}">
-      <td>${r.name}</td>
-      <td>${r.code || '<span class="muted">—</span>'}</td>
+      <td><a href="worksite-detail.html?name=${encodeURIComponent(r.name)}" target="_blank" rel="noopener" data-worksite-link>${r.name}</a></td>
+      ${window.ASSET_WORKSITE_CODE_ENABLED!==false ? `<td>${r.code || '<span class="muted">—</span>'}</td>` : ""}
       <td class="num">${r.items.length}</td>
       <td>${assetsSummaryCell(r.items)}</td>
     </tr>`).join("");
@@ -700,7 +724,8 @@
   /* ---------- render ---------- */
   function sortHtml() {
     if (!["all", "product", "employee", "worksite"].includes(state.view)) return "";
-    const cur = sortFieldsFor(state.view).find(f => f.k === state.sort.key);
+    const cur = sortFieldsFor(state.view).find(f => f.k === state.sort.key) || sortFieldsFor(state.view)[0];
+    state.sort.key=cur.k;
     return `
       <div class="sortbar">
         <button class="sort-key-btn" id="sort-key-btn">${cur.label}${CARET}</button>
@@ -776,7 +801,7 @@
     const filtering = activeFilterCount() > 0 || !!state.search.trim();
     const emptyMsg = !hasViewScope() ? "조회 가능한 자산이 없습니다."
       : filtering ? "결과가 없습니다."
-      : state.view === "employee" ? "표시할 목록이 없습니다." : "등록된 자산이 없습니다.";
+      : ["employee","worksite"].includes(state.view) ? "표시할 목록이 없습니다." : "등록된 자산이 없습니다.";
     const colspan = state.view === "product" ? (state.productType === "quantity" ? 7 : 8)
       : state.view === "employee" ? 4 : state.view === "worksite" ? 3 : (canManageAssets() ? 11 : 10);
     const empty = `<tr><td colspan="${colspan}" style="text-align:center;color:var(--text-mut);padding:32px">${emptyMsg}</td></tr>`;
@@ -859,7 +884,7 @@
           <button class="btn danger" data-cok disabled>삭제</button>
         </div>
       </div>`;
-    cb.addEventListener("click", e => { if (e.target === cb) cb.remove(); });
+    // Confirmation closes only through its buttons.
     cb.querySelector("[data-cclose]").onclick = () => cb.remove();
     const input = cb.querySelector("[data-del-input]");
     const okBtn = cb.querySelector("[data-cok]");
@@ -937,7 +962,7 @@
       b.onclick = () => {
         state.view = b.dataset.view;
         state.page = 1;
-        state.filters = emptyFilters();
+        state.filters = emptyFilters(); state.statFilter=null;
         state.search = "";
         state.productType = "individual";
         // 이 뷰에서 안 쓰는 정렬 기준으로 넘어가는 경우(예: 전체>유효기한 정렬 중 품목별로 이동)를 대비해
@@ -946,6 +971,8 @@
         if (!fields.some(f => f.k === state.sort.key)) state.sort = { key: fields[0].k, dir: fields[0].defDir };
         render();
       });
+    c.querySelectorAll("[data-worksite-link]").forEach(a=>a.onclick=e=>e.stopPropagation());
+    fitSummaryChips(c);
     bindRows(c);
     bindBulkSelect(c);
     c.querySelectorAll("[data-ptype]").forEach(b => b.onclick = () => {
@@ -992,24 +1019,22 @@
     c.querySelectorAll("[data-clear]").forEach(b =>
       b.onclick = () => {
         const { k, v } = JSON.parse(b.dataset.clear);
-        state.filters[k] = state.filters[k].filter(x => x !== v);
+        state.filters[k] = state.filters[k].filter(x => x !== v); state.statFilter=null;
         state.page = 1;
         render();
       });
 
     c.querySelectorAll(".statcol.click").forEach(el => el.onclick = () => {
       const p = JSON.parse(el.dataset.filter);   // {필드명: 값배열, ...} — 필드 여러 개 동시 지정 가능
-      const keys = Object.keys(p);
-      const isOn = keys.every(k => arrEq(state.filters[k], p[k]));
-      const base = { ...emptyFilters(), category: state.filters.category };
-      state.filters = isOn ? base : { ...base, ...p };
+      const isOn=JSON.stringify(state.statFilter)===JSON.stringify(p);
+      state.statFilter=isOn ? null : p;
       state.page = 1;
       render();
     });
 
     const resetBtn = document.getElementById("filter-reset");
     if (resetBtn) resetBtn.onclick = () => {
-      state.filters = emptyFilters();
+      state.filters = emptyFilters(); state.statFilter=null;
       state.page = 1;
       render();
     };
@@ -1058,11 +1083,7 @@
   }
 
   /* ---------- stats (분류 필터까지만 반영) ---------- */
-  function catScoped() {
-    const cat = state.filters.category;
-    const list = viewableAssets();
-    return cat.length ? list.filter(a => cat.some(c => c === a.group || c === `${a.group}/${a.sub}`)) : list;
-  }
+  function catScoped() { return getFiltered(true); }
   function computeStats() {
     const list = catScoped();
     const indiv = list.filter(a => a.type === "individual");
@@ -1077,10 +1098,10 @@
       stock: cnt("stock"), assigned: cnt("assigned"), repair: cnt("repair"),
       lost: cnt("lost"), disposed: cnt("disposed"), assignable,
       expOver, expSoon,
-      rate: assignable ? Math.round(cnt("assigned") / assignable * 100) : 0,
+      rate: assignable ? (Math.round(cnt("assigned") / assignable * 1000)/10).toFixed(1) : 0,
       // 수량형은 폐기 개념이 없어 제외 없이 전체 대비 비율(개별형 배정률과 동일 원리, 4.3 "보유 대상 없음" 참조)
       qtyHeld: qtyCnt("held"), qtyStock: qtyCnt("stock"),
-      qtyRate: qty.length ? Math.round(qtyCnt("held") / qty.length * 100) : 0,
+      qtyRate: qty.length ? (Math.round(qtyCnt("held") / qty.length * 1000)/10).toFixed(1) : 0,
       qtyDepleted: qty.filter(isDepleted).length,
       // 미보유대상은 품목이 아니라 보유 대상(레코드) 단위 카운트 — 한 품목에 0개짜리 보유 대상이 여러 명이면
       // 그만큼 더해짐. 소진인 품목의 0개짜리 레코드도 그대로 포함(소진과 별개 집계)
@@ -1162,6 +1183,7 @@
     bulkRegister.results.clear();
     bulkRegister.dirtyGroups.clear();
     bulkRegister.attempts.clear();
+    bulkRegister.excluded.clear(); bulkRegister.selectedRows.clear(); bulkRegister.page=1; bulkRegister.pageSize=300;
     bulkRegister.errorsOnly = false;
     bulkRegister.duplicateErrors.clear();
   }
@@ -1170,13 +1192,13 @@
     return !!bulkRegister.fileName || bulkRegister.groups.length > 0 || bulkRegister.results.size > 0;
   }
 
-  function openBulkDiscardConfirm(onConfirm, { title = "작성을 중단하시겠습니까?", body = "지금까지 작성한 내용은 저장되지 않습니다." } = {}) {
+  function openBulkDiscardConfirm(onConfirm, { title = "작성을 중단하시겠습니까?", body = "지금까지 작성한 내용은 저장되지 않습니다.", confirmLabel="확인" } = {}) {
     const back = document.createElement("div");
     back.className = "modal-back";
     back.style.zIndex = 340;
     back.innerHTML = `<div class="modal sm" role="dialog" aria-modal="true" aria-label="${title}">
       <h3>${title}</h3><div class="body">${body}</div>
-      <div class="foot"><button class="btn" data-cancel>취소</button><button class="btn primary" data-confirm>확인</button></div>
+      <div class="foot"><button class="btn" data-cancel>취소</button><button class="btn primary" data-confirm>${confirmLabel}</button></div>
     </div>`;
     back.querySelector("[data-cancel]").onclick = () => back.remove();
     back.querySelector("[data-confirm]").onclick = () => { back.remove(); onConfirm(); };
@@ -1312,9 +1334,10 @@
       toast("자산 1개당 사진은 최대 10장까지 첨부할 수 있습니다.");
       return;
     }
-    const affected = new Set([targetGroupId]);
+    const crossGroup=moving.some(photo=>!target.photos.some(p=>p.id===photo.id));
+    const affected = new Set(crossGroup ? [targetGroupId] : []);
     bulkRegister.groups.forEach(group => {
-      if (group.photos.some(photo => selectedSet.has(photo.id))) affected.add(group.id);
+      if (crossGroup && group.photos.some(photo => selectedSet.has(photo.id))) affected.add(group.id);
       group.photos = group.photos.filter(photo => !selectedSet.has(photo.id));
     });
     let insertAt = beforePhotoId ? targetRemaining.findIndex(photo => photo.id === beforePhotoId) : -1;
@@ -1387,7 +1410,8 @@
           const index = categories.indexOf(category);
           return `<button type="button" class="catpick-row${selected === `${category.group}/${category.sub}` ? " active" : ""}" data-category-index="${index}">${bulkEsc(category.sub)}</button>`;
         }).join("")}</div>` : "";
-      }).join("") || '<p class="tag-manage-empty">결과가 없습니다.</p>';
+      }).join("") || `<p class="tag-manage-empty">${categories.length ? "결과가 없습니다." : "표시할 목록이 없습니다."}</p>`;
+      back.querySelector("[data-apply]").disabled=!selected;
       list.querySelectorAll("[data-category-index]").forEach(button => button.onclick = () => {
         const category = categories[Number(button.dataset.categoryIndex)];
         selected = `${category.group}/${category.sub}`;
@@ -1485,7 +1509,7 @@
       for (const field of ["serial", "imei"]) {
         if (bulkFieldEnabled(result, field) && String(result[field] || "").length > 40) errors[field] = true;
       }
-    } else if (!/^(0|[1-9]\d*)$/.test(String(result.totalQty ?? "")) || String(result.totalQty).length > 6) {
+    } else if (window.AssetQuantity.parse(result.totalQty) === null) {
       errors.totalQty = true;
     }
     for (const field of ["manufactured", "purchaseDate"]) {
@@ -1521,7 +1545,7 @@
       if (asset.assetNo) byNumber.set(asset.assetNo, null);
       if (asset.type === "quantity") byQuantityName.set(`${asset.group}/${asset.sub}\u0000${asset.product.trim()}`, null);
     });
-    bulkRegister.groups.forEach(group => {
+    bulkActiveGroups().forEach(group => {
       const result = bulkRegister.results.get(group.id);
       if (!result || result.status === "technical") return;
       if (bulkRegister.type === "individual") {
@@ -1547,25 +1571,28 @@
     return bulkRegister.duplicateErrors.size === 0;
   }
 
-  function bulkCanSave() {
-    if (!bulkRegister.groups.length || bulkRegister.results.size !== bulkRegister.groups.length || bulkRegister.dirtyGroups.size) return false;
-    return bulkRegister.groups.every(group => !bulkResultHasError(bulkRegister.results.get(group.id), group.id));
+  function bulkActiveGroups() { return bulkRegister.groups.filter(g=>!bulkRegister.excluded.has(g.id)); }
+  function bulkVisibleGroups() {
+    return bulkActiveGroups().filter(g=>bulkRegister.results.has(g.id)
+      && (!bulkRegister.errorsOnly || bulkResultHasError(bulkRegister.results.get(g.id),g.id)));
   }
-
+  function bulkErrorCount() { return bulkActiveGroups().filter(g=>bulkRegister.results.has(g.id) && bulkResultHasError(bulkRegister.results.get(g.id),g.id)).length; }
+  function bulkCanSave() {
+    const groups=bulkActiveGroups();
+    return groups.length>0 && groups.every(g=>bulkRegister.results.has(g.id) && !bulkRegister.dirtyGroups.has(g.id)
+      && !bulkResultHasError(bulkRegister.results.get(g.id),g.id));
+  }
   function bulkResultTableHtml() {
     if (!bulkRegister.results.size) return "";
     // Shopl 일괄 추가 양식의 컬럼 순서와 동일하게 제공한다. No.만 확인 테이블의 행 번호다.
-    const typeField = bulkRegister.type === "individual" ? "고유관리번호" : "총수량";
-    const columns = ["No.", "대분류 *", "소분류 *", "품목명 *", (bulkRegister.type === "individual" ? `${typeField} <span title="${window.ASSET_NUMBER_GUIDE}">ⓘ</span>` : `${typeField} *`), "유효기한", "태그",
+    const typeField = bulkRegister.type === "individual" ? "고유관리번호" : "전체 수량";
+    const columns = ['<input type="checkbox" data-result-all aria-label="현재 페이지 전체 선택">', "No.", "대분류 *", "소분류 *", "품목명 *", (bulkRegister.type === "individual" ? `${typeField} <span title="${window.ASSET_NUMBER_GUIDE}">ⓘ</span>` : `${typeField} *`), "유효기한", "태그",
       ...(bulkRegister.type === "individual" ? ["S/N", "IMEI"] : []), "제조연월", "구매연월", "구매가격", "메모"];
-    const rows = bulkRegister.groups.map((group, index) => {
-      const result = bulkRegister.results.get(group.id);
-      if (!result) return "";
-      if (bulkRegister.errorsOnly && !bulkResultHasError(result, group.id) && !bulkRegister.dirtyGroups.has(group.id)) return "";
-      if (result.status === "technical") {
-        return `<tr class="bulk-result-error"><td>${index + 1}</td>
-          <td colspan="${columns.length - 1}"><div class="bulk-analysis-error"><b>사진을 분석하지 못했습니다.</b><span>[적용]을 눌러 다시 분석해 주세요.</span></div></td></tr>`;
-      }
+    const visible=bulkVisibleGroups(), pages=Math.max(1,Math.ceil(visible.length/bulkRegister.pageSize));
+    bulkRegister.page=Math.min(bulkRegister.page,pages);
+    const offset=(bulkRegister.page-1)*bulkRegister.pageSize;
+    const rows = visible.slice(offset,offset+bulkRegister.pageSize).map((group,index) => {
+      const result=bulkRegister.results.get(group.id);
       const errors = bulkInputErrors(result);
       for (const field of bulkRegister.duplicateErrors.get(group.id) || []) errors[field] = true;
       const tagNames = bulkTags(result);
@@ -1575,14 +1602,15 @@
         const enabled = ["product", "assetNo", "totalQty"].includes(field) || bulkFieldEnabled(result, setting);
         // OFF 필드는 확인 테이블의 같은 컬럼을 유지하되 빈 비활성 입력칸으로 표시한다.
         // AI 원본값은 초안에 남아 있어도 등록값·검증 대상에는 포함하지 않는다.
-        return `<td><input data-result-field="${field}" data-gid="${group.id}" value="${enabled ? bulkEsc(value) : ""}" placeholder="${enabled ? placeholder : ""}" inputmode="${mode}" ${max ? `maxlength="${max}"` : ""} ${enabled ? "" : "disabled"} class="${enabled && errors[field] ? "is-error" : ""}" aria-invalid="${!!(enabled && errors[field])}"></td>`;
+        const date=["expiry","manufactured","purchaseDate"].includes(field);
+        return `<td><div class="${date ? "bulk-date-cell" : ""}"><input data-result-field="${field}" data-gid="${group.id}" value="${enabled ? bulkEsc(value) : ""}" placeholder="${enabled ? placeholder : ""}" inputmode="${mode}" ${max ? `maxlength="${max}"` : ""} ${enabled ? "" : "disabled"} class="${enabled && errors[field] ? "is-error" : ""}" aria-invalid="${!!(enabled && errors[field])}">${date ? `<button type="button" class="bulk-calendar" data-calendar="${field}" data-gid="${group.id}" aria-label="${field === "expiry" ? "날짜" : "연월"} 선택" ${enabled ? "" : "disabled"}>▦</button><input class="bulk-native-date" type="${field === "expiry" ? "date" : "month"}" data-calendar-value="${field}" data-gid="${group.id}" tabindex="-1" aria-hidden="true" ${field !== "expiry" ? `max="${new Date().toISOString().slice(0,7)}"` : ""}>` : ""}</div></td>`;
       };
       return `<tr class="${Object.keys(errors).length ? "bulk-result-error" : ""}" data-result-row="${group.id}">
-        <td>${index + 1}</td>
+        <td><input type="checkbox" data-result-check="${group.id}" aria-label="행 선택" ${bulkRegister.selectedRows.has(group.id) ? "checked" : ""}></td><td>${offset+index+1}</td>
         <td><button type="button" class="bulk-pick-field ${errors.category ? "is-error" : ""}" data-pick-category="${group.id}" aria-label="대분류 선택" aria-invalid="${!!errors.category}">${categoryGroup ? bulkEsc(categoryGroup) : "선택"}<span>›</span></button></td>
         <td><button type="button" class="bulk-pick-field ${errors.category ? "is-error" : ""}" data-pick-category="${group.id}" aria-label="소분류 선택" aria-invalid="${!!errors.category}">${categorySub ? bulkEsc(categorySub) : "선택"}<span>›</span></button></td>
         ${inputCell("product", { max: 50 })}
-        ${bulkRegister.type === "individual" ? inputCell("assetNo", { max: 30 }) : inputCell("totalQty", { mode: "numeric", max: 6 })}
+        ${bulkRegister.type === "individual" ? inputCell("assetNo", { max: 30 }) : inputCell("totalQty", { mode: "numeric", max: 9, value:window.AssetQuantity.format(result.totalQty ?? "") })}
         ${inputCell("expiry", { placeholder: "YYYY.MM.DD", max: 10, mode: "numeric" })}
         <td><button type="button" class="bulk-pick-field ${errors.tags ? "is-error" : ""}" data-pick-tags="${group.id}" aria-invalid="${!!errors.tags}">${tagNames.length ? `${bulkEsc(tagNames[0])}${tagNames.length > 1 ? ` +${tagNames.length - 1}` : ""}` : "선택"}<span>›</span></button></td>
         ${bulkRegister.type === "individual" ? inputCell("serial", { max: 40 }) + inputCell("imei", { max: 40 }) : ""}
@@ -1592,13 +1620,12 @@
         <td><button type="button" class="bulk-pick-field bulk-note-button ${errors.note ? "is-error" : ""}" data-pick-note="${group.id}" aria-invalid="${!!errors.note}">${window.AssetMemo.has(result.note) ? bulkEsc(window.AssetMemo.plain(result.note).slice(0, 32)) : "입력"}<span>›</span></button></td>
       </tr>`;
     }).join("");
-    const errorCount = bulkRegister.groups.filter(group => {
-      const result = bulkRegister.results.get(group.id);
-      return result && (bulkResultHasError(result, group.id) || bulkRegister.dirtyGroups.has(group.id));
-    }).length;
+    const errorCount=bulkErrorCount();
+    if(!errorCount) bulkRegister.errorsOnly=false;
     return `<section class="bulk-results-card">
-      <div class="bulk-results-head"><div><h3>업로드한 자산</h3><p>전체 ${bulkRegister.groups.length}</p></div><div class="bulk-results-actions"><label class="bulk-errors-toggle"><span>오류라인만 보기${errorCount ? ` (${errorCount})` : ""}</span><input type="checkbox" data-errors-only ${bulkRegister.errorsOnly ? "checked" : ""}><i aria-hidden="true"></i></label></div></div>
-      <div class="bulk-results-table-wrap"><table class="bulk-results-table"><thead><tr>${columns.map(label => `<th>${label}</th>`).join("")}</tr></thead><tbody>${rows || `<tr><td colspan="${columns.length}" class="bulk-no-errors">오류가 없습니다.</td></tr>`}</tbody></table></div>
+      <div class="bulk-results-head"><div><h3>업로드한 자산</h3><p>전체 ${bulkActiveGroups().filter(g=>bulkRegister.results.has(g.id)).length}</p></div><div class="bulk-results-actions"><label class="bulk-errors-toggle" ${errorCount ? "" : "hidden"}><span>오류 라인만 보기</span><input type="checkbox" data-errors-only ${bulkRegister.errorsOnly ? "checked" : ""}><i aria-hidden="true"></i></label></div></div>
+      <div class="bulk-results-table-wrap"><table class="bulk-results-table"><thead><tr>${columns.map(label=>`<th>${label}</th>`).join("")}</tr></thead><tbody>${rows}</tbody></table></div>
+      <div class="pager"><button class="btn" data-result-delete ${bulkRegister.selectedRows.size ? "" : "disabled"}>삭제</button><button class="btn" data-result-prev ${bulkRegister.page<=1 ? "disabled" : ""}>‹</button><span>${bulkRegister.page} / ${pages}</span><button class="btn" data-result-next ${bulkRegister.page>=pages ? "disabled" : ""}>›</button><select data-result-size aria-label="페이지당 행 수">${[100,200,300].map(n=>`<option ${n===bulkRegister.pageSize ? "selected" : ""}>${n}</option>`).join("")}</select></div>
     </section>`;
   }
 
@@ -1628,12 +1655,12 @@
         <div class="bulk-photo-list">${photos}${group.photos.length < BULK_AI_MAX_GROUP_PHOTOS ? `<label class="bulk-group-add" aria-label="같은 자산 사진 추가">＋<input type="file" accept="image/jpeg,image/png" multiple data-group-file="${group.id}" hidden></label>` : ""}</div>
       </article>`;
     }).join("");
-    const canApply = bulkRegister.groups.length && (bulkRegister.results.size !== bulkRegister.groups.length || bulkRegister.dirtyGroups.size || [...bulkRegister.results.values()].some(result => result.status === "technical"));
+    const canApply = bulkActiveGroups().some(g=>!bulkRegister.results.has(g.id) || bulkRegister.dirtyGroups.has(g.id));
     return `<div class="bulk-step bulk-ai-step">
       <span class="bulk-step-label">STEP 2</span><div class="bulk-ai-title"><div><h3>파일 선택</h3><p>사진을 자산별로 묶은 뒤 AI 분석을 적용해 주세요. AI가 입력한 값을 확인하고 필요한 내용을 수정해서 등록할 수 있습니다.</p></div></div>
       ${selected ? `<div class="bulk-ai-toolbar"><span>${selected}장 선택</span><button type="button" data-clear-photo-selection>선택 해제</button></div>` : ""}
       <div class="bulk-ai-drop" data-ai-drop>${groupCards || '<div class="bulk-ai-empty"><b>자산 사진을 추가해 주세요.</b><span>사진을 한 번에 여러 장 선택할 수 있으며, 처음에는 사진 1장당 자산 그룹 1개로 추가됩니다.</span></div>'}</div>
-      <div class="bulk-panel-actions">${new URLSearchParams(location.search).get("qa") === "bulk-ai" ? '<button class="btn" type="button" data-add-qa-photos>샘플 사진 3장 추가</button>' : ""}<label class="btn"><input type="file" accept="image/jpeg,image/png" multiple data-global-photo hidden>사진 추가</label>${bulkRegister.results.size ? `<button type="button" class="btn" data-reset-analysis>분석 결과 초기화</button>` : ""}<button class="btn primary" type="button" data-analyze ${canApply ? "" : "disabled"}>적용</button></div>
+      <div class="bulk-panel-actions">${new URLSearchParams(location.search).get("qa") === "bulk-ai" ? '<button class="btn" type="button" data-add-qa-photos>샘플 사진 3장 추가</button>' : ""}<label class="btn"><input type="file" accept="image/jpeg,image/png" multiple data-global-photo hidden>찾아보기</label>${bulkRegister.results.size ? `<button type="button" class="btn" data-reset-analysis>재분석</button>` : ""}<button class="btn primary" type="button" data-analyze ${canApply ? "" : "disabled"}>적용</button></div>
     </div>`;
   }
 
@@ -1641,7 +1668,7 @@
     const content = document.getElementById("content");
     const saveEnabled = bulkCanSave();
     content.innerHTML = `<div class="bulk-page">
-      <div class="bulk-page-head"><div><button type="button" data-bulk-back aria-label="뒤로가기">‹</button><h2>자산 일괄 추가</h2></div><button class="btn primary" type="button" data-bulk-save ${saveEnabled ? "" : "disabled"}>저장</button></div>
+      <div class="bulk-page-head"><div><button type="button" data-bulk-back aria-label="뒤로가기">‹</button><h2>자산 일괄 추가</h2></div><button class="btn primary" type="button" data-bulk-save ${saveEnabled ? "" : "disabled"}>일괄 추가</button></div>
       <section class="bulk-upload-card">
         <h3>파일 업로드</h3>
         <div class="bulk-upload-grid">
@@ -1663,14 +1690,9 @@
 
     content.querySelector("[data-bulk-back]").onclick = leaveBulkRegister;
     const resetAnalysis = content.querySelector("[data-reset-analysis]");
-    if (resetAnalysis) resetAnalysis.onclick = () => openBulkDiscardConfirm(() => {
-      // 사진과 그룹은 유지하고 확인 테이블 전체를 비운다. 다음 [적용]은 모든 그룹을 다시 분석한다.
-      bulkRegister.results.clear();
-      bulkRegister.dirtyGroups = new Set(bulkRegister.groups.map(group => group.id));
-      bulkRegister.duplicateErrors.clear();
-      bulkRegister.errorsOnly = false;
-      renderBulkRegister();
-    }, { title: "분석 결과를 초기화하시겠습니까?", body: "입력한 내용은 저장되지 않습니다." });
+    if (resetAnalysis) resetAnalysis.onclick = () => openBulkDiscardConfirm(() => openBulkAnalyzeLoading(true), {
+      title:"다시 분석하시겠습니까?", body:"분석 결과와 직접 입력한 내용이 새 분석 결과로 변경됩니다."
+    });
     content.querySelector("[data-bulk-save]").onclick = () => {
       // 저장 직전 권한이 사라졌으면 더 이상 이 화면에서 할 수 있는 작업이 없으므로 초안을 닫고 현황으로 복귀한다.
       // 실서비스 서버의 권한 상실 응답도 같은 화면 전이로 처리한다.
@@ -1678,7 +1700,7 @@
         resetBulkRegister();
         activeScreen = "list";
         render();
-        toast("자산을 등록할 권한이 없습니다.");
+        toast("자산 관리 권한이 없습니다.");
         return;
       }
       if (!bulkCanSave()) return;
@@ -1687,17 +1709,17 @@
       if (!checkBulkDuplicates()) {
         renderBulkRegister();
         content.querySelector(".bulk-result-error")?.scrollIntoView({ block: "center", behavior: "smooth" });
-        toast("입력 내용을 확인해 주세요.");
+        toast("오류가 있는 라인이 있습니다. 오류를 수정하거나, 해당 라인을 삭제해주세요.");
         return;
       }
-      const drafts = bulkRegister.groups.map(group => {
+      const drafts = bulkActiveGroups().map(group => {
         const result = bulkRegister.results.get(group.id);
         const category = window.DATA.categories.find(cat => `${cat.group}/${cat.sub}` === result.category && cat.type === bulkRegister.type);
         if (!category) return null;
         const photos = group.photos.map(photo => ({ ...photo, color: photo.color || "#5b8def", at: new Date().toISOString(), by: "dana" }));
         const month = value => value ? `${value.replaceAll(".", "-")}-01` : undefined;
         return { type: bulkRegister.type, group: category.group, sub: category.sub, product: result.product,
-          assetNo: result.assetNo || "", totalQty: Number(result.totalQty), labels: bulkTags(result),
+          assetNo: result.assetNo || "", totalQty: window.AssetQuantity.parse(result.totalQty), labels: bulkTags(result),
           expiry: result.expiry ? result.expiry.replaceAll(".", "-") : undefined,
           serial: result.serial || undefined, imei: result.imei || undefined,
           manufactured: month(result.manufactured), purchaseDate: month(result.purchaseDate),
@@ -1713,6 +1735,7 @@
         return;
       }
       toast("자산이 추가되었습니다.");
+      state.search="";state.page=1;state.filters=emptyFilters();state.statFilter=null;state.sort={key:"updatedAt",dir:"desc"};state.view="all";
       resetBulkRegister();
       activeScreen = "list";
       render();
@@ -1787,7 +1810,6 @@
       const group = bulkRegister.groups.find(item => item.photos.some(photo => photo.id === button.dataset.primaryPhoto));
       if (!group || group.primaryPhotoId === button.dataset.primaryPhoto) return;
       group.primaryPhotoId = button.dataset.primaryPhoto;
-      bulkRegister.dirtyGroups.add(group.id);
       renderBulkRegister();
     });
     content.querySelectorAll("[data-photo-id]").forEach(photo => {
@@ -1815,7 +1837,7 @@
     });
     const clearSelection = content.querySelector("[data-clear-photo-selection]");
     if (clearSelection) clearSelection.onclick = () => { bulkRegister.selectedPhotos.clear(); bulkRegister.lastSelectedPhoto = null; renderBulkRegister(); };
-    content.querySelector("[data-analyze]").onclick = openBulkAnalyzeLoading;
+    content.querySelector("[data-analyze]").onclick = () => openBulkAnalyzeLoading(false);
     bindBulkResultInputs(content);
   }
 
@@ -1830,50 +1852,70 @@
     };
   }
 
-  function openBulkAnalyzeLoading() {
-    const targets = bulkRegister.groups.filter(group => !bulkRegister.results.has(group.id) || bulkRegister.dirtyGroups.has(group.id) || bulkRegister.results.get(group.id)?.status === "technical");
-    if (!targets.length) return;
-    const back = document.createElement("div");
-    back.className = "modal-back";
-    back.style.zIndex = 340;
-    back.innerHTML = `<div class="modal sm bulk-ai-loading-modal" role="dialog" aria-modal="true" aria-label="AI 분석 중">
-      <button type="button" data-close aria-label="분석 취소">×</button><div><span class="areg-ai-spinner" aria-hidden="true"></span><b>AI가 자산 사진을 분석하고 있습니다.</b></div>
-    </div>`;
-    const cancel = () => { clearTimeout(bulkAnalyzeTimer); bulkAnalyzeTimer = null; back.remove(); };
-    back.querySelector("[data-close]").onclick = cancel;
-    document.body.appendChild(back);
-    // 캡처용(?hold=loading): 분석 중 모달을 자동으로 닫지 않고 [×]를 누를 때까지 유지한다.
-    if (new URLSearchParams(location.search).get("hold") === "loading") return;
-    bulkAnalyzeTimer = setTimeout(() => {
-      targets.forEach(group => {
-        const groupIndex = bulkRegister.groups.findIndex(item => item.id === group.id);
-        const attempt = (bulkRegister.attempts.get(group.id) || 0) + 1;
-        bulkRegister.attempts.set(group.id, attempt);
-        const ai = analyzedBulkValues(groupIndex);
-        // [적용]을 다시 실행한 그룹은 수동 수정값을 포함해 이전 결과 전체를 새 분석 결과로 교체한다.
-        // 새 결과에 없는 필드는 빈 값으로 남고, 사진이 바뀌지 않은 다른 그룹의 결과는 유지한다.
-        const technicalFailure = attempt === 1 && groupIndex === 2;
-        // 재분석 실패 시에는 이전 결과와 사진 변경 상태를 그대로 두어 다시 시도할 수 있게 한다.
-        if (technicalFailure && bulkRegister.results.has(group.id)) return;
-        const next = technicalFailure ? { status: "technical" } : { ...ai, status: "success" };
-        if (attempt === 1 && groupIndex === 1 && next.status === "success") {
-          next.category = "";
-          next.status = "review";
-        }
-        bulkRegister.results.set(group.id, next);
-        bulkRegister.dirtyGroups.delete(group.id);
+  function openBulkAnalyzeLoading(force=false) {
+    const targets=bulkActiveGroups().filter(g=>force || !bulkRegister.results.has(g.id) || bulkRegister.dirtyGroups.has(g.id));
+    if(!targets.length) return;
+    const back=document.createElement("div"); back.className="modal-back"; back.style.zIndex=340;
+    const qa=new URLSearchParams(location.search).get("qa")==="bulk-ai";
+    back.innerHTML=`<div class="modal sm bulk-ai-loading-modal" role="dialog" aria-modal="true" aria-label="AI 분석 중"><button type="button" data-close aria-label="분석 취소">×</button><div><span class="areg-ai-spinner" aria-hidden="true"></span><b>AI가 자산 사진을 분석하고 있습니다.</b></div>${qa ? '<div class="areg-ai-test-actions"><button class="btn" data-bulk-outcome="success">성공</button><button class="btn" data-bulk-outcome="review">정보 부족</button><button class="btn" data-bulk-outcome="error">분석 오류</button></div>' : ""}</div>`;
+    let settled=false;
+    function close(){ clearTimeout(bulkAnalyzeTimer);bulkAnalyzeTimer=null;back.remove(); }
+    function finish(outcome){
+      if(settled) return; settled=true; close();
+      if(outcome==="error") {
+        // One technical group failure rejects the whole request, including an
+        // unchanged-photo reanalysis: previous table/edit/exclusion state stays.
+        targets.forEach(g=>bulkRegister.dirtyGroups.add(g.id));
+        renderBulkRegister(); toast("에러가 발생하였습니다. 잠시 후 다시 시도해보세요."); return;
+      }
+      const staged=new Map();
+      targets.forEach((g,i)=>{
+        const values=analyzedBulkValues(bulkRegister.groups.indexOf(g));
+        staged.set(g.id,{...values,status:"success"});
+        if(outcome==="review" && i===0) staged.set(g.id,{...values,category:"",status:"review"});
       });
-      bulkRegister.duplicateErrors.clear();
-      bulkAnalyzeTimer = null;
-      back.remove();
-      renderBulkRegister();
-    }, 1100);
+      // Atomic publication happens only after all target groups succeed.
+      staged.forEach((v,id)=>{bulkRegister.results.set(id,v);bulkRegister.dirtyGroups.delete(id);});
+      bulkRegister.duplicateErrors.clear();bulkRegister.selectedRows.clear();bulkRegister.page=1;
+      bulkRegister.errorsOnly=bulkErrorCount()>0; renderBulkRegister();
+    }
+    back.querySelector("[data-close]").onclick=()=>{settled=true;close();};
+    back.querySelectorAll("[data-bulk-outcome]").forEach(b=>b.onclick=()=>finish(b.dataset.bulkOutcome));
+    document.body.appendChild(back);
+    if(!qa && new URLSearchParams(location.search).get("hold")!=="loading") bulkAnalyzeTimer=setTimeout(()=>finish("success"),1100);
   }
 
   function bindBulkResultInputs(content) {
+    const checks=[...content.querySelectorAll("[data-result-check]")];
+    const all=content.querySelector("[data-result-all]");
+    const syncSelection=()=>{
+      if(all){ all.checked=checks.length>0 && checks.every(c=>bulkRegister.selectedRows.has(c.dataset.resultCheck)); all.indeterminate=!all.checked && checks.some(c=>bulkRegister.selectedRows.has(c.dataset.resultCheck)); }
+      const del=content.querySelector("[data-result-delete]");if(del)del.disabled=!bulkRegister.selectedRows.size;
+    };
+    checks.forEach(c=>c.onchange=()=>{if(c.checked)bulkRegister.selectedRows.add(c.dataset.resultCheck);else bulkRegister.selectedRows.delete(c.dataset.resultCheck);syncSelection();});
+    if(all)all.onchange=()=>{checks.forEach(c=>{c.checked=all.checked;if(c.checked)bulkRegister.selectedRows.add(c.dataset.resultCheck);else bulkRegister.selectedRows.delete(c.dataset.resultCheck);});syncSelection();};
+    syncSelection();
+    const del=content.querySelector("[data-result-delete]");
+    if(del)del.onclick=()=>openBulkDiscardConfirm(()=>{
+      bulkRegister.selectedRows.forEach(id=>{bulkRegister.excluded.add(id);bulkRegister.results.delete(id);bulkRegister.dirtyGroups.delete(id);});
+      bulkRegister.selectedRows.clear();bulkRegister.duplicateErrors.clear();renderBulkRegister();toast("삭제되었습니다.");
+    },{title:"삭제하시겠습니까?",body:"",confirmLabel:"삭제"});
+    const movePage=delta=>{bulkRegister.page+=delta;bulkRegister.selectedRows.clear();renderBulkRegister();};
+    const prev=content.querySelector("[data-result-prev]"),next=content.querySelector("[data-result-next]"),size=content.querySelector("[data-result-size]");
+    if(prev)prev.onclick=()=>movePage(-1);if(next)next.onclick=()=>movePage(1);
+    if(size)size.onchange=()=>{bulkRegister.pageSize=Number(size.value);bulkRegister.page=1;bulkRegister.selectedRows.clear();renderBulkRegister();};
+    content.querySelectorAll("[data-calendar]").forEach(b=>b.onclick=()=>{
+      const picker=content.querySelector(`[data-calendar-value="${b.dataset.calendar}"][data-gid="${b.dataset.gid}"]`);
+      const field=content.querySelector(`[data-result-field="${b.dataset.calendar}"][data-gid="${b.dataset.gid}"]`);
+      picker.value=field.value.replaceAll(".","-");picker.showPicker();
+    });
+    content.querySelectorAll("[data-calendar-value]").forEach(p=>p.onchange=()=>{
+      updateBulkResult(p.dataset.gid,p.dataset.calendarValue,p.value.replaceAll("-","."));
+    });
     const errorsOnly = content.querySelector("[data-errors-only]");
     if (errorsOnly) errorsOnly.onchange = () => {
       bulkRegister.errorsOnly = errorsOnly.checked;
+      bulkRegister.page=1;bulkRegister.selectedRows.clear();
       renderBulkRegister();
     };
     content.querySelectorAll("[data-pick-category]").forEach(button => button.onclick = () => openBulkCategoryModal(button.dataset.pickCategory));
@@ -1906,6 +1948,8 @@
         field.setAttribute("aria-invalid", String(invalid));
         field.closest("tr")?.classList.toggle("bulk-result-error", bulkResultHasError(result, field.dataset.gid));
         if (result.status === "review" && !bulkResultHasError(result, field.dataset.gid)) result.status = "success";
+        const toggle=content.querySelector(".bulk-errors-toggle");
+        if(toggle) { toggle.hidden=bulkErrorCount()===0; if(toggle.hidden){bulkRegister.errorsOnly=false;toggle.querySelector("input").checked=false;} }
         const save = content.querySelector("[data-bulk-save]");
         if (save) save.disabled = !bulkCanSave();
       };
@@ -2143,7 +2187,7 @@
     }
 
     back.querySelector("#f-apply").onclick = () => {
-      state.filters = draft;
+      state.filters = draft; state.statFilter=null;
       state.page = 1;
       back.remove();
       render();

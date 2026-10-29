@@ -181,12 +181,12 @@ input { font: inherit; }
 .bulk-results-table { width: 100%; min-width: 2040px; border-collapse: collapse; table-layout: fixed; }
 .bulk-results-table th, .bulk-results-table td { border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 10px; text-align: left; vertical-align: top; }
 .bulk-results-table th { background: #fafbfc; color: var(--text-sub); font-size: 11.5px; font-weight: 600; }
-.bulk-results-table th:nth-child(1), .bulk-results-table td:nth-child(1) { width: 54px; text-align: center; }
-.bulk-results-table th:nth-child(2), .bulk-results-table td:nth-child(2) { width: 190px; }
+.bulk-results-table th:nth-child(2), .bulk-results-table td:nth-child(2) { width: 54px; text-align: center; }
 .bulk-results-table th:nth-child(3), .bulk-results-table td:nth-child(3) { width: 190px; }
-.bulk-results-table th:nth-child(4), .bulk-results-table td:nth-child(4) { width: 180px; }
-.bulk-results-table th:nth-child(5), .bulk-results-table td:nth-child(5) { width: 160px; }
-.bulk-results-table th:nth-child(6), .bulk-results-table td:nth-child(6) { width: 190px; }
+.bulk-results-table th:nth-child(4), .bulk-results-table td:nth-child(4) { width: 190px; }
+.bulk-results-table th:nth-child(5), .bulk-results-table td:nth-child(5) { width: 180px; }
+.bulk-results-table th:nth-child(6), .bulk-results-table td:nth-child(6) { width: 160px; }
+.bulk-results-table th:nth-child(7), .bulk-results-table td:nth-child(7) { width: 190px; }
 .bulk-results-table textarea { width: 100%; min-height: 34px; resize: vertical; border: 1px solid var(--line-strong); border-radius: 6px; padding: 7px 9px; background: #fff; font: inherit; }
 .bulk-results-table input:disabled, .bulk-results-table .bulk-pick-field:disabled { background: #f6f7f8; color: var(--text-mut); cursor: not-allowed; }
 .bulk-results-table .bulk-note-button { height: auto; min-height: 34px; }
@@ -2134,3 +2134,17 @@ button.dthumb:hover { filter: brightness(0.94); }
 .permission-qa-actions button { padding:8px 10px; border:1px solid #dbe2ea; border-radius:8px; background:#f8fafc; color:#334155; text-align:left; }
 .permission-qa-actions button[aria-pressed="true"] { border-color:#3298f5; background:#eaf4ff; color:#1677d2; font-weight:700; }
 /* 구성원 업무 자산 카드: 내 자산과 같은 소분류별 접기/펼치기 목록. */
+
+/* Bulk confirmation: selection column, icon-only native calendar trigger. */
+.bulk-errors-toggle[hidden] { display:none; }
+.bulk-results-table th:first-child,.bulk-results-table td:first-child { width:44px;text-align:center; }
+.bulk-results-table input[type=checkbox] { width:16px;height:16px; }
+.bulk-date-cell { display:flex;position:relative;align-items:center; }
+.bulk-date-cell > input:first-child { padding-right:32px; }
+.bulk-calendar { position:absolute;right:5px;border:0;background:transparent;color:var(--text-mut);cursor:pointer; }
+.bulk-calendar:disabled { cursor:not-allowed;opacity:.4; }
+.bulk-native-date { position:absolute!important;width:1px!important;height:1px!important;bottom:0;right:0;opacity:0;pointer-events:none; }
+
+.asset-fit-chips { display:flex;gap:4px;width:100%;min-width:0;overflow:hidden;white-space:nowrap; }
+.asset-fit-chips > [hidden] { display:none; }
+.asset-fit-chips > span { flex-shrink:0; }

@@ -366,12 +366,12 @@
       </div>
       <div class="field">
         <label>자산 조회 권한<span class="req">*</span></label>
-        <p class="hint" style="margin-top:0;margin-bottom:8px">이 소분류의 자산을 조회할 수 있는 대상을 설정합니다.</p>
+        <p class="hint" style="margin-top:0;margin-bottom:8px">이 소분류의 자산을 조회할 수 있는 구성원을 설정합니다.</p>
         <button type="button" class="cat-manage-select-btn" data-f-view-btn><span>${state.view}</span><span class="chev">▾</span></button>
       </div>
       <div class="field">
         <label>${assignLabel(state.type)}<span class="req">*</span></label>
-        <p class="hint" style="margin-top:0;margin-bottom:8px">이 소분류의 자산에 대해 ${state.type === "individual" ? "배정" : "보유"} 변경을 할 수 있는 대상을 설정합니다.</p>
+        <p class="hint" style="margin-top:0;margin-bottom:8px">${state.type === "individual" ? "이 소분류의 자산을 배정·반납하거나 상태를 변경할 수 있는 구성원을 설정합니다." : "이 소분류의 자산을 보유 추가·해제하거나 수량을 변경할 수 있는 구성원을 설정합니다."}</p>
         <button type="button" class="cat-manage-select-btn" data-f-assign-btn><span>${state.assign}</span><span class="chev">▾</span></button>
       </div>
       <div class="field">

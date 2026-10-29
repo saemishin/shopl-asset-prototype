@@ -652,7 +652,7 @@
       <div class="qty-pop-title">수량 차감</div>
       <label class="qty-pop-label">차감 수량</label>
       <input class="qty-deduct-input" type="text" inputmode="numeric" data-deduct-input placeholder="입력">
-      <div class="qty-pop-remain" data-held-qty>보유 수량: ${a.stocks[idx].qty}개</div>
+      <div class="qty-pop-remain" data-held-qty>보유 수량: ${window.AssetQuantity.format(a.stocks[idx].qty)}개</div>
       <div class="qty-pop-help">차감한 수량만큼 전체 수량도 함께 줄어듭니다.</div>
       <div class="field-err qty-deduct-error" data-deduct-error hidden>현재 보유 수량 이하로 입력해 주세요.</div>
       <div class="qty-pop-acts">
@@ -1449,7 +1449,7 @@
     const subMeta = `<div>${statusBadge}</div>${
       isIndiv && a.assetNo ? `<div style="margin-top:5px">고유관리번호 <b>${a.assetNo}</b></div>` : ""
     }${
-      !isIndiv ? `<div style="margin-top:5px">전체 <b>${window.AssetQuantity.format(a.totalQty)}개</b> · 보유 <b>${heldQty}개</b> · 잔여 <b>${a.totalQty - heldQty}개</b></div>` : ""
+      !isIndiv ? `<div style="margin-top:5px">전체 <b>${window.AssetQuantity.format(a.totalQty)}개</b> · 보유 <b>${window.AssetQuantity.format(heldQty)}개</b> · 잔여 <b>${window.AssetQuantity.format(a.totalQty - heldQty)}개</b></div>` : ""
     }`;
 
     const QR_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM19 14h2v2h-2zM14 19h2v2h-2zM19 19h2v2h-2z"/></svg>`;
@@ -1487,7 +1487,7 @@
       // 메모는 다른 필드와 달리 "자산 수정" 폼(자산관리 권한) 없이도 배정/보유 변경 권한만 있으면 옆의
       // 편집 아이콘으로 바로 고칠 수 있음(2026-09-27, 구조설계안 4.3 예외 — 지급 이력처럼 배정·보유 흐름과
       // 엮이는 기록이 많아 품목명·구매가격 같은 자산 고정 속성과 성격이 다르다고 판단, 앱(직원모드)도 동일)
-      { k: "메모", v: `${memoHtml(a.note)}<button class="icon-edit" data-memoedit aria-label="메모 수정" title="메모 수정">${IC_EDIT}</button>` },
+      { k: "메모", v: `${memoHtml(a.note)}${a.status!=="disposed" ? `<button class="icon-edit" data-memoedit aria-label="메모 수정" title="메모 수정">${IC_EDIT}</button>` : ""}` },
     ].filter(Boolean)
      .filter(row => !row.field || !hidden.includes(row.field))
      .map(({ k, v }) => `<div><div class="k">${k}</div><div class="v">${v}</div></div>`).join("");
@@ -1620,6 +1620,7 @@
         });
       };
       stockCatBtn.onclick = () => openStockCatMenu(stockCatBtn, stockCat, v => {
+        if(stockCat!==v) stockQ.value="";
         stockCat = v;
         stockCatBtn.innerHTML = `${CAT_LABEL[v]}<span class="bchev">▾</span>`;
         stockQ.placeholder = CAT_PLACEHOLDER[v];
@@ -1627,7 +1628,8 @@
         refreshStock();
       });
       stockQ.oninput = () => { stockPage = 1; refreshStock(); };
-      historyQ.oninput = () => { sbody.innerHTML = timelineHtml(a, historyQ.value); };
+      historyQ.value=a._prototypeHistoryQuery || "";
+      historyQ.oninput = () => { a._prototypeHistoryQuery=historyQ.value; sbody.innerHTML = timelineHtml(a, historyQ.value); };
       // 최초 렌더(위 템플릿의 stock-body)엔 페이저 버튼 이벤트가 아직 안 걸려있으니 refreshStock()으로
       // 다시 그려서 wireStockCards + 페이저 바인딩을 한 번에 맞춤(검색어·카테고리는 기본값과 동일해 결과는 같음)
       refreshStock();
@@ -1642,7 +1644,7 @@
         stoolbar.hidden = !isCurrent;
         htoolbar.hidden = isCurrent;    // 이력 검색은 이력 탭에서만
         if (isCurrent) refreshStock();
-        else { historyQ.value = ""; sbody.innerHTML = timelineHtml(a, ""); }
+        else { sbody.innerHTML = timelineHtml(a, historyQ.value); }
       });
     }
   }
