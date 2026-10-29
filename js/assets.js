@@ -119,6 +119,12 @@
     { k: "name", label: "근무지명", defDir: "asc" },
     { k: "code", label: "근무지 코드", defDir: "asc" },
   ];
+  // QA overrides stand in for settings screens outside this prototype.
+  const identityQa=new URLSearchParams(location.search);
+  if(identityQa.has("employee-number"))window.ASSET_MEMBER_NUMBER_ENABLED=identityQa.get("employee-number")!=="off";
+  if(identityQa.has("worksite-code"))window.ASSET_WORKSITE_CODE_ENABLED=identityQa.get("worksite-code")!=="off";
+  const displayField=(a,field)=>!(window.DATA.categories.find(c=>c.group===a.group && c.sub===a.sub)?.hiddenFields || []).includes(field);
+  const productKey=a=>encodeURIComponent(JSON.stringify([a.group,a.sub,a.product]));
   function sortFieldsFor(view) {
     if (view === "product") return SORT_FIELDS_PRODUCT;
     if (view === "employee") return SORT_FIELDS_MEMBER.filter(f=>f.k!=="empNo" || window.ASSET_MEMBER_NUMBER_ENABLED!==false);
@@ -279,6 +285,7 @@
   // 체크박스 자체를 토글하는 것만으로는 render()를 다시 부르지 않고 DOM을 직접 건드려서 선택을 유지함
   let selected = new Set();
   let activeScreen = "list";
+  let qaBulkInitialized=false;
   let bulkAnalyzeTimer = null;
   let bulkPhotoSeq = 0;
   let bulkGroupSeq = 0;
@@ -293,7 +300,7 @@
     dirtyGroups: new Set(),
     attempts: new Map(),
     errorsOnly: false,
-    excluded: new Set(), selectedRows: new Set(), page: 1, pageSize: 300,
+    excluded: new Set(), selectedRows: new Set(), page: 1, pageSize: 300, hasAnalyzed:false,
     duplicateErrors: new Map(), // group ID → 오류 필드 Set. 중복은 [저장]을 누를 때 검사한다.
   };
 
@@ -308,28 +315,30 @@
     // 품목별 탭 전용 — 개별 자산/수량 자산은 컬럼 구성·클릭 동작이 아예 달라서 한 테이블에 섞지 않고 토글로 구분
     productType: "individual",
   };
+  if(performance.getEntriesByType("navigation")[0]?.type==="back_forward"){
+    try{const saved=JSON.parse(sessionStorage.getItem("asset-overview-return") || "null");if(saved)Object.assign(state,saved);}catch{}
+  }
+  const rememberOverview=()=>sessionStorage.setItem("asset-overview-return",JSON.stringify(state));
   // 품목별 행 클릭 시 필요한 품목 그룹(품목명+자산 목록)을 렌더링 시점의 키로 찾기 위한 조회용 — view_product()가 매번 다시 채움
   let productGroupsByKey = new Map();
   // 구성원별·근무지별 행 클릭 시 필요한 조회용 — 위와 동일한 패턴(view_employee()/view_worksite()가 매번 다시 채움)
   let memberRowsByName = new Map();
   let worksiteRowsByName = new Map();
   function sortList(list) {
-    const { key, dir } = state.sort;
-    const mul = dir === "asc" ? 1 : -1;
-    const val = a => a[key] || "";
-    return [...list].sort((a, b) => {
-      const va = val(a), vb = val(b);
-      // 값이 없는 항목은 정렬 방향과 무관하게 항상 맨 뒤로
-      if (!va && !vb) return (a.name || a.product || "").localeCompare(b.name || b.product || "","ko");
-      if (!va) return 1;
-      if (!vb) return -1;
-      if (key === "product" || key === "assetNo" || key === "name" || key === "empNo" || key === "code") {
-        const primary=va.localeCompare(vb,"ko")*mul;if(primary)return primary;
-        const tie=state.view==="employee" && window.ASSET_MEMBER_NUMBER_ENABLED!==false ? "empNo" : state.view==="worksite" && window.ASSET_WORKSITE_CODE_ENABLED!==false ? "code" : "name";
-        if(!a[tie] && b[tie])return 1;if(a[tie] && !b[tie])return -1;
-        return String(a[tie] || a.name || "").localeCompare(String(b[tie] || b.name || ""),"ko");
+    const {key,dir}=state.sort,mul=dir==="asc" ? 1 : -1;
+    const value=a=>key==="expiry" && !displayField(a,"expiry") ? "" : a[key] || "";
+    const tie=(a,b)=>{
+      if(["employee","worksite"].includes(state.view)){
+        const field=state.view==="employee" && window.ASSET_MEMBER_NUMBER_ENABLED!==false ? "empNo" : state.view==="worksite" && window.ASSET_WORKSITE_CODE_ENABLED!==false ? "code" : "name";
+        if(!a[field] && b[field])return 1;if(a[field] && !b[field])return -1;
+        return String(a[field] || a.name || "").localeCompare(String(b[field] || b.name || ""),"ko");
       }
-      return (va < vb ? -1 : va > vb ? 1 : 0) * mul;
+      return String(b.updatedAt || "").localeCompare(String(a.updatedAt || "")) || String(a.id || "").localeCompare(String(b.id || ""));
+    };
+    return [...list].sort((a,b)=>{
+      const va=value(a),vb=value(b);
+      if(!va && !vb)return tie(a,b);if(!va)return 1;if(!vb)return -1;
+      return String(va).localeCompare(String(vb),"ko")*mul || tie(a,b);
     });
   }
   function emptyFilters() {
@@ -346,7 +355,7 @@
         const p=state.statFilter;
         if(p.type && !p.type.includes(a.type)) return false;
         if(p.status && !p.status.includes(a.status)) return false;
-        if(p.expiry && !p.expiry.includes(expiryKey(a.expiry))) return false;
+        if(p.expiry && (!displayField(a,"expiry") || !p.expiry.includes(expiryKey(a.expiry)))) return false;
         if(p.depleted && !isDepleted(a)) return false;
         if(p.unheld && !hasUnheldHolder(a)) return false;
       }
@@ -356,7 +365,7 @@
       // 수량형도 이제 실제 status(stock·held)를 가지므로 개별형 전용 가드는 제거 — 값 자체가
       // 타입별로 겹치지 않아(held는 수량형만, assigned/repair/lost/disposed는 개별형만) 자연히 분리됨
       if (f.status.length && !f.status.includes(a.status)) return false;
-      if (f.expiry.length && !f.expiry.includes(expiryKey(a.expiry))) return false;
+      if (f.expiry.length && (!displayField(a,"expiry") || !f.expiry.includes(expiryKey(a.expiry)))) return false;
       if (f.depleted.length && !isDepleted(a)) return false;
       if (f.unheld.length && !hasUnheldHolder(a)) return false;
       if (f.note.length && !f.note.includes(window.AssetMemo.has(a.note) ? "has" : "none")) return false;
@@ -403,7 +412,7 @@
         <td>${a.assetNo || '<span class="muted">—</span>'}</td>
         <td>${st}</td>
         <td>${holderText(a)}</td>
-        <td>${expiryCell(a.expiry)}</td>
+        <td>${expiryCell(displayField(a,"expiry") ? a.expiry : "")}</td>
         <td>${labelsCell(a.labels)}</td>
         <td class="c">${memoCell(a)}</td>
         <td>${window.fmtDate(a.createdAt)}</td>
@@ -415,7 +424,7 @@
   function groupByProduct(list) {
     const map = new Map();
     list.forEach(a => {
-      const key = a.sub + "|" + a.product;
+      const key=productKey(a);
       if (!map.has(key)) map.set(key, { product: a.product, group: a.group, sub: a.sub, type: a.type, list: [] });
       map.get(key).list.push(a);
     });
@@ -438,13 +447,13 @@
     const groups = groupByProduct(list.filter(a => a.type === "individual"));
     const sorted = sortList(groups);
     const paged = pageSlice(sorted);
-    productGroupsByKey = new Map(paged.map(g => [`${g.sub}|${g.product}`, g]));
+    productGroupsByKey = new Map(paged.map(g => [productKey(g), g]));
     const rows = paged.map(g => {
       const counts = { assigned: 0, stock: 0, repair: 0, lost: 0, disposed: 0 };
       g.list.forEach(a => { counts[a.status] = (counts[a.status] || 0) + 1; });
-      return `<tr class="clickable" data-pkey="${g.sub}|${g.product}">
+      return `<tr class="clickable" data-pkey="${productKey(g)}">
         <td>${g.group} <span class="muted">›</span> ${g.sub}</td>
-        <td><div class="prodcell">${thumb(g.list[0])}<span class="pname">${g.product}</span></div></td>
+        <td><div class="prodcell">${thumb([...g.list].sort((a,b)=>String(a.assetNo || "").localeCompare(String(b.assetNo || ""))).find(a=>window.assetPhotos(a).length) || g.list[0])}<span class="pname">${g.product}</span></div></td>
         <td class="num">${g.list.length}</td>
         <td class="num">${counts.assigned}</td>
         <td class="num">${counts.stock}</td>
@@ -461,19 +470,19 @@
     const groups = groupByProduct(list.filter(a => a.type === "quantity"));
     const sorted = sortList(groups);
     const paged = pageSlice(sorted);
-    productGroupsByKey = new Map(paged.map(g => [`${g.sub}|${g.product}`, g]));
+    productGroupsByKey = new Map(paged.map(g => [productKey(g), g]));
     const rows = paged.map(g => {
       // 수량형은 품목=자산이 1:1이라 그룹의 유일한 원소를 그대로 표시(분류 화면 stockRowHtml과 동일 계산)
       const a = g.list[0];
       const qty = (a.stocks || []).reduce((s, x) => s + x.qty, 0);
       const targets = (a.stocks || []).length;
-      return `<tr class="clickable" data-pkey="${g.sub}|${g.product}">
+      return `<tr class="clickable" data-pkey="${productKey(g)}">
         <td>${g.group} <span class="muted">›</span> ${g.sub}</td>
         <td><div class="prodcell">${thumb(a)}<span class="pname">${g.product}</span></div></td>
-        <td class="num">${a.totalQty}</td>
-        <td class="num">${qty}</td>
+        <td class="num">${window.AssetQuantity.format(a.totalQty)}</td>
+        <td class="num">${window.AssetQuantity.format(qty)}</td>
         <td class="num">${targets}</td>
-        <td class="num">${a.totalQty - qty}</td>
+        <td class="num">${window.AssetQuantity.format(a.totalQty-qty)}</td>
         <td>${a.expiry ? window.fmtDate(a.expiry) : '<span class="muted">—</span>'}</td>
       </tr>`;
     }).join("");
@@ -798,7 +807,7 @@
   function tableInner(v) {
     // 조회 가능한 소분류 없음 → 등록 자산 없음 → 검색/필터 결과 없음의 조건을 구분한다.
     // 조회 범위가 없으면 입력 조건과 무관하게 조회 불가 빈 상태를 우선한다.
-    const filtering = activeFilterCount() > 0 || !!state.search.trim();
+    const filtering = activeFilterCount() > 0 || !!state.statFilter || !!state.search.trim();
     const emptyMsg = !hasViewScope() ? "조회 가능한 자산이 없습니다."
       : filtering ? "결과가 없습니다."
       : ["employee","worksite"].includes(state.view) ? "표시할 목록이 없습니다." : "등록된 자산이 없습니다.";
@@ -816,7 +825,7 @@
   }
   function bindRows(scope) {
     scope.querySelectorAll("tbody tr[data-id]").forEach(tr =>
-      tr.onclick = () => location.href = `asset-detail.html?id=${tr.dataset.id}`);
+      tr.onclick = () => {rememberOverview();location.href = `asset-detail.html?id=${tr.dataset.id}`;});
   }
   // 전체 탭 체크박스 선택 + 일괄 삭제 — 체크박스 토글은 render()를 다시 부르지 않고 delete 버튼
   // disabled 상태와 전체선택 체크박스 상태만 직접 갱신(선택을 페이지 안에서 유지하기 위해)
@@ -900,6 +909,9 @@
   }
 
   function render() {
+    if(!qaBulkInitialized && new URLSearchParams(location.search).get("qa")==="bulk-ai"){
+      qaBulkInitialized=true;activeScreen="bulk-register";bulkRegister.method="ai";
+    }
     mountMemberQaPanel();
     // 다른 화면(자산 삭제 등)에서 이동해온 직후 띄울 토스트 — sessionStorage에 있으면 최초 1회만 소비
     const pendingToast = sessionStorage.getItem("pendingToast");
@@ -988,7 +1000,7 @@
       const g = productGroupsByKey.get(tr.dataset.pkey);
       if (!g) return;
       if (g.type === "individual") window.openProductUnitsModal(g.product, g.list);
-      else location.href = `asset-detail.html?id=${g.list[0].id}`;
+      else {rememberOverview();location.href = `asset-detail.html?id=${g.list[0].id}`;}
     });
     // 구성원별·근무지별 행 클릭 — 배정된 자산 전체 목록 모달. 헤더는 테이블의 정체성 컬럼과 동일한 정보를 보여줌
     // (구성원=프로필+이름+그룹, memberIdentity() 재사용 / 근무지=근무지명+코드)
@@ -1003,7 +1015,11 @@
     c.querySelectorAll("tbody tr[data-wkey]").forEach(tr => tr.onclick = () => {
       const r = worksiteRowsByName.get(tr.dataset.wkey);
       const codeHtml = r.code || '<span class="muted">—</span>';
-      if (r) openAssignedAssetsModal(`<div><div class="cat-unit-product">${r.name}</div><div class="acard-sub">${codeHtml}</div></div>`, r.items);
+      if (r) {
+        const current=viewableAssets().flatMap(asset=>(asset.type==="individual" ? asset.assignments || [] : asset.stocks || []).filter(x=>x.worksite===r.name).map(x=>({asset,sub:asset.sub,qty:asset.type==="individual" ? 1 : x.qty})));
+        if(!current.length){openMemberUnavailableModal();return;}
+        openAssignedAssetsModal(`<div><a class="cat-unit-product" href="worksite-detail.html?name=${encodeURIComponent(r.name)}" target="_blank" rel="noopener">${r.name}</a><div class="acard-sub">${codeHtml}</div></div>`,current);
+      }
     });
     c.querySelectorAll("[data-stub]").forEach(el =>
       el.onclick = () => toast(`"${el.dataset.stub}" — 이후 단계에서 정의`));
@@ -1076,6 +1092,8 @@
     // 엑셀 다운로드 — 실제 파일 생성 대신 양식 정의가 완료된 구글시트로 연결(2026-09-24). 프로토타입 목적상
     // "실제 파일 다운로드"를 흉내낼 필요가 없어지고, 양식은 사용자가 구글시트에서 직접 계속 다듬는 게 더
     // 정확한 최신 상태라 생성 코드보다 그쪽이 소스 오브 트루스
+    document.getElementById("btn-list-dl").disabled=v.count===0;
+    if(document.getElementById("btn-qr-dl"))document.getElementById("btn-qr-dl").disabled=v.count===0;
     document.getElementById("btn-list-dl").onclick = () => {
       const url = state.view === "product" ? DOWNLOAD_SHEET_LINKS.product[state.productType] : DOWNLOAD_SHEET_LINKS[state.view];
       window.open(url, "_blank", "noopener");
@@ -1090,18 +1108,18 @@
     const qty = list.filter(a => a.type === "quantity");
     const cnt = k => indiv.filter(a => a.status === k).length;
     const qtyCnt = k => qty.filter(a => a.status === k).length;
-    const expOver = list.filter(a => a.expiry && expiryKey(a.expiry) === "over").length;
-    const expSoon = list.filter(a => a.expiry && expiryKey(a.expiry) === "soon").length;
+    const expOver = list.filter(a => displayField(a,"expiry") && a.expiry && expiryKey(a.expiry) === "over").length;
+    const expSoon = list.filter(a => displayField(a,"expiry") && a.expiry && expiryKey(a.expiry) === "soon").length;
     const assignable = indiv.length - cnt("disposed");
     return {
       indivN: indiv.length, qtyN: qty.length,
       stock: cnt("stock"), assigned: cnt("assigned"), repair: cnt("repair"),
       lost: cnt("lost"), disposed: cnt("disposed"), assignable,
       expOver, expSoon,
-      rate: assignable ? (Math.round(cnt("assigned") / assignable * 1000)/10).toFixed(1) : 0,
+      rate: assignable ? (Math.round(cnt("assigned") / assignable * 1000)/10).toFixed(1) : "0.0",
       // 수량형은 폐기 개념이 없어 제외 없이 전체 대비 비율(개별형 배정률과 동일 원리, 4.3 "보유 대상 없음" 참조)
       qtyHeld: qtyCnt("held"), qtyStock: qtyCnt("stock"),
-      qtyRate: qty.length ? (Math.round(qtyCnt("held") / qty.length * 1000)/10).toFixed(1) : 0,
+      qtyRate: qty.length ? (Math.round(qtyCnt("held") / qty.length * 1000)/10).toFixed(1) : "0.0",
       qtyDepleted: qty.filter(isDepleted).length,
       // 미보유대상은 품목이 아니라 보유 대상(레코드) 단위 카운트 — 한 품목에 0개짜리 보유 대상이 여러 명이면
       // 그만큼 더해짐. 소진인 품목의 0개짜리 레코드도 그대로 포함(소진과 별개 집계)
@@ -1183,7 +1201,7 @@
     bulkRegister.results.clear();
     bulkRegister.dirtyGroups.clear();
     bulkRegister.attempts.clear();
-    bulkRegister.excluded.clear(); bulkRegister.selectedRows.clear(); bulkRegister.page=1; bulkRegister.pageSize=300;
+    bulkRegister.hasAnalyzed=false;bulkRegister.excluded.clear(); bulkRegister.selectedRows.clear(); bulkRegister.page=1; bulkRegister.pageSize=300;
     bulkRegister.errorsOnly = false;
     bulkRegister.duplicateErrors.clear();
   }
@@ -1441,7 +1459,7 @@
       const known = window.DATA.tags || [];
       const unknown = [...selected].filter(tag => !known.includes(tag));
       options.innerHTML = `${unknown.length ? `<div class="bulk-tag-unknown"><b>등록되지 않은 태그</b>${unknown.map(tag => `<button type="button" data-remove-unknown="${bulkEsc(tag)}">${bulkEsc(tag)} ×</button>`).join("")}</div>` : ""}
-        ${known.map((tag, index) => `<label><input type="checkbox" data-tag-index="${index}" ${selected.has(tag) ? "checked" : ""}>${bulkEsc(tag)}</label>`).join("")}`;
+        ${known.map((tag, index) => `<label><input type="checkbox" data-tag-index="${index}" ${selected.has(tag) ? "checked" : selected.size >= window.ASSET_TAG_MAX_COUNT ? "disabled" : ""}>${bulkEsc(tag)}</label>`).join("")}`;
       options.querySelectorAll("[data-tag-index]").forEach(input => input.onchange = () => {
         const tag = known[Number(input.dataset.tagIndex)];
         if (input.checked && selected.size >= (window.ASSET_TAG_MAX_COUNT || 10)) {
@@ -1451,6 +1469,7 @@
         }
         if (input.checked) selected.add(tag);
         else selected.delete(tag);
+        renderOptions();
       });
       options.querySelectorAll("[data-remove-unknown]").forEach(button => button.onclick = () => {
         selected.delete(button.dataset.removeUnknown);
@@ -1583,7 +1602,8 @@
       && !bulkResultHasError(bulkRegister.results.get(g.id),g.id));
   }
   function bulkResultTableHtml() {
-    if (!bulkRegister.results.size) return "";
+    if (!bulkRegister.hasAnalyzed) return "";
+    if(!bulkErrorCount())bulkRegister.errorsOnly=false;
     // Shopl 일괄 추가 양식의 컬럼 순서와 동일하게 제공한다. No.만 확인 테이블의 행 번호다.
     const typeField = bulkRegister.type === "individual" ? "고유관리번호" : "전체 수량";
     const columns = ['<input type="checkbox" data-result-all aria-label="현재 페이지 전체 선택">', "No.", "대분류 *", "소분류 *", "품목명 *", (bulkRegister.type === "individual" ? `${typeField} <span title="${window.ASSET_NUMBER_GUIDE}">ⓘ</span>` : `${typeField} *`), "유효기한", "태그",
@@ -1624,7 +1644,7 @@
     if(!errorCount) bulkRegister.errorsOnly=false;
     return `<section class="bulk-results-card">
       <div class="bulk-results-head"><div><h3>업로드한 자산</h3><p>전체 ${bulkActiveGroups().filter(g=>bulkRegister.results.has(g.id)).length}</p></div><div class="bulk-results-actions"><label class="bulk-errors-toggle" ${errorCount ? "" : "hidden"}><span>오류 라인만 보기</span><input type="checkbox" data-errors-only ${bulkRegister.errorsOnly ? "checked" : ""}><i aria-hidden="true"></i></label></div></div>
-      <div class="bulk-results-table-wrap"><table class="bulk-results-table"><thead><tr>${columns.map(label=>`<th>${label}</th>`).join("")}</tr></thead><tbody>${rows}</tbody></table></div>
+      ${visible.length ? `<div class="bulk-results-table-wrap"><table class="bulk-results-table"><thead><tr>${columns.map(label=>`<th>${label}</th>`).join("")}</tr></thead><tbody>${rows}</tbody></table></div>` : ""}
       <div class="pager"><button class="btn" data-result-delete ${bulkRegister.selectedRows.size ? "" : "disabled"}>삭제</button><button class="btn" data-result-prev ${bulkRegister.page<=1 ? "disabled" : ""}>‹</button><span>${bulkRegister.page} / ${pages}</span><button class="btn" data-result-next ${bulkRegister.page>=pages ? "disabled" : ""}>›</button><select data-result-size aria-label="페이지당 행 수">${[100,200,300].map(n=>`<option ${n===bulkRegister.pageSize ? "selected" : ""}>${n}</option>`).join("")}</select></div>
     </section>`;
   }
@@ -1660,7 +1680,7 @@
       <span class="bulk-step-label">STEP 2</span><div class="bulk-ai-title"><div><h3>파일 선택</h3><p>사진을 자산별로 묶은 뒤 AI 분석을 적용해 주세요. AI가 입력한 값을 확인하고 필요한 내용을 수정해서 등록할 수 있습니다.</p></div></div>
       ${selected ? `<div class="bulk-ai-toolbar"><span>${selected}장 선택</span><button type="button" data-clear-photo-selection>선택 해제</button></div>` : ""}
       <div class="bulk-ai-drop" data-ai-drop>${groupCards || '<div class="bulk-ai-empty"><b>자산 사진을 추가해 주세요.</b><span>사진을 한 번에 여러 장 선택할 수 있으며, 처음에는 사진 1장당 자산 그룹 1개로 추가됩니다.</span></div>'}</div>
-      <div class="bulk-panel-actions">${new URLSearchParams(location.search).get("qa") === "bulk-ai" ? '<button class="btn" type="button" data-add-qa-photos>샘플 사진 3장 추가</button>' : ""}<label class="btn"><input type="file" accept="image/jpeg,image/png" multiple data-global-photo hidden>찾아보기</label>${bulkRegister.results.size ? `<button type="button" class="btn" data-reset-analysis>재분석</button>` : ""}<button class="btn primary" type="button" data-analyze ${canApply ? "" : "disabled"}>적용</button></div>
+      <div class="bulk-panel-actions">${new URLSearchParams(location.search).get("qa") === "bulk-ai" ? '<button class="btn" type="button" data-add-qa-photos>샘플 사진 3장 추가</button>' : ""}<label class="btn"><input type="file" accept="image/jpeg,image/png" multiple data-global-photo hidden>찾아보기</label>${bulkRegister.hasAnalyzed ? `<button type="button" class="btn" data-reset-analysis ${bulkActiveGroups().length ? "" : "disabled"}>재분석</button>` : ""}<button class="btn primary" type="button" data-analyze ${canApply ? "" : "disabled"}>적용</button></div>
     </div>`;
   }
 
@@ -1776,10 +1796,10 @@
     if (bulkRegister.method !== "ai") {
       const fileInput = content.querySelector("[data-bulk-file]");
       const applyFile = files => {
-        const file = [...files].find(item => /\.(xlsx?|XLSX?)$/.test(item.name));
-        if (!file) { toast("XLSX 또는 XLS 파일을 선택해 주세요."); return; }
+        const file = [...files][0];
+        if (!file || !/\.xlsx?$/i.test(file.name) || file.size>500*1024*1024) { toast("XLSX, XLS 형식의 500MB 이하의 파일만 업로드할 수 있습니다."); return; }
         bulkRegister.fileName = file.name;
-        renderBulkRegister();
+        renderBulkRegister();toast("파일 업로드가 완료되었습니다.");
       };
       content.querySelector("[data-find-file]").onclick = () => fileInput.click();
       fileInput.onchange = () => applyFile(fileInput.files);
@@ -1871,13 +1891,14 @@
       const staged=new Map();
       targets.forEach((g,i)=>{
         const values=analyzedBulkValues(bulkRegister.groups.indexOf(g));
+        if(qa && i===0 && new URLSearchParams(location.search).get("scenario")==="memo-over-limit")values.note="메".repeat(501);
         staged.set(g.id,{...values,status:"success"});
         if(outcome==="review" && i===0) staged.set(g.id,{...values,category:"",status:"review"});
       });
       // Atomic publication happens only after all target groups succeed.
       staged.forEach((v,id)=>{bulkRegister.results.set(id,v);bulkRegister.dirtyGroups.delete(id);});
       bulkRegister.duplicateErrors.clear();bulkRegister.selectedRows.clear();bulkRegister.page=1;
-      bulkRegister.errorsOnly=bulkErrorCount()>0; renderBulkRegister();
+      bulkRegister.hasAnalyzed=true;bulkRegister.errorsOnly=bulkErrorCount()>0; renderBulkRegister();
     }
     back.querySelector("[data-close]").onclick=()=>{settled=true;close();};
     back.querySelectorAll("[data-bulk-outcome]").forEach(b=>b.onclick=()=>finish(b.dataset.bulkOutcome));
@@ -1897,7 +1918,7 @@
     syncSelection();
     const del=content.querySelector("[data-result-delete]");
     if(del)del.onclick=()=>openBulkDiscardConfirm(()=>{
-      bulkRegister.selectedRows.forEach(id=>{bulkRegister.excluded.add(id);bulkRegister.results.delete(id);bulkRegister.dirtyGroups.delete(id);});
+      bulkRegister.selectedRows.forEach(id=>{bulkRegister.excluded.add(id);bulkRegister.dirtyGroups.delete(id);});
       bulkRegister.selectedRows.clear();bulkRegister.duplicateErrors.clear();renderBulkRegister();toast("삭제되었습니다.");
     },{title:"삭제하시겠습니까?",body:"",confirmLabel:"삭제"});
     const movePage=delta=>{bulkRegister.page+=delta;bulkRegister.selectedRows.clear();renderBulkRegister();};
@@ -2009,7 +2030,7 @@
   /* ---------- filter modal ---------- */
   function openFilterModal() {
     const draft = JSON.parse(JSON.stringify(state.filters));
-    let group = "category";
+    let group = "type";
     let query = "";
 
     const GROUPS = [
@@ -2044,7 +2065,6 @@
           const groupMatches = !q || g.toLowerCase().includes(q);
           const filtered = subs.filter(s => groupMatches || s.toLowerCase().includes(q));
           if (!filtered.length) return;
-          out.push(g);
           filtered.forEach(s => out.push(`${g}/${s}`));
         });
         return out;
@@ -2121,7 +2141,7 @@
           const kids = filtered.map(s => optRow(draft.category.includes(`${g}/${s}`), s, `${g}/${s}`, groupMatches ? "child" : "")).join("");
           return parent + kids;
         }).join("");
-        if (!listHtml) listHtml = `<p class="muted" style="padding:12px 2px">결과가 없습니다.</p>`;
+        if (!listHtml) listHtml = `<p class="muted" style="padding:12px 2px">${CAT_GROUPS.size ? "결과가 없습니다." : "표시할 목록이 없습니다."}</p>`;
       } else if (group === "type") {
         listHtml = Object.entries(TYPE_LABEL).map(([v, l]) => optRow(draft.type.includes(v), l, v)).join("");
       } else if (group === "status") {
@@ -2131,7 +2151,7 @@
       } else if (group === "labels") {
         const filtered = ALL_LABELS.filter(l => !q || l.toLowerCase().includes(q));
         listHtml = filtered.length ? filtered.map(l => optRow(draft.labels.includes(l), l, l)).join("")
-          : `<p class="muted" style="padding:12px 2px">결과가 없습니다.</p>`;
+          : `<p class="muted" style="padding:12px 2px">${ALL_LABELS.length ? "결과가 없습니다." : "표시할 목록이 없습니다."}</p>`;
       } else if (group === "note") {
         listHtml = [{ v: "has", l: "있음" }, { v: "none", l: "없음" }]
           .map(o => optRow(draft.note.includes(o.v), o.l, o.v)).join("");
@@ -2165,7 +2185,7 @@
           if (v.startsWith("grp:")) {
             const g = v.slice(4);
             // 대분류를 체크하면 그 자체도 소분류들과 별개로 draft에 들어가서, 칩도 "대분류 + 소분류 N개"로 각각 따로 뜸(병합 안 함)
-            const keys = [g, ...CAT_GROUPS.get(g).map(s => `${g}/${s}`)];
+            const keys = CAT_GROUPS.get(g).filter(sub=>!query || g.toLowerCase().includes(query.toLowerCase()) || sub.toLowerCase().includes(query.toLowerCase())).map(sub=>`${g}/${sub}`);
             draft.category = cb.checked
               ? [...new Set([...draft.category, ...keys])]
               : draft.category.filter(k => !keys.includes(k));
@@ -2220,7 +2240,6 @@
         const groupMatches = !q || g.toLowerCase().includes(q);
         const filtered = subs.filter(s => groupMatches || s.toLowerCase().includes(q));
         if (!filtered.length) return;
-        out.push(g);
         filtered.forEach(s => out.push(`${g}/${s}`));
       });
       return out;
@@ -2267,7 +2286,7 @@
         const kids = filtered.map(s => optRow(draft.includes(`${g}/${s}`), s, `${g}/${s}`, groupMatches ? "child" : "")).join("");
         return parent + kids;
       }).join("");
-      if (!listHtml) listHtml = `<p class="muted" style="padding:12px 2px">결과가 없습니다.</p>`;
+      if (!listHtml) listHtml = `<p class="muted" style="padding:12px 2px">${CAT_GROUPS.size ? "결과가 없습니다." : "표시할 목록이 없습니다."}</p>`;
 
       const vis = visibleValues();
       const allChecked = vis.length > 0 && vis.every(v => draft.includes(v));
@@ -2291,7 +2310,7 @@
         if (v.startsWith("grp:")) {
           const g = v.slice(4);
           // 대분류를 체크하면 그 자체도 소분류들과 별개로 draft에 들어가서, 칩도 "대분류 + 소분류 N개"로 각각 따로 뜸(병합 안 함)
-          const keys = [g, ...groups.get(g).map(s => `${g}/${s}`)];
+          const keys = groups.get(g).filter(sub=>!query || g.toLowerCase().includes(query.toLowerCase()) || sub.toLowerCase().includes(query.toLowerCase())).map(sub=>`${g}/${sub}`);
           if (cb.checked) keys.forEach(k => { if (!draft.includes(k)) draft.push(k); });
           else keys.forEach(k => { const i = draft.indexOf(k); if (i > -1) draft.splice(i, 1); });
         } else if (cb.checked) draft.push(v);
@@ -2486,7 +2505,7 @@
       const d = new Date(), p2 = n => String(n).padStart(2, "0");
       const ts = `${d.getFullYear()}${p2(d.getMonth() + 1)}${p2(d.getDate())}_${p2(d.getHours())}${p2(d.getMinutes())}${p2(d.getSeconds())}`;
       if (items.length === 1) {
-        const a = items[0];
+        const a = [...items].sort((a,b)=>String(a.assetNo || "").localeCompare(String(b.assetNo || ""))).find(a=>window.assetPhotos(a).length) || items[0];
         // 구조설계안 5.4 사진 다운로드와 동일한 식별 라벨 규칙(개별=고유관리번호, 수량=품목명) + QR 접두어
         const label = a.type === "individual" ? (a.assetNo || a.id) : a.product;
         const fileName = window.assetDownloadFileName(`QR_${label}_${ts}.png`);

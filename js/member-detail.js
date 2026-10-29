@@ -148,7 +148,7 @@
     const WORK_SUBTABS = [
       { key: "asset", label: "자산" },
       { key: "todo", label: "할 일" },
-      { key: "report", label: "보고서", dropdown: true },
+      { key: "report", label: "보고서", dropdown: false },
       { key: "board", label: "게시판", dropdown: true },
     ];
     // 업무 > 자산을 바로 보여주는 게 이 페이지를 만든 목적이라 기본 진입 상태로 설정
@@ -195,7 +195,7 @@
         state.openDropdown = null;
         draw();
       });
-      c.querySelectorAll("[data-subtab]").forEach(b => b.onclick = () => { state.subtab = b.dataset.subtab; state.openDropdown = null; draw(); });
+      c.querySelectorAll("[data-subtab]").forEach(b => b.onclick = () => { if(b.dataset.subtab==="report"){toast("해당 구성원의 보고서 화면으로 이동합니다.");return;} state.subtab = b.dataset.subtab; state.openDropdown = null; draw(); });
       // 보고서·게시판 — 실제 페이지 이동 없이 그룹 선택 드롭다운까지만 구현(사용자 확정 스코프)
       c.querySelectorAll("[data-dropdown]").forEach(b => b.onclick = (e) => {
         e.stopPropagation();

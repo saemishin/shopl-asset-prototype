@@ -70,7 +70,7 @@
   ];
   const JOB_TITLES = ["직무/직급 없음", "팀장", "매니저", "주임", "사원"];
   const MEMBERS = [
-    { name: "김민수", team: "개발팀" }, { name: "이서연", team: "디자인팀" }, { name: "박지훈", team: "영업팀" },
+    { name: "김민수", team: "개발팀", role:"admin" }, { name: "이서연", team: "디자인팀" }, { name: "박지훈", team: "영업팀" },
     { name: "정우성", team: "CS팀" }, { name: "김철수", team: "운영팀" }, { name: "최유진", team: "개발팀" },
     { name: "한소희", team: "디자인팀" }, { name: "장민호", team: "국내영업" }, { name: "오세훈", team: "운영팀" },
     { name: "배수지", team: "CS팀" }, { name: "윤재현", team: "해외영업" }, { name: "임하늘", team: "개발팀" },
@@ -92,8 +92,15 @@
   // 배정/보유 변경 권한 대상은 조회 권한 대상의 부분집합이어야 함(구조설계안 4.3) — 대상 선택 모달에서 비활성 처리할 때 쓰는 안내 문구
   const RESTRICT_TIP = "변경 권한을 부여하려면 먼저 조회 권한이 부여되어야 합니다.";
 
-  const assetsOf = (group, sub) => assets.filter(a => a.group === group && a.sub === sub);
+  const assetsOf = (group, sub) => assets.filter(a => !a.deleted_at && a.group === group && a.sub === sub);
 
+  const categoryName = value => String(value || "").trim().replace(/\s+/g," ");
+  function subFormSnapshot(state) {
+    const normalize=value=>Array.isArray(value) ? value.map(normalize).sort() : value && typeof value==="object" ? Object.fromEntries(Object.keys(value).sort().map(k=>[k,normalize(value[k])])) : value;
+    return JSON.stringify(normalize({...state,name:categoryName(state.name)}));
+  }
+  function categoryExit(onLeave) { confirmModal("작성을 중단하시겠습니까?","지금까지 작성한 내용은 저장되지 않습니다.",onLeave); }
+  function productPhotoAsset(items) { return [...items].sort((a,b)=>String(a.assetNo || "").localeCompare(String(b.assetNo || ""))).find(a=>window.assetPhotos(a).length) || items[0]; }
   // 대분류별 접기/펼치기 상태 — 기본은 전부 펼쳐진 상태(Set이 비어있으면 전부 펼침), render() 사이에도 유지됨
   const collapsedGroups = new Set();
 
@@ -175,7 +182,7 @@
   function productRowHtml(p) {
     return `
       <tr class="clickable cat-prod-row" data-product="${p.product}" data-search-count="${p.total}">
-        <td>${prodCell(p.items[0], p.product)}</td>
+        <td>${prodCell(productPhotoAsset(p.items), p.product)}</td>
         <td class="num">${p.total}</td>
         <td class="num">${p.assigned}</td>
         <td class="num">${p.stock}</td>
@@ -191,11 +198,11 @@
     return `
       <tr class="clickable" data-asset="${a.id}" data-search-count="1">
         <td>${prodCell(a, a.product)}</td>
-        <td class="num">${a.totalQty}</td>
-        <td class="num">${qty}</td>
-        <td class="num">${a.totalQty - qty}</td>
+        <td class="num">${window.AssetQuantity.format(a.totalQty)}</td>
+        <td class="num">${window.AssetQuantity.format(qty)}</td>
+        <td class="num">${window.AssetQuantity.format(a.totalQty-qty)}</td>
         <td class="num">${targets}</td>
-        <td>${a.expiry ? window.fmtDate(a.expiry) : '<span class="muted">—</span>'}</td>
+        ${(categories.find(c=>c.group===a.group && c.sub===a.sub)?.hiddenFields || []).includes("expiry") ? "" : `<td>${a.expiry ? window.fmtDate(a.expiry) : '<span class="muted">—</span>'}</td>`}
       </tr>`;
   }
 
@@ -390,8 +397,8 @@
     const nameInputEl = container.querySelector("[data-f-name]");
     const nameErrEl = container.querySelector("[data-f-name-err]");
     function checkName() {
-      const val = state.name.trim();
-      const dup = !!val && (opts.siblingNames || []).includes(val);
+      const val = categoryName(state.name);
+      const dup = !!val && (opts.siblingNames || []).map(categoryName).includes(val);
       nameInputEl.classList.toggle("has-err", dup);
       nameErrEl.hidden = !dup;
       opts.onNameChange(val.length > 0 && !dup);
@@ -419,6 +426,7 @@
       if (i === -1) state.hiddenFields.push(f); else state.hiddenFields.splice(i, 1);
       b.classList.toggle("on");
       b.setAttribute("aria-checked", String(!state.hiddenFields.includes(f)));
+      checkName();
     });
   }
 
@@ -527,7 +535,7 @@
             render();
           }, restrict);
         } else if (picked === "특정 관리자/리더") {
-          const restrict = isNarrowedView ? new Set(state.viewTarget.members) : null;
+          const restrict = !isView && state.view==="관리자만" ? new Set(MEMBERS.filter(m=>m.role==="admin").map(m=>m.name)) : isNarrowedView ? new Set(state.viewTarget.members) : null;
           openMemberPicker(draftTarget.members, res => { draftTarget.members = res; render(); }, restrict);
         }
       };
@@ -630,6 +638,9 @@
         </div>
       </div>`;
     document.body.appendChild(p);
+    const syncSelection=()=>{const ok=p.querySelector("[data-ok]");if(ok)ok.disabled=!(selGroups.size+selJobTitles.size);};
+    new MutationObserver(syncSelection).observe(p,{childList:true,subtree:true});
+    p.addEventListener("change",syncSelection);p.addEventListener("click",()=>queueMicrotask(syncSelection));syncSelection();
     const content = p.querySelector("[data-content]");
     const jobTab = p.querySelector('[data-tab="jobTitles"]');
 
@@ -719,6 +730,9 @@
           </div>
         </div>`;
       document.body.appendChild(p);
+    const syncSelection=()=>{const ok=p.querySelector("[data-ok]");if(ok)ok.disabled=!(sel.size);};
+    new MutationObserver(syncSelection).observe(p,{childList:true,subtree:true});
+    p.addEventListener("change",syncSelection);p.addEventListener("click",()=>queueMicrotask(syncSelection));syncSelection();
       const list = p.querySelector("[data-list]");
       const countEl = p.querySelector("[data-count]");
       const selectedList = p.querySelector("[data-selected-list]");
@@ -779,6 +793,9 @@
         </div>
       </div>`;
     document.body.appendChild(p);
+    const syncSelection=()=>{const ok=p.querySelector("[data-ok]");if(ok)ok.disabled=!(sel.size);};
+    new MutationObserver(syncSelection).observe(p,{childList:true,subtree:true});
+    p.addEventListener("change",syncSelection);p.addEventListener("click",()=>queueMicrotask(syncSelection));syncSelection();
     const list = p.querySelector("[data-list]");
     function renderList() {
       const filtered = candidates.filter(m => !query || m.name.includes(query));
@@ -809,6 +826,7 @@
       assignTarget: cat.assignTarget ? { ...cat.assignTarget } : { groups: [], jobTitles: [], members: [] },
       hiddenFields: [...(cat.hiddenFields || [])],
     };
+    const initial=subFormSnapshot(state);
     const back = document.createElement("div");
     back.className = "modal-back";
     back.innerHTML = `
@@ -827,13 +845,19 @@
       groupLabel: cat.group,
       typeLocked: hasAssets,
       siblingNames: categories.filter(c => c.group === cat.group && c.sub !== cat.sub).map(c => c.sub),
-      onNameChange: valid => { saveBtn.disabled = !valid; },
+      onNameChange: valid => { saveBtn.disabled = !valid || subFormSnapshot(state)===initial; },
     });
     // Input/selection/confirmation modal: backdrop clicks do not dismiss.
-    back.querySelector("[data-cancel]").onclick = () => back.remove();
+    back.querySelector("[data-cancel]").onclick = () => { if(subFormSnapshot(state)!==initial)categoryExit(()=>back.remove());else back.remove(); };
     saveBtn.onclick = () => {
-      const name = state.name.trim();
-      if (!name) return;
+      const name = categoryName(state.name);
+      if (!name || saveBtn.disabled) return;
+      if(categories.some(c=>c!==cat && c.group===cat.group && categoryName(c.sub)===name)){
+        form.querySelector("[data-f-name]").classList.add("has-err");form.querySelector("[data-f-name-err]").hidden=false;saveBtn.disabled=true;return;
+      }
+      if(!categories.includes(cat) || (state.type!==cat.type && assetsOf(cat.group,cat.sub).length)){
+        back.remove();toast("설정이 변경되었습니다. 잠시 후 다시 시도해주세요.");render();return;
+      }
       // 이름이 바뀌면 이 소분류에 걸린 자산들의 sub도 같이 갱신(대분류는 이 폼에서 안 바뀌므로 group은 그대로)
       if (cat.sub !== name) {
         assets.forEach(a => { if (a.group === cat.group && a.sub === cat.sub) a.sub = name; });
@@ -865,6 +889,7 @@
     let dirty = false;
     let createGi = null; // 소분류 생성 모드일 때, 생성 대상 대분류의 draft 인덱스
     let createState = null;
+    let createInitial="";
     const selectedCategory = sel ? categories.find(c => c.group === sel.group && c.sub === sel.sub) : null;
     const normalizedName = value => value.trim().replace(/\s+/g, " ");
 
@@ -949,7 +974,7 @@
 
     // 뒤로가기 — 소분류명을 입력한 상태(= [저장]이 활성화될 만큼 진행된 상태)에서 나가려 하면 한 번 확인. 이름을 아직 안 썼으면 잃을 내용이 없다고 보고 바로 이동
     function guardedBack() {
-      if (createState && createState.name.trim()) {
+      if (createState && subFormSnapshot(createState)!==createInitial) {
         confirmModal("페이지를 벗어나시겠습니까?", "페이지를 벗어날 경우 편집한 내용이 저장되지 않습니다.", () => setMode("list"));
       } else {
         setMode("list");
@@ -1161,8 +1186,10 @@
         assignTarget: { groups: [], jobTitles: [], members: [] },
         hiddenFields: [...DEFAULT_HIDDEN_FIELDS.individual],
       };
+      createInitial=subFormSnapshot(createState);
       renderCreateForm();
       setMode("create");
+      confirmBtn.disabled=!categoryName(createState.name);
     }
 
 
@@ -1176,7 +1203,7 @@
     }
 
     function commitCreate() {
-      const name = createState.name.trim();
+      const name = categoryName(createState.name);
       if (!name) return;
       const group = draft[createGi].origName || draft[createGi].name;
       const newCat = {
@@ -1205,8 +1232,10 @@
         ? productsOf(cat.group, cat.sub)
         : [...assetsOf(cat.group, cat.sub)].sort((a, b) => a.product.localeCompare(b.product, "ko"));
       const nameOf = it => it.product;
-      const st = { q: "", page: 1, size: 20 };
+      const stored=JSON.parse(sessionStorage.getItem("asset-category-return") || "null");
+      const st=stored?.group===cat.group && stored?.sub===cat.sub ? {q:stored.q,page:stored.page,size:stored.size} : {q:"",page:1,size:20};
       const searchInput = c.querySelector("[data-product-search]");
+      searchInput.value=st.q;
       const sbox = searchInput.closest(".searchbox");
       const tableWrap = c.querySelector("[data-asset-table]");
       const emptyMsg = c.querySelector("[data-search-empty]");
@@ -1242,7 +1271,8 @@
         });
         tbody.querySelectorAll("[data-asset]").forEach(row => row.onclick = e => {
           e.stopPropagation();
-          window.open(`asset-detail.html?id=${row.dataset.asset}`, "_blank", "noopener");
+          sessionStorage.setItem("asset-category-return",JSON.stringify({...st,group:cat.group,sub:cat.sub}));
+          location.href=`asset-detail.html?id=${row.dataset.asset}`;
         });
         pagerEl.querySelectorAll("button[data-page]").forEach(b => b.onclick = () => { st.page = +b.dataset.page; refresh(); });
         const sizeSel = pagerEl.querySelector("[data-asset-pagesize]");
@@ -1260,6 +1290,7 @@
   }
 
   function render(sel) {
+    if(!sel && performance.getEntriesByType("navigation")[0]?.type==="back_forward") {const saved=JSON.parse(sessionStorage.getItem("asset-category-return") || "null");if(saved)sel={group:saved.group,sub:saved.sub};}
     const c = document.getElementById("content");
     const groups = groupsOf();
     if (!sel || !categories.some(x => x.group === sel.group && x.sub === sel.sub)) sel = firstSelectable(groups);

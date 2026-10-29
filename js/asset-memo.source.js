@@ -8,10 +8,10 @@
  * - 추가/수정 폼은 직접 편집하고 자산 최종 저장 시 반영. 상세는 메모만 별도 저장:
  *   대시보드 센터 모달, 앱 풀스크린 팝업. 기존 권한·폐기 동결 판정은 호출 화면에서 유지.
  * - 정규화한 HTML로 변경 판정: 서식만 변경해도 저장/이력 대상, 원복하면 저장 비활성.
- *   메모 팝업의 취소/X/배경/ESC는 미저장 변경 시 수정 중단 확인. 폼은 기존 이탈 확인 사용.
+ *   메모 팝업의 취소/X/ESC는 미저장 변경 시 수정 중단 확인. 폼은 기존 이탈 확인 사용.
  * - 지원 서식 붙여넣기 및 HTML 저장/조회/이력 유지, 목록 툴팁은 본문 텍스트.
  * - 링크: 기본 URI 검증·자동 인식, 편집 중 이동 없음, 조회 시 새 탭.
- *   운영 웹 prompt 대신 미리보기 호환 URL 모달 사용(취소 유지, 빈 URL은 링크 해제).
+ *   공통 운영 웹과 같은 브라우저 기본 prompt(취소 유지, 빈 URL은 링크 해제). 미지원 내장 미리보기만 URL 모달로 대체.
  * - 저장 콜백 성공 후에만 팝업을 닫음. 예외/Promise 거부/false는 실패로 보고 내용·서식을 보존해 재시도.
  *   저장 중 중복 실행·닫기·추가 편집 방지. 실제 동시 저장은 마지막 성공값 우선(API 구현 계약).
  * - 정적 인메모리 프로토타입. 실제 API/DB·네이티브 키보드·엑셀 생성 구현을 뜻하지 않음.
@@ -85,6 +85,15 @@ const groups = [
 ];
 const mounted = new Map();
 function openLinkInput(editor) {
+  // Use the common browser prompt; only unsupported embedded previews fall back.
+  let value;
+  try { value=window.prompt('링크 URL을 입력하세요',editor.getAttributes('link').href || ''); }
+  catch { openPreviewLinkInput(editor);return; }
+  if(value===null)return;
+  const chain=editor.chain().focus().extendMarkRange('link');
+  if(value==='')chain.unsetLink().run();else chain.setLink({href:value}).run();
+}
+function openPreviewLinkInput(editor) {
   if (document.querySelector('.asset-memo-link-back')) return;
   const back=document.createElement('div');
   back.className='asset-memo-link-back';
@@ -103,7 +112,7 @@ function openLinkInput(editor) {
   function onKey(event){if(event.key==='Escape'){event.preventDefault();event.stopImmediatePropagation();close();}else if(event.key==='Enter'){event.preventDefault();event.stopImmediatePropagation();apply();}}
   back.querySelector('[data-link-cancel]').onclick=close;
   back.querySelector('[data-link-apply]').onclick=apply;
-  back.addEventListener('click',event=>{if(event.target===back)close();});
+  // Preview fallback is an input modal: outside click does nothing.
   document.addEventListener('keydown',onKey,true);
   input.focus();input.select();
 }
@@ -132,7 +141,7 @@ function mountTextarea(input) {
   };
   const editor = new Editor({
     element: shell.querySelector('.asset-memo-body'),
-    extensions: [...base, Placeholder.configure({placeholder:'입력'}), CharacterCount.configure({limit:LIMIT})],
+    extensions: [...base, Placeholder.configure({placeholder:'입력'}), CharacterCount.configure({limit:LIMIT,autoTrim:false})],
     content: input.value || '<p></p>',
     editorProps: { attributes: { role:'textbox', 'aria-label':'메모', 'aria-multiline':'true', 'data-memo-content':'' } },
     onUpdate: ({editor: instance}) => {
@@ -183,10 +192,10 @@ function open({value='',back,mobile=false,onSave}) {
   const close=()=>{document.removeEventListener('keydown',onKey,true);api.destroy();overlay.remove();};
   const requestClose=()=>{if(!saving)dirty()?confirmDiscard(overlay,close):close();};
   function onKey(event){if(event.key!=='Escape'||document.querySelector('.asset-memo-link-back'))return;event.preventDefault();event.stopImmediatePropagation();const confirm=overlay.querySelector('.asset-memo-discard');if(confirm)confirm.remove();else requestClose();}
-  input.addEventListener('input',()=>save.disabled=saving||!dirty());
+  input.addEventListener('input',()=>save.disabled=saving||!dirty()||count(input.value)>LIMIT);
   overlay.querySelector('[data-cancel]').onclick=requestClose;
   overlay.querySelector('.asset-memo-close').onclick=requestClose;
-  overlay.addEventListener('click',event=>{if(event.target===overlay)requestClose();});
+  // Input modal: backdrop clicks never dismiss or request exit confirmation.
   // onSave is a commit boundary: failure must not remove the editor or the draft.
   // Current screens save in memory. Real API callers must reject/return false on failure,
   // and update the asset/activity only after a confirmed successful save.
@@ -210,7 +219,7 @@ function open({value='',back,mobile=false,onSave}) {
         overlay.removeAttribute('aria-busy');
         api.editor.setEditable(true);
         controls.forEach(({button,disabled})=>button.disabled=disabled);
-        save.disabled=!dirty();
+        save.disabled=!dirty()||count(input.value)>LIMIT;
       }
     }
   };

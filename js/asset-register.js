@@ -166,7 +166,7 @@
         .filter(t => t.orig && t.orig !== normalizeTagName(t.name))
         .map(t => ({ from: t.orig, to: normalizeTagName(t.name) }));
 
-      (window.DATA.assets || []).forEach(a => {
+      [...(window.DATA.assets || []),...(window.DATA.deletedAssets || [])].forEach(a => {
         if (!a.labels || !a.labels.length) return;
         a.labels = a.labels
           .filter(l => !deletedOrigs.includes(l))

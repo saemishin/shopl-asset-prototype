@@ -4,6 +4,11 @@
    자기 완결적(상수 중복 정의)이라 app.js/assets.js와 겹치는 부분이 많음 */
 (function () {
   const { assets } = window.DATA;
+  // QA fixture only: make progressive list rendering observable without an API.
+  if(new URLSearchParams(location.search).get("qa")==="long-list"){
+    const sample=assets.find(a=>a.type==="individual" && a.sub==="노트북");
+    for(let i=0;i<100;i++)assets.push({...sample,id:`QA-LIST-${i}`,assetNo:`QA-LIST-${String(i+1).padStart(4,"0")}`,status:"stock",assignments:[],_photos:[],_activityLog:[]});
+  }
 
   // 요금제 및 기능은 회사 전역 설정이며 직원/리더 모드와 별개로 관리자급(서버 역할 2/7/9)만 접근한다.
   // 이번 화면을 확인하기 위한 관리자급 권한 가정이다. 기존 자산 화면의 페르소나/권한 시뮬레이션은 유지한다.
@@ -2776,7 +2781,7 @@
             const rename = renamed.find(item => item.from === label);
             return rename ? rename.to : label;
           }).filter((label, index, all) => finalNames.includes(label) && all.indexOf(label) === index);
-          assets.forEach(asset => { asset.labels = updateLabels(asset.labels); });
+          [...assets,...(window.DATA.deletedAssets || [])].forEach(asset => { asset.labels = updateLabels(asset.labels); });
           state.addDraft.labels = updateLabels(state.addDraft.labels);
           master.length = 0;
           master.push(...finalNames);

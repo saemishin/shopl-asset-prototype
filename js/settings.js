@@ -160,6 +160,7 @@
     const selectedList = p.querySelector("[data-selected-list]");
 
     function renderSelected() {
+      p.querySelector("[data-ok]").disabled=sel.size===0;
       countEl.textContent = sel.size;
       selectedList.innerHTML = sel.size ? [...sel].map(name => `
         <div class="picker-selected-row">
