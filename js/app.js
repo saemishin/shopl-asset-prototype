@@ -1144,7 +1144,8 @@
     }, back.querySelector("[data-vclose]").onclick = () => back.remove(), back.querySelector("[data-vdownload]").onclick = () => toast("사진을 저장하였습니다."), draw();
   }
   const STATUS_TRANSITIONS = {
-    stock: [["repair-start", "수리/점검 접수"], ["lost-report", "분실 신고"], ["dispose", "폐기 처리"]],
+    // 배정 가능 상태에서는 배정 추가와 같은 동작을 '배정'으로 바로 제공한다(2026-10-29 사용자 결정).
+    stock: [["assign-add", "배정"], ["repair-start", "수리/점검 접수"], ["lost-report", "분실 신고"], ["dispose", "폐기 처리"]],
     assigned: [["repair-start", "수리/점검 접수"], ["lost-report", "분실 신고"], ["dispose", "폐기 처리"]],
     repair: [["repair-done", "수리/점검 완료"], ["lost-report", "분실 신고"], ["dispose", "폐기 처리"]],
     lost: [["lost-recover", "분실 회수"], ["dispose", "폐기 처리"]],

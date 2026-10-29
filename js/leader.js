@@ -966,8 +966,7 @@
       </div>
       ${addFabHtml()}`;
   }
-  const INDIV_STATUS_CHIPS = [["all", "전체"], ["stock", "배정 가능"], ["assigned", "배정 중"], ["lost", "분실"], ["repair", "수리/점검 중"]],
-    STATUS_HELP = {};
+  // 소분류 상세의 상태 필터 칩은 제공하지 않는다. 상태는 필터 팝업에서만 고른다(2026-10-29 사용자 결정).
   function matchesStatus(a, type, statusFilter) {
     return statusFilter === "all" ? !0 : a.status === statusFilter;
   }
@@ -975,7 +974,6 @@
     const cat = window.DATA.categories.find(c => c.sub === sub) || {},
       type = cat.type || "individual",
       searchPlaceholder = "품목명/고유관리번호",
-      statusChips = INDIV_STATUS_CHIPS,
       subItems = collectLeaderItems().filter(x => x.asset.sub === sub),
       filterGroups = MappAssetFilter.config(cat, "leader"),
       popupActive = MappAssetFilter.count(popupFilters) > 0,
@@ -988,8 +986,6 @@
         ${subItems.length ? MappAssetFilter.buttonHtml(popupFilters) : ""}
       </div>
       <div class="mapp-body">
-        ${subItems.length ? `<div class="mapp-chip-row">${statusChips.map(([k, l]) => `<button type="button" class="mapp-chip${k === statusFilter ? " active" : ""}" data-status-chip="${k}" aria-pressed="${k === statusFilter}">${l}</button>`).join("")}</div>` : ""}
-        ${subItems.length && STATUS_HELP[statusFilter] ? `<p class="hint">${STATUS_HELP[statusFilter]}</p>` : ""}
         ${subItems.length ? `<div class="mapp-search"><input type="text" data-mapp-search placeholder="${searchPlaceholder}"></div>` : ""}
         ${MappAssetFilter.appliedHtml(popupFilters, filterGroups)}
         <div class="mapp-count">전체 <b data-leader-result-count>${items.length}</b></div>
@@ -1780,7 +1776,8 @@
     }, back.querySelector("[data-vclose]").onclick = () => back.remove(), back.querySelector("[data-vdownload]").onclick = () => toast("사진을 저장하였습니다."), draw();
   }
   const STATUS_TRANSITIONS = {
-    stock: [["repair-start", "수리/점검 접수"], ["lost-report", "분실 신고"], ["dispose", "폐기 처리"]],
+    // 배정 가능 상태에서는 배정 추가와 같은 동작을 '배정'으로 바로 제공한다(2026-10-29 사용자 결정).
+    stock: [["assign-add", "배정"], ["repair-start", "수리/점검 접수"], ["lost-report", "분실 신고"], ["dispose", "폐기 처리"]],
     assigned: [["repair-start", "수리/점검 접수"], ["lost-report", "분실 신고"], ["dispose", "폐기 처리"]],
     repair: [["repair-done", "수리/점검 완료"], ["lost-report", "분실 신고"], ["dispose", "폐기 처리"]],
     lost: [["lost-recover", "분실 회수"], ["dispose", "폐기 처리"]],
@@ -2023,8 +2020,6 @@
         const body = b.nextElementSibling,
           expanded = b.getAttribute("aria-expanded") === "true";
         b.setAttribute("aria-expanded", String(!expanded)), body.hidden = expanded, b.classList.toggle("collapsed", expanded), expanded ? state.collapsedGroups.add(b.dataset.treeGroup) : state.collapsedGroups.delete(b.dataset.treeGroup);
-      }), root.querySelectorAll("[data-status-chip]").forEach(b => b.onclick = () => {
-        state.popupFilters = MappAssetFilter.empty(), state.statusFilter = b.dataset.statusChip, draw();
       });
       function applyPopup(filters) {
         state.popupFilters = filters, state.statusFilter = MappAssetFilter.count(filters) ? null : "all", draw();

@@ -1099,6 +1099,22 @@ window.formatAssetCount = value => Number(value || 0).toLocaleString("en-US");
     {id:'purchasePrice',name:'구매가격',description:'자산 1개를 구매한 가격을 기록합니다.'}
   ];
   window.DATA.extraFields ||= [];
+  // 데모 회사가 직접 추가한 추가 정보 항목(정책상 실제 회사는 빈 목록에서 시작). 소분류마다 ON/OFF를 다르게 둔다:
+  // 노트북 S/N·IMEI ON, 모니터 S/N만 ON, 그 외 소분류는 OFF. 기존 S/N·IMEI 값은 OFF 소분류에서도 원본값으로 보존한다.
+  if (!window.DATA.extraFields.length && new URLSearchParams(location.search).get('qa') !== 'extra-info') {
+    window.DATA.extraFields.push({id:'sn',name:'S/N'},{id:'imei',name:'IMEI'});
+    const ON = {'노트북':['sn','imei'],'모니터':['sn']};
+    for (const c of window.DATA.categories) c.extraEnabled = [...(ON[c.sub] || [])];
+    for (const a of window.DATA.assets) {
+      const v = {};
+      if (a.serial) v.sn = a.serial;
+      if (a.imei) v.imei = a.imei;
+      if (Object.keys(v).length) a.extraValues = {...v, ...(a.extraValues || {})};
+    }
+    // IMEI 데모 값: LTE 모델로 가정한 노트북 일부에만 입력
+    window.DATA.assets.filter(a => a.sub === '노트북' && a.status !== 'disposed').slice(0, 3)
+      .forEach((a, i) => { a.extraValues = {...(a.extraValues || {}), imei: `35937955039${1650 + i}`}; });
+  }
   window.hasPrototypeAssetManagePermission = () => {
     const p = new URLSearchParams(location.search);
     if (p.has('manage')) return p.get('manage') === '1';

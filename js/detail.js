@@ -213,6 +213,8 @@
     }, document.body.appendChild(cb), input.focus();
   }
   const STATUS_ACTION_HANDLERS = {
+    // 배정 가능 상태의 상태 변경 메뉴에서 배정 추가와 같은 Modal을 바로 연다.
+    "배정": a => openAssignAddModal(a),
     "수리/점검 접수": handleRepairStart,
     "분실 신고": handleLostReport,
     "수리/점검 완료": handleRepairDone,
@@ -985,7 +987,7 @@
       thumb = photos.length ? `<button class="dthumb" style="background:${primColor}" data-viewer aria-label="사진 보기">
            ${photos.length > 1 ? `<span class="tcount">+${photos.length - 1}</span>` : ""}</button>` : '<span class="dthumb empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 15 5-4 4 3 4-4 5 4"/></svg></span>',
       statusItems = {
-        stock: ["수리/점검 접수", "분실 신고", "폐기 처리"],
+        stock: ["배정", "수리/점검 접수", "분실 신고", "폐기 처리"],
         assigned: ["수리/점검 접수", "분실 신고", "폐기 처리"],
         repair: ["수리/점검 완료", "분실 신고", "폐기 처리"],
         lost: ["분실 회수", "폐기 처리"],
