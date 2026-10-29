@@ -1,30 +1,20 @@
-/* 분류 관리 — 분류-1 메인 화면. 좌측 트리(대분류는 그룹 헤더, 소분류만 선택 가능) + 우측(선택된 소분류 정보 + 품목 목록) */
 (function () {
-  const { categories, assets } = window.DATA;
-  // 분류가 전혀 없거나 대분류만 남은 회사의 화면을 확인하는 QA 전용 상태.
-  const categoryQa = new URLSearchParams(window.location.search).get("qa");
+  const {
+      categories,
+      assets
+    } = window.DATA,
+    categoryQa = new URLSearchParams(window.location.search).get("qa");
   if (categoryQa === "empty-subcategory") {
     const groupNames = [...new Set(categories.map(c => c.group))].slice(0, 2);
-    categories.length = 0;
-    assets.length = 0;
-    window.DATA.emptyGroups.splice(0, window.DATA.emptyGroups.length, ...groupNames);
-  } else if (categoryQa === "empty-category") {
-    categories.length = 0;
-    assets.length = 0;
-    window.DATA.emptyGroups.length = 0;
-  }
-
+    categories.length = 0, assets.length = 0, window.DATA.emptyGroups.splice(0, window.DATA.emptyGroups.length, ...groupNames);
+  } else categoryQa === "empty-category" && (categories.length = 0, assets.length = 0, window.DATA.emptyGroups.length = 0);
   function toast(msg) {
     const t = document.createElement("div");
-    t.textContent = msg;
-    t.style.cssText = "position:fixed;left:50%;bottom:32px;transform:translateX(-50%);background:#1b1d1f;color:#fff;padding:10px 16px;border-radius:8px;font-size:12.5px;z-index:300";
-    document.body.appendChild(t); setTimeout(() => t.remove(), 1800);
+    t.textContent = msg, t.style.cssText = "position:fixed;left:50%;bottom:32px;transform:translateX(-50%);background:#1b1d1f;color:#fff;padding:10px 16px;border-radius:8px;font-size:12.5px;z-index:300", document.body.appendChild(t), setTimeout(() => t.remove(), 1800);
   }
   function confirmModal(title, body, onOk) {
     const cb = document.createElement("div");
-    cb.className = "modal-back";
-    cb.style.zIndex = 340;
-    cb.innerHTML = `
+    cb.className = "modal-back", cb.style.zIndex = 340, cb.innerHTML = `
       <div class="modal" style="width:380px">
         <div class="body" style="padding-top:20px">
           <p style="font-size:14px;font-weight:700;margin-bottom:6px">${title}</p>
@@ -34,275 +24,283 @@
           <button class="btn" data-cclose>취소</button>
           <button class="btn primary" data-cok>확인</button>
         </div>
-      </div>`;
-    // Input/selection/confirmation modal: backdrop clicks do not dismiss.
-    cb.querySelector("[data-cclose]").onclick = () => cb.remove();
-    cb.querySelector("[data-cok]").onclick = () => { cb.remove(); onOk(); };
-    document.body.appendChild(cb);
+      </div>`, cb.querySelector("[data-cclose]").onclick = () => cb.remove(), cb.querySelector("[data-cok]").onclick = () => {
+      cb.remove(), onOk();
+    }, document.body.appendChild(cb);
   }
-  const TRASH_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M9.5 7l.7 13a1 1 0 0 0 1 1h5.6a1 1 0 0 0 1-1l.7-13"/></svg>`;
-  const HANDLE_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>`;
-  const BACK_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>`;
-  const CLOSE_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg>`;
-  const RESET_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 1 2.64 6.36"/><path d="M3 20v-6h6"/></svg>`;
-  const INFO_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 8v.01"/></svg>`;
-
-  // 자산 조회·배정/보유 변경 권한 옵션 — 구조설계안 4.3. assign은 항상 view 범위의 부분집합(표에 정의된 선택 가능 범위/기본값 그대로 반영)
-  const VIEW_OPTIONS = ["회사의 모든 구성원", "모든 관리자 및 리더", "특정 그룹 및 직무/직급", "특정 관리자/리더", "관리자만"];
-  const ASSIGN_BY_VIEW = {
-    "회사의 모든 구성원": { options: VIEW_OPTIONS, default: "모든 관리자 및 리더" },
-    "모든 관리자 및 리더": { options: ["모든 관리자 및 리더", "특정 그룹 및 직무/직급", "특정 관리자/리더", "관리자만"], default: "모든 관리자 및 리더" },
-    "특정 그룹 및 직무/직급": { options: ["특정 그룹 및 직무/직급"], default: "특정 그룹 및 직무/직급" },
-    "특정 관리자/리더": { options: ["특정 관리자/리더"], default: "특정 관리자/리더" },
-    "관리자만": { options: ["관리자만", "특정 관리자/리더"], default: "관리자만" },
-  };
-  const TARGET_NEEDED = new Set(["특정 그룹 및 직무/직급", "특정 관리자/리더"]);
-
-  // 권한 대상 선택(그룹/직무/직급·구성원 선택 모달)용 샘플 데이터 — 실제 조직도 연동 전, 프로토타입 데모용
-  const GROUP_TREE = [
-    { name: "샤플앤컴퍼니", children: [
-      { name: "개발팀" },
-      { name: "디자인팀" },
-      { name: "영업팀", children: [{ name: "국내영업" }, { name: "해외영업" }] },
-      { name: "운영팀" },
-      { name: "CS팀" },
-    ] },
-  ];
-  const JOB_TITLES = ["직무/직급 없음", "팀장", "매니저", "주임", "사원"];
-  const MEMBERS = [
-    { name: "김민수", team: "개발팀", role:"admin" }, { name: "이서연", team: "디자인팀" }, { name: "박지훈", team: "영업팀" },
-    { name: "정우성", team: "CS팀" }, { name: "김철수", team: "운영팀" }, { name: "최유진", team: "개발팀" },
-    { name: "한소희", team: "디자인팀" }, { name: "장민호", team: "국내영업" }, { name: "오세훈", team: "운영팀" },
-    { name: "배수지", team: "CS팀" }, { name: "윤재현", team: "해외영업" }, { name: "임하늘", team: "개발팀" },
-  ];
-  const AVATAR_COLORS = ["#5b8def", "#8f6ef0", "#eb7f8b", "#3fb37f", "#e0a63c", "#4dabf7"];
+  const TRASH_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M9.5 7l.7 13a1 1 0 0 0 1 1h5.6a1 1 0 0 0 1-1l.7-13"/></svg>',
+    HANDLE_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>',
+    BACK_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>',
+    CLOSE_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+    RESET_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 1 2.64 6.36"/><path d="M3 20v-6h6"/></svg>',
+    INFO_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 8v.01"/></svg>',
+    VIEW_OPTIONS = ["회사의 모든 구성원", "모든 관리자 및 리더", "특정 그룹 및 직무/직급", "특정 관리자/리더", "관리자만"],
+    ASSIGN_BY_VIEW = {
+      "회사의 모든 구성원": {
+        options: VIEW_OPTIONS,
+        default: "모든 관리자 및 리더"
+      },
+      "모든 관리자 및 리더": {
+        options: ["모든 관리자 및 리더", "특정 그룹 및 직무/직급", "특정 관리자/리더", "관리자만"],
+        default: "모든 관리자 및 리더"
+      },
+      "특정 그룹 및 직무/직급": {
+        options: ["특정 그룹 및 직무/직급"],
+        default: "특정 그룹 및 직무/직급"
+      },
+      "특정 관리자/리더": {
+        options: ["특정 관리자/리더"],
+        default: "특정 관리자/리더"
+      },
+      관리자만: {
+        options: ["관리자만", "특정 관리자/리더"],
+        default: "관리자만"
+      }
+    },
+    TARGET_NEEDED = /* @__PURE__ */new Set(["특정 그룹 및 직무/직급", "특정 관리자/리더"]),
+    GROUP_TREE = [{
+      name: "샤플앤컴퍼니",
+      children: [{
+        name: "개발팀"
+      }, {
+        name: "디자인팀"
+      }, {
+        name: "영업팀",
+        children: [{
+          name: "국내영업"
+        }, {
+          name: "해외영업"
+        }]
+      }, {
+        name: "운영팀"
+      }, {
+        name: "CS팀"
+      }]
+    }],
+    JOB_TITLES = ["직무/직급 없음", "팀장", "매니저", "주임", "사원"],
+    MEMBERS = [{
+      name: "김민수",
+      team: "개발팀",
+      role: "admin"
+    }, {
+      name: "이서연",
+      team: "디자인팀"
+    }, {
+      name: "박지훈",
+      team: "영업팀"
+    }, {
+      name: "정우성",
+      team: "CS팀"
+    }, {
+      name: "김철수",
+      team: "운영팀"
+    }, {
+      name: "최유진",
+      team: "개발팀"
+    }, {
+      name: "한소희",
+      team: "디자인팀"
+    }, {
+      name: "장민호",
+      team: "국내영업"
+    }, {
+      name: "오세훈",
+      team: "운영팀"
+    }, {
+      name: "배수지",
+      team: "CS팀"
+    }, {
+      name: "윤재현",
+      team: "해외영업"
+    }, {
+      name: "임하늘",
+      team: "개발팀"
+    }],
+    AVATAR_COLORS = ["#5b8def", "#8f6ef0", "#eb7f8b", "#3fb37f", "#e0a63c", "#4dabf7"];
   function avatarColor(name) {
     let h = 0;
     for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) % 997;
     return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length];
   }
-  // 구조설계안 3.3: 필드 노출 설정 대상은 유효기한·S/N·IMEI·제조연월·구매연월·구매가격 6개(IMEI·S/N은 개별형 전용)
-  // — 기본값: IMEI off, 나머지 on(2026-09-30 — 유효기한은 이전엔 기본 off였다가, 앱 전역 만료 판정에 쓰이는
-  // 필드를 꺼둔 채로 두는 게 위험하다고 판단해 기본값만 on으로 변경. 계속 소분류별로 껐다 켰다 할 수 있는 건 동일)
-  const FIELD_LABEL = { serial: "S/N", imei: "IMEI", purchaseDate: "구매연월", purchasePrice: "구매가격", manufactured: "제조연월", expiry: "유효기한" };
-  const DEFAULT_HIDDEN_FIELDS = { individual: ["imei"], quantity: [] };
-  // 배정/보유 변경 권한 — 개별형은 "배정", 수량형은 "보유"로 부르는 게 구조설계안 4.3 표현과도 맞고,
-  // 화면이 항상 하나의 자산 유형으로 스코프돼 있으니(소분류 상세·생성/수정 폼) 더 정확하게 부를 수 있음
-  const assignLabel = type => type === "individual" ? "배정 변경 권한" : "보유 변경 권한";
-  // 배정/보유 변경 권한 대상은 조회 권한 대상의 부분집합이어야 함(구조설계안 4.3) — 대상 선택 모달에서 비활성 처리할 때 쓰는 안내 문구
-  const RESTRICT_TIP = "변경 권한을 부여하려면 먼저 조회 권한이 부여되어야 합니다.";
-
-  const assetsOf = (group, sub) => assets.filter(a => !a.deleted_at && a.group === group && a.sub === sub);
-
-  const categoryName = value => String(value || "").trim().replace(/\s+/g," ");
+  const FIELD_LABEL = {
+      serial: "S/N",
+      imei: "IMEI",
+      purchaseDate: "구매연월",
+      purchasePrice: "구매가격",
+      manufactured: "제조연월",
+      expiry: "유효기한"
+    },
+    DEFAULT_HIDDEN_FIELDS = {
+      individual: ["imei"]
+    },
+    assignLabel = type => "배정 변경 권한",
+    RESTRICT_TIP = "변경 권한을 부여하려면 먼저 조회 권한이 부여되어야 합니다.",
+    assetsOf = (group, sub) => assets.filter(a => !a.deleted_at && a.group === group && a.sub === sub),
+    categoryName = value => String(value || "").trim().replace(/\s+/g, " ");
   function subFormSnapshot(state) {
-    const normalize=value=>Array.isArray(value) ? value.map(normalize).sort() : value && typeof value==="object" ? Object.fromEntries(Object.keys(value).sort().map(k=>[k,normalize(value[k])])) : value;
-    return JSON.stringify(normalize({...state,name:categoryName(state.name)}));
+    const normalize = value => Array.isArray(value) ? value.map(normalize).sort() : value && typeof value == "object" ? Object.fromEntries(Object.keys(value).sort().map(k => [k, normalize(value[k])])) : value;
+    return JSON.stringify(normalize({
+      ...state,
+      name: categoryName(state.name)
+    }));
   }
-  function categoryExit(onLeave) { confirmModal("작성을 중단하시겠습니까?","지금까지 작성한 내용은 저장되지 않습니다.",onLeave); }
-  function productPhotoAsset(items) { return [...items].sort((a,b)=>String(a.assetNo || "").localeCompare(String(b.assetNo || ""))).find(a=>window.assetPhotos(a).length) || items[0]; }
-  // 대분류별 접기/펼치기 상태 — 기본은 전부 펼쳐진 상태(Set이 비어있으면 전부 펼침), render() 사이에도 유지됨
-  const collapsedGroups = new Set();
-
-  // 대분류 등장 순서대로 그룹핑(소분류는 categories 배열 순서 그대로). 소분류가 아직 없는 대분류(emptyGroups)도 포함
+  function categoryExit(onLeave) {
+    confirmModal("작성을 중단하시겠습니까?", "지금까지 작성한 내용은 저장되지 않습니다.", onLeave);
+  }
+  function productPhotoAsset(items) {
+    return [...items].sort((a, b) => String(a.assetNo || "").localeCompare(String(b.assetNo || ""))).find(a => window.assetPhotos(a).length) || items[0];
+  }
+  const collapsedGroups = /* @__PURE__ */new Set();
   function groupsOf() {
-    const order = [];
-    const map = {};
-    categories.forEach(c => {
-      if (!map[c.group]) { map[c.group] = []; order.push(c.group); }
-      map[c.group].push(c);
-    });
-    (window.DATA.emptyGroups || []).forEach(g => {
-      if (!map[g]) { map[g] = []; order.push(g); }
-    });
-    return order.map(group => ({ group, subs: map[group] }));
+    const order = [],
+      map = {};
+    return categories.forEach(c => {
+      map[c.group] || (map[c.group] = [], order.push(c.group)), map[c.group].push(c);
+    }), (window.DATA.emptyGroups || []).forEach(g => {
+      map[g] || (map[g] = [], order.push(g));
+    }), order.map(group => ({
+      group,
+      subs: map[group]
+    }));
   }
   function firstSelectable(groups) {
-    for (const g of groups) if (g.subs.length) return { group: g.group, sub: g.subs[0].sub };
+    for (const g of groups) if (g.subs.length) return {
+      group: g.group,
+      sub: g.subs[0].sub
+    };
     return null;
   }
-
   function treeHtml(groups, sel) {
     const head = `
       <div class="cat-tree-head">
-        <button class="btn sm" data-manage>분류 관리</button>
-      </div>`;
-    const body = groups.map(({ group, subs }) => {
-      const collapsed = collapsedGroups.has(group);
-      return `
+        ${window.hasPrototypeAssetManagePermission()?'<button class="btn sm" data-manage-dropdown>관리 ▾</button>':''}
+      </div>`,
+      body = groups.map(({
+        group,
+        subs
+      }) => {
+        const collapsed = collapsedGroups.has(group);
+        return `
       <div class="cat-tree-group">
         <button class="cat-tree-label" data-toggle="${group}">
           <span class="cat-tree-chevron">${collapsed ? "▸" : "▾"}</span>${group}
         </button>
-        ${collapsed ? "" : (subs.length ? subs.map(s => `
+        ${collapsed ? "" : subs.length ? subs.map(s => `
           <button class="cat-tree-item${sel && sel.group === group && sel.sub === s.sub ? " active" : ""}"
                   data-tree="${group}|${s.sub}">
             ${s.sub}<span class="cat-tree-count">${assetsOf(group, s.sub).length}</span>
-          </button>`).join("") : '<p class="cat-tree-empty">소분류 없음</p>')}
+          </button>`).join("") : '<p class="cat-tree-empty">소분류 없음</p>'}
       </div>`;
-    }).join("");
+      }).join("");
     return head + body;
   }
-
-  // 개별형 자산 목록을 품목(품목명) 단위로 집계 — 품목 식별키는 구조안 3.1과 동일하게 "소분류+품목명".
-  // 이미 소분류 하나로 좁혀진 목록이라 정렬은 품목명순만 적용(현황 화면 정렬 정책의 2단계와 동일)
   function productsOf(group, sub) {
-    const list = assetsOf(group, sub);
-    const order = [];
-    const map = {};
-    list.forEach(a => {
-      if (!map[a.product]) { map[a.product] = []; order.push(a.product); }
-      map[a.product].push(a);
-    });
-    order.sort((a, b) => a.localeCompare(b, "ko"));
-    return order.map(product => {
-      const items = map[product];
-      const assigned = items.filter(a => a.status === "assigned").length;
-      const stock = items.filter(a => a.status === "stock").length;
-      const repair = items.filter(a => a.status === "repair").length;
-      const lost = items.filter(a => a.status === "lost").length;
-      const disposed = items.filter(a => a.status === "disposed").length;
-      return { product, items, total: items.length, assigned, stock, repair, lost, disposed };
+    const list = assetsOf(group, sub),
+      order = [],
+      map = {};
+    return list.forEach(a => {
+      map[a.product] || (map[a.product] = [], order.push(a.product)), map[a.product].push(a);
+    }), order.sort((a, b) => a.localeCompare(b, "ko")), order.map(product => {
+      const items = map[product],
+        assigned = items.filter(a => a.status === "assigned").length,
+        stock = items.filter(a => a.status === "stock").length,
+        repair = items.filter(a => a.status === "repair").length,
+        lost = items.filter(a => a.status === "lost").length,
+        disposed = items.filter(a => a.status === "disposed").length;
+      return {
+        product,
+        items,
+        total: items.length,
+        assigned,
+        stock,
+        repair,
+        lost,
+        disposed
+      };
     });
   }
-
-  // 현황(assets.js)의 thumb()와 동일 — 대표 사진(window.assetPhotos, data.js 공유)을 품목명 옆에 표시
   function thumb(a) {
     const ph = window.assetPhotos(a);
-    if (ph.length) {
-      const c = ph[a._primary || 0].color;
-      return `<span class="thumb" style="background:${c}"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10" r="1.6"/><path d="m21 16-5-5-9 8"/></svg></span>`;
-    }
-    return `<span class="thumb empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 15 5-4 4 3 4-4 5 4"/></svg></span>`;
+    return ph.length ? `<span class="thumb" style="background:${ph[a._primary || 0].color}"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10" r="1.6"/><path d="m21 16-5-5-9 8"/></svg></span>` : '<span class="thumb empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 15 5-4 4 3 4-4 5 4"/></svg></span>';
   }
   function prodCell(a, name) {
     return `<div class="prodcell">${thumb(a)}<span class="pname">${name}</span></div>`;
   }
-
   function productRowHtml(p) {
     return `
       <tr class="clickable cat-prod-row" data-product="${p.product}" data-search-count="${p.total}">
         <td>${prodCell(productPhotoAsset(p.items), p.product)}</td>
         <td class="num">${p.total}</td>
         <td class="num">${p.assigned}</td>
-        <td class="num">${p.stock}</td>
         <td class="num">${p.repair}</td>
         <td class="num">${p.lost}</td>
         <td class="num">${p.disposed}</td>
+        <td class="num">${p.stock}</td>
       </tr>`;
   }
-
-  function stockRowHtml(a) {
-    const qty = (a.stocks || []).reduce((s, x) => s + x.qty, 0);
-    const targets = (a.stocks || []).length;
-    return `
-      <tr class="clickable" data-asset="${a.id}" data-search-count="1">
-        <td>${prodCell(a, a.product)}</td>
-        <td class="num">${window.AssetQuantity.format(a.totalQty)}</td>
-        <td class="num">${window.AssetQuantity.format(qty)}</td>
-        <td class="num">${window.AssetQuantity.format(a.totalQty-qty)}</td>
-        <td class="num">${targets}</td>
-        ${(categories.find(c=>c.group===a.group && c.sub===a.sub)?.hiddenFields || []).includes("expiry") ? "" : `<td>${a.expiry ? window.fmtDate(a.expiry) : '<span class="muted">—</span>'}</td>`}
-      </tr>`;
-  }
-
-  // 관리 정보 — 소분류 필드 노출 설정(구조안 3.3)을 전체 필드 대비 on/off 라벨로 표시. S/N·IMEI는 개별형에만 해당하는 필드라 수량형엔 안 보여줌.
-  // 순서는 자산 추가/수정 화면(asset-register.js)에서 실제 노출되는 순서와 동일하게 맞춤(2026-09-30)
-  const fieldsForType = type => type === "individual"
-    ? ["expiry", "serial", "imei", "manufactured", "purchaseDate", "purchasePrice"]
-    : ["expiry", "manufactured", "purchaseDate", "purchasePrice"];
-
+  const fieldsForType = type => window.AssetExtra.fields().map(f=>f.id);
   function usageInfoHtml(cat) {
-    const hidden = cat.hiddenFields || [];
-    const fields = fieldsForType(cat.type);
-    return fields.map(f => {
-      const on = !hidden.includes(f);
-      return `<span class="usebullet ${on ? "on" : "off"}">${FIELD_LABEL[f]}</span>`;
-    }).join("");
-  }
-
-  // 현황 페이지 검색창(searchbox/search/search-clear)과 동일한 패턴 — 평소엔 좁고 "검색", 포커스하면 넓어지며 "품목명"
+ const manage=window.hasPrototypeAssetManagePermission();
+ return window.AssetExtra.fields().filter(f=>manage || !(cat.privateFields||[]).includes(f.id)).map(f=>`<span class="usebullet ${window.AssetExtra.enabled(cat,f.id)?'on':'off'}">${window.AssetExtra.esc(f.name)} ${window.AssetExtra.enabled(cat,f.id)?'ON':'OFF'}${window.AssetExtra.enabled(cat,f.id)&&(cat.privateFields||[]).includes(f.id)?' · 비공개':''}</span>`).join('');
+}
   const ASSET_SEARCH_HTML = `
     <div class="cat-asset-search">
       <div class="searchbox">
         <input class="search" type="text" data-product-search placeholder="검색">
         <button class="search-clear" type="button" data-product-search-clear aria-label="검색어 지우기">✕</button>
       </div>
-    </div>`;
-  const assetEmptyHtml = () => `
+    </div>`,
+    assetEmptyHtml = () => `
     <div class="cat-asset-empty">
       <p class="muted">등록된 자산이 없습니다.</p>
-      <button class="btn sm" data-add-asset>자산 추가</button>
+      <button class="btn sm" data-add-asset>자산 추가</button><button class="btn sm" data-bulk-add>일괄 추가</button>
     </div>`;
-
   function assetSectionHtml(cat) {
-    if (cat.type === "individual") {
+    {
       const products = productsOf(cat.group, cat.sub);
-      const total = products.reduce((s, p) => s + p.total, 0);
       return `
         <div class="cat-asset-head">
           <h4>품목 목록</h4>
         </div>
         <div class="cat-asset-countrow">
-          <p class="cat-asset-count">전체 <span data-product-result-count>${total}</span></p>
+          <p class="cat-asset-count">전체 <span data-product-result-count>${products.reduce((s, p) => s + p.total, 0)}</span></p>
           ${products.length ? ASSET_SEARCH_HTML : ""}
         </div>
         ${products.length ? `
           <div class="table-wrap" data-asset-table>
             <table class="cat-asset-table">
-              <thead><tr><th>품목명</th><th class="num">자산 수</th><th class="num">배정 중</th><th class="num">재고</th><th class="num">수리/점검 중</th><th class="num">분실</th><th class="num">폐기</th></tr></thead>
+              <thead><tr><th>품목명</th><th class="num">자산 수</th><th class="num">배정 중</th><th class="num">수리/점검 중</th><th class="num">분실</th><th class="num">폐기</th><th class="num">배정 가능</th></tr></thead>
               <tbody data-asset-tbody></tbody>
             </table>
           </div>
           <p class="muted" data-search-empty hidden style="padding:12px 0">결과가 없습니다.</p>
           <div data-asset-pager></div>` : assetEmptyHtml()}`;
     }
-    // 이미 소분류 하나로 좁혀진 목록이라 정렬은 품목명순만 적용(개별형 productsOf()와 동일 원칙)
-    const list = [...assetsOf(cat.group, cat.sub)].sort((a, b) => a.product.localeCompare(b.product, "ko"));
-    return `
-      <div class="cat-asset-head">
-        <h4>품목 목록</h4>
-      </div>
-      <div class="cat-asset-countrow">
-        <p class="cat-asset-count">전체 <span data-product-result-count>${list.length}</span></p>
-        ${list.length ? ASSET_SEARCH_HTML : ""}
-      </div>
-      ${list.length ? `
-        <div class="table-wrap" data-asset-table>
-          <table class="cat-asset-table">
-            <thead><tr><th>품목명</th><th class="num">전체 수량</th><th class="num">보유 수량</th><th class="num">잔여 수량</th><th class="num">보유 대상</th><th>유효기한</th></tr></thead>
-            <tbody data-asset-tbody></tbody>
-          </table>
-        </div>
-        <p class="muted" data-search-empty hidden style="padding:12px 0">결과가 없습니다.</p>
-        <div data-asset-pager></div>` : assetEmptyHtml()}`;
   }
-
-  // 권한 범위명 — 특정 그룹 및 직무/직급·특정 관리자/리더는 지정 대상이 있으니 범위명을 눌러 대상 조회 모달을 열 수 있게 함(수정은 [수정] 버튼에서만)
   function permValueHtml(cat, kind) {
     const value = cat[kind];
-    if (!TARGET_NEEDED.has(value) || !cat[kind + "Target"]) return value;
-    return `<button type="button" class="perm-value-link" data-perm-target="${kind}">${value}</button>`;
+    return !TARGET_NEEDED.has(value) || !cat[kind + "Target"] ? value : `<button type="button" class="perm-value-link" data-perm-target="${kind}">${value}</button>`;
   }
-
-  // 권한 대상 조회 모달 — 조회 전용(푸터 없음). 목록은 구성원·그룹·직무/직급 모두 이름 가나다순.
-  // 그룹·직무/직급 중 비어 있는 쪽은 제한하지 않은 축(전체)이라 "전체"로 표시
   function openPermTargetModal(cat, kind) {
-    const target = cat[kind + "Target"] || { groups: [], jobTitles: [], members: [] };
-    const byName = list => [...list].sort((a, b) => a.localeCompare(b, "ko"));
+    const target = cat[kind + "Target"] || {
+        groups: [],
+        jobTitles: [],
+        members: []
+      },
+      byName = list => [...list].sort((a, b) => a.localeCompare(b, "ko"));
     let bodyHtml;
     if (cat[kind] === "특정 관리자/리더") {
       const names = byName(target.members);
       bodyHtml = `
         <p class="perm-target-count">전체 <b>${names.length}</b></p>
         <div class="perm-target-list">${names.map(name => {
-          const m = MEMBERS.find(x => x.name === name);
-          return `
+        const m2 = MEMBERS.find(x => x.name === name);
+        return `
             <div class="perm-target-row">
               <span class="picker-avatar" style="background:${avatarColor(name)}">${name[0]}</span>
-              <span class="perm-target-info"><b>${name}</b>${m ? `<span>${m.team}</span>` : ""}</span>
+              <span class="perm-target-info"><b>${name}</b>${m2 ? `<span>${m2.team}</span>` : ""}</span>
             </div>`;
-        }).join("")}</div>`;
+      }).join("")}</div>`;
     } else {
       const section = (label, list) => `
         <div class="perm-target-section">
@@ -312,41 +310,34 @@
       bodyHtml = section("그룹", byName(target.groups)) + section("직무/직급", byName(target.jobTitles));
     }
     const m = document.createElement("div");
-    m.className = "modal-back";
-    m.innerHTML = `
+    m.className = "modal-back", m.innerHTML = `
       <div class="modal help-modal perm-target-modal">
         <div class="help-modal-head">
           <h3>${kind === "view" ? "자산 조회 권한" : assignLabel(cat.type)}</h3>
           <button type="button" class="btn icon-only sm" data-close aria-label="닫기">${CLOSE_ICON}</button>
         </div>
         <div class="body">${bodyHtml}</div>
-      </div>`;
-    document.body.appendChild(m);
-    m.addEventListener("click", e => { if (e.target === m) m.remove(); });
-    m.querySelector("[data-close]").onclick = () => m.remove();
+      </div>`, document.body.appendChild(m), m.addEventListener("click", e => {
+      e.target === m && m.remove();
+    }), m.querySelector("[data-close]").onclick = () => m.remove();
   }
-
   function detailHtml(cat) {
     return `
       <div class="cat-detail-head">
-        <h3>${cat.sub} <span class="type-pill">${cat.type === "individual" ? "개별 자산" : "수량 자산"}</span></h3>
-        <div class="cat-detail-acts"><button class="btn sm" data-edit-sub>수정</button></div>
+        <div class="category-two-line"><span>${cat.group}</span><h3>${cat.sub}</h3></div>
+        ${window.hasPrototypeAssetManagePermission()?'<div class="cat-detail-acts"><button class="btn sm" data-edit-sub>수정</button></div>':''}
       </div>
       <div class="kv2 cat-detail-kv">
         <div><div class="k">자산 조회 권한</div><div class="v">${permValueHtml(cat, "view")}</div></div>
         <div><div class="k">${assignLabel(cat.type)}</div><div class="v">${permValueHtml(cat, "assign")}</div></div>
       </div>
       <div class="cat-usage">
-        <div class="k">관리 정보</div>
+        <div class="k">추가 정보</div>
         <div class="cat-usage-bullets">${usageInfoHtml(cat)}</div>
       </div>
       ${assetSectionHtml(cat)}
     `;
   }
-
-  // 소분류 생성/수정 폼 — 둘 다 이 함수 하나로 렌더링(소분류 생성 화면 vs [수정] 모달이 필드 구성은 완전히 동일하고
-  // 뒤로가기 유무·모달 타이틀만 다름). state: { name, type, view, assign, viewTarget, assignTarget, hiddenFields }
-  // opts: { groupLabel, typeLocked, onNameChange(valid) }
   function renderSubForm(container, state, opts) {
     const typeLocked = !!opts.typeLocked;
     container.innerHTML = `
@@ -360,113 +351,55 @@
         <p class="field-err" data-f-name-err hidden>동일한 명칭이 존재합니다.</p>
       </div>
       <div class="field">
-        <label>자산 유형<span class="req">*</span> <button type="button" class="help-icon" data-f-type-help aria-label="자산 유형 도움말">?</button></label>
-        ${typeLocked ? `
-          <p class="field-static">${state.type === "individual" ? "개별 자산" : "수량 자산"}</p>
-          <p class="hint" style="margin:4px 0 0">등록된 자산이 있어 자산 유형을 변경할 수 없습니다.</p>
-        ` : `
-          <div class="seg" data-f-type>
-            <button type="button" data-val="individual" class="${state.type === "individual" ? "active" : ""}">개별 자산</button>
-            <button type="button" data-val="quantity" class="${state.type === "quantity" ? "active" : ""}">수량 자산</button>
-          </div>
-        `}
-      </div>
-      <div class="field">
         <label>자산 조회 권한<span class="req">*</span></label>
         <p class="hint" style="margin-top:0;margin-bottom:8px">이 소분류의 자산을 조회할 수 있는 구성원을 설정합니다.</p>
         <button type="button" class="cat-manage-select-btn" data-f-view-btn><span>${state.view}</span><span class="chev">▾</span></button>
       </div>
       <div class="field">
         <label>${assignLabel(state.type)}<span class="req">*</span></label>
-        <p class="hint" style="margin-top:0;margin-bottom:8px">${state.type === "individual" ? "이 소분류의 자산을 배정·반납하거나 상태를 변경할 수 있는 구성원을 설정합니다." : "이 소분류의 자산을 보유 추가·해제하거나 수량을 변경할 수 있는 구성원을 설정합니다."}</p>
+        <p class="hint" style="margin-top:0;margin-bottom:8px">이 소분류의 자산을 배정·반납하거나 상태를 변경할 수 있는 구성원을 설정합니다.</p>
         <button type="button" class="cat-manage-select-btn" data-f-assign-btn><span>${state.assign}</span><span class="chev">▾</span></button>
       </div>
       <div class="field">
-        <label>관리 정보</label>
-        <p class="hint" style="margin-top:0;margin-bottom:10px">이 소분류의 자산 관리에 필요한 정보만 사용하도록 설정합니다.</p>
+        <label>추가 정보</label>
+        <p class="hint" style="margin-top:0;margin-bottom:10px">비공개로 설정한 항목은 자산 관리 권한을 보유한 구성원만 보고 입력할 수 있습니다.</p>
         <div class="cat-manage-fieldlist" data-f-fields>
-          ${fieldsForType(state.type).map(f => `
-            <div class="cat-manage-fieldrow">
-              <span>${FIELD_LABEL[f]}</span>
-              <button type="button" class="toggle-switch${state.hiddenFields.includes(f) ? "" : " on"}" data-field="${f}" role="switch" aria-checked="${!state.hiddenFields.includes(f)}" aria-label="${FIELD_LABEL[f]} 노출"><span class="toggle-knob"></span></button>
-            </div>`).join("")}
+          ${window.AssetExtra.fields().map(f => {
+            const enabled=window.AssetExtra.fixed.some(x=>x.id===f.id)?!state.hiddenFields.includes(f.id):(state.extraEnabled||[]).includes(f.id);
+            return `<div class="extra-field-settings"><div class="cat-manage-fieldrow"><span>${window.AssetExtra.esc(f.name)}</span><button type="button" class="toggle-switch${enabled?' on':''}" data-field="${f.id}" role="switch" aria-checked="${enabled}" aria-label="${window.AssetExtra.esc(f.name)} 노출"><span class="toggle-knob"></span></button></div>${f.description?`<small>${f.description}</small>`:''}${enabled?`<label class="extra-private"><input type="checkbox" data-private-field="${f.id}"${(state.privateFields||[]).includes(f.id)?' checked':''}>비공개</label>`:''}</div>`;
+          }).join("")}
         </div>
       </div>`;
-
-    // 소분류명은 같은 대분류 안에서만 유일하면 되도록 검증(다른 대분류의 동명 소분류는 무관 — 항상 "대분류 › 소분류"로 노출돼 혼동 없음)
-    const nameInputEl = container.querySelector("[data-f-name]");
-    const nameErrEl = container.querySelector("[data-f-name-err]");
+    const nameInputEl = container.querySelector("[data-f-name]"),
+      nameErrEl = container.querySelector("[data-f-name-err]");
+    container.querySelectorAll('[data-private-field]').forEach(el=>el.onchange=()=>{state.privateFields ||= [];const i=state.privateFields.indexOf(el.dataset.privateField);if(el.checked&&i<0)state.privateFields.push(el.dataset.privateField);else if(!el.checked&&i>=0)state.privateFields.splice(i,1);checkName();});
     function checkName() {
-      const val = categoryName(state.name);
-      const dup = !!val && (opts.siblingNames || []).map(categoryName).includes(val);
-      nameInputEl.classList.toggle("has-err", dup);
-      nameErrEl.hidden = !dup;
-      opts.onNameChange(val.length > 0 && !dup);
+      const val = categoryName(state.name),
+        dup = !!val && (opts.siblingNames || []).map(categoryName).includes(val);
+      nameInputEl.classList.toggle("has-err", dup), nameErrEl.hidden = !dup, opts.onNameChange(val.length > 0 && !dup);
     }
-    nameInputEl.addEventListener("input", e => { state.name = e.target.value; checkName(); });
-    checkName();
-
-    if (!typeLocked) {
-      container.querySelector("[data-f-type]").addEventListener("click", e => {
-        const b = e.target.closest("[data-val]");
-        if (!b) return;
-        state.type = b.dataset.val;
-        state.hiddenFields = [...DEFAULT_HIDDEN_FIELDS[state.type]];
-        renderSubForm(container, state, opts);
-      });
-    }
-    container.querySelector("[data-f-type-help]").onclick = openTypeHelp;
-    container.querySelector("[data-f-view-btn]").onclick = () => openPermPicker("view", state, () => renderSubForm(container, state, opts));
-    container.querySelector("[data-f-assign-btn]").onclick = () => openPermPicker("assign", state, () => renderSubForm(container, state, opts));
-    container.querySelector("[data-f-fields]").addEventListener("click", e => {
+    nameInputEl.addEventListener("input", e => {
+      state.name = e.target.value, checkName();
+    }), checkName(), container.querySelector("[data-f-view-btn]").onclick = () => openPermPicker("view", state, () => renderSubForm(container, state, opts)), container.querySelector("[data-f-assign-btn]").onclick = () => openPermPicker("assign", state, () => renderSubForm(container, state, opts)), container.querySelector("[data-f-fields]").addEventListener("click", e => {
       const b = e.target.closest("[data-field]");
       if (!b) return;
-      const f = b.dataset.field;
-      const i = state.hiddenFields.indexOf(f);
-      if (i === -1) state.hiddenFields.push(f); else state.hiddenFields.splice(i, 1);
-      b.classList.toggle("on");
-      b.setAttribute("aria-checked", String(!state.hiddenFields.includes(f)));
-      checkName();
+      const f=b.dataset.field;
+      state.extraEnabled ||= [];state.privateFields ||= [];
+      const list=window.AssetExtra.fixed.some(x=>x.id===f)?state.hiddenFields:state.extraEnabled,index=list.indexOf(f);
+      index===-1?list.push(f):list.splice(index,1);renderSubForm(container,state,opts);
     });
   }
-
-  // 자산 유형 도움말 — 대시보드 공용 도움말 모달 패턴(다이얼로그 위에 dim 오버레이) 참조
-  function openTypeHelp() {
-    const p = document.createElement("div");
-    p.className = "modal-back";
-    p.innerHTML = `
-      <div class="modal help-modal">
-        <div class="help-modal-head">
-          <h3>도움말</h3>
-          <button type="button" class="btn icon-only sm" data-close aria-label="닫기">${CLOSE_ICON}</button>
-        </div>
-        <div class="body">
-          <p><b>개별 자산</b><br>노트북, 책상처럼 실물 하나하나를 구분해서 관리하는 자산입니다. 자산마다 별도의 배정 정보와 상태(배정 중·재고·수리/점검 중·분실·폐기)를 가지며, 필요한 경우 S/N·IMEI 같은 개체 식별 정보도 함께 관리할 수 있습니다.</p>
-          <p><b>수량 자산</b><br>유니폼, 사무용품처럼 개별 식별 없이 수량으로만 관리하는 자산입니다. 근무지·구성원별 보유 수량을 기록하고, 잔여 수량을 확인할 수 있습니다.</p>
-        </div>
-      </div>`;
-    document.body.appendChild(p);
-    p.addEventListener("click", e => { if (e.target === p) p.remove(); });
-    p.querySelector("[data-close]").onclick = () => p.remove();
-  }
-
-  // 조회/배정 권한 선택 — 드롭다운이 아니라 라디오 목록의 모달 선택창으로. "특정 그룹 및 직무/직급"·"특정 관리자/리더"는
-  // 대상을 별도로 지정해야 하는 옵션이라, 선택 시 그 아래 요약 UI가 추가되고 눌러서 하위 선택 모달을 연다.
-  // 라디오를 이리저리 바꿔도 이 모달이 열려 있는 동안은(적용/취소로 닫기 전까지) 각 옵션별 세부 선택 내용을 draftTarget에 그대로 들고 있음
-  // state: { view, assign, viewTarget, assignTarget } 형태의 아무 객체나(소분류 생성 폼·수정 폼 공용) — 적용되면 onApply() 호출
   function openPermPicker(kind, state, onApply) {
-    const isView = kind === "view";
-    const current = state[kind];
-    const draftTarget = {
-      groups: [...state[kind + "Target"].groups],
-      jobTitles: [...state[kind + "Target"].jobTitles],
-      members: [...state[kind + "Target"].members],
-    };
+    const isView = kind === "view",
+      current = state[kind],
+      draftTarget = {
+        groups: [...state[kind + "Target"].groups],
+        jobTitles: [...state[kind + "Target"].jobTitles],
+        members: [...state[kind + "Target"].members]
+      };
     let picked = current;
-
     const p = document.createElement("div");
-    p.className = "modal-back";
-    p.innerHTML = `
+    p.className = "modal-back", p.innerHTML = `
       <div class="modal">
         <h3>${isView ? "자산 조회 권한" : assignLabel(state.type)}</h3>
         <div class="body" data-picker-body></div>
@@ -474,42 +407,23 @@
           <button class="btn" data-close>취소</button>
           <button class="btn primary" data-ok>적용</button>
         </div>
-      </div>`;
-    document.body.appendChild(p);
-    const body = p.querySelector("[data-picker-body]");
-    const okBtn = p.querySelector("[data-ok]");
-
-    // "특정 그룹 및 직무/직급"과 "특정 관리자/리더"는 서로 다른 대상 종류라 draftTarget 안에서도 완전히 독립적으로 관리 —
-    // 라디오를 이리저리 바꿔도 각자 골라둔 내용이 안 섞이고 그대로 남아있어야 함
+      </div>`, document.body.appendChild(p);
+    const body = p.querySelector("[data-picker-body]"),
+      okBtn = p.querySelector("[data-ok]");
     function isTargetSetFor(v) {
-      if (v === "특정 그룹 및 직무/직급") {
-        if (!draftTarget.groups.length && !draftTarget.jobTitles.length) return false;
-        // 비어 있는 축은 전체다. 조회에서 제한한 축을 비워 변경 범위가 넓어지는 경우를 막는다.
-        return isView || state.view !== v || window.isAssetGroupPositionSubset(draftTarget, state.viewTarget);
-      }
-      if (v === "특정 관리자/리더") return draftTarget.members.length > 0;
-      return false;
+      return v === "특정 그룹 및 직무/직급" ? !draftTarget.groups.length && !draftTarget.jobTitles.length ? !1 : isView || state.view !== v || window.isAssetGroupPositionSubset(draftTarget, state.viewTarget) : v === "특정 관리자/리더" ? draftTarget.members.length > 0 : !1;
     }
     function targetSummaryHtml(v) {
-      if (!isTargetSetFor(v)) return `<button type="button" class="perm-target-btn" data-target-open><span class="muted">선택</span><span class="chev">›</span></button>`;
-      let chips, avatar = "";
-      if (v === "특정 그룹 및 직무/직급") {
-        chips = [];
-        if (draftTarget.groups.length) chips.push(`그룹 : ${draftTarget.groups[0]}${draftTarget.groups.length > 1 ? `<span class="chip-more">+${draftTarget.groups.length - 1}</span>` : ""}`);
-        if (draftTarget.jobTitles.length) chips.push(`직무/직급 : ${draftTarget.jobTitles[0]}${draftTarget.jobTitles.length > 1 ? `<span class="chip-more">+${draftTarget.jobTitles.length - 1}</span>` : ""}`);
-      } else {
-        avatar = `<span class="picker-avatar sm" style="background:${avatarColor(draftTarget.members[0])}">${draftTarget.members[0][0]}</span>`;
-        chips = [`${draftTarget.members[0]}${draftTarget.members.length > 1 ? `<span class="chip-more">+${draftTarget.members.length - 1}</span>` : ""}`];
-      }
-      return `
+      if (!isTargetSetFor(v)) return '<button type="button" class="perm-target-btn" data-target-open><span class="muted">선택</span><span class="chev">›</span></button>';
+      let chips,
+        avatar = "";
+      return v === "특정 그룹 및 직무/직급" ? (chips = [], draftTarget.groups.length && chips.push(`그룹 : ${draftTarget.groups[0]}${draftTarget.groups.length > 1 ? `<span class="chip-more">+${draftTarget.groups.length - 1}</span>` : ""}`), draftTarget.jobTitles.length && chips.push(`직무/직급 : ${draftTarget.jobTitles[0]}${draftTarget.jobTitles.length > 1 ? `<span class="chip-more">+${draftTarget.jobTitles.length - 1}</span>` : ""}`)) : (avatar = `<span class="picker-avatar sm" style="background:${avatarColor(draftTarget.members[0])}">${draftTarget.members[0][0]}</span>`, chips = [`${draftTarget.members[0]}${draftTarget.members.length > 1 ? `<span class="chip-more">+${draftTarget.members.length - 1}</span>` : ""}`]), `
         <div class="perm-target-row">
           <button type="button" class="perm-target-chips" data-target-open>${avatar}${chips.map(c => `<span class="perm-chip">${c}</span>`).join("")}</button>
           <button type="button" class="perm-target-clear" data-target-clear aria-label="선택 해제">${CLOSE_ICON}</button>
         </div>`;
     }
-    function render() {
-      // 배정/보유 변경 권한은 조회 권한값에 따라 고를 수 있는 옵션이 제한되지만(구조설계안 4.3), 옵션 자체를 숨기지 않고
-      // 5개 다 보여준 채로 선택 불가한 것만 비활성 처리 — 뭐가 왜 안 되는지는 목록만 봐도 자연스럽게 드러나서 별도 툴팁은 안 둠
+    function render2() {
       const allowedSet = isView ? null : new Set(ASSIGN_BY_VIEW[state.view].options);
       body.innerHTML = VIEW_OPTIONS.map(v => {
         const isDisabled = allowedSet && !allowedSet.has(v);
@@ -519,107 +433,97 @@
           <span>${v}</span>
         </label>
         ${picked === v && TARGET_NEEDED.has(v) ? `<div class="perm-target-wrap">${targetSummaryHtml(v)}</div>` : ""}`;
-      }).join("")
-        + (isView ? `<div class="perm-info-note">${INFO_ICON}<span>관리자라도 조회 권한을 부여받아야 이 정보를 볼 수 있습니다.</span></div>` : "");
-
-      body.querySelectorAll('input[name="perm-pick"]').forEach(r => r.onchange = () => { picked = r.value; render(); });
+      }).join("") + (isView ? `<div class="perm-info-note">${INFO_ICON}<span>관리자라도 조회 권한을 부여받아야 이 정보를 볼 수 있습니다.</span></div>` : ""), body.querySelectorAll('input[name="perm-pick"]').forEach(r => r.onchange = () => {
+        picked = r.value, render2();
+      });
       const openBtn = body.querySelector("[data-target-open]");
-      if (openBtn) openBtn.onclick = () => {
-        // 배정/보유 변경 권한 쪽에서, 조회 권한 자체가 같은 "특정 그룹/관리자" 타입으로 좁혀져 있으면
-        // 조회 권한에서 고른 대상 밖은 선택 못 하게 제한(조회 권한이 회사 전체/관리자 전체처럼 넓으면 제한 없음)
+      openBtn && (openBtn.onclick = () => {
         const isNarrowedView = !isView && state.view === picked;
         if (picked === "특정 그룹 및 직무/직급") {
-          const restrict = isNarrowedView ? { groups: state.viewTarget.groups.length ? new Set(state.viewTarget.groups) : null, jobTitles: state.viewTarget.jobTitles.length ? new Set(state.viewTarget.jobTitles) : null } : null;
-          openGroupJobPicker({ groups: draftTarget.groups, jobTitles: draftTarget.jobTitles }, res => {
-            draftTarget.groups = res.groups; draftTarget.jobTitles = res.jobTitles;
-            render();
+          const restrict = isNarrowedView ? {
+            groups: state.viewTarget.groups.length ? new Set(state.viewTarget.groups) : null,
+            jobTitles: state.viewTarget.jobTitles.length ? new Set(state.viewTarget.jobTitles) : null
+          } : null;
+          openGroupJobPicker({
+            groups: draftTarget.groups,
+            jobTitles: draftTarget.jobTitles
+          }, res => {
+            draftTarget.groups = res.groups, draftTarget.jobTitles = res.jobTitles, render2();
           }, restrict);
         } else if (picked === "특정 관리자/리더") {
-          const restrict = !isView && state.view==="관리자만" ? new Set(MEMBERS.filter(m=>m.role==="admin").map(m=>m.name)) : isNarrowedView ? new Set(state.viewTarget.members) : null;
-          openMemberPicker(draftTarget.members, res => { draftTarget.members = res; render(); }, restrict);
+          const restrict = !isView && state.view === "관리자만" ? new Set(MEMBERS.filter(m => m.role === "admin").map(m => m.name)) : isNarrowedView ? new Set(state.viewTarget.members) : null;
+          openMemberPicker(draftTarget.members, res => {
+            draftTarget.members = res, render2();
+          }, restrict);
         }
-      };
+      });
       const clearBtn = body.querySelector("[data-target-clear]");
-      if (clearBtn) clearBtn.onclick = () => {
-        if (picked === "특정 그룹 및 직무/직급") { draftTarget.groups = []; draftTarget.jobTitles = []; }
-        else { draftTarget.members = []; }
-        render();
-      };
-      okBtn.disabled = TARGET_NEEDED.has(picked) && !isTargetSetFor(picked);
+      clearBtn && (clearBtn.onclick = () => {
+        picked === "특정 그룹 및 직무/직급" ? (draftTarget.groups = [], draftTarget.jobTitles = []) : draftTarget.members = [], render2();
+      }), okBtn.disabled = TARGET_NEEDED.has(picked) && !isTargetSetFor(picked);
     }
-    render();
-
-    // Selection modal: backdrop clicks do not dismiss.
-    p.querySelector("[data-close]").onclick = () => p.remove();
-    okBtn.onclick = () => {
+    render2(), p.querySelector("[data-close]").onclick = () => p.remove(), okBtn.onclick = () => {
       if (okBtn.disabled) return;
-      // 실제로 선택된 종류(picked)에 해당하는 대상만 커밋 — draftTarget엔 다른 옵션 볼 때 골라둔 값이 같이 남아있을 수 있어 그건 버림
-      const appliedTarget = picked === "특정 그룹 및 직무/직급"
-        ? { groups: [...draftTarget.groups], jobTitles: [...draftTarget.jobTitles], members: [] }
-        : picked === "특정 관리자/리더"
-          ? { groups: [], jobTitles: [], members: [...draftTarget.members] }
-          : { groups: [], jobTitles: [], members: [] };
-      if (isView) {
-        state.view = picked;
-        state.assign = ASSIGN_BY_VIEW[picked].default;
-        state.viewTarget = appliedTarget;
-        state.assignTarget = { groups: [], jobTitles: [], members: [] };
-      } else {
-        state.assign = picked;
-        state.assignTarget = appliedTarget;
-      }
-      p.remove();
-      onApply();
+      const appliedTarget = picked === "특정 그룹 및 직무/직급" ? {
+        groups: [...draftTarget.groups],
+        jobTitles: [...draftTarget.jobTitles],
+        members: []
+      } : picked === "특정 관리자/리더" ? {
+        groups: [],
+        jobTitles: [],
+        members: [...draftTarget.members]
+      } : {
+        groups: [],
+        jobTitles: [],
+        members: []
+      };
+      isView ? (state.view = picked, state.assign = ASSIGN_BY_VIEW[picked].default, state.viewTarget = appliedTarget, state.assignTarget = {
+        groups: [],
+        jobTitles: [],
+        members: []
+      }) : (state.assign = picked, state.assignTarget = appliedTarget), p.remove(), onApply();
     };
   }
-
-  // 그룹 및 직무/직급 선택 — 대시보드 공용 컴포넌트 참조(좌측 그룹/직무·직급 탭 + 우측 체크리스트)
-  // restrict가 있으면(배정/보유 변경 권한이 조회 권한과 같은 "특정 그룹 및 직무/직급" 타입일 때) 조회 권한에서
-  // 고르지 않은 그룹/직무·직급은 선택 자체를 막고 사유를 보여줌 — 변경 권한은 조회 권한의 부분집합이어야 함(구조설계안 4.3)
   function openGroupJobPicker(initial, onApply, restrict) {
-    const selGroups = new Set(initial.groups);
-    const selJobTitles = new Set(initial.jobTitles);
-    let activeTab = "groups";
-    let cascade = true;
-    const collapsed = new Set();
+    const selGroups = new Set(initial.groups),
+      selJobTitles = new Set(initial.jobTitles);
+    let activeTab = "groups",
+      cascade = !0;
+    const collapsed = /* @__PURE__ */new Set();
     let query = "";
-
-    const flatten = nodes => nodes.reduce((out, n) => out.concat(n.name, n.children ? flatten(n.children) : []), []);
-    const ALL_GROUP_NAMES = flatten(GROUP_TREE);
-    const selectableGroupNames = restrict?.groups ? ALL_GROUP_NAMES.filter(n => restrict.groups.has(n)) : ALL_GROUP_NAMES;
+    const flatten = nodes => nodes.reduce((out, n) => out.concat(n.name, n.children ? flatten(n.children) : []), []),
+      ALL_GROUP_NAMES = flatten(GROUP_TREE),
+      selectableGroupNames = restrict?.groups ? ALL_GROUP_NAMES.filter(n => restrict.groups.has(n)) : ALL_GROUP_NAMES;
     function findNode(nodes, name) {
       for (const n of nodes) {
         if (n.name === name) return n;
-        if (n.children) { const f = findNode(n.children, name); if (f) return f; }
+        if (n.children) {
+          const f = findNode(n.children, name);
+          if (f) return f;
+        }
       }
       return null;
     }
     function setChecked(node, checked, withCascade) {
-      if (restrict?.groups && !restrict.groups.has(node.name)) return;
-      checked ? selGroups.add(node.name) : selGroups.delete(node.name);
-      if (withCascade && node.children) node.children.forEach(c => setChecked(c, checked, true));
+      restrict?.groups && !restrict.groups.has(node.name) || (checked ? selGroups.add(node.name) : selGroups.delete(node.name), withCascade && node.children && node.children.forEach(c => setChecked(c, checked, !0)));
     }
     function matches(node) {
-      if (!query) return true;
-      if (node.name.includes(query)) return true;
-      return !!(node.children && node.children.some(matches));
+      return !query || node.name.includes(query) ? !0 : !!(node.children && node.children.some(matches));
     }
     function groupRowHtml(node, depth) {
       if (!matches(node)) return "";
-      const hasChildren = node.children && node.children.length;
-      const isCollapsed = collapsed.has(node.name);
-      const isDisabled = restrict?.groups && !restrict.groups.has(node.name);
+      const hasChildren = node.children && node.children.length,
+        isCollapsed = collapsed.has(node.name),
+        isDisabled = restrict?.groups && !restrict.groups.has(node.name);
       return `
         <div class="picker-tree-row" style="padding-left:${depth * 20}px">
-          ${hasChildren ? `<button type="button" class="picker-tree-toggle" data-toggle-group="${node.name}">${isCollapsed ? "▸" : "▾"}</button>` : `<span class="picker-tree-toggle"></span>`}
+          ${hasChildren ? `<button type="button" class="picker-tree-toggle" data-toggle-group="${node.name}">${isCollapsed ? "▸" : "▾"}</button>` : '<span class="picker-tree-toggle"></span>'}
           <label class="picker-check${isDisabled ? " is-disabled" : ""}"${isDisabled ? ` data-tip="${RESTRICT_TIP}"` : ""}><input type="checkbox" data-group="${node.name}"${selGroups.has(node.name) ? " checked" : ""}${isDisabled ? " disabled" : ""}><span>${node.name}</span></label>
         </div>
         ${hasChildren && !isCollapsed ? node.children.map(c => groupRowHtml(c, depth + 1)).join("") : ""}`;
     }
-
     const p = document.createElement("div");
-    p.className = "modal-back";
-    p.innerHTML = `
+    p.className = "modal-back", p.innerHTML = `
       <div class="modal picker-modal">
         <div class="picker-head">
           <h3>그룹 및 직무/직급 선택</h3>
@@ -636,14 +540,17 @@
           <button class="btn" data-close>취소</button>
           <button class="btn primary" data-ok>적용</button>
         </div>
-      </div>`;
-    document.body.appendChild(p);
-    const syncSelection=()=>{const ok=p.querySelector("[data-ok]");if(ok)ok.disabled=!(selGroups.size+selJobTitles.size);};
-    new MutationObserver(syncSelection).observe(p,{childList:true,subtree:true});
-    p.addEventListener("change",syncSelection);p.addEventListener("click",()=>queueMicrotask(syncSelection));syncSelection();
-    const content = p.querySelector("[data-content]");
-    const jobTab = p.querySelector('[data-tab="jobTitles"]');
-
+      </div>`, document.body.appendChild(p);
+    const syncSelection = () => {
+      const ok = p.querySelector("[data-ok]");
+      ok && (ok.disabled = !(selGroups.size + selJobTitles.size));
+    };
+    new MutationObserver(syncSelection).observe(p, {
+      childList: !0,
+      subtree: !0
+    }), p.addEventListener("change", syncSelection), p.addEventListener("click", () => queueMicrotask(syncSelection)), syncSelection();
+    const content = p.querySelector("[data-content]"),
+      jobTab = p.querySelector('[data-tab="jobTitles"]');
     function renderContent() {
       if (activeTab === "groups") {
         const allChecked = selectableGroupNames.length > 0 && selectableGroupNames.every(n => selGroups.has(n));
@@ -653,17 +560,16 @@
             <label class="picker-check"><input type="checkbox" data-select-all${allChecked ? " checked" : ""}><span>전체 선택</span></label>
             <label class="picker-check right"><input type="checkbox" data-cascade${cascade ? " checked" : ""}><span>하위그룹도 한번에 체크</span></label>
           </div>
-          <div class="picker-tree">${GROUP_TREE.map(n => groupRowHtml(n, 0)).join("")}</div>`;
-        content.querySelector(".picker-search").addEventListener("input", e => { query = e.target.value; renderContent(); });
-        content.querySelector("[data-select-all]").onchange = e => { selectableGroupNames.forEach(n => e.target.checked ? selGroups.add(n) : selGroups.delete(n)); renderContent(); };
-        content.querySelector("[data-cascade]").onchange = e => { cascade = e.target.checked; };
-        content.querySelectorAll("[data-toggle-group]").forEach(b => b.onclick = () => {
-          collapsed.has(b.dataset.toggleGroup) ? collapsed.delete(b.dataset.toggleGroup) : collapsed.add(b.dataset.toggleGroup);
-          renderContent();
-        });
-        content.querySelectorAll("[data-group]").forEach(cb => cb.onchange = e => {
-          setChecked(findNode(GROUP_TREE, e.target.dataset.group), e.target.checked, cascade);
-          renderContent();
+          <div class="picker-tree">${GROUP_TREE.map(n => groupRowHtml(n, 0)).join("")}</div>`, content.querySelector(".picker-search").addEventListener("input", e => {
+          query = e.target.value, renderContent();
+        }), content.querySelector("[data-select-all]").onchange = e => {
+          selectableGroupNames.forEach(n => e.target.checked ? selGroups.add(n) : selGroups.delete(n)), renderContent();
+        }, content.querySelector("[data-cascade]").onchange = e => {
+          cascade = e.target.checked;
+        }, content.querySelectorAll("[data-toggle-group]").forEach(b => b.onclick = () => {
+          collapsed.has(b.dataset.toggleGroup) ? collapsed.delete(b.dataset.toggleGroup) : collapsed.add(b.dataset.toggleGroup), renderContent();
+        }), content.querySelectorAll("[data-group]").forEach(cb => cb.onchange = e => {
+          setChecked(findNode(GROUP_TREE, e.target.dataset.group), e.target.checked, cascade), renderContent();
         });
       } else {
         const filtered = JOB_TITLES.filter(t => !query || t.includes(query));
@@ -671,42 +577,58 @@
           <input type="text" class="picker-search" placeholder="검색어를 입력하세요" value="${query}">
           <div class="picker-flatlist">
             ${filtered.map(t => {
-              const isDisabled = restrict?.jobTitles && !restrict.jobTitles.has(t);
-              return `<label class="picker-check row${isDisabled ? " is-disabled" : ""}"${isDisabled ? ` data-tip="${RESTRICT_TIP}"` : ""}><input type="checkbox" data-jobtitle="${t}"${selJobTitles.has(t) ? " checked" : ""}${isDisabled ? " disabled" : ""}><span>${t}</span></label>`;
-            }).join("")}
-          </div>`;
-        content.querySelector(".picker-search").addEventListener("input", e => { query = e.target.value; renderContent(); });
-        content.querySelectorAll("[data-jobtitle]").forEach(cb => cb.onchange = e => {
+          const isDisabled = restrict?.jobTitles && !restrict.jobTitles.has(t);
+          return `<label class="picker-check row${isDisabled ? " is-disabled" : ""}"${isDisabled ? ` data-tip="${RESTRICT_TIP}"` : ""}><input type="checkbox" data-jobtitle="${t}"${selJobTitles.has(t) ? " checked" : ""}${isDisabled ? " disabled" : ""}><span>${t}</span></label>`;
+        }).join("")}
+          </div>`, content.querySelector(".picker-search").addEventListener("input", e => {
+          query = e.target.value, renderContent();
+        }), content.querySelectorAll("[data-jobtitle]").forEach(cb => cb.onchange = e => {
           e.target.checked ? selJobTitles.add(e.target.dataset.jobtitle) : selJobTitles.delete(e.target.dataset.jobtitle);
         });
       }
     }
     function renderAll() {
-      p.querySelectorAll("[data-tab]").forEach(b => b.classList.toggle("active", b.dataset.tab === activeTab));
-      jobTab.innerHTML = `직무/직급${selJobTitles.size ? '<span class="picker-tab-dot"></span>' : ""}`;
-      renderContent();
+      p.querySelectorAll("[data-tab]").forEach(b => b.classList.toggle("active", b.dataset.tab === activeTab)), jobTab.innerHTML = `직무/직급${selJobTitles.size ? '<span class="picker-tab-dot"></span>' : ""}`, renderContent();
     }
-    p.querySelectorAll("[data-tab]").forEach(b => b.onclick = () => { activeTab = b.dataset.tab; query = ""; renderAll(); });
-    p.querySelector("[data-reset]").onclick = () => { selGroups.clear(); selJobTitles.clear(); renderAll(); };
-    renderAll();
-
-    // Selection modal: backdrop clicks do not dismiss.
-    p.querySelector("[data-close]").onclick = () => p.remove();
-    p.querySelector("[data-ok]").onclick = () => { p.remove(); onApply({ groups: [...selGroups], jobTitles: [...selJobTitles] }); };
+    p.querySelectorAll("[data-tab]").forEach(b => b.onclick = () => {
+      activeTab = b.dataset.tab, query = "", renderAll();
+    }), p.querySelector("[data-reset]").onclick = () => {
+      selGroups.clear(), selJobTitles.clear(), renderAll();
+    }, renderAll(), p.querySelector("[data-close]").onclick = () => p.remove(), p.querySelector("[data-ok]").onclick = () => {
+      p.remove(), onApply({
+        groups: [...selGroups],
+        jobTitles: [...selJobTitles]
+      });
+    };
   }
-
-  // 구성원(직원) 선택 — 대시보드 공용 컴포넌트 참조
-  // restrict 없음(조회 권한): 좌우 분할(전체 목록 + 선택됨 목록), 자유 선택
-  // restrict 있음(배정/보유 변경 권한 — 조회 권한의 부분집합이어야 함, 구조설계안 4.3): 단일 목록으로 전환하고
-  // 조회 권한 범위 밖 인원은 비활성화가 아니라 목록에서 완전히 제외(실제 대시보드 "구성원 추가 정보" 등 restrict형
-  // 직원 선택 팝업과 동일한 패턴)
   function openMemberPicker(initial, onApply, restrict) {
     const sel = new Set(initial);
     let query = "";
     const p = document.createElement("div");
-    p.className = "modal-back";
-
-    if (!restrict) {
+    if (p.className = "modal-back", !restrict) {
+      let renderSelected2 = function () {
+          countEl.textContent = sel.size, selectedList.innerHTML = sel.size ? [...sel].map(name => `
+          <div class="picker-selected-row">
+            <span class="picker-avatar sm" style="background:${avatarColor(name)}">${name[0]}</span>
+            <span>${name}</span>
+            <button type="button" class="picker-selected-remove" data-remove="${name}" aria-label="제거">${CLOSE_ICON}</button>
+          </div>`).join("") : '<p class="muted" style="padding:16px 0">선택된 인원이 없습니다.</p>', selectedList.querySelectorAll("[data-remove]").forEach(b => b.onclick = () => {
+            sel.delete(b.dataset.remove), renderSelected2(), renderList2();
+          });
+        },
+        renderList2 = function () {
+          const filtered = MEMBERS.filter(m => !query || m.name.includes(query));
+          list2.innerHTML = filtered.length ? filtered.map(m => `
+          <label class="picker-member-row">
+            <input type="checkbox" data-member="${m.name}"${sel.has(m.name) ? " checked" : ""}>
+            <span class="picker-avatar" style="background:${avatarColor(m.name)}">${m.name[0]}</span>
+            <span class="picker-member-info"><b>${m.name}</b><span>${m.team}</span></span>
+          </label>`).join("") : '<p class="muted" style="padding:16px 0">결과가 없습니다.</p>', p.querySelector("[data-select-all]").checked = filtered.length > 0 && filtered.every(m => sel.has(m.name)), list2.querySelectorAll("[data-member]").forEach(cb => cb.onchange = e => {
+            e.target.checked ? sel.add(e.target.dataset.member) : sel.delete(e.target.dataset.member), p.querySelector("[data-select-all]").checked = filtered.length > 0 && filtered.every(m => sel.has(m.name)), renderSelected2();
+          });
+        };
+      var renderSelected = renderSelected2,
+        renderList = renderList2;
       p.innerHTML = `
         <div class="modal picker-modal" style="width:680px">
           <h3>직원 선택</h3>
@@ -728,57 +650,27 @@
             <button class="btn" data-close>취소</button>
             <button class="btn primary" data-ok>적용</button>
           </div>
-        </div>`;
-      document.body.appendChild(p);
-    const syncSelection=()=>{const ok=p.querySelector("[data-ok]");if(ok)ok.disabled=!(sel.size);};
-    new MutationObserver(syncSelection).observe(p,{childList:true,subtree:true});
-    p.addEventListener("change",syncSelection);p.addEventListener("click",()=>queueMicrotask(syncSelection));syncSelection();
-      const list = p.querySelector("[data-list]");
-      const countEl = p.querySelector("[data-count]");
-      const selectedList = p.querySelector("[data-selected-list]");
-
-      function renderSelected() {
-        countEl.textContent = sel.size;
-        selectedList.innerHTML = sel.size ? [...sel].map(name => `
-          <div class="picker-selected-row">
-            <span class="picker-avatar sm" style="background:${avatarColor(name)}">${name[0]}</span>
-            <span>${name}</span>
-            <button type="button" class="picker-selected-remove" data-remove="${name}" aria-label="제거">${CLOSE_ICON}</button>
-          </div>`).join("") : '<p class="muted" style="padding:16px 0">선택된 인원이 없습니다.</p>';
-        selectedList.querySelectorAll("[data-remove]").forEach(b => b.onclick = () => {
-          sel.delete(b.dataset.remove);
-          renderSelected(); renderList();
-        });
-      }
-      function renderList() {
-        const filtered = MEMBERS.filter(m => !query || m.name.includes(query));
-        list.innerHTML = filtered.length ? filtered.map(m => `
-          <label class="picker-member-row">
-            <input type="checkbox" data-member="${m.name}"${sel.has(m.name) ? " checked" : ""}>
-            <span class="picker-avatar" style="background:${avatarColor(m.name)}">${m.name[0]}</span>
-            <span class="picker-member-info"><b>${m.name}</b><span>${m.team}</span></span>
-          </label>`).join("") : `<p class="muted" style="padding:16px 0">결과가 없습니다.</p>`;
-        p.querySelector("[data-select-all]").checked = filtered.length > 0 && filtered.every(m => sel.has(m.name));
-        list.querySelectorAll("[data-member]").forEach(cb => cb.onchange = e => {
-          e.target.checked ? sel.add(e.target.dataset.member) : sel.delete(e.target.dataset.member);
-          p.querySelector("[data-select-all]").checked = filtered.length > 0 && filtered.every(m => sel.has(m.name));
-          renderSelected();
-        });
-      }
-      p.querySelector(".picker-search").addEventListener("input", e => { query = e.target.value; renderList(); });
-      p.querySelector("[data-select-all]").onchange = e => {
-        MEMBERS.filter(m => !query || m.name.includes(query)).forEach(m => e.target.checked ? sel.add(m.name) : sel.delete(m.name));
-        renderSelected(); renderList();
+        </div>`, document.body.appendChild(p);
+      const syncSelection2 = () => {
+        const ok = p.querySelector("[data-ok]");
+        ok && (ok.disabled = !sel.size);
       };
-      renderList();
-      renderSelected();
-    // Selection modal: backdrop clicks do not dismiss.
-      p.querySelector("[data-close]").onclick = () => p.remove();
-      p.querySelector("[data-ok]").onclick = () => { p.remove(); onApply([...sel]); };
+      new MutationObserver(syncSelection2).observe(p, {
+        childList: !0,
+        subtree: !0
+      }), p.addEventListener("change", syncSelection2), p.addEventListener("click", () => queueMicrotask(syncSelection2)), syncSelection2();
+      const list2 = p.querySelector("[data-list]"),
+        countEl = p.querySelector("[data-count]"),
+        selectedList = p.querySelector("[data-selected-list]");
+      p.querySelector(".picker-search").addEventListener("input", e => {
+        query = e.target.value, renderList2();
+      }), p.querySelector("[data-select-all]").onchange = e => {
+        MEMBERS.filter(m => !query || m.name.includes(query)).forEach(m => e.target.checked ? sel.add(m.name) : sel.delete(m.name)), renderSelected2(), renderList2();
+      }, renderList2(), renderSelected2(), p.querySelector("[data-close]").onclick = () => p.remove(), p.querySelector("[data-ok]").onclick = () => {
+        p.remove(), onApply([...sel]);
+      };
       return;
     }
-
-    // restrict 있음 — 조회 권한 범위 안의 인원만 후보로 제공
     const candidates = MEMBERS.filter(m => restrict.has(m.name));
     p.innerHTML = `
       <div class="modal picker-modal">
@@ -791,11 +683,15 @@
           <button class="btn" data-close>취소</button>
           <button class="btn primary" data-ok>적용</button>
         </div>
-      </div>`;
-    document.body.appendChild(p);
-    const syncSelection=()=>{const ok=p.querySelector("[data-ok]");if(ok)ok.disabled=!(sel.size);};
-    new MutationObserver(syncSelection).observe(p,{childList:true,subtree:true});
-    p.addEventListener("change",syncSelection);p.addEventListener("click",()=>queueMicrotask(syncSelection));syncSelection();
+      </div>`, document.body.appendChild(p);
+    const syncSelection = () => {
+      const ok = p.querySelector("[data-ok]");
+      ok && (ok.disabled = !sel.size);
+    };
+    new MutationObserver(syncSelection).observe(p, {
+      childList: !0,
+      subtree: !0
+    }), p.addEventListener("change", syncSelection), p.addEventListener("click", () => queueMicrotask(syncSelection)), syncSelection();
     const list = p.querySelector("[data-list]");
     function renderList() {
       const filtered = candidates.filter(m => !query || m.name.includes(query));
@@ -804,32 +700,96 @@
           <input type="checkbox" data-member="${m.name}"${sel.has(m.name) ? " checked" : ""}>
           <span class="picker-avatar" style="background:${avatarColor(m.name)}">${m.name[0]}</span>
           <span class="picker-member-info"><b>${m.name}</b><span>${m.team}</span></span>
-        </label>`).join("") : `<p class="muted" style="padding:16px 0">결과가 없습니다.</p>`;
-      list.querySelectorAll("[data-member]").forEach(cb => cb.onchange = e => {
+        </label>`).join("") : '<p class="muted" style="padding:16px 0">결과가 없습니다.</p>', list.querySelectorAll("[data-member]").forEach(cb => cb.onchange = e => {
         e.target.checked ? sel.add(e.target.dataset.member) : sel.delete(e.target.dataset.member);
       });
     }
-    p.querySelector(".picker-search").addEventListener("input", e => { query = e.target.value; renderList(); });
-    renderList();
-    // Selection modal: backdrop clicks do not dismiss.
-    p.querySelector("[data-close]").onclick = () => p.remove();
-    p.querySelector("[data-ok]").onclick = () => { p.remove(); onApply([...sel]); };
-  }
-
-  // 소분류 수정 — 자산 상세 우측 패널의 [수정] 버튼에서 진입. 필드 구성은 소분류 생성 화면과 동일(renderSubForm 공용) —
-  // 뒤로가기 없이 바로 모달로 뜨고 타이틀만 다름. 이미 등록된 자산이 있으면 자산 유형은 변경 제한(구조설계안 3.3)
-  function openSubEditModal(cat) {
-    const hasAssets = assetsOf(cat.group, cat.sub).length > 0;
-    const state = {
-      name: cat.sub, type: cat.type, view: cat.view, assign: cat.assign,
-      viewTarget: cat.viewTarget ? { ...cat.viewTarget } : { groups: [], jobTitles: [], members: [] },
-      assignTarget: cat.assignTarget ? { ...cat.assignTarget } : { groups: [], jobTitles: [], members: [] },
-      hiddenFields: [...(cat.hiddenFields || [])],
+    p.querySelector(".picker-search").addEventListener("input", e => {
+      query = e.target.value, renderList();
+    }), renderList(), p.querySelector("[data-close]").onclick = () => p.remove(), p.querySelector("[data-ok]").onclick = () => {
+      p.remove(), onApply([...sel]);
     };
-    const initial=subFormSnapshot(state);
-    const back = document.createElement("div");
-    back.className = "modal-back";
-    back.innerHTML = `
+  }
+  function openExtraInfoManager() {
+  const master=window.DATA.extraFields, draft=master.filter(f=>!f.deleted).map(f=>({...f}));
+  const initial=JSON.stringify(draft), back=document.createElement('div');
+  back.className='modal-back';
+  back.innerHTML='<div class="modal scroll-body"><h3>추가 정보 관리</h3><div class="body"><div class="extra-manager-row"><div class="field"><input type="text" data-extra-name maxlength="20" placeholder="입력"><p class="field-err" data-extra-create-error hidden>동일한 명칭이 존재합니다.</p></div><button class="btn primary" data-extra-add disabled>+ 추가</button></div><div data-extra-list></div></div><div class="foot"><button class="btn" data-extra-cancel>취소</button><button class="btn primary" data-extra-save disabled>저장</button></div></div>';
+  document.body.appendChild(back);
+  let dragging=null;
+  const input=back.querySelector('[data-extra-name]'), add=back.querySelector('[data-extra-add]'), save=back.querySelector('[data-extra-save]');
+  function validate() {
+    const names=draft.map(f=>f.name.trim()), q=input.value.trim(), reserved=[];
+    const dup=q && [...names,...reserved].includes(q);
+    add.disabled=!q || dup || draft.length>=30;
+    input.classList.toggle('has-err',!!dup);back.querySelector('[data-extra-create-error]').hidden=!dup;
+    let invalid=false;
+    back.querySelectorAll('[data-extra-rename]').forEach(el=>{
+      const f=draft.find(f=>f.id===el.dataset.extraRename), name=f.name.trim();
+      const error=!name || names.filter(n=>n===name).length>1 || reserved.includes(name);
+      el.classList.toggle('has-err',error);el.nextElementSibling.hidden=!error;
+      el.nextElementSibling.textContent=!name?'명칭은 필수로 입력해야 합니다.':'동일한 명칭이 존재합니다.';invalid ||= error;
+    });
+    save.disabled=invalid || initial===JSON.stringify(draft);
+  }
+  function draw() {
+    const list=back.querySelector('[data-extra-list]');
+    list.innerHTML=draft.length?draft.map(f=>`<div class="extra-manager-row" draggable="true" data-extra-row="${f.id}"><span aria-label="순서 이동">☰</span><div class="field"><input type="text" maxlength="20" data-extra-rename="${f.id}" value="${window.AssetExtra.esc(f.name)}"><p class="field-err" hidden></p></div><button class="btn sm" data-extra-delete="${f.id}">삭제</button></div>`).join(''):'<p class="muted" style="padding:40px;text-align:center">등록된 추가 정보가 없습니다.</p>';
+    list.querySelectorAll('[data-extra-rename]').forEach(el=>el.oninput=()=>{draft.find(f=>f.id===el.dataset.extraRename).name=el.value;validate();});
+    list.querySelectorAll('[data-extra-delete]').forEach(button=>button.onclick=()=>confirmModal('삭제하시겠습니까?','',()=>{draft.splice(draft.findIndex(f=>f.id===button.dataset.extraDelete),1);draw();}));
+    list.querySelectorAll('[data-extra-row]').forEach(row=>{
+      row.ondragstart=e=>{dragging=row.dataset.extraRow;e.dataTransfer.setData('text/plain',dragging);};
+      row.ondragover=e=>e.preventDefault();
+      row.ondrop=e=>{e.preventDefault();if(!dragging||dragging===row.dataset.extraRow)return;const from=draft.findIndex(f=>f.id===dragging),to=draft.findIndex(f=>f.id===row.dataset.extraRow);draft.splice(to,0,draft.splice(from,1)[0]);dragging=null;draw();};
+    });validate();
+  }
+  input.oninput=validate;
+  add.onclick=()=>{if(add.disabled)return;draft.push({id:'extra-'+Date.now()+'-'+draft.length,name:input.value.trim()});input.value='';draw();};
+  back.querySelector('[data-extra-cancel]').onclick=()=>{if(JSON.stringify(draft)!==initial) categoryExit(()=>back.remove());else back.remove();};
+  save.onclick=()=>{
+    if(save.disabled)return;
+    if(!window.hasPrototypeAssetManagePermission()){back.remove();toast('자산 관리 권한이 없습니다.');return;}
+    const ids=new Set(draft.map(f=>f.id)), retired=master.filter(f=>!ids.has(f.id)).map(f=>({...f,deleted:true}));
+    master.splice(0,master.length,...draft.map(f=>({...f,name:f.name.trim()})),...retired);
+    back.remove();toast('저장되었습니다.');render();
+  };draw();
+}
+function openManagementMenu(button,sel) {
+  document.querySelectorAll('[data-category-manage-menu]').forEach(el=>el.remove());
+  const menu=document.createElement('div');menu.className='dropdown-menu';menu.dataset.categoryManageMenu='';
+  menu.innerHTML='<button type="button" data-manage-classification>분류</button><button type="button" data-manage-extra>추가 정보</button>';
+  const rect=button.getBoundingClientRect();menu.style.cssText=`position:fixed;left:${rect.left}px;top:${rect.bottom+4}px;min-width:160px`;document.body.appendChild(menu);
+  menu.querySelector('[data-manage-classification]').onclick=()=>{menu.remove();openManageModal(sel);};
+  menu.querySelector('[data-manage-extra]').onclick=()=>{menu.remove();openExtraInfoManager();};
+  const close=e=>{if(!menu.contains(e.target)&&!button.contains(e.target)){menu.remove();document.removeEventListener('click',close);}};document.addEventListener('click',close);
+}
+
+  function openSubEditModal(cat) {
+    const hasAssets = assetsOf(cat.group, cat.sub).length > 0,
+      state = {
+        name: cat.sub,
+        type: cat.type,
+        view: cat.view,
+        assign: cat.assign,
+        viewTarget: cat.viewTarget ? {
+          ...cat.viewTarget
+        } : {
+          groups: [],
+          jobTitles: [],
+          members: []
+        },
+        assignTarget: cat.assignTarget ? {
+          ...cat.assignTarget
+        } : {
+          groups: [],
+          jobTitles: [],
+          members: []
+        },
+        hiddenFields: [...(cat.hiddenFields || [])], extraEnabled:[...(cat.extraEnabled||[])], privateFields:[...(cat.privateFields||[])]
+      },
+      initial = subFormSnapshot(state),
+      back = document.createElement("div");
+    back.className = "modal-back", back.innerHTML = `
       <div class="modal lg cat-manage-modal">
         <div class="cat-manage-head"><h3>소분류 수정</h3></div>
         <div class="cat-manage-create" data-form></div>
@@ -837,65 +797,63 @@
           <button class="btn" data-cancel>취소</button>
           <button class="btn primary" data-save>저장</button>
         </div>
-      </div>`;
-    document.body.appendChild(back);
-    const form = back.querySelector("[data-form]");
-    const saveBtn = back.querySelector("[data-save]");
+      </div>`, document.body.appendChild(back);
+    const form = back.querySelector("[data-form]"),
+      saveBtn = back.querySelector("[data-save]");
     renderSubForm(form, state, {
       groupLabel: cat.group,
       typeLocked: hasAssets,
       siblingNames: categories.filter(c => c.group === cat.group && c.sub !== cat.sub).map(c => c.sub),
-      onNameChange: valid => { saveBtn.disabled = !valid || subFormSnapshot(state)===initial; },
-    });
-    // Input/selection/confirmation modal: backdrop clicks do not dismiss.
-    back.querySelector("[data-cancel]").onclick = () => { if(subFormSnapshot(state)!==initial)categoryExit(()=>back.remove());else back.remove(); };
-    saveBtn.onclick = () => {
+      onNameChange: valid => {
+        saveBtn.disabled = !valid || subFormSnapshot(state) === initial;
+      }
+    }), back.querySelector("[data-cancel]").onclick = () => {
+      subFormSnapshot(state) !== initial ? categoryExit(() => back.remove()) : back.remove();
+    }, saveBtn.onclick = () => {
       const name = categoryName(state.name);
-      if (!name || saveBtn.disabled) return;
-      if(categories.some(c=>c!==cat && c.group===cat.group && categoryName(c.sub)===name)){
-        form.querySelector("[data-f-name]").classList.add("has-err");form.querySelector("[data-f-name-err]").hidden=false;saveBtn.disabled=true;return;
+      if (!(!name || saveBtn.disabled)) {
+        if (categories.some(c => c !== cat && c.group === cat.group && categoryName(c.sub) === name)) {
+          form.querySelector("[data-f-name]").classList.add("has-err"), form.querySelector("[data-f-name-err]").hidden = !1, saveBtn.disabled = !0;
+          return;
+        }
+        if (!categories.includes(cat) || state.type !== cat.type && assetsOf(cat.group, cat.sub).length) {
+          back.remove(), toast("설정이 변경되었습니다. 잠시 후 다시 시도해주세요."), render();
+          return;
+        }
+        cat.sub !== name && assets.forEach(a => {
+          a.group === cat.group && a.sub === cat.sub && (a.sub = name);
+        }), cat.sub = name, cat.type = state.type, cat.hiddenFields = [...state.hiddenFields], cat.extraEnabled=[...(state.extraEnabled||[])], cat.privateFields=[...(state.privateFields||[])], cat.view = state.view, cat.assign = state.assign, cat.viewTarget = TARGET_NEEDED.has(state.view) ? {
+          ...state.viewTarget
+        } : null, cat.assignTarget = TARGET_NEEDED.has(state.assign) ? {
+          ...state.assignTarget
+        } : null, back.remove(), toast("저장되었습니다."), render({
+          group: cat.group,
+          sub: cat.sub
+        });
       }
-      if(!categories.includes(cat) || (state.type!==cat.type && assetsOf(cat.group,cat.sub).length)){
-        back.remove();toast("설정이 변경되었습니다. 잠시 후 다시 시도해주세요.");render();return;
-      }
-      // 이름이 바뀌면 이 소분류에 걸린 자산들의 sub도 같이 갱신(대분류는 이 폼에서 안 바뀌므로 group은 그대로)
-      if (cat.sub !== name) {
-        assets.forEach(a => { if (a.group === cat.group && a.sub === cat.sub) a.sub = name; });
-      }
-      cat.sub = name;
-      cat.type = state.type;
-      cat.hiddenFields = [...state.hiddenFields];
-      cat.view = state.view;
-      cat.assign = state.assign;
-      cat.viewTarget = TARGET_NEEDED.has(state.view) ? { ...state.viewTarget } : null;
-      cat.assignTarget = TARGET_NEEDED.has(state.assign) ? { ...state.assignTarget } : null;
-      back.remove();
-      toast("저장되었습니다.");
-      render({ group: cat.group, sub: cat.sub });
     };
   }
-
-  // 대분류/소분류 추가·이름변경·삭제·순서변경(핸들 드래그)을 한 곳에서 처리하는 구조 편집 전용 모달.
-  // 열려 있는 동안은 draft(로컬 사본)만 수정하고, [저장]을 눌러야 실제 데이터(window.DATA)에 반영됨 — [취소]/배경 클릭 시 draft는 버려짐.
-  // 유형·권한·필드노출 같은 "내용"은 여기서 안 다룸 — 소분류 생성/수정은 별도 폼(소분류 상세의 "소분류 수정" 버튼)이 담당
   function openManageModal(sel) {
-    // draft: [{ name, subs: [{ name, data(원본 category 객체 참조 — 삭제 가능 여부는 항상 이 원본 소속 기준으로 판단) }] }]
-    // 이름변경/삭제/순서변경/대분류 추가는 전부 이 draft에만 반영되고 [저장]을 눌러야 실제 데이터로 감. 단, 소분류 생성만은 예외
-    // — 유형·권한까지 다 채우는 무거운 액션이라(분류 관리 화면 안에서 벌크로 여러 개 만드는 상황 고려) 폼에서 확정하는 즉시 실제 데이터에 반영됨(draft 취소와 무관)
-    // origName: 실제 데이터상의 원래 대분류명(대분류 이름변경은 draft라 취소될 수 있음 — 그 사이 소분류 생성이 즉시 커밋될 때는
-    // 항상 이 origName을 써서, 나중에 이름변경이 취소돼도 방금 만든 소분류가 엉뚱한 이름의 그룹으로 붕 뜨지 않게 함)
-    let draft = groupsOf().map(({ group, subs }) => ({ name: group, origName: group, subs: subs.map(s => ({ name: s.sub, data: s })) }));
-    let dragging = null;
-    let dirty = false;
-    let createGi = null; // 소분류 생성 모드일 때, 생성 대상 대분류의 draft 인덱스
-    let createState = null;
-    let createInitial="";
-    const selectedCategory = sel ? categories.find(c => c.group === sel.group && c.sub === sel.sub) : null;
-    const normalizedName = value => value.trim().replace(/\s+/g, " ");
-
-    const back = document.createElement("div");
-    back.className = "modal-back";
-    back.innerHTML = `
+    let draft = groupsOf().map(({
+        group,
+        subs
+      }) => ({
+        name: group,
+        origName: group,
+        subs: subs.map(s => ({
+          name: s.sub,
+          data: s
+        }))
+      })),
+      dragging = null,
+      dirty = !1,
+      createGi = null,
+      createState = null,
+      createInitial = "";
+    const selectedCategory = sel ? categories.find(c => c.group === sel.group && c.sub === sel.sub) : null,
+      normalizedName = value => value.trim().replace(/\s+/g, " "),
+      back = document.createElement("div");
+    back.className = "modal-back", back.innerHTML = `
       <div class="modal lg cat-manage-modal">
         <div class="cat-manage-head">
           <button class="btn icon-only sm" data-back hidden aria-label="뒤로">${BACK_ICON}</button>
@@ -914,92 +872,74 @@
           <button class="btn" data-cancel>취소</button>
           <button class="btn primary" data-confirm disabled>저장</button>
         </div>
-      </div>`;
-    document.body.appendChild(back);
-
-    const body = back.querySelector(".cat-manage-body");
-    const createEl = back.querySelector(".cat-manage-create");
-    const addGroupRow = back.querySelector(".cat-manage-add-group");
-    const titleEl = back.querySelector("[data-modal-title]");
-    const backBtn = back.querySelector("[data-back]");
-    const cancelBtn = back.querySelector("[data-cancel]");
-    const confirmBtn = back.querySelector("[data-confirm]");
-    const addInput = back.querySelector(".cat-manage-add-group input");
-    const addGroupErr = back.querySelector("[data-addgroup-err]");
+      </div>`, document.body.appendChild(back);
+    const body = back.querySelector(".cat-manage-body"),
+      createEl = back.querySelector(".cat-manage-create"),
+      addGroupRow = back.querySelector(".cat-manage-add-group"),
+      titleEl = back.querySelector("[data-modal-title]"),
+      backBtn = back.querySelector("[data-back]"),
+      cancelBtn = back.querySelector("[data-cancel]"),
+      confirmBtn = back.querySelector("[data-confirm]"),
+      addInput = back.querySelector(".cat-manage-add-group input"),
+      addGroupErr = back.querySelector("[data-addgroup-err]");
     let currentMode = "list";
-    // 대분류명은 전체 통틀어, 소분류명은 같은 대분류 안에서만 유일하면 됨(다른 대분류의 동명 소분류는 무관)
     function computeDups() {
-      const groupCounts = Object.create(null);
-      draft.forEach(g => { const n = normalizedName(g.name); if (n) groupCounts[n] = (groupCounts[n] || 0) + 1; });
-      const groupDups = new Set(Object.keys(groupCounts).filter(n => groupCounts[n] > 1));
-      const subDupsByGi = draft.map(g => {
-        const counts = Object.create(null);
-        g.subs.forEach(s => { const n = normalizedName(s.name); if (n) counts[n] = (counts[n] || 0) + 1; });
-        return new Set(Object.keys(counts).filter(n => counts[n] > 1));
+      const groupCounts = /* @__PURE__ */Object.create(null);
+      draft.forEach(g => {
+        const n = normalizedName(g.name);
+        n && (groupCounts[n] = (groupCounts[n] || 0) + 1);
       });
-      return { groupDups, subDupsByGi };
+      const groupDups = new Set(Object.keys(groupCounts).filter(n => groupCounts[n] > 1)),
+        subDupsByGi = draft.map(g => {
+          const counts = /* @__PURE__ */Object.create(null);
+          return g.subs.forEach(s => {
+            const n = normalizedName(s.name);
+            n && (counts[n] = (counts[n] || 0) + 1);
+          }), new Set(Object.keys(counts).filter(n => counts[n] > 1));
+        });
+      return {
+        groupDups,
+        subDupsByGi
+      };
     }
     function updateValidity() {
-      const { groupDups, subDupsByGi } = computeDups();
-      let anyDup = groupDups.size > 0;
-      let anyEmpty = false;
+      const {
+        groupDups,
+        subDupsByGi
+      } = computeDups();
+      let anyDup = groupDups.size > 0,
+        anyEmpty = !1;
       body.querySelectorAll("[data-rename-group]").forEach(inp => {
-        const name = normalizedName(inp.value);
-        const dup = groupDups.has(name);
-        if (!name) anyEmpty = true;
-        inp.classList.toggle("has-err", dup);
-        inp.closest(".cat-manage-row").classList.toggle("has-err", dup);
-        inp.parentElement.querySelector("[data-name-err]").hidden = !dup;
+        const name = normalizedName(inp.value),
+          dup = groupDups.has(name);
+        name || (anyEmpty = !0), inp.classList.toggle("has-err", dup), inp.closest(".cat-manage-row").classList.toggle("has-err", dup), inp.parentElement.querySelector("[data-name-err]").hidden = !dup;
+      }), body.querySelectorAll("[data-rename-sub]").forEach(inp => {
+        const gi = +inp.dataset.renameSub.split("|")[0],
+          name = normalizedName(inp.value),
+          dup = subDupsByGi[gi] && subDupsByGi[gi].has(name);
+        name || (anyEmpty = !0), inp.classList.toggle("has-err", !!dup), inp.closest(".cat-manage-row").classList.toggle("has-err", !!dup), inp.parentElement.querySelector("[data-name-err]").hidden = !dup, dup && (anyDup = !0);
       });
-      body.querySelectorAll("[data-rename-sub]").forEach(inp => {
-        const gi = +inp.dataset.renameSub.split("|")[0];
-        const name = normalizedName(inp.value);
-        const dup = subDupsByGi[gi] && subDupsByGi[gi].has(name);
-        if (!name) anyEmpty = true;
-        inp.classList.toggle("has-err", !!dup);
-        inp.closest(".cat-manage-row").classList.toggle("has-err", !!dup);
-        inp.parentElement.querySelector("[data-name-err]").hidden = !dup;
-        if (dup) anyDup = true;
-      });
-      const addName = normalizedName(addInput.value);
-      const addDup = !!addName && draft.some(g => normalizedName(g.name) === addName);
-      addInput.classList.toggle("has-err", addDup);
-      addGroupErr.hidden = !addDup;
-      back.querySelector("[data-add-group]").disabled = !addName || addDup;
-      if (currentMode === "list") confirmBtn.disabled = !dirty || anyDup || anyEmpty;
+      const addName = normalizedName(addInput.value),
+        addDup = !!addName && draft.some(g => normalizedName(g.name) === addName);
+      addInput.classList.toggle("has-err", addDup), addGroupErr.hidden = !addDup, back.querySelector("[data-add-group]").disabled = !addName || addDup, currentMode === "list" && (confirmBtn.disabled = !dirty || anyDup || anyEmpty);
     }
-    const markDirty = () => { dirty = true; updateValidity(); };
-    const clearDragMarks = () => body.querySelectorAll(".drag-over-top,.drag-over-bottom")
-      .forEach(el => el.classList.remove("drag-over-top", "drag-over-bottom"));
-
-    // 뒤로가기 — 소분류명을 입력한 상태(= [저장]이 활성화될 만큼 진행된 상태)에서 나가려 하면 한 번 확인. 이름을 아직 안 썼으면 잃을 내용이 없다고 보고 바로 이동
+    const markDirty = () => {
+        dirty = !0, updateValidity();
+      },
+      clearDragMarks = () => body.querySelectorAll(".drag-over-top,.drag-over-bottom").forEach(el => el.classList.remove("drag-over-top", "drag-over-bottom"));
     function guardedBack() {
-      if (createState && subFormSnapshot(createState)!==createInitial) {
-        confirmModal("페이지를 벗어나시겠습니까?", "페이지를 벗어날 경우 편집한 내용이 저장되지 않습니다.", () => setMode("list"));
-      } else {
-        setMode("list");
-      }
+      createState && subFormSnapshot(createState) !== createInitial ? confirmModal("페이지를 벗어나시겠습니까?", "페이지를 벗어날 경우 편집한 내용이 저장되지 않습니다.", () => setMode("list")) : setMode("list");
     }
     function setMode(mode) {
       currentMode = mode;
       const isList = mode === "list";
-      titleEl.textContent = isList ? "분류 관리" : "소분류 추가";
-      backBtn.hidden = isList;
-      addGroupRow.hidden = !isList;
-      body.hidden = !isList;
-      createEl.hidden = isList;
-      cancelBtn.hidden = !isList; // 소분류 생성 화면에선 헤더의 뒤로가기(←)가 같은 역할을 하므로 푸터 취소는 없앰
-      confirmBtn.textContent = "저장";
-      if (isList) updateValidity(); else confirmBtn.disabled = true;
-      cancelBtn.onclick = () => { back.remove(); render(sel); };
-      confirmBtn.onclick = isList ? saveAll : commitCreate;
+      titleEl.textContent = isList ? "분류 관리" : "소분류 추가", backBtn.hidden = isList, addGroupRow.hidden = !isList, body.hidden = !isList, createEl.hidden = isList, cancelBtn.hidden = !isList, confirmBtn.textContent = "저장", isList ? updateValidity() : confirmBtn.disabled = !0, cancelBtn.onclick = () => {
+        back.remove(), render(sel);
+      }, confirmBtn.onclick = isList ? saveAll : commitCreate;
     }
-    backBtn.onclick = guardedBack;
-    back.addEventListener("click", e => {
-      if (e.target !== back) return;
-      if (currentMode === "list") cancelBtn.click(); else guardedBack();
+    backBtn.onclick = guardedBack, back.addEventListener("click", e => {
+      e.target === back && (currentMode === "list" ? cancelBtn.click() : guardedBack());
     });
-
     function renderBody() {
       body.innerHTML = draft.length ? draft.map((g, gi) => {
         const blocked = g.subs.length > 0;
@@ -1018,8 +958,8 @@
           </div>
           <div class="cat-manage-subs">
             ${g.subs.map((s, si) => {
-              const hasAssets = assetsOf(s.data.group, s.data.sub).length > 0;
-              return `
+          const hasAssets = assetsOf(s.data.group, s.data.sub).length > 0;
+          return `
               <div class="cat-manage-row cat-manage-sub-row" draggable="true" data-drag="sub" data-gi="${gi}" data-si="${si}">
                 <span class="cat-manage-handle" data-tip="순서 변경 및 대분류 이동">${HANDLE_ICON}</span>
                 <div class="cat-manage-name-field">
@@ -1031,271 +971,269 @@
                     data-tip="${hasAssets ? "등록된 자산이 있어 삭제할 수 없습니다." : "삭제"}">${TRASH_ICON}</button>
                 </div>
               </div>`;
-            }).join("")}
+        }).join("")}
             ${g.subs.length ? "" : '<p class="cat-tree-empty" style="padding-left:8px">소분류 없음</p>'}
             <button class="btn sm cat-manage-add-sub" data-add-sub="${gi}">+ 소분류 추가</button>
           </div>
         </div>`;
-      }).join("") : '<p class="cat-manage-empty">등록된 분류가 없습니다.</p>';
-      updateValidity();
+      }).join("") : '<p class="cat-manage-empty">등록된 분류가 없습니다.</p>', updateValidity();
     }
     renderBody();
-
     function addGroup() {
       const name = normalizedName(addInput.value);
-      if (!name || draft.some(g => normalizedName(g.name) === name)) { addInput.focus(); return; }
-      draft.unshift({ name, origName: null, subs: [] });
-      addInput.value = "";
-      markDirty(); renderBody();
+      if (!name || draft.some(g => normalizedName(g.name) === name)) {
+        addInput.focus();
+        return;
+      }
+      draft.unshift({
+        name,
+        origName: null,
+        subs: []
+      }), addInput.value = "", markDirty(), renderBody();
     }
-    back.querySelector("[data-add-group]").onclick = addGroup;
-    addInput.addEventListener("input", updateValidity);
-    addInput.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); addGroup(); } });
-
-    body.addEventListener("input", e => {
-      const rg = e.target.closest("[data-rename-group]");
-      const rs = e.target.closest("[data-rename-sub]");
-      if (rg) { draft[+rg.dataset.renameGroup].name = e.target.value; markDirty(); }
-      else if (rs) {
+    back.querySelector("[data-add-group]").onclick = addGroup, addInput.addEventListener("input", updateValidity), addInput.addEventListener("keydown", e => {
+      e.key === "Enter" && (e.preventDefault(), addGroup());
+    }), body.addEventListener("input", e => {
+      const rg = e.target.closest("[data-rename-group]"),
+        rs = e.target.closest("[data-rename-sub]");
+      if (rg) draft[+rg.dataset.renameGroup].name = e.target.value, markDirty();else if (rs) {
         const [gi, si] = rs.dataset.renameSub.split("|").map(Number);
-        draft[gi].subs[si].name = e.target.value; markDirty();
+        draft[gi].subs[si].name = e.target.value, markDirty();
       }
-    });
-    body.addEventListener("click", e => {
-      const delGroup = e.target.closest("[data-del-group]");
-      const delSub = e.target.closest("[data-del-sub]");
-      const addSub = e.target.closest("[data-add-sub]");
-      if (delGroup && !delGroup.classList.contains("is-disabled")) {
-        draft.splice(+delGroup.dataset.delGroup, 1);
-        markDirty(); renderBody();
-      } else if (delSub && !delSub.classList.contains("is-disabled")) {
+    }), body.addEventListener("click", e => {
+      const delGroup = e.target.closest("[data-del-group]"),
+        delSub = e.target.closest("[data-del-sub]"),
+        addSub = e.target.closest("[data-add-sub]");
+      if (delGroup && !delGroup.classList.contains("is-disabled")) draft.splice(+delGroup.dataset.delGroup, 1), markDirty(), renderBody();else if (delSub && !delSub.classList.contains("is-disabled")) {
         const [gi, si] = delSub.dataset.delSub.split("|").map(Number);
-        draft[gi].subs.splice(si, 1);
-        markDirty(); renderBody();
-      } else if (addSub) {
-        enterCreate(+addSub.dataset.addSub);
-      }
-    });
-
-    // 드래그 정렬 — 핸들을 잡고 시작(입력창/버튼에서는 브라우저 기본 동작이 드래그를 가로채 자연히 막힘)
-    body.addEventListener("dragstart", e => {
+        draft[gi].subs.splice(si, 1), markDirty(), renderBody();
+      } else addSub && enterCreate(+addSub.dataset.addSub);
+    }), body.addEventListener("dragstart", e => {
       const row = e.target.closest("[data-drag]");
-      if (!row) return;
-      dragging = row.dataset.drag === "group"
-        ? { type: "group", gi: +row.dataset.gi }
-        : { type: "sub", gi: +row.dataset.gi, si: +row.dataset.si };
-      e.dataTransfer.effectAllowed = "move";
-      e.dataTransfer.setData("text/plain", "");
-      row.classList.add("dragging");
-    });
-    body.addEventListener("dragend", e => {
-      dragging = null;
-      e.target.closest("[data-drag]")?.classList.remove("dragging");
-      clearDragMarks();
-    });
-    body.addEventListener("dragover", e => {
+      row && (dragging = row.dataset.drag === "group" ? {
+        type: "group",
+        gi: +row.dataset.gi
+      } : {
+        type: "sub",
+        gi: +row.dataset.gi,
+        si: +row.dataset.si
+      }, e.dataTransfer.effectAllowed = "move", e.dataTransfer.setData("text/plain", ""), row.classList.add("dragging"));
+    }), body.addEventListener("dragend", e => {
+      dragging = null, e.target.closest("[data-drag]")?.classList.remove("dragging"), clearDragMarks();
+    }), body.addEventListener("dragover", e => {
       if (!dragging) return;
-      const subRow = e.target.closest('[data-drag="sub"]');
-      const groupRow = e.target.closest('[data-drag="group"]');
+      const subRow = e.target.closest('[data-drag="sub"]'),
+        groupRow = e.target.closest('[data-drag="group"]');
       if (dragging.type === "sub" && subRow) {
-        e.preventDefault(); clearDragMarks();
+        e.preventDefault(), clearDragMarks();
         const rect = subRow.getBoundingClientRect();
         subRow.classList.add(e.clientY < rect.top + rect.height / 2 ? "drag-over-top" : "drag-over-bottom");
-      } else if (dragging.type === "sub" && groupRow) {
-        e.preventDefault(); clearDragMarks();
-        groupRow.classList.add("drag-over-bottom");
-      } else if (dragging.type === "group" && groupRow) {
-        e.preventDefault(); clearDragMarks();
+      } else if (dragging.type === "sub" && groupRow) e.preventDefault(), clearDragMarks(), groupRow.classList.add("drag-over-bottom");else if (dragging.type === "group" && groupRow) {
+        e.preventDefault(), clearDragMarks();
         const rect = groupRow.getBoundingClientRect();
         groupRow.classList.add(e.clientY < rect.top + rect.height / 2 ? "drag-over-top" : "drag-over-bottom");
       }
-    });
-    body.addEventListener("drop", e => {
+    }), body.addEventListener("drop", e => {
       if (!dragging) return;
       e.preventDefault();
-      const subRow = e.target.closest('[data-drag="sub"]');
-      const groupRow = e.target.closest('[data-drag="group"]');
+      const subRow = e.target.closest('[data-drag="sub"]'),
+        groupRow = e.target.closest('[data-drag="group"]');
       if (dragging.type === "sub") {
         let targetGi, targetIndex;
-        if (subRow) {
-          targetGi = +subRow.dataset.gi;
-          targetIndex = +subRow.dataset.si + (subRow.classList.contains("drag-over-top") ? 0 : 1);
-        } else if (groupRow) {
-          targetGi = +groupRow.dataset.gi;
-          targetIndex = draft[targetGi].subs.length;
-        } else { dragging = null; clearDragMarks(); return; }
+        if (subRow) targetGi = +subRow.dataset.gi, targetIndex = +subRow.dataset.si + (subRow.classList.contains("drag-over-top") ? 0 : 1);else if (groupRow) targetGi = +groupRow.dataset.gi, targetIndex = draft[targetGi].subs.length;else {
+          dragging = null, clearDragMarks();
+          return;
+        }
         const [moved] = draft[dragging.gi].subs.splice(dragging.si, 1);
         let insertAt = targetIndex;
-        if (dragging.gi === targetGi && dragging.si < targetIndex) insertAt -= 1;
-        draft[targetGi].subs.splice(insertAt, 0, moved);
-        markDirty(); renderBody();
+        dragging.gi === targetGi && dragging.si < targetIndex && (insertAt -= 1), draft[targetGi].subs.splice(insertAt, 0, moved), markDirty(), renderBody();
       } else if (dragging.type === "group" && groupRow) {
-        const targetIndex = +groupRow.dataset.gi + (groupRow.classList.contains("drag-over-top") ? 0 : 1);
-        const [moved] = draft.splice(dragging.gi, 1);
+        const targetIndex = +groupRow.dataset.gi + (groupRow.classList.contains("drag-over-top") ? 0 : 1),
+          [moved] = draft.splice(dragging.gi, 1);
         let insertAt = targetIndex;
-        if (dragging.gi < targetIndex) insertAt -= 1;
-        draft.splice(insertAt, 0, moved);
-        markDirty(); renderBody();
+        dragging.gi < targetIndex && (insertAt -= 1), draft.splice(insertAt, 0, moved), markDirty(), renderBody();
       }
-      dragging = null;
-      clearDragMarks();
+      dragging = null, clearDragMarks();
     });
-
     function saveAll() {
-      // 운영 저장 계약: 저장 직전 자산 관리 권한을 재검증한다. 권한 상실이면 미반영·모달 종료 후
-      // 현재 분류 탭 접근 가능 여부에 따라 분류 화면 갱신/현황 > 전체 이동, 일시적 시스템 오류면
-      // 미반영·모달과 입력 초안 유지. 이 클릭 프로토타입에는 서버 저장/실패 응답이 없다.
-      const dups = computeDups();
-      const hasEmptyName = draft.some(g => !normalizedName(g.name) || g.subs.some(s => !normalizedName(s.name)));
+      const dups = computeDups(),
+        hasEmptyName = draft.some(g => !normalizedName(g.name) || g.subs.some(s => !normalizedName(s.name)));
       if (!dirty || hasEmptyName || dups.groupDups.size > 0 || dups.subDupsByGi.some(s => s.size > 0)) return;
-      const newCategories = [];
-      const newEmptyGroups = [];
+      const newCategories = [],
+        newEmptyGroups = [];
       let nextSelection = null;
       draft.forEach(g => {
         const groupName = normalizedName(g.name);
-        if (!g.subs.length) { newEmptyGroups.push(groupName); return; }
+        if (!g.subs.length) {
+          newEmptyGroups.push(groupName);
+          return;
+        }
         g.subs.forEach(s => {
-          // 이름변경·대분류이동으로 소속이 바뀐 소분류는, 거기 걸린 자산들의 group/sub도 같이 옮겨줘야
-          // 자산 목록 조회(assetsOf)가 끊기지 않음 — 원래 소속(s.data.group/sub) 기준으로 자산을 찾아 갱신
-          const oldGroup = s.data.group, oldSub = s.data.sub;
-          const subName = normalizedName(s.name);
-          if (oldGroup !== groupName || oldSub !== subName) {
-            assets.forEach(a => { if (a.group === oldGroup && a.sub === oldSub) { a.group = groupName; a.sub = subName; } });
-          }
-          newCategories.push({ ...s.data, group: groupName, sub: subName });
-          if (s.data === selectedCategory) nextSelection = { group: groupName, sub: subName };
+          const oldGroup = s.data.group,
+            oldSub = s.data.sub,
+            subName = normalizedName(s.name);
+          (oldGroup !== groupName || oldSub !== subName) && assets.forEach(a => {
+            a.group === oldGroup && a.sub === oldSub && (a.group = groupName, a.sub = subName);
+          }), newCategories.push({
+            ...s.data,
+            group: groupName,
+            sub: subName
+          }), s.data === selectedCategory && (nextSelection = {
+            group: groupName,
+            sub: subName
+          });
         });
-      });
-      categories.length = 0;
-      categories.push(...newCategories);
-      window.DATA.emptyGroups = newEmptyGroups;
-      back.remove();
-      toast("저장되었습니다.");
-      // 선택했던 소분류가 삭제됐다면 render가 저장 순서상 첫 소분류를 선택한다.
-      render(nextSelection);
+      }), categories.length = 0, categories.push(...newCategories), window.DATA.emptyGroups = newEmptyGroups, back.remove(), toast("저장되었습니다."), render(nextSelection);
     }
-
-    // 소분류 생성 — 유형·권한까지 다 채우는 무거운 액션이라 여기서만 예외적으로 "추가"를 누르는 즉시 실제 데이터(categories)에 반영됨.
-    // 이 draft(구조 편집)의 [취소]와는 무관 — 다만 목록에 바로 보이도록 draft에도 같이 끼워 넣음
     function enterCreate(gi) {
-      createGi = gi;
-      createState = {
-        name: "", type: "individual",
-        view: VIEW_OPTIONS[0], assign: ASSIGN_BY_VIEW[VIEW_OPTIONS[0]].default,
-        viewTarget: { groups: [], jobTitles: [], members: [] },
-        assignTarget: { groups: [], jobTitles: [], members: [] },
-        hiddenFields: [...DEFAULT_HIDDEN_FIELDS.individual],
-      };
-      createInitial=subFormSnapshot(createState);
-      renderCreateForm();
-      setMode("create");
-      confirmBtn.disabled=!categoryName(createState.name);
+      createGi = gi, createState = {
+        name: "",
+        type: "individual",
+        view: VIEW_OPTIONS[0],
+        assign: ASSIGN_BY_VIEW[VIEW_OPTIONS[0]].default,
+        viewTarget: {
+          groups: [],
+          jobTitles: [],
+          members: []
+        },
+        assignTarget: {
+          groups: [],
+          jobTitles: [],
+          members: []
+        },
+        hiddenFields: [...DEFAULT_HIDDEN_FIELDS.individual]
+      }, createInitial = subFormSnapshot(createState), renderCreateForm(), setMode("create"), confirmBtn.disabled = !categoryName(createState.name);
     }
-
-
     function renderCreateForm() {
       renderSubForm(createEl, createState, {
         groupLabel: draft[createGi].name,
-        typeLocked: false,
+        typeLocked: !1,
         siblingNames: draft[createGi].subs.map(s => s.name),
-        onNameChange: valid => { confirmBtn.disabled = !valid; },
+        onNameChange: valid => {
+          confirmBtn.disabled = !valid;
+        }
       });
     }
-
     function commitCreate() {
       const name = categoryName(createState.name);
       if (!name) return;
-      const group = draft[createGi].origName || draft[createGi].name;
       const newCat = {
-        group, sub: name, type: createState.type, hiddenFields: [...createState.hiddenFields],
-        view: createState.view, assign: createState.assign,
-        viewTarget: TARGET_NEEDED.has(createState.view) ? { ...createState.viewTarget } : null,
-        assignTarget: TARGET_NEEDED.has(createState.assign) ? { ...createState.assignTarget } : null,
+        group: draft[createGi].origName || draft[createGi].name,
+        sub: name,
+        type: createState.type,
+        hiddenFields: [...createState.hiddenFields], extraEnabled:[...(createState.extraEnabled||[])], privateFields:[...(createState.privateFields||[])],
+        view: createState.view,
+        assign: createState.assign,
+        viewTarget: TARGET_NEEDED.has(createState.view) ? {
+          ...createState.viewTarget
+        } : null,
+        assignTarget: TARGET_NEEDED.has(createState.assign) ? {
+          ...createState.assignTarget
+        } : null
       };
-      categories.push(newCat);
-      draft[createGi].subs.push({ name, data: newCat });
-      toast("소분류가 추가되었습니다.");
-      setMode("list");
-      renderBody();
+      categories.push(newCat), draft[createGi].subs.push({
+        name,
+        data: newCat
+      }), toast("소분류가 추가되었습니다."), setMode("list"), renderBody();
     }
-
     setMode("list");
   }
-
-  // 품목 목록 — 현황 화면과 같은 페이지네이션(20/50/100개). 검색은 품목명 기준으로 데이터를 거른 뒤 페이지를 나눠 다시 그리고,
-  // 검색어·페이지 크기를 바꾸면 1페이지로 돌아감. 전체 건수는 개별형=일치 품목의 자산 수 합계, 수량형=일치 자산 행 수
   function wireAssetSection(c, cat) {
     const tbody = c.querySelector("[data-asset-tbody]");
     if (tbody) {
-      const isIndividual = cat.type === "individual";
-      const items = isIndividual
-        ? productsOf(cat.group, cat.sub)
-        : [...assetsOf(cat.group, cat.sub)].sort((a, b) => a.product.localeCompare(b.product, "ko"));
-      const nameOf = it => it.product;
-      const stored=JSON.parse(sessionStorage.getItem("asset-category-return") || "null");
-      const st=stored?.group===cat.group && stored?.sub===cat.sub ? {q:stored.q,page:stored.page,size:stored.size} : {q:"",page:1,size:20};
-      const searchInput = c.querySelector("[data-product-search]");
-      searchInput.value=st.q;
-      const sbox = searchInput.closest(".searchbox");
-      const tableWrap = c.querySelector("[data-asset-table]");
-      const emptyMsg = c.querySelector("[data-search-empty]");
-      const pagerEl = c.querySelector("[data-asset-pager]");
-      const countEl = c.querySelector("[data-product-result-count]");
-      const pagerHtml = totalPages => {
-        const p = st.page;
-        const winStart = Math.max(1, Math.min(p - 2, totalPages - 4));
-        const winEnd = Math.min(totalPages, Math.max(p + 2, winStart + 4));
-        const btn = (label, target, disabled, cls = "") => `<button data-page="${target}" ${disabled ? "disabled" : ""} class="${cls}">${label}</button>`;
-        const nums = [];
-        for (let i = winStart; i <= winEnd; i++) nums.push(btn(i, i, false, i === p ? "active" : ""));
-        return `
+      const items = productsOf(cat.group, cat.sub),
+        nameOf = it => it.product,
+        stored = JSON.parse(sessionStorage.getItem("asset-category-return") || "null"),
+        st = stored?.group === cat.group && stored?.sub === cat.sub ? {
+          q: stored.q,
+          page: stored.page,
+          size: stored.size
+        } : {
+          q: "",
+          page: 1,
+          size: 20
+        },
+        searchInput = c.querySelector("[data-product-search]");
+      searchInput.value = st.q;
+      const sbox = searchInput.closest(".searchbox"),
+        tableWrap = c.querySelector("[data-asset-table]"),
+        emptyMsg = c.querySelector("[data-search-empty]"),
+        pagerEl = c.querySelector("[data-asset-pager]"),
+        countEl = c.querySelector("[data-product-result-count]"),
+        pagerHtml = totalPages => {
+          const p = st.page,
+            winStart = Math.max(1, Math.min(p - 2, totalPages - 4)),
+            winEnd = Math.min(totalPages, Math.max(p + 2, winStart + 4)),
+            btn = (label, target, disabled, cls = "") => `<button data-page="${target}" ${disabled ? "disabled" : ""} class="${cls}">${label}</button>`,
+            nums = [];
+          for (let i = winStart; i <= winEnd; i++) nums.push(btn(i, i, !1, i === p ? "active" : ""));
+          return `
           <div class="pager">
             ${btn("«", 1, p === 1)}${btn("‹", p - 1, p === 1)}${nums.join("")}${btn("›", p + 1, p === totalPages)}${btn("»", totalPages, p === totalPages)}
             <span class="pagesize"><select data-asset-pagesize>${[20, 50, 100].map(n => `<option value="${n}" ${st.size === n ? "selected" : ""}>${n}</option>`).join("")}</select></span>
           </div>`;
-      };
-      const refresh = () => {
-        const q = st.q.trim().toLowerCase();
-        const filtered = q ? items.filter(it => nameOf(it).toLowerCase().includes(q)) : items;
-        countEl.textContent = isIndividual ? filtered.reduce((sum, p) => sum + p.total, 0) : filtered.length;
-        const totalPages = Math.max(1, Math.ceil(filtered.length / st.size));
-        if (st.page > totalPages) st.page = totalPages;
-        const pageItems = filtered.slice((st.page - 1) * st.size, st.page * st.size);
-        tbody.innerHTML = pageItems.map(isIndividual ? productRowHtml : stockRowHtml).join("");
-        tableWrap.hidden = !filtered.length;
-        emptyMsg.hidden = !!filtered.length;
-        pagerEl.innerHTML = filtered.length ? pagerHtml(totalPages) : "";
-        tbody.querySelectorAll(".cat-prod-row").forEach(row => row.onclick = () => {
-          const p = items.find(x => x.product === row.dataset.product);
-          if (p) window.openProductUnitsModal(p.product, p.items);
-        });
-        tbody.querySelectorAll("[data-asset]").forEach(row => row.onclick = e => {
-          e.stopPropagation();
-          sessionStorage.setItem("asset-category-return",JSON.stringify({...st,group:cat.group,sub:cat.sub}));
-          location.href=`asset-detail.html?id=${row.dataset.asset}`;
-        });
-        pagerEl.querySelectorAll("button[data-page]").forEach(b => b.onclick = () => { st.page = +b.dataset.page; refresh(); });
-        const sizeSel = pagerEl.querySelector("[data-asset-pagesize]");
-        if (sizeSel) sizeSel.onchange = () => { st.size = +sizeSel.value; st.page = 1; refresh(); };
-        sbox.classList.toggle("has-term", !!st.q);
-      };
-      searchInput.addEventListener("input", () => { st.q = searchInput.value; st.page = 1; refresh(); });
-      searchInput.onfocus = () => { searchInput.classList.add("expanded"); searchInput.placeholder = "품목명"; };
-      searchInput.onblur = () => { if (!searchInput.value) { searchInput.classList.remove("expanded"); searchInput.placeholder = "검색"; } };
-      c.querySelector("[data-product-search-clear]").onclick = () => { searchInput.value = ""; st.q = ""; st.page = 1; refresh(); searchInput.focus(); };
-      refresh();
+        },
+        refresh = () => {
+          const q = st.q.trim().toLowerCase(),
+            filtered = q ? items.filter(it => nameOf(it).toLowerCase().includes(q)) : items;
+          countEl.textContent = filtered.reduce((sum, p) => sum + p.total, 0);
+          const totalPages = Math.max(1, Math.ceil(filtered.length / st.size));
+          st.page > totalPages && (st.page = totalPages);
+          const pageItems = filtered.slice((st.page - 1) * st.size, st.page * st.size);
+          tbody.innerHTML = pageItems.map(productRowHtml).join(""), tableWrap.hidden = !filtered.length, emptyMsg.hidden = !!filtered.length, pagerEl.innerHTML = filtered.length ? pagerHtml(totalPages) : "", tbody.querySelectorAll(".cat-prod-row").forEach(row => row.onclick = () => {
+            const p = items.find(x => x.product === row.dataset.product);
+            p && window.openProductUnitsModal(p.product, p.items);
+          }), tbody.querySelectorAll("[data-asset]").forEach(row => row.onclick = e => {
+            e.stopPropagation(), sessionStorage.setItem("asset-category-return", JSON.stringify({
+              ...st,
+              group: cat.group,
+              sub: cat.sub
+            })), location.href = `asset-detail.html?id=${row.dataset.asset}`;
+          }), pagerEl.querySelectorAll("button[data-page]").forEach(b => b.onclick = () => {
+            st.page = +b.dataset.page, refresh();
+          });
+          const sizeSel = pagerEl.querySelector("[data-asset-pagesize]");
+          sizeSel && (sizeSel.onchange = () => {
+            st.size = +sizeSel.value, st.page = 1, refresh();
+          }), sbox.classList.toggle("has-term", !!st.q);
+        };
+      searchInput.addEventListener("input", () => {
+        st.q = searchInput.value, st.page = 1, refresh();
+      }), searchInput.onfocus = () => {
+        searchInput.classList.add("expanded"), searchInput.placeholder = "품목명";
+      }, searchInput.onblur = () => {
+        searchInput.value || (searchInput.classList.remove("expanded"), searchInput.placeholder = "검색");
+      }, c.querySelector("[data-product-search-clear]").onclick = () => {
+        searchInput.value = "", st.q = "", st.page = 1, refresh(), searchInput.focus();
+      }, refresh();
     }
+    const bulkButton=c.querySelector('[data-bulk-add]');
+    if(bulkButton)bulkButton.onclick=()=>{sessionStorage.setItem('asset-bulk-origin',JSON.stringify({group:cat.group,sub:cat.sub}));location.href='assets.html?screen=bulk-register';};
     const addAssetBtn = c.querySelector("[data-add-asset]");
-    if (addAssetBtn) addAssetBtn.onclick = () => window.openAssetAddModal({ type: cat.type, group: cat.group, sub: cat.sub, onSaved: () => render({ group: cat.group, sub: cat.sub }) });
+    addAssetBtn && (addAssetBtn.onclick = () => window.openAssetAddModal({
+      type: cat.type,
+      group: cat.group,
+      sub: cat.sub,
+      onSaved: () => render({
+        group: cat.group,
+        sub: cat.sub
+      })
+    }));
   }
-
   function render(sel) {
-    if(!sel && performance.getEntriesByType("navigation")[0]?.type==="back_forward") {const saved=JSON.parse(sessionStorage.getItem("asset-category-return") || "null");if(saved)sel={group:saved.group,sub:saved.sub};}
-    const c = document.getElementById("content");
-    const groups = groupsOf();
-    if (!sel || !categories.some(x => x.group === sel.group && x.sub === sel.sub)) sel = firstSelectable(groups);
+    if(!sel){const params=new URLSearchParams(location.search),group=params.get('group'),sub=params.get('sub');if(categories.some(c=>c.group===group&&c.sub===sub))sel={group,sub};}
+    const pendingToast=sessionStorage.getItem('pendingToast');if(pendingToast){sessionStorage.removeItem('pendingToast');toast(pendingToast);}
+    if (!sel && performance.getEntriesByType("navigation")[0]?.type === "back_forward") {
+      const saved = JSON.parse(sessionStorage.getItem("asset-category-return") || "null");
+      saved && (sel = {
+        group: saved.group,
+        sub: saved.sub
+      });
+    }
+    const c = document.getElementById("content"),
+      groups = groupsOf();
+    (!sel || !categories.some(x => x.group === sel.group && x.sub === sel.sub)) && (sel = firstSelectable(groups));
     const cat = sel ? categories.find(x => x.group === sel.group && x.sub === sel.sub) : null;
-
     c.innerHTML = `
       <div class="tabs">
         <a href="assets.html">현황</a>
@@ -1315,23 +1253,20 @@
             <p class="cat-sub-empty">등록된 소분류가 없습니다.</p>
             <button type="button" class="btn sm" data-manage>분류 관리</button>`}</div>
         </div>`}
-    `;
-    c.classList.add("cat-split");
-    c.querySelectorAll("[data-tree]").forEach(b => b.onclick = () => {
+    `, c.classList.add("cat-split"), c.querySelectorAll("[data-tree]").forEach(b => b.onclick = () => {
       const [group, sub] = b.dataset.tree.split("|");
-      render({ group, sub });
-    });
-    c.querySelectorAll("[data-toggle]").forEach(b => b.onclick = () => {
+      render({
+        group,
+        sub
+      });
+    }), c.querySelectorAll("[data-toggle]").forEach(b => b.onclick = () => {
       const g = b.dataset.toggle;
-      if (collapsedGroups.has(g)) collapsedGroups.delete(g); else collapsedGroups.add(g);
-      render(sel);
-    });
-    c.querySelectorAll("[data-manage]").forEach(b => b.onclick = () => openManageModal(sel));
+      collapsedGroups.has(g) ? collapsedGroups.delete(g) : collapsedGroups.add(g), render(sel);
+    }), c.querySelectorAll("[data-manage]").forEach(b => b.onclick = () => openManageModal(sel)); c.querySelectorAll("[data-manage-dropdown]").forEach(b=>b.onclick=()=>openManagementMenu(b,sel));
     const editBtn = c.querySelector("[data-edit-sub]");
-    if (editBtn) editBtn.onclick = () => openSubEditModal(cat);
-    c.querySelectorAll("[data-perm-target]").forEach(b => b.onclick = () => openPermTargetModal(cat, b.dataset.permTarget));
-    wireAssetSection(c, cat);
+    editBtn && (editBtn.onclick = () => openSubEditModal(cat)), c.querySelectorAll("[data-perm-target]").forEach(b => b.onclick = () => openPermTargetModal(cat, b.dataset.permTarget)), wireAssetSection(c, cat);
   }
-
-  window.CategoryScreen = { render: () => render(null) };
+  window.CategoryScreen = {
+    render: () => render(null)
+  };
 })();

@@ -1,140 +1,214 @@
-/* 현황 탭 — 자산 목록 (진입 화면) */
 (function () {
-  const TODAY = new Date("2026-09-04");
-  const { assets } = window.DATA;
+  const TODAY = /* @__PURE__ */new Date("2026-09-04"),
+    {
+      assets
+    } = window.DATA;
   window.addEventListener("asset-registered", () => render());
-  // 대시보드는 자산 관리 권한 보유 관리자 가정. 권한 QA 모드에서만 비관리 리더를 재현한다.
-  // 실제 서비스에서는 현재 계정의 관리 권한·이름/그룹/직무 ID 응답으로 대체한다(인증 API 목업 아님).
-  const DEMO_ASSUME_ASSET_MANAGE_PERMISSION = window.AssetPermissionQa?.managePermission ?? true;
-  const DEMO_VIEWER_NAME = "김민수";
-  // 7-3의 동시 변경은 실제 서버 없이 QA URL에서만 재현한다. 일반 URL의 시드·조회 범위는 바꾸지 않는다.
-  const memberQaParams = new URLSearchParams(location.search);
-  const memberQaEnabled = memberQaParams.get("qa") === "member-unavailable";
-  const memberQaScenario = ["relation", "scope", "partial"].includes(memberQaParams.get("scenario"))
-    ? memberQaParams.get("scenario") : "relation";
-  const memberQaHiddenCategories = new Set();
+  const DEMO_ASSUME_ASSET_MANAGE_PERMISSION = window.AssetPermissionQa?.managePermission ?? !0,
+    DEMO_VIEWER_NAME = "김민수",
+    memberQaParams = new URLSearchParams(location.search),
+    memberQaEnabled = memberQaParams.get("qa") === "member-unavailable",
+    memberQaScenario = ["relation", "scope", "partial"].includes(memberQaParams.get("scenario")) ? memberQaParams.get("scenario") : "relation",
+    memberQaHiddenCategories = /* @__PURE__ */new Set();
   let memberQaPending = memberQaEnabled;
-
-
-  // held(보유 중)는 수량형 전용 — 개별형의 배정중처럼 "활성 상태"라 배지 색은 assigned를 그대로 재사용(구조설계안
-  // 3.4: status는 개별형·수량형 둘 다 필수, 값 범위만 다름 — 수량형은 stock·held 2종만)
   const STATUS_LABEL = {
-    stock: ["재고", "stock"], assigned: ["배정 중", "assigned"], repair: ["수리/점검 중", "repair"],
-    lost: ["분실", "lost"], disposed: ["폐기", "disposed"], held: ["보유 중", "assigned"],
-  };
-  // 개별형 상태값들(기존 순서 유지) → 수량형(보유중) → 공통(재고). 재고가 맨 위였던 걸 맨 아래로 내림(사용자 피드백)
-  const STATUS_ORDER = ["assigned", "repair", "lost", "disposed", "held", "stock"];
-  const TYPE_LABEL = { individual: "개별 자산", quantity: "수량 자산" };
-  const EXP_LABEL = { valid: "유효", soon: "만료 예정", over: "만료", none: "미설정" };
-  // 엑셀 다운로드 버튼 → 양식 정의가 완료된 구글시트 링크(2026-09-24, 사용자가 준 5개 URL 매핑).
-  // By_Item만 개별/수량 유형별로 파일이 2개로 나뉨(토글 상태에 따라 분기)
-  const DOWNLOAD_SHEET_LINKS = {
-    all: "https://docs.google.com/spreadsheets/d/1UYRvac6KC84vSu5cfjATV2Wb11cAY0_LtjqNHD4YhSk/edit?usp=drive_link",
-    product: {
-      individual: "https://docs.google.com/spreadsheets/d/1JgWLKfL1mQoEH02LDDxufezknWSjKrh6QthCO6SptXk/edit?usp=drive_link",
-      quantity: "https://docs.google.com/spreadsheets/d/16mhOZWYQBUW4LkjGRcYlqdoXzyPnr3-If7eBaeb-flQ/edit?usp=drive_link",
+      stock: ["배정 가능", "stock"],
+      assigned: ["배정 중", "assigned"],
+      repair: ["수리/점검 중", "repair"],
+      lost: ["분실", "lost"],
+      disposed: ["폐기", "disposed"]
     },
-    employee: "https://docs.google.com/spreadsheets/d/1pj6N07JExX6p1AqFCahJ9DvxMVcKzgdhS3-J6asFSWE/edit?usp=drive_link",
-    worksite: "https://docs.google.com/spreadsheets/d/10rbRIp_DL3FS-VrtHjV2HXU7VjeQtJilBbHiUFNQkos/edit?usp=drive_link",
-  };
-  // 일괄 등록 Shopl 양식. 수량형/개별형은 필수 필드가 달라 각각 확정된 Google Sheet를 연다.
-  const BULK_REGISTER_SHEET_LINKS = {
-    individual: "https://docs.google.com/spreadsheets/d/1bmjjq4zuGAcxDv80f03V52GbNEs6y05nIwzei9boABc/edit?usp=drive_link",
-    quantity: "https://docs.google.com/spreadsheets/d/1wfm4lLSqZE2nrnAOj2zC1Pfjl3EAneVGIGhXbDbd5Mk/edit?usp=drive_link",
-  };
-  const BULK_AI_MAX_PHOTOS = 100;
-  const BULK_AI_MAX_GROUP_PHOTOS = window.ASSET_PHOTO_MAX_COUNT || 10;
-  // 근무지 코드는 구조설계안에 없는 필드 — 근무지가 "기존 재사용" 엔티티라 여기선 프로토타입 데모용 샘플값만 매핑(detail.js의 WS_CODE와 동일)
-  const WS_CODE = { "강남점": "GN-01", "판교점": "PG-01", "본사": "HQ-01", "역삼점": "YS-01" };
-  // 근무지별 엑셀 다운로드(아이데이션 중)용 주소 — 실 서비스 DB엔 근무지마다 이미 주소값이 있어서 프로토타입엔 더미로만 시드(detail.js의 WS_ADDRESS와 동일)
-  const WS_ADDRESS = {
-    "강남점": "서울특별시 강남구 테헤란로 129",
-    "판교점": "경기도 성남시 분당구 판교역로 235",
-    "본사": "서울특별시 중구 을지로 100",
-    "역삼점": "서울특별시 강남구 역삼로 180",
-  };
-  // 구성원도 근무지와 동일하게 "기존 재사용" 엔티티라 프로토타입 데모용 샘플만 매핑 — 팀은 category.js의 MEMBERS와 동일 값으로 통일,
-  // 사번·휴대폰번호는 검색 placeholder(아래)가 이미 약속해놓고 실제 필드가 없던 걸 이번에 시드.
-  // grade(등급)·jobTitle(직무·직급, category.js의 JOB_TITLES 값 재사용)은 구성원별 엑셀 다운로드용 —
-  // 실 서비스엔 구성원마다 저장돼있는 값, 프로토타입엔 더미로만 시드
-  const MEMBER_INFO = {
-    "김민수": { team: "개발팀", empNo: "2021001", phone: "010-2001-1234", grade: "Lv.3", jobTitle: "매니저" },
-    "이서연": { team: "디자인팀", empNo: "2021015", phone: "010-3412-5678", grade: "Lv.2", jobTitle: "주임" },
-    "박지훈": { team: "영업팀", empNo: "2020032", phone: "010-8823-9910", grade: "Lv.4", jobTitle: "팀장" },
-    "정우성": { team: "CS팀", empNo: "2022041", phone: "010-5567-2231", grade: "Lv.1", jobTitle: "사원" },
-    "김철수": { team: "운영팀", empNo: "2019008", phone: "010-9012-4456", grade: "Lv.5", jobTitle: "팀장" },
-    "최유진": { team: "개발팀", empNo: "2023019", phone: "010-6634-8821", grade: "Lv.1", jobTitle: "사원" },
-    "한소희": { team: "디자인팀", empNo: "2022055", phone: "010-4478-2093", grade: "Lv.2", jobTitle: "주임" },
-    "오세훈": { team: "운영팀", empNo: "2018014", phone: "010-7712-3345", grade: "Lv.4", jobTitle: "매니저" },
-  };
-  const AVATAR_COLORS = ["#5b8def", "#8f6ef0", "#eb7f8b", "#3fb37f", "#e0a63c", "#4dabf7"];
+    STATUS_ORDER = ["assigned", "repair", "lost", "disposed", "stock"],
+    TYPE_LABEL = {
+      individual: "자산"
+    },
+    EXP_LABEL = {
+      valid: "유효",
+      soon: "만료 예정",
+      over: "만료",
+      none: "미설정"
+    },
+    DOWNLOAD_SHEET_LINKS = {
+      all: "https://docs.google.com/spreadsheets/d/1UYRvac6KC84vSu5cfjATV2Wb11cAY0_LtjqNHD4YhSk/edit?usp=drive_link",
+      product: {
+        individual: "https://docs.google.com/spreadsheets/d/1JgWLKfL1mQoEH02LDDxufezknWSjKrh6QthCO6SptXk/edit?usp=drive_link"
+      },
+      employee: "https://docs.google.com/spreadsheets/d/1pj6N07JExX6p1AqFCahJ9DvxMVcKzgdhS3-J6asFSWE/edit?usp=drive_link",
+      worksite: "https://docs.google.com/spreadsheets/d/10rbRIp_DL3FS-VrtHjV2HXU7VjeQtJilBbHiUFNQkos/edit?usp=drive_link"
+    },
+    BULK_REGISTER_SHEET_LINKS = {
+      individual: "https://docs.google.com/spreadsheets/d/1bmjjq4zuGAcxDv80f03V52GbNEs6y05nIwzei9boABc/edit?usp=drive_link"
+    },
+    BULK_AI_MAX_PHOTOS = 100,
+    BULK_AI_MAX_GROUP_PHOTOS = window.ASSET_PHOTO_MAX_COUNT || 10,
+    WS_CODE = {
+      강남점: "GN-01",
+      판교점: "PG-01",
+      본사: "HQ-01",
+      역삼점: "YS-01"
+    },
+    WS_ADDRESS = {
+      강남점: "서울특별시 강남구 테헤란로 129",
+      판교점: "경기도 성남시 분당구 판교역로 235",
+      본사: "서울특별시 중구 을지로 100",
+      역삼점: "서울특별시 강남구 역삼로 180"
+    },
+    MEMBER_INFO = {
+      김민수: {
+        team: "개발팀",
+        empNo: "2021001",
+        phone: "010-2001-1234",
+        grade: "Lv.3",
+        jobTitle: "매니저"
+      },
+      이서연: {
+        team: "디자인팀",
+        empNo: "2021015",
+        phone: "010-3412-5678",
+        grade: "Lv.2",
+        jobTitle: "주임"
+      },
+      박지훈: {
+        team: "영업팀",
+        empNo: "2020032",
+        phone: "010-8823-9910",
+        grade: "Lv.4",
+        jobTitle: "팀장"
+      },
+      정우성: {
+        team: "CS팀",
+        empNo: "2022041",
+        phone: "010-5567-2231",
+        grade: "Lv.1",
+        jobTitle: "사원"
+      },
+      김철수: {
+        team: "운영팀",
+        empNo: "2019008",
+        phone: "010-9012-4456",
+        grade: "Lv.5",
+        jobTitle: "팀장"
+      },
+      최유진: {
+        team: "개발팀",
+        empNo: "2023019",
+        phone: "010-6634-8821",
+        grade: "Lv.1",
+        jobTitle: "사원"
+      },
+      한소희: {
+        team: "디자인팀",
+        empNo: "2022055",
+        phone: "010-4478-2093",
+        grade: "Lv.2",
+        jobTitle: "주임"
+      },
+      오세훈: {
+        team: "운영팀",
+        empNo: "2018014",
+        phone: "010-7712-3345",
+        grade: "Lv.4",
+        jobTitle: "매니저"
+      }
+    },
+    AVATAR_COLORS = ["#5b8def", "#8f6ef0", "#eb7f8b", "#3fb37f", "#e0a63c", "#4dabf7"];
   function avatarColor(name) {
     let h = 0;
     for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) % 997;
     return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length];
   }
-  // 배정 현황 카드(detail.js의 assignIdentity)와 동일한 프로필+이름+그룹 컴포넌트 재사용
   function memberIdentity(name) {
     const team = (MEMBER_INFO[name] || {}).team;
     return `<span class="acard-avatar" style="background:${avatarColor(name)}">${name[0]}</span>
       <div><div class="acard-name">${name}</div><div class="acard-sub">${team || '<span class="muted">—</span>'}</div></div>`;
   }
-  // 구성원 필터 — 실제 대시보드의 공통 "직원 필터" 팝업 목업. 복잡한 실사용 필터 로직은 이 프로토타입 범위 밖이라
-  // 버튼을 누르면 뜨는 모달 형태만 재현(적용해도 실제 목록엔 반영 안 됨). 그룹 트리는 category.js의 GROUP_TREE와 동일 구조 재사용
-  const MEMBER_GROUP_TREE = [
-    { name: "샤플앤컴퍼니", children: [
-      { name: "개발팀" }, { name: "디자인팀" },
-      { name: "영업팀", children: [{ name: "국내영업" }, { name: "해외영업" }] },
-      { name: "운영팀" }, { name: "CS팀" },
-    ] },
-  ];
-  const MEMBER_JOB_TITLES = ["직무/직급 없음", "팀장", "매니저", "주임", "사원"];
-  const SEARCH_PLACEHOLDER = {
-    all: "품목명 / 고유관리번호", product: "품목명", employee: "이름/사번/휴대폰번호", worksite: "근무지명/코드",
-  };
-  const RESET_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 1 2.64 6.36"/><path d="M3 20v-6h6"/></svg>`;
-  const SORT_ASC_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 18V6M5 6l-3 3M5 6l3 3"/><path d="M11 7h4M11 12h7M11 17h10"/></svg>`;
-  const SORT_DESC_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 6v12M5 18l-3-3M5 18l3-3"/><path d="M11 7h10M11 12h7M11 17h4"/></svg>`;
-  // 정렬 기준별 기본 방향: 날짜(등록일·유효기한)는 최신순(desc), 문자열(품목명·고유관리번호)은 가나다순(asc)
-  const SORT_FIELDS = [
-    { k: "updatedAt", label: "최근 변경일시", defDir: "desc" },
-    { k: "assetNo", label: "고유 관리번호", defDir: "asc" },
-    { k: "product", label: "품목명", defDir: "asc" },
-    { k: "expiry", label: "유효기한", defDir: "desc" },
-    { k: "createdAt", label: "자산 등록일", defDir: "desc" },
-  ];
-  // 품목별은 행이 자산(유닛)이 아니라 품목 단위라, 유닛에만 있는 값(고유관리번호·유효기한·등록일)은 정렬 기준에서 제외.
-  // 최근 변경일시는 그 품목에 속한 유닛들의 값 중 최댓값으로 파생(전체 탭과 기본 방향은 동일하게 맞춤)
-  const SORT_FIELDS_PRODUCT = [
-    { k: "updatedAt", label: "최근 변경일시", defDir: "desc" },
-    { k: "product", label: "품목명", defDir: "asc" },
-  ];
-  // 구성원별·근무지별은 자산이 아니라 사람/장소 단위 행이라 "최근 변경일시" 같은 자산 이벤트 파생값은 개념이
-  // 헷갈릴 수 있어 제외 — 이미 컬럼으로 노출된 정체성 값(이름/사번, 근무지명/코드)만 정렬 기준으로 제공
-  const SORT_FIELDS_MEMBER = [
-    { k: "name", label: "이름", defDir: "asc" },
-    { k: "empNo", label: "사번", defDir: "asc" },
-  ];
-  const SORT_FIELDS_WORKSITE = [
-    { k: "name", label: "근무지명", defDir: "asc" },
-    { k: "code", label: "근무지 코드", defDir: "asc" },
-  ];
-  // QA overrides stand in for settings screens outside this prototype.
-  const identityQa=new URLSearchParams(location.search);
-  if(identityQa.has("employee-number"))window.ASSET_MEMBER_NUMBER_ENABLED=identityQa.get("employee-number")!=="off";
-  if(identityQa.has("worksite-code"))window.ASSET_WORKSITE_CODE_ENABLED=identityQa.get("worksite-code")!=="off";
-  const displayField=(a,field)=>!(window.DATA.categories.find(c=>c.group===a.group && c.sub===a.sub)?.hiddenFields || []).includes(field);
-  const productKey=a=>encodeURIComponent(JSON.stringify([a.group,a.sub,a.product]));
+  const MEMBER_GROUP_TREE = [{
+      name: "샤플앤컴퍼니",
+      children: [{
+        name: "개발팀"
+      }, {
+        name: "디자인팀"
+      }, {
+        name: "영업팀",
+        children: [{
+          name: "국내영업"
+        }, {
+          name: "해외영업"
+        }]
+      }, {
+        name: "운영팀"
+      }, {
+        name: "CS팀"
+      }]
+    }],
+    MEMBER_JOB_TITLES = ["직무/직급 없음", "팀장", "매니저", "주임", "사원"],
+    SEARCH_PLACEHOLDER = {
+      all: "품목명 / 고유관리번호",
+      product: "품목명",
+      employee: "이름/사번/휴대폰번호",
+      worksite: "근무지명/코드"
+    },
+    RESET_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 1 2.64 6.36"/><path d="M3 20v-6h6"/></svg>',
+    SORT_ASC_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 18V6M5 6l-3 3M5 6l3 3"/><path d="M11 7h4M11 12h7M11 17h10"/></svg>',
+    SORT_DESC_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 6v12M5 18l-3-3M5 18l3-3"/><path d="M11 7h10M11 12h7M11 17h4"/></svg>',
+    SORT_FIELDS = [{
+      k: "updatedAt",
+      label: "최근 변경일시",
+      defDir: "desc"
+    }, {
+      k: "assetNo",
+      label: "고유 관리번호",
+      defDir: "asc"
+    }, {
+      k: "product",
+      label: "품목명",
+      defDir: "asc"
+    }, {
+      k: "expiry",
+      label: "유효기한",
+      defDir: "desc"
+    }, {
+      k: "createdAt",
+      label: "자산 등록일",
+      defDir: "desc"
+    }],
+    SORT_FIELDS_PRODUCT = [{
+      k: "updatedAt",
+      label: "최근 변경일시",
+      defDir: "desc"
+    }, {
+      k: "product",
+      label: "품목명",
+      defDir: "asc"
+    }],
+    SORT_FIELDS_MEMBER = [{
+      k: "name",
+      label: "이름",
+      defDir: "asc"
+    }, {
+      k: "empNo",
+      label: "사번",
+      defDir: "asc"
+    }],
+    SORT_FIELDS_WORKSITE = [{
+      k: "name",
+      label: "근무지명",
+      defDir: "asc"
+    }, {
+      k: "code",
+      label: "근무지 코드",
+      defDir: "asc"
+    }],
+    identityQa = new URLSearchParams(location.search);
+  identityQa.has("employee-number") && (window.ASSET_MEMBER_NUMBER_ENABLED = identityQa.get("employee-number") !== "off"), identityQa.has("worksite-code") && (window.ASSET_WORKSITE_CODE_ENABLED = identityQa.get("worksite-code") !== "off");
+  const displayField = (a, field) => window.AssetExtra.visible(window.AssetExtra.category(a),field,canManageAssets()),
+    productKey = a => encodeURIComponent(JSON.stringify([a.group, a.sub, a.product]));
   function sortFieldsFor(view) {
-    if (view === "product") return SORT_FIELDS_PRODUCT;
-    if (view === "employee") return SORT_FIELDS_MEMBER.filter(f=>f.k!=="empNo" || window.ASSET_MEMBER_NUMBER_ENABLED!==false);
-    if (view === "worksite") return SORT_FIELDS_WORKSITE.filter(f=>f.k!=="code" || window.ASSET_WORKSITE_CODE_ENABLED!==false);
-    return SORT_FIELDS;
+    return view === "product" ? SORT_FIELDS_PRODUCT : view === "employee" ? SORT_FIELDS_MEMBER.filter(f => f.k !== "empNo" || window.ASSET_MEMBER_NUMBER_ENABLED !== !1) : view === "worksite" ? SORT_FIELDS_WORKSITE.filter(f => f.k !== "code" || window.ASSET_WORKSITE_CODE_ENABLED !== !1) : SORT_FIELDS;
   }
-
   function expiryKey(d) {
     if (!d) return "none";
-    const days = Math.ceil((new Date(d) - TODAY) / 86400000);
+    const days = Math.ceil((new Date(d) - TODAY) / 864e5);
     return days < 0 ? "over" : days <= 7 ? "soon" : "valid";
   }
   function expiryCell(d) {
@@ -142,318 +216,283 @@
     const k = expiryKey(d);
     return `${window.fmtDate(d)} <span class="badge exp-${k}">${EXP_LABEL[k]}</span>`;
   }
-  const IC_EMP = `<svg class="hi" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5.5 20c0-4 3-6.5 6.5-6.5s6.5 2.5 6.5 6.5"/></svg>`;
-  const IC_WS = `<svg class="hi" viewBox="0 0 24 24"><path d="M4 20V9.5L12 4l8 5.5V20"/><path d="M9.5 20v-5h5v5"/></svg>`;
-  // 소진 — 수량형 전용, 품목의 잔여 수량(total_qty - 배분합계)이 0인 상태(더 이상 나눠줄 여유가 없음)
-  function isDepleted(a) {
-    return a.type === "quantity" && a.totalQty - (a.stocks || []).reduce((s, x) => s + x.qty, 0) === 0;
-  }
-  // 미보유대상 — 소진과는 다른 개념. 보유 대상(AssetStock 레코드) 중 수량이 0인 것 — "이 품목을 다
-  // 나눠줬다"가 아니라 "이 특정 대상은 지금 0개다"를 가리킴(재입고 필요 대상을 짚어주는 신호). 소진 여부와
-  // 무관하게 그대로 집계(소진일 때 제외하는 건 배정·보유 현황 셀의 뱃지 중복 방지용이었는데 그 뱃지 자체를
-  // 뺐으므로 통계·필터에선 더 이상 제외할 이유가 없음 — 레코드가 quantity=0이면 항상 카운트)
-  function unheldHolders(a) {
-    if (a.type !== "quantity") return [];
-    return (a.stocks || []).filter(x => x.qty === 0);
-  }
-  function hasUnheldHolder(a) {
-    return unheldHolders(a).length > 0;
-  }
+  const IC_EMP = '<svg class="hi" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5.5 20c0-4 3-6.5 6.5-6.5s6.5 2.5 6.5 6.5"/></svg>',
+    IC_WS = '<svg class="hi" viewBox="0 0 24 24"><path d="M4 20V9.5L12 4l8 5.5V20"/><path d="M9.5 20v-5h5v5"/></svg>';
   function holderText(a) {
-    if (a.type === "individual") {
+    {
       const as = a.assignments || [];
-      // "상태" 컬럼에 이미 재고 뱃지가 있어서 여기선 중복 표기하지 않음
       if (!as.length) return '<span class="muted">—</span>';
-      // 상세 페이지 배정 현황 카드와 동일하게 배정일 내림차순(최신이 첫번째)
-      const sorted = [...as].sort((p, q) => p.since === q.since ? 0 : (p.since < q.since ? 1 : -1));
-      // 배정 대상(구성원/근무지)을 레코드 순서대로 평탄화 — 복합 레코드는 구성원→근무지
-      const targets = [];
-      sorted.forEach(x => {
-        if (x.employee) targets.push(`${IC_EMP}${x.employee}`);
-        if (x.worksite) targets.push(`${IC_WS}${x.worksite}`);
-      });
-      if (sorted.length === 1) return targets.join(" ");              // 단일 배정(복합이면 둘 다 표시)
-      return `${targets[0]} <span class="muted">+${targets.length - 1}</span>`;  // 공동 배정: 첫 대상 + N
+      const sorted2 = [...as].sort((p, q) => p.since === q.since ? 0 : p.since < q.since ? 1 : -1),
+        targets2 = [];
+      return sorted2.forEach(x => {
+        x.employee && targets2.push(`${IC_EMP}${x.employee}`), x.worksite && targets2.push(`${IC_WS}${x.worksite}`);
+      }), sorted2.length === 1 ? targets2.join(" ") : `${targets2[0]} <span class="muted">+${targets2.length - 1}</span>`;
     }
-    // 수량 자산도 개별 자산과 동일한 패턴(보유처 이름, 총 개수 미표기)으로 통일 — "상태" 컬럼에
-    // 이미 재고/보유중 뱃지가 있어서 여기선 중복 표기하지 않음(개별 자산과 동일 원칙)
-    const stocks = a.stocks || [];
-    if (!stocks.length) return '<span class="muted">—</span>';
-    // 상세 페이지 보유 현황 카드와 동일하게 이름 가나다순
-    const sorted = [...stocks].sort((p, q) => (p.employee || p.worksite).localeCompare(q.employee || q.worksite, "ko"));
-    const targets = sorted.map(x => x.employee ? `${IC_EMP}${x.employee}` : `${IC_WS}${x.worksite}`);
-    // 소진/미보유대상은 상태 컬럼과 무관한 별도 통계라 여기 셀엔 표시 안 함(전체 탭은 요약 화면이라
-    // 자기완결성까진 필요 없음 — 통계 카드 툴팁 + 필터 칩으로 충분, 특정 보유 대상이 궁금하면 상세 페이지에서 확인)
-    if (sorted.length === 1) return targets.join(" ");
-    return `${targets[0]} <span class="muted">+${targets.length - 1}</span>`;
   }
   function thumb(a) {
-    const ph = window.assetPhotos(a);            // 대표 사진 (상세와 공유)
-    if (ph.length) {
-      const c = ph[a._primary || 0].color;
-      return `<span class="thumb" style="background:${c}"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10" r="1.6"/><path d="m21 16-5-5-9 8"/></svg></span>`;
-    }
-    return `<span class="thumb empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 15 5-4 4 3 4-4 5 4"/></svg></span>`;
+    const ph = window.assetPhotos(a);
+    return ph.length ? `<span class="thumb" style="background:${ph[a._primary || 0].color}"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10" r="1.6"/><path d="m21 16-5-5-9 8"/></svg></span>` : '<span class="thumb empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 15 5-4 4 3 4-4 5 4"/></svg></span>';
   }
   function prodCell(a) {
     return `<div class="prodcell">${thumb(a)}<span class="pname">${a.product}</span></div>`;
   }
   function memoCell(a) {
-    if (!window.AssetMemo.has(a.note)) return "";
-    return `<span class="memo-flag"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M9 13h5M9 17h4"/></svg></span>`;
+    return window.AssetMemo.has(a.note) ? '<span class="memo-flag"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M9 13h5M9 17h4"/></svg></span>' : "";
   }
   function labelsCell(labels) {
-    if (!labels || !labels.length) return '<span class="muted">—</span>';
-    return `<span class="asset-fit-chips">${labels.map(l=>`<span class="tag">${l}</span>`).join("")}<span class="muted" data-chip-rest hidden></span></span>`;
+    return !labels || !labels.length ? '<span class="muted">—</span>' : `<span class="asset-fit-chips">${labels.map(l => `<span class="tag">${l}</span>`).join("")}<span class="muted" data-chip-rest hidden></span></span>`;
   }
-
   function fitSummaryChips(scope) {
-    scope.querySelectorAll(".asset-fit-chips").forEach(box=>{
-      const fit=()=>{
-        const rest=box.querySelector("[data-chip-rest]"), chips=[...box.children].filter(x=>x!==rest);
-        chips.forEach(x=>x.hidden=false);rest.hidden=true;
-        for(let visible=chips.length; visible>0 && box.scrollWidth>box.clientWidth;visible--){
-          chips[visible-1].hidden=true;rest.hidden=false;rest.textContent=`+${chips.length-visible+1}`;
-        }
+    scope.querySelectorAll(".asset-fit-chips").forEach(box => {
+      const fit = () => {
+        const rest = box.querySelector("[data-chip-rest]"),
+          chips = [...box.children].filter(x => x !== rest);
+        chips.forEach(x => x.hidden = !1), rest.hidden = !0;
+        for (let visible = chips.length; visible > 0 && box.scrollWidth > box.clientWidth; visible--) chips[visible - 1].hidden = !0, rest.hidden = !1, rest.textContent = `+${chips.length - visible + 1}`;
       };
-      fit();const observer=new ResizeObserver(fit);observer.observe(box);
+      fit(), new ResizeObserver(fit).observe(box);
     });
   }
-  /* ---------- state & filtering ---------- */
-  const ALL_LABELS = [...new Set(assets.flatMap(a => a.labels || []))].sort();
-  const CAT_GROUPS = (() => {
-    const m = new Map();
-    viewableCategories().forEach(c => {
-      if (!m.has(c.group)) m.set(c.group, []);
-      m.get(c.group).push(c.sub);
-    });
-    return m;
-  })();
-  // 소분류명 → 분류 관리(구조설계안 sort_order)에 저장된 등장 순서. 구성원별·근무지별 "배정된 자산" 요약/모달의
-  // 소분류 정렬 기준으로 사용 — 개수순이 아니라 분류 화면과 동일한 순서로 보여야 두 화면 간에 일관됨
-  const CATEGORY_ORDER = new Map(window.DATA.categories.map((c, i) => [c.sub, i]));
-  function subOrder(sub) { return CATEGORY_ORDER.has(sub) ? CATEGORY_ORDER.get(sub) : 999; }
-
-  // 자산 삭제 권한 — 전역 "자산 관리 권한"(구조설계안 4.1 manage_permission_type: 관리자만(기본값)/관리자
-  // 및 모든 리더/관리자 및 특정 리더). 소분류별 view/assign과 달리 클라이언트 전체에 하나만 적용되는 값이라
-  // 여러 소분류 자산을 섞어 선택해도 권한 불일치가 생기지 않음. 대시보드엔 구성원 role 개념이 아직 없어
-  // 현재 데모에서는 관리 권한 보유를 true로 가정하고, 조회 검증용 사본에서 false로 전환할 수 있음
-  // (2026-09-30, detail.js의 개별 삭제와 동일한 함수로 통일)
-  function canManageAssets() { return DEMO_ASSUME_ASSET_MANAGE_PERMISSION; }
+  const ALL_LABELS = [...new Set(assets.flatMap(a => a.labels || []))].sort(),
+    CAT_GROUPS = (() => {
+      const m = /* @__PURE__ */new Map();
+      return viewableCategories().forEach(c => {
+        m.has(c.group) || m.set(c.group, []), m.get(c.group).push(c.sub);
+      }), m;
+    })(),
+    CATEGORY_ORDER = new Map(window.DATA.categories.map((c, i) => [c.sub, i]));
+  function subOrder(sub) {
+    return CATEGORY_ORDER.has(sub) ? CATEGORY_ORDER.get(sub) : 999;
+  }
+  function canManageAssets(){return window.hasPrototypeAssetManagePermission();}
   function canViewCategory(cat) {
-    if (!cat) return false;
-    if (memberQaHiddenCategories.has(JSON.stringify([cat.group, cat.sub]))) return false;
-    if (canManageAssets()) return true;
-    // 관리 권한이 없는 리더에게는 본인 배정 여부가 아니라 소분류 조회 설정을 적용한다.
+    if (!cat || memberQaHiddenCategories.has(JSON.stringify([cat.group, cat.sub]))) return !1;
+    if (canManageAssets()) return !0;
     switch (cat.view) {
       case "회사의 모든 구성원":
-      case "모든 관리자 및 리더": return true;
-      case "특정 관리자/리더": return (cat.viewTarget?.members || []).includes(DEMO_VIEWER_NAME);
-      case "특정 그룹 및 직무/직급": return window.matchesAssetGroupPositionTarget(
-        cat.viewTarget, MEMBER_INFO[DEMO_VIEWER_NAME]?.team, window.ASSET_MEMBER_JOB_TITLES[DEMO_VIEWER_NAME]);
-      default: return false;
+      case "모든 관리자 및 리더":
+        return !0;
+      case "특정 관리자/리더":
+        return (cat.viewTarget?.members || []).includes(DEMO_VIEWER_NAME);
+      case "특정 그룹 및 직무/직급":
+        return window.matchesAssetGroupPositionTarget(cat.viewTarget, MEMBER_INFO[DEMO_VIEWER_NAME]?.team, window.ASSET_MEMBER_JOB_TITLES[DEMO_VIEWER_NAME]);
+      default:
+        return !1;
     }
   }
-  // 일괄 배정은 자산 관리 권한 또는 소분류 배정/보유 변경 권한으로 제공한다.
-  // 비관리 리더의 변경 권한은 조회 범위 안에서만 인정하며, 등록 자산 수와는 무관하다.
   function canAssignCategory(cat) {
-    if (!cat || !canViewCategory(cat)) return false;
-    if (canManageAssets()) return true;
+    if (!cat || !canViewCategory(cat)) return !1;
+    if (canManageAssets()) return !0;
     switch (cat.assign) {
       case "회사의 모든 구성원":
-      case "모든 관리자 및 리더": return true;
-      case "특정 관리자/리더": return (cat.assignTarget?.members || []).includes(DEMO_VIEWER_NAME);
-      case "특정 그룹 및 직무/직급": return window.matchesAssetGroupPositionTarget(
-        cat.assignTarget, MEMBER_INFO[DEMO_VIEWER_NAME]?.team, window.ASSET_MEMBER_JOB_TITLES[DEMO_VIEWER_NAME]);
-      default: return false;
+      case "모든 관리자 및 리더":
+        return !0;
+      case "특정 관리자/리더":
+        return (cat.assignTarget?.members || []).includes(DEMO_VIEWER_NAME);
+      case "특정 그룹 및 직무/직급":
+        return window.matchesAssetGroupPositionTarget(cat.assignTarget, MEMBER_INFO[DEMO_VIEWER_NAME]?.team, window.ASSET_MEMBER_JOB_TITLES[DEMO_VIEWER_NAME]);
+      default:
+        return !1;
     }
   }
   function bulkActions() {
     const actions = [];
-    if (canManageAssets()) actions.push("일괄 추가");
-    if (canManageAssets() || window.DATA.categories.some(canAssignCategory)) actions.push("일괄 배정");
-    return actions;
+    return canManageAssets() && actions.push("일괄 추가"), (canManageAssets() || window.DATA.categories.some(canAssignCategory)) && actions.push("일괄 배정"), actions;
   }
-  function viewableCategories() { return window.DATA.categories.filter(canViewCategory); }
-  function hasViewScope() { return viewableCategories().length > 0; }
+  function viewableCategories() {
+    return window.DATA.categories.filter(canViewCategory);
+  }
+  function hasViewScope() {
+    return viewableCategories().length > 0;
+  }
   function viewableAssets() {
     const categories = new Set(viewableCategories().map(cat => JSON.stringify([cat.group, cat.sub])));
     return assets.filter(a => !a.deleted_at && categories.has(JSON.stringify([a.group, a.sub])));
   }
-  // 전체 탭 체크박스 선택 — 현재 페이지 안에서만 유지되는 휘발성 상태(state에 안 넣음). 정렬·필터·검색·
-  // 페이지 이동 등 render()를 다시 부르는 모든 조작에서 자동으로 비워짐(render() 맨 앞에서 항상 clear).
-  // 체크박스 자체를 토글하는 것만으로는 render()를 다시 부르지 않고 DOM을 직접 건드려서 선택을 유지함
-  let selected = new Set();
-  let activeScreen = "list";
-  let qaBulkInitialized=false;
-  let bulkAnalyzeTimer = null;
-  let bulkPhotoSeq = 0;
-  let bulkGroupSeq = 0;
+  let selected = /* @__PURE__ */new Set(),
+    activeScreen = new URLSearchParams(location.search).get("screen")==="bulk-register"?"bulk-register":"list",
+    qaBulkInitialized = !1,
+    bulkAnalyzeTimer = null,
+    bulkPhotoSeq = 0,
+    bulkGroupSeq = 0;
   const bulkRegister = {
-    method: "company",
-    type: "individual",
-    fileName: "",
-    groups: [],
-    selectedPhotos: new Set(),
-    lastSelectedPhoto: null,
-    results: new Map(),
-    dirtyGroups: new Set(),
-    attempts: new Map(),
-    errorsOnly: false,
-    excluded: new Set(), selectedRows: new Set(), page: 1, pageSize: 300, hasAnalyzed:false,
-    duplicateErrors: new Map(), // group ID → 오류 필드 Set. 중복은 [저장]을 누를 때 검사한다.
-  };
-
-  const state = {
-    view: memberQaEnabled ? "employee" : "all",
-    search: "",
-    statFilter: null,
-    page: 1,
-    pageSize: 20,
-    sort: memberQaEnabled ? { key: "name", dir: "asc" } : { key: "updatedAt", dir: "desc" },
-    filters: { category: [], type: [], status: [], expiry: [], labels: [], note: [], depleted: [], unheld: [] },
-    // 품목별 탭 전용 — 개별 자산/수량 자산은 컬럼 구성·클릭 동작이 아예 달라서 한 테이블에 섞지 않고 토글로 구분
-    productType: "individual",
-  };
-  if(performance.getEntriesByType("navigation")[0]?.type==="back_forward"){
-    try{const saved=JSON.parse(sessionStorage.getItem("asset-overview-return") || "null");if(saved)Object.assign(state,saved);}catch{}
-  }
-  const rememberOverview=()=>sessionStorage.setItem("asset-overview-return",JSON.stringify(state));
-  // 품목별 행 클릭 시 필요한 품목 그룹(품목명+자산 목록)을 렌더링 시점의 키로 찾기 위한 조회용 — view_product()가 매번 다시 채움
-  let productGroupsByKey = new Map();
-  // 구성원별·근무지별 행 클릭 시 필요한 조회용 — 위와 동일한 패턴(view_employee()/view_worksite()가 매번 다시 채움)
-  let memberRowsByName = new Map();
-  let worksiteRowsByName = new Map();
-  function sortList(list) {
-    const {key,dir}=state.sort,mul=dir==="asc" ? 1 : -1;
-    const value=a=>key==="expiry" && !displayField(a,"expiry") ? "" : a[key] || "";
-    const tie=(a,b)=>{
-      if(["employee","worksite"].includes(state.view)){
-        const field=state.view==="employee" && window.ASSET_MEMBER_NUMBER_ENABLED!==false ? "empNo" : state.view==="worksite" && window.ASSET_WORKSITE_CODE_ENABLED!==false ? "code" : "name";
-        if(!a[field] && b[field])return 1;if(a[field] && !b[field])return -1;
-        return String(a[field] || a.name || "").localeCompare(String(b[field] || b.name || ""),"ko");
-      }
-      return String(b.updatedAt || "").localeCompare(String(a.updatedAt || "")) || String(a.id || "").localeCompare(String(b.id || ""));
+      method: "company",
+      type: "individual",
+      fileName: "",
+      groups: [],
+      selectedPhotos: /* @__PURE__ */new Set(),
+      lastSelectedPhoto: null,
+      results: /* @__PURE__ */new Map(),
+      dirtyGroups: /* @__PURE__ */new Set(),
+      attempts: /* @__PURE__ */new Map(),
+      errorsOnly: !1,
+      excluded: /* @__PURE__ */new Set(),
+      selectedRows: /* @__PURE__ */new Set(),
+      page: 1,
+      pageSize: 300,
+      hasAnalyzed: !1,
+      duplicateErrors: /* @__PURE__ */new Map()
+      // group ID → 오류 필드 Set. 중복은 [저장]을 누를 때 검사한다.
+    },
+    state = {
+      view: memberQaEnabled ? "employee" : "all",
+      search: "",
+      statFilter: null,
+      page: 1,
+      pageSize: 20,
+      sort: memberQaEnabled ? {
+        key: "name",
+        dir: "asc"
+      } : {
+        key: "updatedAt",
+        dir: "desc"
+      },
+      filters: {
+        category: [],
+        type: [],
+        status: [],
+        expiry: [],
+        labels: [],
+        note: []
+      },
+      productType: "individual"
     };
-    return [...list].sort((a,b)=>{
-      const va=value(a),vb=value(b);
-      if(!va && !vb)return tie(a,b);if(!va)return 1;if(!vb)return -1;
-      return String(va).localeCompare(String(vb),"ko")*mul || tie(a,b);
+  if (performance.getEntriesByType("navigation")[0]?.type === "back_forward") try {
+    const saved = JSON.parse(sessionStorage.getItem("asset-overview-return") || "null");
+    saved && Object.assign(state, saved);
+  } catch {}
+  // 이전 목업의 유형·보유 필터를 복원하지 않고 현재 제공하는 조건만 유지한다.
+  state.productType = "individual";
+  state.filters = Object.fromEntries(["category", "status", "expiry", "labels", "note"].map(key => [key, Array.isArray(state.filters?.[key]) ? state.filters[key] : []]));
+  state.filters.status = state.filters.status.filter(value => Object.hasOwn(STATUS_LABEL, value));
+  if (state.statFilter) {
+    state.statFilter = Object.fromEntries(Object.entries(state.statFilter).filter(([key]) => ["status", "expiry"].includes(key)));
+    if (!Object.keys(state.statFilter).length) state.statFilter = null;
+  }
+  const classificationScopes={all:[],product:[]};
+  const scopeStorageKey=view=>`asset-classification:${window.AssetPrototypeActor.companyId}:${DEMO_VIEWER_NAME}:${view}`;
+  for(const view of ['all','product']){try{const stored=JSON.parse(localStorage.getItem(scopeStorageKey(view))||'[]');classificationScopes[view]=Array.isArray(stored)?stored.filter(key=>viewableCategories().some(c=>`${c.group}/${c.sub}`===key)):[];}catch{classificationScopes[view]=[];}}
+  function classificationScopeHtml(){const chosen=classificationScopes[state.view]||[],first=viewableCategories().find(c=>chosen.includes(`${c.group}/${c.sub}`));return `<div class="overview-scope"><span>분류</span><button type="button" class="btn sm" id="classification-scope">${first?`${first.sub}${chosen.length>1?' +'+(chosen.length-1):''}`:'전체'} ▾</button></div>`;}
+  const rememberOverview = () => sessionStorage.setItem("asset-overview-return", JSON.stringify(state));
+  let productGroupsByKey = /* @__PURE__ */new Map(),
+    memberRowsByName = /* @__PURE__ */new Map(),
+    worksiteRowsByName = /* @__PURE__ */new Map();
+  function sortList(list) {
+    const {
+        key,
+        dir
+      } = state.sort,
+      mul = dir === "asc" ? 1 : -1,
+      value = a => key === "expiry" && !displayField(a, "expiry") ? "" : a[key] || "",
+      tie = (a, b) => {
+        if (["employee", "worksite"].includes(state.view)) {
+          const field = state.view === "employee" && window.ASSET_MEMBER_NUMBER_ENABLED !== !1 ? "empNo" : state.view === "worksite" && window.ASSET_WORKSITE_CODE_ENABLED !== !1 ? "code" : "name";
+          return !a[field] && b[field] ? 1 : a[field] && !b[field] ? -1 : String(a[field] || a.name || "").localeCompare(String(b[field] || b.name || ""), "ko");
+        }
+        return String(b.updatedAt || "").localeCompare(String(a.updatedAt || "")) || String(a.id || "").localeCompare(String(b.id || ""));
+      };
+    return [...list].sort((a, b) => {
+      const va = value(a),
+        vb = value(b);
+      return !va && !vb ? tie(a, b) : va ? vb ? String(va).localeCompare(String(vb), "ko") * mul || tie(a, b) : -1 : 1;
     });
   }
   function emptyFilters() {
-    // depleted(소진)·unheld(미보유대상)는 상태값이 아니라 파생 조건이라 상태 필터 모달엔
-    // 없음 — 전체 탭 통계 "수량 자산 요약" 카드 클릭으로만 켜고 끔
-    return { category: [], type: [], status: [], expiry: [], labels: [], note: [], depleted: [], unheld: [] };
+    return {
+      category: [],
+      type: [],
+      status: [],
+      expiry: [],
+      labels: [],
+      note: []
+    };
   }
-
   function getFiltered(forStats=false) {
-    const f = state.filters;
-    const q = forStats ? "" : state.search.trim().toLowerCase();
-    return viewableAssets().filter(a => {
-      if (!forStats && state.statFilter) {
-        const p=state.statFilter;
-        if(p.type && !p.type.includes(a.type)) return false;
-        if(p.status && !p.status.includes(a.status)) return false;
-        if(p.expiry && (!displayField(a,"expiry") || !p.expiry.includes(expiryKey(a.expiry)))) return false;
-        if(p.depleted && !isDepleted(a)) return false;
-        if(p.unheld && !hasUnheldHolder(a)) return false;
-      }
-      // 분류 필터 항목은 "대분류"(부모 체크 시 자체로도 들어감) 또는 "대분류/소분류"(leaf) 둘 다 올 수 있음
-      if (f.category.length && !f.category.some(c => c === a.group || c === `${a.group}/${a.sub}`)) return false;
-      if (f.type.length && !f.type.includes(a.type)) return false;
-      // 수량형도 이제 실제 status(stock·held)를 가지므로 개별형 전용 가드는 제거 — 값 자체가
-      // 타입별로 겹치지 않아(held는 수량형만, assigned/repair/lost/disposed는 개별형만) 자연히 분리됨
-      if (f.status.length && !f.status.includes(a.status)) return false;
-      if (f.expiry.length && (!displayField(a,"expiry") || !f.expiry.includes(expiryKey(a.expiry)))) return false;
-      if (f.depleted.length && !isDepleted(a)) return false;
-      if (f.unheld.length && !hasUnheldHolder(a)) return false;
-      if (f.note.length && !f.note.includes(window.AssetMemo.has(a.note) ? "has" : "none")) return false;
-      if (f.labels.length) {
-        const has = f.labels.filter(l => (a.labels || []).includes(l));
-        if (has.length !== f.labels.length) return false;
-      }
-      // 검색 대상은 뷰마다 다름 — 전체는 고유관리번호+품목명, 품목별은 품목명만. 구성원별·근무지별은
-      // 자산이 아니라 집계된 사람/근무지 이름(+코드)을 대상으로 하므로 여기가 아니라 view_axis()에서 걸러냄
-      if (q && state.view === "all" && !(`${a.product} ${a.assetNo || ""}`.toLowerCase().includes(q))) return false;
-      if (q && state.view === "product" && !a.product.toLowerCase().includes(q)) return false;
-      return true;
-    });
-  }
+ const f=state.filters,scope=classificationScopes[state.view]||[],q=forStats?'':state.search.trim().toLowerCase();
+ return viewableAssets().filter(a=>{
+  if(scope.length&&!scope.includes(`${a.group}/${a.sub}`))return false;
+  if(!forStats&&state.statFilter){const p=state.statFilter;if(p.status&&!p.status.includes(a.status)||p.expiry&&(!displayField(a,'expiry')||!p.expiry.includes(expiryKey(a.expiry))))return false;}
+  return !(f.status.length&&!f.status.includes(a.status)||f.expiry.length&&(!displayField(a,'expiry')||!f.expiry.includes(expiryKey(a.expiry)))||f.note.length&&!f.note.includes(window.AssetMemo.has(a.note)?'has':'none')||f.labels.length&&f.labels.some(l=>!(a.labels||[]).includes(l))||q&&state.view==='all'&&!`${a.product} ${a.assetNo||''}`.toLowerCase().includes(q)||q&&state.view==='product'&&!a.product.toLowerCase().includes(q));
+ });
+}
   function activeFilterCount() {
     const f = state.filters;
-    return f.category.length + f.type.length + f.status.length + f.expiry.length + f.labels.length + f.note.length + f.depleted.length + f.unheld.length;
+    return f.status.length + f.expiry.length + f.labels.length + f.note.length;
   }
   function pageSlice(arr) {
     const totalPages = Math.max(1, Math.ceil(arr.length / state.pageSize));
-    if (state.page > totalPages) state.page = totalPages;
-    if (state.page < 1) state.page = 1;
+    state.page > totalPages && (state.page = totalPages), state.page < 1 && (state.page = 1);
     const start = (state.page - 1) * state.pageSize;
     return arr.slice(start, start + state.pageSize);
   }
-
-  // 정렬 메뉴의 펼침 아이콘. 2026-10-22: 테이블 헤더 필터는 제거하고 필터 팝업으로 통일한다.
-  const CARET = `<svg class="th-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>`;
-
-  /* ---------- views ---------- */
+  const CARET = '<svg class="th-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>';
   function view_all(list) {
-    const canDelete = canManageAssets();
-    const head = `<tr>
-      ${canDelete ? `<th class="td-check"><input type="checkbox" data-check-all aria-label="전체 선택"></th>` : ""}
-      <th>자산 유형</th><th>분류</th><th>품목명</th><th>고유관리번호</th><th>상태</th>
-      <th>배정·보유 현황</th><th>유효기한</th><th>태그</th><th class="c">메모</th><th>등록일</th></tr>`;
-    const rows = pageSlice(sortList(list)).map(a => {
-      const st = `<span class="badge ${STATUS_LABEL[a.status][1]}">${STATUS_LABEL[a.status][0]}</span>`;
-      return `<tr class="clickable" data-id="${a.id}">
+    const canDelete = canManageAssets(),
+      head = `<tr>
+      ${canDelete ? '<th class="td-check"><input type="checkbox" data-check-all aria-label="전체 선택"></th>' : ""}
+      <th>분류</th><th>품목명</th><th>고유관리번호</th><th>상태</th>
+      <th>배정 현황</th><th>유효기한</th><th>태그</th><th class="c">메모</th><th>등록일</th></tr>`,
+      rows = pageSlice(sortList(list)).map(a => {
+        const st = `<span class="badge ${STATUS_LABEL[a.status][1]}">${STATUS_LABEL[a.status][0]}</span>`;
+        return `<tr class="clickable" data-id="${a.id}">
         ${canDelete ? `<td class="td-check"><input type="checkbox" data-check data-id="${a.id}" aria-label="선택"></td>` : ""}
-        <td><span class="type-pill">${TYPE_LABEL[a.type]}</span></td>
         <td>${a.group} <span class="muted">›</span> ${a.sub}</td>
         <td>${prodCell(a)}</td>
         <td>${a.assetNo || '<span class="muted">—</span>'}</td>
         <td>${st}</td>
         <td>${holderText(a)}</td>
-        <td>${expiryCell(displayField(a,"expiry") ? a.expiry : "")}</td>
+        <td>${expiryCell(displayField(a, "expiry") ? a.expiry : "")}</td>
         <td>${labelsCell(a.labels)}</td>
         <td class="c">${memoCell(a)}</td>
         <td>${window.fmtDate(a.createdAt)}</td>
       </tr>`;
-    }).join("");
-    return { head, rows, count: list.length };
+      }).join("");
+    return {
+      head,
+      rows,
+      count: list.length
+    };
   }
-
   function groupByProduct(list) {
-    const map = new Map();
+    const map = /* @__PURE__ */new Map();
     list.forEach(a => {
-      const key=productKey(a);
-      if (!map.has(key)) map.set(key, { product: a.product, group: a.group, sub: a.sub, type: a.type, list: [] });
-      map.get(key).list.push(a);
+      const key = productKey(a);
+      map.has(key) || map.set(key, {
+        product: a.product,
+        group: a.group,
+        sub: a.sub,
+        type: a.type,
+        list: []
+      }), map.get(key).list.push(a);
     });
     const groups = [...map.values()];
-    // 최근 수정일시 정렬용 — 이 품목에 속한 유닛들의 updatedAt 중 최댓값을 그룹 자체의 값으로 둠
-    groups.forEach(g => { g.updatedAt = g.list.reduce((max, a) => (a.updatedAt > max ? a.updatedAt : max), ""); });
-    return groups;
+    return groups.forEach(g => {
+      g.updatedAt = g.list.reduce((max, a) => a.updatedAt > max ? a.updatedAt : max, "");
+    }), groups;
   }
-
-  // 품목별 탭은 개별 자산/수량 자산 토글(state.productType)로 완전히 다른 테이블을 그림 — 컬럼 구성도, 행 클릭 동작(모달 vs 상세이동)도
-  // 유형마다 달라서 한 테이블에 섞으면 어색했던 걸(수량형 행이 상태 컬럼 전부 "—") 분리해서 해결. 두 테이블 다 분류 화면의 품목 목록 표와
-  // 동일한 컬럼 구성(+분류 컬럼만 추가 — 이 화면은 여러 소분류를 가로지르니 분류 표기가 필요)
   function view_product(list) {
-    return state.productType === "quantity" ? view_product_quantity(list) : view_product_individual(list);
+    return view_product_individual(list);
   }
-
   function view_product_individual(list) {
     const head = `<tr><th>분류</th><th>품목명</th><th class="num">자산 수</th>
-      <th class="num">배정 중</th><th class="num">재고</th><th class="num">수리/점검 중</th><th class="num">분실</th><th class="num">폐기</th></tr>`;
-    const groups = groupByProduct(list.filter(a => a.type === "individual"));
-    const sorted = sortList(groups);
-    const paged = pageSlice(sorted);
+      <th class="num">배정 중</th><th class="num">배정 가능</th><th class="num">수리/점검 중</th><th class="num">분실</th><th class="num">폐기</th></tr>`,
+      groups = groupByProduct(list.filter(a => !0)),
+      sorted = sortList(groups),
+      paged = pageSlice(sorted);
     productGroupsByKey = new Map(paged.map(g => [productKey(g), g]));
     const rows = paged.map(g => {
-      const counts = { assigned: 0, stock: 0, repair: 0, lost: 0, disposed: 0 };
-      g.list.forEach(a => { counts[a.status] = (counts[a.status] || 0) + 1; });
-      return `<tr class="clickable" data-pkey="${productKey(g)}">
+      const counts = {
+        assigned: 0,
+        stock: 0,
+        repair: 0,
+        lost: 0,
+        disposed: 0
+      };
+      return g.list.forEach(a => {
+        counts[a.status] = (counts[a.status] || 0) + 1;
+      }), `<tr class="clickable" data-pkey="${productKey(g)}">
         <td>${g.group} <span class="muted">›</span> ${g.sub}</td>
-        <td><div class="prodcell">${thumb([...g.list].sort((a,b)=>String(a.assetNo || "").localeCompare(String(b.assetNo || ""))).find(a=>window.assetPhotos(a).length) || g.list[0])}<span class="pname">${g.product}</span></div></td>
+        <td><div class="prodcell">${thumb([...g.list].sort((a, b) => String(a.assetNo || "").localeCompare(String(b.assetNo || ""))).find(a => window.assetPhotos(a).length) || g.list[0])}<span class="pname">${g.product}</span></div></td>
         <td class="num">${g.list.length}</td>
         <td class="num">${counts.assigned}</td>
         <td class="num">${counts.stock}</td>
@@ -462,266 +501,156 @@
         <td class="num">${counts.disposed}</td>
       </tr>`;
     }).join("");
-    return { head, rows, count: groups.length };
+    return {
+      head,
+      rows,
+      count: groups.length
+    };
   }
-
-  function view_product_quantity(list) {
-    const head = `<tr><th>분류</th><th>품목명</th><th class="num">전체 수량</th><th class="num">보유 수량</th><th class="num">보유 대상 수</th><th class="num">잔여 수량</th><th>유효기한</th></tr>`;
-    const groups = groupByProduct(list.filter(a => a.type === "quantity"));
-    const sorted = sortList(groups);
-    const paged = pageSlice(sorted);
-    productGroupsByKey = new Map(paged.map(g => [productKey(g), g]));
-    const rows = paged.map(g => {
-      // 수량형은 품목=자산이 1:1이라 그룹의 유일한 원소를 그대로 표시(분류 화면 stockRowHtml과 동일 계산)
-      const a = g.list[0];
-      const qty = (a.stocks || []).reduce((s, x) => s + x.qty, 0);
-      const targets = (a.stocks || []).length;
-      return `<tr class="clickable" data-pkey="${productKey(g)}">
-        <td>${g.group} <span class="muted">›</span> ${g.sub}</td>
-        <td><div class="prodcell">${thumb(a)}<span class="pname">${g.product}</span></div></td>
-        <td class="num">${window.AssetQuantity.format(a.totalQty)}</td>
-        <td class="num">${window.AssetQuantity.format(qty)}</td>
-        <td class="num">${targets}</td>
-        <td class="num">${window.AssetQuantity.format(a.totalQty-qty)}</td>
-        <td>${a.expiry ? window.fmtDate(a.expiry) : '<span class="muted">—</span>'}</td>
-      </tr>`;
-    }).join("");
-    return { head, rows, count: groups.length };
-  }
-
-  // 배정된 자산 요약 셀 — 개별/수량 구분 없이 합친 총 개수 + 소분류별 개수 내림차순(많은 것부터), labelsCell()과
-  // 동일한 "앞 2개 + 나머지 N" 오버플로 패턴
-  // 소분류별 개수만 보여줌(총합 없음) — 개별형(유닛 1개=1)과 수량형(재고 수량)을 그냥 더하면 "옷 12벌+노트북 1대=13개"처럼
-  // 단위가 다른 값이 섞여 의미 없는 숫자가 되므로, 애초에 동질적인 소분류 단위로만 집계
-  // 소분류별 개수를 칩(박스) 하나에 "소분류명 개수"로 같이 담아 나열 — 5개 넘으면 나머지는 동일한 칩 형태의 "+N"으로 축약
-  // (셀 너비가 넉넉해도 무한정 늘어나지 않도록 상한)
-  function assetsSummaryCell(items) {
-    if (!items.length) return '<span class="muted">—</span>';
-    const bySub = new Map();
-    items.forEach(x => bySub.set(x.sub, (bySub.get(x.sub) || 0) + 1));
-    const sorted = [...bySub.entries()].sort((a, b) => subOrder(a[0]) - subOrder(b[0]));
-    return `<span class="asset-fit-chips">${sorted.map(([sub,n])=>`<span class="chip">${sub} ${n}</span>`).join("")}<span class="chip" data-chip-rest hidden></span></span>`;
-  }
-
-  // 구성원별·근무지별 행 클릭 — 배정된 자산 전체 목록. 품목 모달(product-units-modal.js)과 시각 언어는
-  // 같지만 그룹 기준이 다름: 거기는 상태(고정 5종)라 5열 그리드가 맞았고, 여기는 소분류(사람/장소마다
-  // 1~8개로 가변적)라 세로 섹션 리스트가 더 자연스러움. 개별형은 고유관리번호+상태뱃지, 수량형은 품목명+수량.
-  function openAssignedAssetsModal(headerHtml, items) {
-    const CLOSE_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg>`;
-    const bySub = new Map();
-    items.forEach(x => { if (!bySub.has(x.sub)) bySub.set(x.sub, []); bySub.get(x.sub).push(x); });
-    // 요약 칩과 동일하게 분류 화면에 저장된 소분류 순서(subOrder)로 섹션을 배치해 컬럼-모달 간 일관성 유지.
-    // 그룹 내부는 품목명 우선(같은 품목끼리 묶여 보이도록) + 동점 시 개별형=고유관리번호, 수량형=보유 수량
-    // 내림차순(자산 상세 페이지의 보유 현황 정렬 방향과 통일, 2026-09-24)
-    const groups = [...bySub.entries()].sort((a, b) => subOrder(a[0]) - subOrder(b[0]));
-    groups.forEach(([, list]) => list.sort((p, q) => {
-      const byProduct = p.asset.product.localeCompare(q.asset.product, "ko");
-      if (byProduct) return byProduct;
-      if (p.asset.type === "individual") return (p.asset.assetNo || "").localeCompare(q.asset.assetNo || "", "ko");
-      return q.qty - p.qty;
-    }));
-
-    function rowHtml(x) {
-      const a = x.asset;
-      if (a.type === "individual") {
-        return `<a class="assign-row" href="asset-detail.html?id=${a.id}" target="_blank" rel="noopener">
-          <div><div>${a.product}</div><div class="acard-sub">${a.assetNo || "—"}</div></div>
-          <span class="badge ${STATUS_LABEL[a.status][1]}">${STATUS_LABEL[a.status][0]}</span>
-        </a>`;
-      }
-      // 개별형의 상태 뱃지와 시각적으로 짝이 맞도록 뱃지 형태 유지, 다만 배정 중·수리/점검 중·분실 등 상태색과
-      // 혼동되지 않게 무채색(.badge.stock의 회색 톤)만 재사용 — 수량은 상태가 아니라 그냥 수치라서
-      return `<a class="assign-row" href="asset-detail.html?id=${a.id}" target="_blank" rel="noopener">
-        <span>${a.product}</span>
-        <span class="badge stock">${x.qty}개</span>
-      </a>`;
-    }
-
-    // 소분류만으론 어느 대분류인지 알 수 없어서(필터 모달의 분류 트리 미리보기와 동일한 이유) "대분류 › 소분류"로 표기.
-    // 같은 소분류의 모든 항목은 항상 같은 대분류에 속하므로 list[0]의 값을 대표로 사용.
-    // 섹션은 접고 펼 수 있게(기본은 전부 펼침) — category.js의 대분류 트리 접기/펼치기와 동일한 패턴
-    const groupsHtml = groups.map(([sub, list]) => `
-      <div class="assign-group">
-        <button type="button" class="assign-group-label" data-sub="${sub}">
-          <span class="assign-chevron">▾</span>${list[0].asset.group} <span class="muted">›</span> ${sub} <span class="muted">${list.length}</span>
-        </button>
-        <div class="assign-group-body">${list.map(rowHtml).join("")}</div>
-      </div>`).join("");
-
-    const back = modal(`
-      <div class="modal help-modal">
-        <div class="help-modal-head">
-          <h3>배정·보유 자산</h3>
-          <button type="button" class="btn icon-only sm" data-close aria-label="닫기">${CLOSE_ICON}</button>
-        </div>
-        <div class="body">
-          <div class="modal-info-box">${headerHtml}</div>
-          <div>${groupsHtml}</div>
-        </div>
-      </div>`, { closeOnBackdrop: true });
-    back.querySelectorAll(".assign-group-label").forEach(btn => btn.onclick = () => {
-      const body = btn.nextElementSibling;
-      const chevron = btn.querySelector(".assign-chevron");
-      if (body.hasAttribute("hidden")) { body.removeAttribute("hidden"); chevron.textContent = "▾"; }
-      else { body.setAttribute("hidden", ""); chevron.textContent = "▸"; }
-    });
-  }
-
-  // 7-3: 렌더링 캐시 대신 행을 여는 시점의 데이터로 현재 관계·삭제·소분류 조회 범위를 확인한다.
-  // 실제 연동에서는 구성원 ID와 최신 API 응답을 사용한다. 통신 실패를 관계 없음으로 취급하지 않는다.
+  function assetsSummaryCell(items){
+ if(!items.length)return '<span class="muted">—</span>';
+ const groups=new Map();for(const item of items){const key=`${item.asset.group}/${item.asset.sub}`;if(!groups.has(key))groups.set(key,{group:item.asset.group,sub:item.asset.sub,count:0});groups.get(key).count++;}
+ const order=x=>window.DATA.categories.findIndex(c=>c.group===x.group&&c.sub===x.sub);
+ return `<span class="asset-fit-chips">${[...groups.values()].sort((a,b)=>order(a)-order(b)).map(x=>`<span class="chip">${x.sub} ${x.count}</span>`).join('')}<span class="chip" data-chip-rest hidden></span></span>`;
+}
+  function openAssignedAssetsModal(headerHtml,items) {
+ const back=modal(`<div class="modal help-modal"><div class="help-modal-head"><h3>배정 자산</h3><button class="btn icon-only sm" data-close aria-label="닫기">×</button></div><div class="body"><div class="modal-info-box">${headerHtml}</div><input class="search" data-assigned-search placeholder="품목명/고유관리번호"><div data-assigned-list></div></div></div>`,{closeOnBackdrop:true});
+ const query=back.querySelector('[data-assigned-search]'),list=back.querySelector('[data-assigned-list]'),collapsed=new Set();
+ function draw(){const q=query.value.trim().toLowerCase(),groups=new Map();items.filter(x=>!q||`${x.asset.product} ${x.asset.assetNo||''}`.toLowerCase().includes(q)).forEach(x=>{const key=`${x.asset.group}/${x.asset.sub}`;if(!groups.has(key))groups.set(key,[]);groups.get(key).push(x);});
+ list.innerHTML=[...groups.values()].sort((a,b)=>window.DATA.categories.findIndex(c=>c.group===a[0].asset.group&&c.sub===a[0].asset.sub)-window.DATA.categories.findIndex(c=>c.group===b[0].asset.group&&c.sub===b[0].asset.sub)).map(rows=>{rows.sort((a,b)=>a.asset.product.localeCompare(b.asset.product,'ko')||(a.asset.assetNo||'').localeCompare(b.asset.assetNo||''));const a=rows[0].asset,key=`${a.group}/${a.sub}`;return `<div class="assign-group"><button class="assign-group-label" data-assigned-group="${key}"><span>▾</span>${a.group} › ${a.sub} <span class="muted">${rows.length}</span></button><div class="assign-group-body"${collapsed.has(key)?' hidden':''}>${rows.map(x=>`<a class="assign-row" href="asset-detail.html?id=${x.asset.id}" target="_blank" rel="noopener"><div><div>${x.asset.product}</div><div class="acard-sub">${x.asset.assetNo}</div></div><span class="badge ${STATUS_LABEL[x.asset.status][1]}">${STATUS_LABEL[x.asset.status][0]}</span><span class="assign-date">${x.since?x.since.replaceAll('-','.'):'—'}</span></a>`).join('')}</div></div>`;}).join('')||'<p class="muted" style="padding:24px">결과가 없습니다.</p>';
+ list.querySelectorAll('[data-assigned-group]').forEach(b=>b.onclick=()=>{const key=b.dataset.assignedGroup;collapsed.has(key)?collapsed.delete(key):collapsed.add(key);draw();});}
+ query.oninput=draw;draw();
+}
   function currentMemberItems(name) {
-    return viewableAssets().flatMap(asset => {
-      const relations = asset.type === "individual" ? asset.assignments || [] : asset.stocks || [];
-      return relations.filter(relation => relation.employee === name).map(relation => ({
-        sub: asset.sub, qty: asset.type === "individual" ? 1 : relation.qty, asset,
-      }));
-    });
+    return viewableAssets().flatMap(asset => (asset.assignments || []).filter(relation => relation.employee === name).map(relation => ({
+      sub: asset.sub,
+      since: relation.since,
+      qty: 1,
+      asset
+    })));
   }
-
   function openMemberUnavailableModal() {
     const back = modal(`
       <div class="modal sm" role="dialog" aria-modal="true" aria-describedby="member-unavailable-body">
         <div class="body" id="member-unavailable-body">설정이 변경되었습니다. 잠시 후 다시 시도해주세요.</div>
         <div class="foot"><button type="button" class="btn primary" data-member-refresh>확인</button></div>
-      </div>`, { closeOnBackdrop: false });
-    const confirm = back.querySelector("[data-member-refresh]");
-    // 헤더·X·취소는 두지 않는다. 모달을 여는 시점에는 목록/건수를 갱신하지 않고 확인 후에만 갱신한다.
+      </div>`, {
+        closeOnBackdrop: !1
+      }),
+      confirm = back.querySelector("[data-member-refresh]");
     back.addEventListener("keydown", event => {
-      if (event.key === "Escape" || event.key === "Tab") {
-        event.preventDefault();
-        confirm.focus();
-      }
-    });
-    confirm.onclick = () => {
-      back.remove();
-      state.view = "employee";
-      state.search = "";
-      state.filters = emptyFilters(); state.statFilter=null;
-      state.sort = { key: "name", dir: "asc" };
-      state.pageSize = 20;
-      state.page = 1;
-      // 구성원 공통 필터 실제 연동 시 초안·적용값도 리더 포함·퇴사자 포함을 모두 체크한 기본값으로 초기화한다.
-      render();
-    };
-    confirm.focus();
+      (event.key === "Escape" || event.key === "Tab") && (event.preventDefault(), confirm.focus());
+    }), confirm.onclick = () => {
+      back.remove(), state.view = "employee", state.search = "", state.filters = emptyFilters(), state.statFilter = null, state.sort = {
+        key: "name",
+        dir: "asc"
+      }, state.pageSize = 20, state.page = 1, render();
+    }, confirm.focus();
   }
-
   function simulateMemberChange(name, items) {
     if (!memberQaPending) return;
-    memberQaPending = false;
-    if (memberQaScenario === "scope") {
+    if (memberQaPending = !1, memberQaScenario === "scope") {
       items.forEach(item => memberQaHiddenCategories.add(JSON.stringify([item.asset.group, item.asset.sub])));
       return;
     }
     const retainedAsset = memberQaScenario === "partial" ? items[0]?.asset : null;
     assets.forEach(asset => {
       if (asset === retainedAsset) return;
-      const field = asset.type === "individual" ? "assignments" : "stocks";
-      asset[field] = (asset[field] || []).filter(relation => relation.employee !== name);
-      if (!asset[field].length && (asset.status === "assigned" || asset.status === "held")) asset.status = "stock";
+      const field = "assignments";
+      asset[field] = (asset[field] || []).filter(relation => relation.employee !== name), !asset[field].length && (asset.status === "assigned" || asset.status === "held") && (asset.status = "stock");
     });
   }
-
   function mountMemberQaPanel() {
     if (!memberQaEnabled || document.getElementById("member-unavailable-qa")) return;
     const panel = document.createElement("aside");
-    panel.id = "member-unavailable-qa";
-    panel.className = "permission-qa-panel";
-    panel.setAttribute("aria-label", "구성원별 7-3 QA");
-    const scenarios = [["relation", "배정·보유 관계 종료"], ["scope", "조회 범위 변경"], ["partial", "일부 관계 유지"]];
+    panel.id = "member-unavailable-qa", panel.className = "permission-qa-panel", panel.setAttribute("aria-label", "구성원별 7-3 QA");
+    const scenarios = [["relation", "배정 관계 종료"], ["scope", "조회 범위 변경"], ["partial", "일부 관계 유지"]];
     panel.innerHTML = `<div class="permission-qa-head"><strong>구성원별 7-3 QA</strong><button type="button" aria-label="QA 종료">×</button></div>
       <p style="margin:0 0 8px">구성원 행을 눌러 확인하세요.</p>
-      <div class="permission-qa-actions">${scenarios.map(([key, label]) => `<button type="button" data-member-scenario="${key}" aria-pressed="${key === memberQaScenario}">${label}</button>`).join("")}</div>`;
-    panel.querySelectorAll("[data-member-scenario]").forEach(button => button.onclick = () => {
+      <div class="permission-qa-actions">${scenarios.map(([key, label]) => `<button type="button" data-member-scenario="${key}" aria-pressed="${key === memberQaScenario}">${label}</button>`).join("")}</div>`, panel.querySelectorAll("[data-member-scenario]").forEach(button => button.onclick = () => {
       const url = new URL(location.href);
-      url.searchParams.set("scenario", button.dataset.memberScenario);
-      location.href = url.toString();
-    });
-    panel.querySelector("[aria-label='QA 종료']").onclick = () => {
+      url.searchParams.set("scenario", button.dataset.memberScenario), location.href = url.toString();
+    }), panel.querySelector("[aria-label='QA 종료']").onclick = () => {
       const url = new URL(location.href);
-      url.searchParams.delete("qa");
-      url.searchParams.delete("scenario");
-      location.href = url.toString();
-    };
-    document.body.appendChild(panel);
+      url.searchParams.delete("qa"), url.searchParams.delete("scenario"), location.href = url.toString();
+    }, document.body.appendChild(panel);
   }
-
   function view_employee(list) {
-    const map = new Map();
+    const map = /* @__PURE__ */new Map();
     list.forEach(a => {
-      if (a.type === "individual") {
-        (a.assignments || []).forEach(x => {
-          if (!x.employee) return;
-          if (!map.has(x.employee)) map.set(x.employee, { name: x.employee, empNo: (MEMBER_INFO[x.employee] || {}).empNo || "", items: [] });
-          map.get(x.employee).items.push({ sub: a.sub, qty: 1, asset: a });
-        });
-      } else {
-        (a.stocks || []).forEach(x => {
-          if (!x.employee) return;
-          if (!map.has(x.employee)) map.set(x.employee, { name: x.employee, empNo: (MEMBER_INFO[x.employee] || {}).empNo || "", items: [] });
-          map.get(x.employee).items.push({ sub: a.sub, qty: x.qty, asset: a });
-        });
-      }
+      (a.assignments || []).forEach(x => {
+        x.employee && (map.has(x.employee) || map.set(x.employee, {
+          name: x.employee,
+          empNo: (MEMBER_INFO[x.employee] || {}).empNo || "",
+          items: []
+        }), map.get(x.employee).items.push({
+          sub: a.sub,
+          qty: 1,
+          since: x.since,
+          asset: a
+        }));
+      });
     });
-    const head = `<tr><th>이름</th>${window.ASSET_MEMBER_NUMBER_ENABLED!==false ? "<th>사번</th>" : ""}<th>휴대폰번호</th><th class="num">배정·보유 자산 수</th><th>배정·보유 자산</th></tr>`;
-    const q = state.search.trim().toLowerCase();
-    const rowsArr = [...map.values()].filter(r => {
-      if (!q) return true;
-      const info = MEMBER_INFO[r.name] || {};
-      return r.name.toLowerCase().includes(q) || (info.empNo || "").toLowerCase().includes(q) || (info.phone || "").includes(q);
-    });
-    const sorted = sortList(rowsArr);
-    const paged = pageSlice(sorted);
+    const head = `<tr><th>이름</th>${window.ASSET_MEMBER_NUMBER_ENABLED !== !1 ? "<th>사번</th>" : ""}<th>휴대폰번호</th><th class="num">배정 자산 수</th><th>배정 자산</th></tr>`,
+      q = state.search.trim().toLowerCase(),
+      rowsArr = [...map.values()].filter(r => {
+        if (!q) return !0;
+        const info = MEMBER_INFO[r.name] || {};
+        return r.name.toLowerCase().includes(q) || (info.empNo || "").toLowerCase().includes(q) || (info.phone || "").includes(q);
+      }),
+      sorted = sortList(rowsArr),
+      paged = pageSlice(sorted);
     memberRowsByName = new Map(paged.map(r => [r.name, r]));
     const rows = paged.map(r => {
       const info = MEMBER_INFO[r.name] || {};
       return `<tr class="clickable" data-mkey="${r.name}">
         <td><div class="acard-id">${memberIdentity(r.name)}</div></td>
-        ${window.ASSET_MEMBER_NUMBER_ENABLED!==false ? `<td>${info.empNo || '<span class="muted">—</span>'}</td>` : ""}
+        ${window.ASSET_MEMBER_NUMBER_ENABLED !== !1 ? `<td>${info.empNo || '<span class="muted">—</span>'}</td>` : ""}
         <td>${info.phone || '<span class="muted">—</span>'}</td>
         <td class="num">${r.items.length}</td>
         <td>${assetsSummaryCell(r.items)}</td>
       </tr>`;
     }).join("");
-    return { head, rows, count: rowsArr.length };
+    return {
+      head,
+      rows,
+      count: rowsArr.length
+    };
   }
-
-  // 근무지별 — 구성원별과 동일한 구조(정체성 컬럼들 + "배정된 자산" 요약 컬럼)로 통일
   function view_worksite(list) {
-    const map = new Map();
+    const map = /* @__PURE__ */new Map();
     list.forEach(a => {
-      if (a.type === "individual") {
-        (a.assignments || []).forEach(x => {
-          if (!x.worksite) return;
-          if (!map.has(x.worksite)) map.set(x.worksite, { name: x.worksite, code: WS_CODE[x.worksite] || "", items: [] });
-          map.get(x.worksite).items.push({ sub: a.sub, qty: 1, asset: a });
-        });
-      } else {
-        (a.stocks || []).forEach(x => {
-          if (!x.worksite) return;
-          if (!map.has(x.worksite)) map.set(x.worksite, { name: x.worksite, code: WS_CODE[x.worksite] || "", items: [] });
-          map.get(x.worksite).items.push({ sub: a.sub, qty: x.qty, asset: a });
-        });
-      }
+      (a.assignments || []).forEach(x => {
+        x.worksite && (map.has(x.worksite) || map.set(x.worksite, {
+          name: x.worksite,
+          code: WS_CODE[x.worksite] || "",
+          items: []
+        }), map.get(x.worksite).items.push({
+          sub: a.sub,
+          qty: 1,
+          since: x.since,
+          asset: a
+        }));
+      });
     });
-    const head = `<tr><th>근무지명</th>${window.ASSET_WORKSITE_CODE_ENABLED!==false ? "<th>근무지 코드</th>" : ""}<th class="num">배정·보유 자산 수</th><th>배정·보유 자산</th></tr>`;
-    const q = state.search.trim().toLowerCase();
-    const rowsArr = [...map.values()].filter(r => {
-      if (!q) return true;
-      return r.name.toLowerCase().includes(q) || r.code.toLowerCase().includes(q);
-    });
-    const sorted = sortList(rowsArr);
-    const paged = pageSlice(sorted);
+    const head = `<tr><th>근무지명</th>${window.ASSET_WORKSITE_CODE_ENABLED !== !1 ? "<th>근무지 코드</th>" : ""}<th class="num">배정 자산 수</th><th>배정 자산</th></tr>`,
+      q = state.search.trim().toLowerCase(),
+      rowsArr = [...map.values()].filter(r => q ? r.name.toLowerCase().includes(q) || r.code.toLowerCase().includes(q) : !0),
+      sorted = sortList(rowsArr),
+      paged = pageSlice(sorted);
     worksiteRowsByName = new Map(paged.map(r => [r.name, r]));
     const rows = paged.map(r => `<tr class="clickable" data-wkey="${r.name}">
       <td><a href="worksite-detail.html?name=${encodeURIComponent(r.name)}" target="_blank" rel="noopener" data-worksite-link>${r.name}</a></td>
-      ${window.ASSET_WORKSITE_CODE_ENABLED!==false ? `<td>${r.code || '<span class="muted">—</span>'}</td>` : ""}
+      ${window.ASSET_WORKSITE_CODE_ENABLED !== !1 ? `<td>${r.code || '<span class="muted">—</span>'}</td>` : ""}
       <td class="num">${r.items.length}</td>
       <td>${assetsSummaryCell(r.items)}</td>
     </tr>`).join("");
-    return { head, rows, count: rowsArr.length };
+    return {
+      head,
+      rows,
+      count: rowsArr.length
+    };
   }
-
   function currentView() {
     const list = getFiltered();
     if (state.view === "all") return view_all(list);
@@ -729,13 +658,10 @@
     if (state.view === "employee") return view_employee(list);
     if (state.view === "worksite") return view_worksite(list);
   }
-
-  /* ---------- render ---------- */
   function sortHtml() {
     if (!["all", "product", "employee", "worksite"].includes(state.view)) return "";
     const cur = sortFieldsFor(state.view).find(f => f.k === state.sort.key) || sortFieldsFor(state.view)[0];
-    state.sort.key=cur.k;
-    return `
+    return state.sort.key = cur.k, `
       <div class="sortbar">
         <button class="sort-key-btn" id="sort-key-btn">${cur.label}${CARET}</button>
         <div class="sort-dir-group">
@@ -747,38 +673,31 @@
   function openSortKeyMenu(anchor) {
     document.querySelectorAll(".dropdown-menu").forEach(m => m.remove());
     const menu = document.createElement("div");
-    menu.className = "dropdown-menu";
-    menu.innerHTML = sortFieldsFor(state.view).map(f => `<button data-k="${f.k}" class="${state.sort.key === f.k ? "active" : ""}">${f.label}</button>`).join("");
+    menu.className = "dropdown-menu", menu.innerHTML = sortFieldsFor(state.view).map(f => `<button data-k="${f.k}" class="${state.sort.key === f.k ? "active" : ""}">${f.label}</button>`).join("");
     const r = anchor.getBoundingClientRect();
-    menu.style.cssText = `position:fixed;top:${r.bottom + 4}px;left:${r.left}px;min-width:${Math.max(r.width, 120)}px`;
-    document.body.appendChild(menu);
-    menu.querySelectorAll("button").forEach(b => b.onclick = () => {
-      menu.remove();
-      state.sort.key = b.dataset.k;
-      state.sort.dir = sortFieldsFor(state.view).find(f => f.k === b.dataset.k).defDir;
-      state.page = 1;
-      render();
-    });
-    setTimeout(() => {
-      const close = e => { if (!menu.contains(e.target)) { menu.remove(); document.removeEventListener("click", close); } };
+    menu.style.cssText = `position:fixed;top:${r.bottom + 4}px;left:${r.left}px;min-width:${Math.max(r.width, 120)}px`, document.body.appendChild(menu), menu.querySelectorAll("button").forEach(b => b.onclick = () => {
+      menu.remove(), state.sort.key = b.dataset.k, state.sort.dir = sortFieldsFor(state.view).find(f => f.k === b.dataset.k).defDir, state.page = 1, render();
+    }), setTimeout(() => {
+      const close = e => {
+        menu.contains(e.target) || (menu.remove(), document.removeEventListener("click", close));
+      };
       document.addEventListener("click", close);
     });
   }
   function pagerHtml(total, leftActionsHtml = "") {
-    const totalPages = Math.max(1, Math.ceil(total / state.pageSize));
-    const p = state.page;
-    const winStart = Math.max(1, Math.min(p - 2, totalPages - 4));
-    const winEnd = Math.min(totalPages, Math.max(p + 2, winStart + 4));
-    const pages = [];
+    const totalPages = Math.max(1, Math.ceil(total / state.pageSize)),
+      p = state.page,
+      winStart = Math.max(1, Math.min(p - 2, totalPages - 4)),
+      winEnd = Math.min(totalPages, Math.max(p + 2, winStart + 4)),
+      pages = [];
     for (let i = Math.max(1, winStart); i <= winEnd; i++) pages.push(i);
-    const btn = (label, target, disabled, cls = "") =>
-      `<button data-page="${target}" ${disabled ? "disabled" : ""} class="${cls}">${label}</button>`;
+    const btn = (label, target, disabled, cls = "") => `<button data-page="${target}" ${disabled ? "disabled" : ""} class="${cls}">${label}</button>`;
     return `
       <div class="pager">
         ${leftActionsHtml ? `<span class="pager-actions">${leftActionsHtml}</span>` : ""}
         ${btn("«", 1, p === 1)}
         ${btn("‹", p - 1, p === 1)}
-        ${pages.map(n => btn(n, n, false, n === p ? "active" : "")).join("")}
+        ${pages.map(n => btn(n, n, !1, n === p ? "active" : "")).join("")}
         ${btn("›", p + 1, p === totalPages)}
         ${btn("»", totalPages, p === totalPages)}
         <span class="pagesize"><select id="page-size">
@@ -786,99 +705,49 @@
         </select></span>
       </div>`;
   }
-  // 칩은 "라벨: 값" 접두어 없이 값만 표시, 한 차원에서 여러 개 선택돼도 하나로 뭉치지 않고 값마다 별도 칩(각각 개별 해제)
-  function filterChips() {
-    const f = state.filters;
-    const chips = [];
-    const push = (k, label, v) => chips.push(
-      `<span class="fchip">${label}<button data-clear='${JSON.stringify({ k, v })}'>✕</button></span>`);
-    f.category.forEach(c => { const [g, s] = c.split("/"); push("category", s || g, c); });
-    f.type.forEach(t => push("type", TYPE_LABEL[t], t));
-    f.status.forEach(s => push("status", STATUS_LABEL[s][0], s));
-    f.expiry.forEach(e => push("expiry", EXP_LABEL[e], e));
-    f.depleted.forEach(() => push("depleted", "소진", "yes"));
-    f.unheld.forEach(() => push("unheld", "미보유대상", "yes"));
-    f.note.forEach(n => push("note", n === "has" ? "있음" : "없음", n));
-    f.labels.forEach(l => push("labels", l, l));
-    if (!chips.length) return "";
-    return `<div class="filterbar"><button class="filter-reset" id="filter-reset" aria-label="필터 전체 해제">${RESET_ICON}</button>${chips.join("")}</div>`;
-  }
-
+  function filterChips(){const f=state.filters,chips=[],push=(k,label,v)=>chips.push(`<span class="fchip">${label}<button data-clear='${JSON.stringify({k,v})}'>✕</button></span>`);f.status.forEach(v=>push('status',STATUS_LABEL[v][0],v));f.expiry.forEach(v=>push('expiry',EXP_LABEL[v],v));f.labels.forEach(v=>push('labels',v,v));f.note.forEach(v=>push('note',v==='has'?'있음':'없음',v));return chips.length?`<div class="filterbar"><button class="filter-reset" id="filter-reset" aria-label="필터 전체 해제">${RESET_ICON}</button>${chips.join('')}</div>`:'';}
   function tableInner(v) {
-    // 조회 가능한 소분류 없음 → 등록 자산 없음 → 검색/필터 결과 없음의 조건을 구분한다.
-    // 조회 범위가 없으면 입력 조건과 무관하게 조회 불가 빈 상태를 우선한다.
-    const filtering = activeFilterCount() > 0 || !!state.statFilter || !!state.search.trim();
-    const emptyMsg = !hasViewScope() ? "조회 가능한 자산이 없습니다."
-      : filtering ? "결과가 없습니다."
-      : ["employee","worksite"].includes(state.view) ? "표시할 목록이 없습니다." : "등록된 자산이 없습니다.";
-    const colspan = state.view === "product" ? (state.productType === "quantity" ? 7 : 8)
-      : state.view === "employee" ? 4 : state.view === "worksite" ? 3 : (canManageAssets() ? 11 : 10);
-    const empty = `<tr><td colspan="${colspan}" style="text-align:center;color:var(--text-mut);padding:32px">${emptyMsg}</td></tr>`;
-    const cls = state.view === "product" ? `tbl-product tbl-product-${state.productType}` : `tbl-${state.view}`;
-    return `<table class="${cls}"><thead>${v.head}</thead><tbody>${v.rows || empty}</tbody></table>`;
+    const filtering = activeFilterCount() > 0 || !!state.statFilter || !!state.search.trim(),
+      emptyMsg = hasViewScope() ? filtering ? "결과가 없습니다." : ["employee", "worksite"].includes(state.view) ? "표시할 목록이 없습니다." : "등록된 자산이 없습니다." : "조회 가능한 자산이 없습니다.",
+      empty = `<tr><td colspan="${state.view === "product" ? 8 : state.view === "employee" ? 4 : state.view === "worksite" ? 3 : canManageAssets() ? 10 : 9}" style="text-align:center;color:var(--text-mut);padding:32px">${emptyMsg}</td></tr>`;
+    return `<table class="${state.view === "product" ? `tbl-product tbl-product-${state.productType}` : `tbl-${state.view}`}"><thead>${v.head}</thead><tbody>${v.rows || empty}</tbody></table>`;
   }
   function typeToggleHtml() {
-    return `<div class="type-toggle">
-      <button data-ptype="individual" class="${state.productType === "individual" ? "active" : ""}">개별 자산</button>
-      <button data-ptype="quantity" class="${state.productType === "quantity" ? "active" : ""}">수량 자산</button>
-    </div>`;
+    return "";
   }
   function bindRows(scope) {
-    scope.querySelectorAll("tbody tr[data-id]").forEach(tr =>
-      tr.onclick = () => {rememberOverview();location.href = `asset-detail.html?id=${tr.dataset.id}`;});
+    scope.querySelectorAll("tbody tr[data-id]").forEach(tr => tr.onclick = () => {
+      rememberOverview(), location.href = `asset-detail.html?id=${tr.dataset.id}`;
+    });
   }
-  // 전체 탭 체크박스 선택 + 일괄 삭제 — 체크박스 토글은 render()를 다시 부르지 않고 delete 버튼
-  // disabled 상태와 전체선택 체크박스 상태만 직접 갱신(선택을 페이지 안에서 유지하기 위해)
   function bindBulkSelect(scope) {
     const deleteBtn = document.getElementById("btn-bulk-delete");
     if (!deleteBtn) return;
-    const checkAll = scope.querySelector("[data-check-all]");
-    const rowChecks = () => [...scope.querySelectorAll("tbody [data-check]")];
+    const checkAll = scope.querySelector("[data-check-all]"),
+      rowChecks = () => [...scope.querySelectorAll("tbody [data-check]")];
     function syncHeader() {
-      const boxes = rowChecks();
-      const checkedCount = boxes.filter(b => b.checked).length;
-      checkAll.checked = boxes.length > 0 && checkedCount === boxes.length;
-      checkAll.indeterminate = checkedCount > 0 && checkedCount < boxes.length;
+      const boxes = rowChecks(),
+        checkedCount = boxes.filter(b => b.checked).length;
+      checkAll.checked = boxes.length > 0 && checkedCount === boxes.length, checkAll.indeterminate = checkedCount > 0 && checkedCount < boxes.length;
     }
     rowChecks().forEach(cb => {
-      // change가 tr의 click 핸들러(상세 이동)까지 안 번지도록 클릭 단계에서 막음
-      cb.addEventListener("click", e => e.stopPropagation());
-      cb.addEventListener("change", () => {
-        if (cb.checked) selected.add(cb.dataset.id); else selected.delete(cb.dataset.id);
-        deleteBtn.disabled = selected.size === 0;
-        syncHeader();
+      cb.addEventListener("click", e => e.stopPropagation()), cb.addEventListener("change", () => {
+        cb.checked ? selected.add(cb.dataset.id) : selected.delete(cb.dataset.id), deleteBtn.disabled = selected.size === 0, syncHeader();
       });
-    });
-    if (checkAll) {
-      checkAll.addEventListener("click", e => e.stopPropagation());
-      checkAll.addEventListener("change", () => {
-        rowChecks().forEach(cb => {
-          cb.checked = checkAll.checked;
-          if (checkAll.checked) selected.add(cb.dataset.id); else selected.delete(cb.dataset.id);
-        });
-        deleteBtn.disabled = selected.size === 0;
-        checkAll.indeterminate = false;
-      });
-    }
-    deleteBtn.onclick = () => {
-      if (!selected.size) return;
-      openBulkDeleteAssetModal(() => {
-        assets.filter(a => selected.has(a.id)).forEach(a => window.archiveDeletedAsset(a, "dana"));
-        selected.clear();
-        toast("삭제되었습니다.");
-        render();
+    }), checkAll && (checkAll.addEventListener("click", e => e.stopPropagation()), checkAll.addEventListener("change", () => {
+      rowChecks().forEach(cb => {
+        cb.checked = checkAll.checked, checkAll.checked ? selected.add(cb.dataset.id) : selected.delete(cb.dataset.id);
+      }), deleteBtn.disabled = selected.size === 0, checkAll.indeterminate = !1;
+    })), deleteBtn.onclick = () => {
+      selected.size && openBulkDeleteAssetModal(() => {
+        assets.filter(a => selected.has(a.id)).forEach(a => window.archiveDeletedAsset(a, "dana")), selected.clear(), toast("삭제되었습니다."), render();
       });
     };
   }
-  const WARN_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 9v4M12 16.5h.01M10.3 3.9 2.5 17.5a1.7 1.7 0 0 0 1.47 2.55h16.06a1.7 1.7 0 0 0 1.47-2.55L13.7 3.9a1.7 1.7 0 0 0-2.94 0z"/></svg>`;
-  // 자산 상세의 개별 삭제 확인 모달(detail.js openDeleteAssetModal)과 UI·문구·DELETE 입력 확인 규칙,
-  // 타이틀까지 완전히 동일(선택 건수를 따로 안 밝혀도 충분하다는 판단, 2026-09-30). 동작만 새로 작성 —
-  // 상세는 삭제 후 목록으로 페이지 이동하지만 여긴 이미 목록 화면이라 이동 없이 그 자리에서 테이블만 다시 그림
+  const WARN_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 9v4M12 16.5h.01M10.3 3.9 2.5 17.5a1.7 1.7 0 0 0 1.47 2.55h16.06a1.7 1.7 0 0 0 1.47-2.55L13.7 3.9a1.7 1.7 0 0 0-2.94 0z"/></svg>';
   function openBulkDeleteAssetModal(onConfirm) {
     const cb = document.createElement("div");
-    cb.className = "modal-back";
-    cb.style.zIndex = 340;
-    cb.innerHTML = `
+    cb.className = "modal-back", cb.style.zIndex = 340, cb.innerHTML = `
       <div class="modal" style="width:380px">
         <h3>삭제하시겠습니까?</h3>
         <div class="body">
@@ -892,41 +761,27 @@
           <button class="btn" data-cclose>취소</button>
           <button class="btn danger" data-cok disabled>삭제</button>
         </div>
-      </div>`;
-    // Confirmation closes only through its buttons.
-    cb.querySelector("[data-cclose]").onclick = () => cb.remove();
-    const input = cb.querySelector("[data-del-input]");
-    const okBtn = cb.querySelector("[data-cok]");
-    const confirmed = () => input.value.trim().toUpperCase() === "DELETE";
-    input.addEventListener("input", () => { okBtn.disabled = !confirmed(); });
-    okBtn.onclick = () => {
-      if (!confirmed()) return;
-      cb.remove();
-      onConfirm();
-    };
-    document.body.appendChild(cb);
-    input.focus();
+      </div>`, cb.querySelector("[data-cclose]").onclick = () => cb.remove();
+    const input = cb.querySelector("[data-del-input]"),
+      okBtn = cb.querySelector("[data-cok]"),
+      confirmed = () => input.value.trim().toUpperCase() === "DELETE";
+    input.addEventListener("input", () => {
+      okBtn.disabled = !confirmed();
+    }), okBtn.onclick = () => {
+      confirmed() && (cb.remove(), onConfirm());
+    }, document.body.appendChild(cb), input.focus();
   }
-
   function render() {
-    if(!qaBulkInitialized && new URLSearchParams(location.search).get("qa")==="bulk-ai"){
-      qaBulkInitialized=true;activeScreen="bulk-register";bulkRegister.method="ai";
-    }
-    mountMemberQaPanel();
-    // 다른 화면(자산 삭제 등)에서 이동해온 직후 띄울 토스트 — sessionStorage에 있으면 최초 1회만 소비
+    !qaBulkInitialized && new URLSearchParams(location.search).get("qa") === "bulk-ai" && (qaBulkInitialized = !0, activeScreen = "bulk-register", bulkRegister.method = "ai"), mountMemberQaPanel();
     const pendingToast = sessionStorage.getItem("pendingToast");
-    if (pendingToast) { sessionStorage.removeItem("pendingToast"); toast(pendingToast); }
-    if (activeScreen === "bulk-register") {
+    if (pendingToast && (sessionStorage.removeItem("pendingToast"), toast(pendingToast)), activeScreen === "bulk-register") {
       renderBulkRegister();
       return;
     }
-    // 체크박스 선택은 render()를 다시 부르는 모든 조작(정렬·필터·검색·페이지 이동 등)에서 항상 초기화 —
-    // 체크박스 자체를 토글하는 건 render()를 안 부르고 DOM만 직접 바꾸므로 이 시점엔 영향 없음
     selected.clear();
-    const c = document.getElementById("content");
-    const v = currentView();
-    // 품목별은 필터 범위가 분류 하나뿐(자산 유형은 목록 위 유형 선택으로 별도 제공)이라 뱃지 카운트도 그 하나만 봄
-    const nAct = state.view === "product" ? state.filters.category.length : activeFilterCount();
+    const c = document.getElementById("content"),
+      v = currentView(),
+      nAct = state.view === "product" ? state.filters.category.length : activeFilterCount();
     c.innerHTML = `
       <div class="tabs">
         <a class="active">현황</a>
@@ -935,26 +790,26 @@
       </div>
 
       <div class="subtabs">
-        ${[["all","전체"],["product","품목별"],["employee","구성원별"],["worksite","근무지별"]]
-          .map(([k,t]) => `<button data-view="${k}" class="${state.view===k?'active':''}">${t}</button>`).join("")}
+        ${[["all", "전체"], ["product", "품목별"], ["employee", "구성원별"], ["worksite", "근무지별"]].map(([k, t]) => `<button data-view="${k}" class="${state.view === k ? "active" : ""}">${t}</button>`).join("")}
         ${state.view === "all" ? `
         <div class="sub-actions">
-          ${canManageAssets() ? `<button class="btn primary sm" id="btn-add">＋ 자산 추가 <span class="chev">▾</span></button>` : ""}
-          ${bulkActions().length ? `<button class="btn sm" id="btn-bulk">일괄 작업 <span class="chev">▾</span></button>` : ""}
+          ${canManageAssets() ? '<button class="btn primary sm" id="btn-add">＋ 자산 추가 <span class="chev">▾</span></button>' : ""}
+          ${bulkActions().length ? '<button class="btn sm" id="btn-bulk">일괄 작업 <span class="chev">▾</span></button>' : ""}
         </div>` : ""}
       </div>
 
+      ${['all','product'].includes(state.view)?classificationScopeHtml():''}
       ${state.view === "all" ? statsHtml() : ""}
       ${state.view === "product" ? typeToggleHtml() : ""}
 
       <div class="countrow">
         <span class="total">전체 <b>${v.count}</b></span>
         ${sortHtml()}
-        <button class="filter-btn ${nAct ? 'set' : ''}" id="btn-filter">▤ ${state.view === "product" ? "분류" : state.view === "employee" ? "구성원" : state.view === "worksite" ? "근무지" : "필터"}${nAct ? ` <b>${nAct}</b>` : ""}</button>
+        <button class="filter-btn ${nAct ? "set" : ""}" id="btn-filter" ${state.view==='product'?'hidden':''}>▤ ${state.view === "product" ? "분류" : state.view === "employee" ? "구성원" : state.view === "worksite" ? "근무지" : "필터"}${nAct ? ` <b>${nAct}</b>` : ""}</button>
         <div class="right">
-          <div class="searchbox${state.search ? ' has-term' : ''}">
-            <input class="search${state.search ? ' expanded' : ''}" id="search-input"
-              placeholder="${state.search ? SEARCH_PLACEHOLDER[state.view] : '검색'}" value="${state.search.replace(/"/g, '&quot;')}">
+          <div class="searchbox${state.search ? " has-term" : ""}">
+            <input class="search${state.search ? " expanded" : ""}" id="search-input"
+              placeholder="${state.search ? SEARCH_PLACEHOLDER[state.view] : "검색"}" value="${state.search.replace(/"/g, "&quot;")}">
             <button class="search-clear" id="search-clear" type="button" aria-label="검색어 지우기">✕</button>
           </div>
           ${state.view === "all" ? '<button class="btn sm" id="btn-qr-dl">▦ QR 다운로드</button>' : ""}
@@ -966,284 +821,227 @@
 
       <div class="table-wrap">${tableInner(v)}</div>
 
-      ${pagerHtml(v.count, state.view === "all" && canManageAssets()
-        ? `<button class="btn sm" id="btn-bulk-delete" disabled>삭제</button>` : "")}
-    `;
-
-    c.querySelectorAll(".subtabs button").forEach(b =>
-      b.onclick = () => {
-        state.view = b.dataset.view;
-        state.page = 1;
-        state.filters = emptyFilters(); state.statFilter=null;
-        state.search = "";
-        state.productType = "individual";
-        // 이 뷰에서 안 쓰는 정렬 기준으로 넘어가는 경우(예: 전체>유효기한 정렬 중 품목별로 이동)를 대비해
-        // 현재 정렬 기준이 새 뷰에 없으면 그 뷰의 기본 기준으로 리셋
-        const fields = sortFieldsFor(state.view);
-        if (!fields.some(f => f.k === state.sort.key)) state.sort = { key: fields[0].k, dir: fields[0].defDir };
-        render();
-      });
-    c.querySelectorAll("[data-worksite-link]").forEach(a=>a.onclick=e=>e.stopPropagation());
-    fitSummaryChips(c);
-    bindRows(c);
-    bindBulkSelect(c);
-    c.querySelectorAll("[data-ptype]").forEach(b => b.onclick = () => {
-      if (state.productType === b.dataset.ptype) return;
-      state.productType = b.dataset.ptype;
-      // 유형을 바꾸면 이전 유형의 분류 조건을 해제한다. 검색어·정렬은 유지한다.
-      state.filters.category = [];
-      state.page = 1;
-      render();
-    });
-    // 품목별 행 클릭 — 개별형은 분류 화면과 동일한 공용 자산 목록 모달, 수량형은 품목=자산이 1:1이라 중간 목록 없이 바로 상세로
-    c.querySelectorAll("tbody tr[data-pkey]").forEach(tr => tr.onclick = () => {
+      ${pagerHtml(v.count, state.view === "all" && canManageAssets() ? '<button class="btn sm" id="btn-bulk-delete" disabled>삭제</button>' : "")}
+    `, c.querySelector('#classification-scope') && (c.querySelector('#classification-scope').onclick=openCategoryFilterModal), c.querySelectorAll(".subtabs button").forEach(b => b.onclick = () => {
+      state.view = b.dataset.view, state.page = 1, state.filters = emptyFilters(), state.statFilter = null, state.search = "", state.productType = "individual";
+      const fields = sortFieldsFor(state.view);
+      fields.some(f => f.k === state.sort.key) || (state.sort = {
+        key: fields[0].k,
+        dir: fields[0].defDir
+      }), render();
+    }), c.querySelectorAll("[data-worksite-link]").forEach(a => a.onclick = e => e.stopPropagation()), fitSummaryChips(c), bindRows(c), bindBulkSelect(c), c.querySelectorAll("[data-ptype]").forEach(b => b.onclick = () => {
+      state.productType !== b.dataset.ptype && (state.productType = b.dataset.ptype, state.filters.category = [], state.page = 1, render());
+    }), c.querySelectorAll("tbody tr[data-pkey]").forEach(tr => tr.onclick = () => {
       const g = productGroupsByKey.get(tr.dataset.pkey);
-      if (!g) return;
-      if (g.type === "individual") window.openProductUnitsModal(g.product, g.list);
-      else {rememberOverview();location.href = `asset-detail.html?id=${g.list[0].id}`;}
-    });
-    // 구성원별·근무지별 행 클릭 — 배정된 자산 전체 목록 모달. 헤더는 테이블의 정체성 컬럼과 동일한 정보를 보여줌
-    // (구성원=프로필+이름+그룹, memberIdentity() 재사용 / 근무지=근무지명+코드)
-    c.querySelectorAll("tbody tr[data-mkey]").forEach(tr => tr.onclick = () => {
+      g && window.openProductUnitsModal(g.product, g.list);
+    }), c.querySelectorAll("tbody tr[data-mkey]").forEach(tr => tr.onclick = () => {
       const r = memberRowsByName.get(tr.dataset.mkey);
       if (!r) return;
       simulateMemberChange(r.name, r.items);
       const items = currentMemberItems(r.name);
-      if (!items.length) { openMemberUnavailableModal(); return; }
-      openAssignedAssetsModal(`<div class="acard-id">${memberIdentity(r.name)}</div>`, items);
-    });
-    c.querySelectorAll("tbody tr[data-wkey]").forEach(tr => tr.onclick = () => {
-      const r = worksiteRowsByName.get(tr.dataset.wkey);
-      const codeHtml = r.code || '<span class="muted">—</span>';
-      if (r) {
-        const current=viewableAssets().flatMap(asset=>(asset.type==="individual" ? asset.assignments || [] : asset.stocks || []).filter(x=>x.worksite===r.name).map(x=>({asset,sub:asset.sub,qty:asset.type==="individual" ? 1 : x.qty})));
-        if(!current.length){openMemberUnavailableModal();return;}
-        openAssignedAssetsModal(`<div><a class="cat-unit-product" href="worksite-detail.html?name=${encodeURIComponent(r.name)}" target="_blank" rel="noopener">${r.name}</a><div class="acard-sub">${codeHtml}</div></div>`,current);
+      if (!items.length) {
+        openMemberUnavailableModal();
+        return;
       }
-    });
-    c.querySelectorAll("[data-stub]").forEach(el =>
-      el.onclick = () => toast(`"${el.dataset.stub}" — 이후 단계에서 정의`));
-
-    const si = document.getElementById("search-input");
-    const sbox = si.closest(".searchbox");
-    const commit = () => { state.search = si.value.trim(); state.page = 1; render(); };
-    si.onfocus = () => { si.classList.add("expanded"); si.placeholder = SEARCH_PLACEHOLDER[state.view]; };
-    si.onblur = () => { if (!si.value && !state.search) { si.classList.remove("expanded"); si.placeholder = "검색"; } };
-    si.oninput = () => sbox.classList.toggle("has-term", !!si.value);   // ✕ 노출만, 검색 실행 X
-    si.onkeydown = e => { if (e.key === "Enter") commit(); };
-    document.getElementById("search-clear").onclick = () => { si.value = ""; state.search = ""; state.page = 1; render(); };
-    c.querySelectorAll("[data-clear]").forEach(b =>
-      b.onclick = () => {
-        const { k, v } = JSON.parse(b.dataset.clear);
-        state.filters[k] = state.filters[k].filter(x => x !== v); state.statFilter=null;
-        state.page = 1;
-        render();
-      });
-
-    c.querySelectorAll(".statcol.click").forEach(el => el.onclick = () => {
-      const p = JSON.parse(el.dataset.filter);   // {필드명: 값배열, ...} — 필드 여러 개 동시 지정 가능
-      const isOn=JSON.stringify(state.statFilter)===JSON.stringify(p);
-      state.statFilter=isOn ? null : p;
-      state.page = 1;
-      render();
-    });
-
-    const resetBtn = document.getElementById("filter-reset");
-    if (resetBtn) resetBtn.onclick = () => {
-      state.filters = emptyFilters(); state.statFilter=null;
-      state.page = 1;
-      render();
-    };
-
-    c.querySelectorAll(".pager button[data-page]").forEach(b =>
-      b.onclick = () => { state.page = +b.dataset.page; render(); });
-    const pageSizeSel = document.getElementById("page-size");
-    if (pageSizeSel) pageSizeSel.onchange = () => {
-      state.pageSize = +pageSizeSel.value;
-      state.page = 1;
-      render();
-    };
-
-    const sortKeyBtn = document.getElementById("sort-key-btn");
-    if (sortKeyBtn) sortKeyBtn.onclick = () => openSortKeyMenu(sortKeyBtn);
-    c.querySelectorAll(".sort-dir-btn").forEach(b => b.onclick = () => {
-      state.sort.dir = b.dataset.dir;
-      state.page = 1;
-      render();
-    });
-
-    document.getElementById("btn-filter").onclick =
-      state.view === "product" ? openCategoryFilterModal :
-      state.view === "employee" ? openMemberFilterModal :
-      state.view === "worksite" ? openWorksiteFilterModal :
-      openFilterModal;
-    // QR 다운로드도 개별 유닛(고유관리번호) 단위 액션이라 전체 탭에서만 제공 — 자산 추가/일괄 작업과 동일한 이유
-    if (state.view === "all") {
-      document.getElementById("btn-qr-dl").onclick = openQrDownloadModal;
-      // 자산 추가는 관리 권한이 있을 때만 노출하며, 클릭 진입 시에도 권한을 다시 확인한다.
-      const addButton = document.getElementById("btn-add");
-      if (addButton) addButton.onclick = () => {
-        if (!canManageAssets()) return;
-        window.openAssetAddModal();
+      openAssignedAssetsModal(`<div class="acard-id">${memberIdentity(r.name)}</div>`, items);
+    }), c.querySelectorAll("tbody tr[data-wkey]").forEach(tr => tr.onclick = () => {
+      const r = worksiteRowsByName.get(tr.dataset.wkey),
+        codeHtml = r.code || '<span class="muted">—</span>';
+      if (r) {
+        const current = viewableAssets().flatMap(asset => (asset.assignments || []).filter(x => x.worksite === r.name).map(x => ({
+          asset,
+          sub: asset.sub,
+          since: x.since,
+          qty: 1
+        })));
+        if (!current.length) {
+          openMemberUnavailableModal();
+          return;
+        }
+        openAssignedAssetsModal(`<div><a class="cat-unit-product" href="worksite-detail.html?name=${encodeURIComponent(r.name)}" target="_blank" rel="noopener">${r.name}</a><div class="acard-sub">${codeHtml}</div></div>`, current);
+      }
+    }), c.querySelectorAll("[data-stub]").forEach(el => el.onclick = () => toast(`"${el.dataset.stub}" — 이후 단계에서 정의`));
+    const si = document.getElementById("search-input"),
+      sbox = si.closest(".searchbox"),
+      commit = () => {
+        state.search = si.value.trim(), state.page = 1, render();
       };
+    si.onfocus = () => {
+      si.classList.add("expanded"), si.placeholder = SEARCH_PLACEHOLDER[state.view];
+    }, si.onblur = () => {
+      !si.value && !state.search && (si.classList.remove("expanded"), si.placeholder = "검색");
+    }, si.oninput = () => sbox.classList.toggle("has-term", !!si.value), si.onkeydown = e => {
+      e.key === "Enter" && commit();
+    }, document.getElementById("search-clear").onclick = () => {
+      si.value = "", state.search = "", state.page = 1, render();
+    }, c.querySelectorAll("[data-clear]").forEach(b => b.onclick = () => {
+      const {
+        k,
+        v: v2
+      } = JSON.parse(b.dataset.clear);
+      state.filters[k] = state.filters[k].filter(x => x !== v2), state.statFilter = null, state.page = 1, render();
+    }), c.querySelectorAll(".statcol.click").forEach(el => el.onclick = () => {
+      const p = JSON.parse(el.dataset.filter),
+        isOn = JSON.stringify(state.statFilter) === JSON.stringify(p);
+      state.statFilter = isOn ? null : p, state.page = 1, render();
+    });
+    const resetBtn = document.getElementById("filter-reset");
+    resetBtn && (resetBtn.onclick = () => {
+      state.filters = emptyFilters(), state.statFilter = null, state.page = 1, render();
+    }), c.querySelectorAll(".pager button[data-page]").forEach(b => b.onclick = () => {
+      state.page = +b.dataset.page, render();
+    });
+    const pageSizeSel = document.getElementById("page-size");
+    pageSizeSel && (pageSizeSel.onchange = () => {
+      state.pageSize = +pageSizeSel.value, state.page = 1, render();
+    });
+    const sortKeyBtn = document.getElementById("sort-key-btn");
+    if (sortKeyBtn && (sortKeyBtn.onclick = () => openSortKeyMenu(sortKeyBtn)), c.querySelectorAll(".sort-dir-btn").forEach(b => b.onclick = () => {
+      state.sort.dir = b.dataset.dir, state.page = 1, render();
+    }), document.getElementById("btn-filter").onclick = state.view === "product" ? openCategoryFilterModal : state.view === "employee" ? openMemberFilterModal : state.view === "worksite" ? openWorksiteFilterModal : openFilterModal, state.view === "all") {
+      document.getElementById("btn-qr-dl").onclick = openQrDownloadModal;
+      const addButton = document.getElementById("btn-add");
+      addButton && (addButton.onclick = () => {
+        canManageAssets() && window.openAssetAddModal();
+      });
       const bulkButton = document.getElementById("btn-bulk");
-      if (bulkButton) bulkButton.onclick = e => openBulkMenu(e.currentTarget);
+      bulkButton && (bulkButton.onclick = e => openBulkMenu(e.currentTarget));
     }
-    // 엑셀 다운로드 — 실제 파일 생성 대신 양식 정의가 완료된 구글시트로 연결(2026-09-24). 프로토타입 목적상
-    // "실제 파일 다운로드"를 흉내낼 필요가 없어지고, 양식은 사용자가 구글시트에서 직접 계속 다듬는 게 더
-    // 정확한 최신 상태라 생성 코드보다 그쪽이 소스 오브 트루스
-    document.getElementById("btn-list-dl").disabled=v.count===0;
-    if(document.getElementById("btn-qr-dl"))document.getElementById("btn-qr-dl").disabled=v.count===0;
-    document.getElementById("btn-list-dl").onclick = () => {
+    document.getElementById("btn-list-dl").disabled = v.count === 0, document.getElementById("btn-qr-dl") && (document.getElementById("btn-qr-dl").disabled = v.count === 0), document.getElementById("btn-list-dl").onclick = () => {
       const url = state.view === "product" ? DOWNLOAD_SHEET_LINKS.product[state.productType] : DOWNLOAD_SHEET_LINKS[state.view];
       window.open(url, "_blank", "noopener");
     };
   }
-
-  /* ---------- stats (분류 필터까지만 반영) ---------- */
-  function catScoped() { return getFiltered(true); }
+  function catScoped() {
+    return getFiltered(!0);
+  }
   function computeStats() {
-    const list = catScoped();
-    const indiv = list.filter(a => a.type === "individual");
-    const qty = list.filter(a => a.type === "quantity");
-    const cnt = k => indiv.filter(a => a.status === k).length;
-    const qtyCnt = k => qty.filter(a => a.status === k).length;
-    const expOver = list.filter(a => displayField(a,"expiry") && a.expiry && expiryKey(a.expiry) === "over").length;
-    const expSoon = list.filter(a => displayField(a,"expiry") && a.expiry && expiryKey(a.expiry) === "soon").length;
-    const assignable = indiv.length - cnt("disposed");
+    const list = catScoped(),
+      cnt = k => list.filter(a => a.status === k).length,
+      assignable = list.length - cnt("disposed");
     return {
-      indivN: indiv.length, qtyN: qty.length,
-      stock: cnt("stock"), assigned: cnt("assigned"), repair: cnt("repair"),
-      lost: cnt("lost"), disposed: cnt("disposed"), assignable,
-      expOver, expSoon,
-      rate: assignable ? (Math.round(cnt("assigned") / assignable * 1000)/10).toFixed(1) : "0.0",
-      // 수량형은 폐기 개념이 없어 제외 없이 전체 대비 비율(개별형 배정률과 동일 원리, 4.3 "보유 대상 없음" 참조)
-      qtyHeld: qtyCnt("held"), qtyStock: qtyCnt("stock"),
-      qtyRate: qty.length ? (Math.round(qtyCnt("held") / qty.length * 1000)/10).toFixed(1) : "0.0",
-      qtyDepleted: qty.filter(isDepleted).length,
-      // 미보유대상은 품목이 아니라 보유 대상(레코드) 단위 카운트 — 한 품목에 0개짜리 보유 대상이 여러 명이면
-      // 그만큼 더해짐. 소진인 품목의 0개짜리 레코드도 그대로 포함(소진과 별개 집계)
-      qtyUnheld: qty.reduce((s, a) => s + unheldHolders(a).length, 0),
+      stock: cnt("stock"),
+      assigned: cnt("assigned"),
+      repair: cnt("repair"),
+      lost: cnt("lost"),
+      disposed: cnt("disposed"),
+      assignable,
+      expOver: list.filter(a => displayField(a, "expiry") && a.expiry && expiryKey(a.expiry) === "over").length,
+      expSoon: list.filter(a => displayField(a, "expiry") && a.expiry && expiryKey(a.expiry) === "soon").length,
+      rate: assignable ? (Math.round(cnt("assigned") / assignable * 1e3) / 10).toFixed(1) : "0.0"
     };
   }
-  function arrEq(a, b) { a = a || []; b = b || []; return a.length === b.length && a.every(x => b.includes(x)); }
-  // filter는 {필드명: 값배열, ...} 형태 — 여러 필드를 동시에 지정 가능(예: 재고처럼 개별·수량형이 값을
-  // 공유하는 상태는 type도 같이 지정해야 그 카드가 대표하는 자산 유형으로만 정확히 필터링됨)
-  // 라벨만으론 뜻이 안 잡히는 파생 지표(소진·미보유대상)에 붙이는 작은 도움말 아이콘 — 기존 "?" 도움말
-  // 아이콘(help-icon)을 재사용하되, 전체 화면 모달 대신 짧은 호버 툴팁(data-tip)으로 가볍게 처리
-  function statHelp(text) {
-    return `<span class="help-icon stat-help" data-tip="${text}">?</span>`;
-  }
-  function statCol({ k, v, sub, cls = "", filter, extra = "" }) {
-    const attr = filter ? ` class="statcol click ${cls}" data-filter='${JSON.stringify(filter)}'` : ` class="statcol ${cls}"`;
-    return `<div${attr}>${extra}<div><div class="statcol-k">${k}</div><div class="statcol-v">${v}${sub ? ` <small>${sub}</small>` : ""}</div></div></div>`;
+  function statCol({
+    k,
+    v,
+    sub,
+    cls = "",
+    filter,
+    extra = ""
+  }) {
+    return `<div${filter ? ` class="statcol click ${cls}" data-filter='${JSON.stringify(filter)}'` : ` class="statcol ${cls}"`}>${extra}<div><div class="statcol-k">${k}</div><div class="statcol-v">${v}${sub ? ` <small>${sub}</small>` : ""}</div></div></div>`;
   }
   function statCard(title, cols) {
     return `<div class="statcard"><div class="statcard-title">${title}</div><div class="statcard-body">${cols.join("")}</div></div>`;
   }
   function statsHtml() {
     const s = computeStats();
-    const row1 = `<div class="statrow2">
-      ${statCard("자산 유형", [
-        statCol({ k: "개별 자산", v: s.indivN, sub: "개", filter: { type: ["individual"] } }),
-        statCol({ k: "수량 자산", v: s.qtyN, sub: "품목", filter: { type: ["quantity"] } }),
-      ])}
-      ${statCard("유효기간", [
-        statCol({ k: "만료 예정", v: s.expSoon, cls: "warn", filter: { expiry: ["soon"] } }),
-        statCol({ k: "만료", v: s.expOver, cls: "alert", filter: { expiry: ["over"] } }),
-      ])}
-    </div>`;
-    const row2 = `<div class="statrow2">
-      ${statCard("개별 자산 요약", [
-        statCol({
-          k: "배정 중", v: `${s.rate}%`, sub: `${s.assigned}/${s.assignable}`, filter: { status: ["assigned"] },
-          extra: `<div class="donut" style="--pct:${s.rate}"><div class="donut-hole"></div></div>`,
-        }),
-        statCol({ k: "재고", v: s.stock, filter: { type: ["individual"], status: ["stock"] } }),
-        statCol({ k: "분실", v: s.lost, cls: "alert", filter: { status: ["lost"] } }),
-        statCol({ k: "수리/점검 중", v: s.repair, cls: "warn", filter: { status: ["repair"] } }),
-      ])}
-      ${statCard("수량 자산 요약", [
-        statCol({
-          k: "보유 중", v: `${s.qtyRate}%`, sub: `${s.qtyHeld}/${s.qtyN}`, filter: { status: ["held"] },
-          extra: `<div class="donut" style="--pct:${s.qtyRate}"><div class="donut-hole"></div></div>`,
-        }),
-        statCol({ k: "재고", v: s.qtyStock, filter: { type: ["quantity"], status: ["stock"] } }),
-        statCol({
-          k: `소진 ${statHelp("소진은 전체 수량을 모두 배분해 잔여 수량이 없는 품목을 의미합니다.")}`,
-          v: s.qtyDepleted, cls: "warn", filter: { depleted: ["yes"] },
-        }),
-        statCol({
-          k: `미보유대상 ${statHelp("미보유대상은 보유 수량이 0개인 보유 대상을 의미합니다.")}`,
-          v: s.qtyUnheld, cls: "warn", filter: { unheld: ["yes"] },
-        }),
-      ])}
-    </div>`;
-    return `<div class="statwrap">${row1}${row2}</div>`;
+    return '<div class="statwrap"><div class="statrow2">' + statCard("자산 현황", [statCol({
+      k: "배정 중",
+      v: s.rate + "%",
+      sub: s.assigned + "/" + s.assignable,
+      filter: {
+        status: ["assigned"]
+      },
+      extra: '<div class="donut" style="--pct:' + s.rate + '"><div class="donut-hole"></div></div>'
+    }), statCol({
+      k: "배정 가능",
+      v: s.stock,
+      filter: {
+        status: ["stock"]
+      }
+    }), statCol({
+      k: "분실",
+      v: s.lost,
+      cls: "alert",
+      filter: {
+        status: ["lost"]
+      }
+    }), statCol({
+      k: "수리/점검 중",
+      v: s.repair,
+      cls: "warn",
+      filter: {
+        status: ["repair"]
+      }
+    })]) + statCard("유효기한", [statCol({
+      k: "만료 예정",
+      v: s.expSoon,
+      cls: "warn",
+      filter: {
+        expiry: ["soon"]
+      }
+    }), statCol({
+      k: "만료",
+      v: s.expOver,
+      cls: "alert",
+      filter: {
+        expiry: ["over"]
+      }
+    })]) + "</div></div>";
   }
-
-  /* ---------- 일괄 자산 추가 ---------- */
   function bulkEsc(value) {
-    return String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+    return String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
   }
-
   function resetBulkRegister() {
     bulkRegister.groups.flatMap(g => g.photos).forEach(p => {
-      if (p.url?.startsWith("blob:")) URL.revokeObjectURL(p.url);
-    });
-    bulkRegister.method = "company";
-    bulkRegister.type = "individual";
-    bulkRegister.fileName = "";
-    bulkRegister.groups = [];
-    bulkRegister.selectedPhotos.clear();
-    bulkRegister.lastSelectedPhoto = null;
-    bulkRegister.results.clear();
-    bulkRegister.dirtyGroups.clear();
-    bulkRegister.attempts.clear();
-    bulkRegister.hasAnalyzed=false;bulkRegister.excluded.clear(); bulkRegister.selectedRows.clear(); bulkRegister.page=1; bulkRegister.pageSize=300;
-    bulkRegister.errorsOnly = false;
-    bulkRegister.duplicateErrors.clear();
+      p.url?.startsWith("blob:") && URL.revokeObjectURL(p.url);
+    }), bulkRegister.method = "company", bulkRegister.type = "individual", bulkRegister.fileName = "", bulkRegister.groups = [], bulkRegister.selectedPhotos.clear(), bulkRegister.lastSelectedPhoto = null, bulkRegister.results.clear(), bulkRegister.dirtyGroups.clear(), bulkRegister.attempts.clear(), bulkRegister.hasAnalyzed = !1, bulkRegister.excluded.clear(), bulkRegister.selectedRows.clear(), bulkRegister.page = 1, bulkRegister.pageSize = 300, bulkRegister.errorsOnly = !1, bulkRegister.duplicateErrors.clear();
   }
-
   function bulkHasDraft() {
     return !!bulkRegister.fileName || bulkRegister.groups.length > 0 || bulkRegister.results.size > 0;
   }
-
-  function openBulkDiscardConfirm(onConfirm, { title = "작성을 중단하시겠습니까?", body = "지금까지 작성한 내용은 저장되지 않습니다.", confirmLabel="확인" } = {}) {
+  function openBulkDiscardConfirm(onConfirm, {
+    title = "작성을 중단하시겠습니까?",
+    body = "지금까지 작성한 내용은 저장되지 않습니다.",
+    confirmLabel = "확인"
+  } = {}) {
     const back = document.createElement("div");
-    back.className = "modal-back";
-    back.style.zIndex = 340;
-    back.innerHTML = `<div class="modal sm" role="dialog" aria-modal="true" aria-label="${title}">
+    back.className = "modal-back", back.style.zIndex = 340, back.innerHTML = `<div class="modal sm" role="dialog" aria-modal="true" aria-label="${title}">
       <h3>${title}</h3><div class="body">${body}</div>
       <div class="foot"><button class="btn" data-cancel>취소</button><button class="btn primary" data-confirm>${confirmLabel}</button></div>
-    </div>`;
-    back.querySelector("[data-cancel]").onclick = () => back.remove();
-    back.querySelector("[data-confirm]").onclick = () => { back.remove(); onConfirm(); };
-    document.body.appendChild(back);
+    </div>`, back.querySelector("[data-cancel]").onclick = () => back.remove(), back.querySelector("[data-confirm]").onclick = () => {
+      back.remove(), onConfirm();
+    }, document.body.appendChild(back);
   }
-
+  function returnFromBulk(message='') {
+    let origin=null;try{origin=JSON.parse(sessionStorage.getItem('asset-bulk-origin')||'null');}catch{}
+    sessionStorage.removeItem('asset-bulk-origin');
+    if(origin){if(message)sessionStorage.setItem('pendingToast',message);location.href=`category.html?group=${encodeURIComponent(origin.group)}&sub=${encodeURIComponent(origin.sub)}`;return;}
+    resetBulkRegister();activeScreen='list';render();if(message)toast(message);
+  }
   function leaveBulkRegister() {
-    const leave = () => { resetBulkRegister(); activeScreen = "list"; render(); };
-    if (bulkHasDraft()) openBulkDiscardConfirm(leave);
-    else leave();
+    const leave = () => {
+      returnFromBulk();
+    };
+    bulkHasDraft() ? openBulkDiscardConfirm(leave) : leave();
   }
-
   function bulkPhotoCount() {
     return bulkRegister.groups.reduce((sum, group) => sum + group.photos.length, 0);
   }
-
   function validBulkImageFiles(fileList) {
-    const files = [...fileList];
-    const valid = files.filter(file => ["image/jpeg", "image/png"].includes(file.type) && file.size <= 20 * 1024 * 1024);
-    if (valid.length !== files.length) toast("20MB 이하의 JPG, JPEG, PNG 파일만 첨부할 수 있습니다.");
-    return valid;
+    const files = [...fileList],
+      valid = files.filter(file => ["image/jpeg", "image/png"].includes(file.type) && file.size <= 20 * 1024 * 1024);
+    return valid.length !== files.length && toast("20MB 이하의 JPG, JPEG, PNG 파일만 첨부할 수 있습니다."), valid;
   }
-
   function newBulkPhoto(file) {
-    return { id: `bulk-photo-${++bulkPhotoSeq}`, name: file.name, url: URL.createObjectURL(file), file };
+    return {
+      id: `bulk-photo-${++bulkPhotoSeq}`,
+      name: file.name,
+      url: URL.createObjectURL(file),
+      file
+    };
   }
-
   function addBulkQaPhotos() {
     const colors = ["#5b8def", "#8f6ef0", "#26a69a"];
     if (bulkPhotoCount() + colors.length > BULK_AI_MAX_PHOTOS || bulkRegister.groups.length + colors.length > BULK_AI_MAX_PHOTOS) {
@@ -1252,441 +1050,363 @@
     }
     colors.forEach((color, index) => {
       const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="240" height="240"><rect width="240" height="240" fill="${color}"/><rect x="46" y="62" width="148" height="104" rx="12" fill="white" fill-opacity=".82"/><circle cx="88" cy="104" r="15" fill="${color}"/><path d="M56 150l42-35 31 24 25-21 30 32" fill="none" stroke="${color}" stroke-width="10"/></svg>`;
-      newBulkGroup([{ id: `bulk-photo-${++bulkPhotoSeq}`, name: `샘플 자산 ${index + 1}.png`, url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`, file: null }]);
-    });
-    renderBulkRegister();
+      newBulkGroup([{
+        id: `bulk-photo-${++bulkPhotoSeq}`,
+        name: `샘플 자산 ${index + 1}.png`,
+        url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`,
+        file: null
+      }]);
+    }), renderBulkRegister();
   }
-
   function newBulkGroup(photos) {
-    const group = { id: `bulk-group-${++bulkGroupSeq}`, photos, primaryPhotoId: photos[0]?.id || null };
-    bulkRegister.groups.push(group);
-    bulkRegister.dirtyGroups.add(group.id);
-    return group;
+    const group = {
+      id: `bulk-group-${++bulkGroupSeq}`,
+      photos,
+      primaryPhotoId: photos[0]?.id || null
+    };
+    return bulkRegister.groups.push(group), bulkRegister.dirtyGroups.add(group.id), group;
   }
-
   function addBulkPhotosAsGroups(fileList) {
     const files = validBulkImageFiles(fileList);
-    if (!files.length) return;
-    if (bulkPhotoCount() + files.length > BULK_AI_MAX_PHOTOS || bulkRegister.groups.length + files.length > BULK_AI_MAX_PHOTOS) {
-      toast(`한 번에 사진은 최대 ${BULK_AI_MAX_PHOTOS}장까지 첨부할 수 있습니다.`);
-      return;
+    if (files.length) {
+      if (bulkPhotoCount() + files.length > BULK_AI_MAX_PHOTOS || bulkRegister.groups.length + files.length > BULK_AI_MAX_PHOTOS) {
+        toast(`한 번에 사진은 최대 ${BULK_AI_MAX_PHOTOS}장까지 첨부할 수 있습니다.`);
+        return;
+      }
+      files.forEach(file => newBulkGroup([newBulkPhoto(file)])), renderBulkRegister();
     }
-    files.forEach(file => newBulkGroup([newBulkPhoto(file)]));
-    renderBulkRegister();
   }
-
   function addBulkPhotosToGroup(groupId, fileList) {
     const group = bulkRegister.groups.find(g => g.id === groupId);
     if (!group) return;
     const files = validBulkImageFiles(fileList);
-    if (!files.length) return;
-    if (group.photos.length + files.length > BULK_AI_MAX_GROUP_PHOTOS) {
-      toast("자산 1개당 사진은 최대 10장까지 첨부할 수 있습니다.");
-      return;
+    if (files.length) {
+      if (group.photos.length + files.length > BULK_AI_MAX_GROUP_PHOTOS) {
+        toast("자산 1개당 사진은 최대 10장까지 첨부할 수 있습니다.");
+        return;
+      }
+      if (bulkPhotoCount() + files.length > BULK_AI_MAX_PHOTOS) {
+        toast(`한 번에 사진은 최대 ${BULK_AI_MAX_PHOTOS}장까지 첨부할 수 있습니다.`);
+        return;
+      }
+      group.photos.push(...files.map(newBulkPhoto)), bulkRegister.dirtyGroups.add(groupId), renderBulkRegister();
     }
-    if (bulkPhotoCount() + files.length > BULK_AI_MAX_PHOTOS) {
-      toast(`한 번에 사진은 최대 ${BULK_AI_MAX_PHOTOS}장까지 첨부할 수 있습니다.`);
-      return;
-    }
-    group.photos.push(...files.map(newBulkPhoto));
-    bulkRegister.dirtyGroups.add(groupId);
-    renderBulkRegister();
   }
-
   function removeBulkPhoto(photoId) {
     const group = bulkRegister.groups.find(g => g.photos.some(p => p.id === photoId));
     if (!group) return;
     const photo = group.photos.find(p => p.id === photoId);
-    if (photo?.url?.startsWith("blob:")) URL.revokeObjectURL(photo.url);
-    group.photos = group.photos.filter(p => p.id !== photoId);
-    if (group.primaryPhotoId === photoId) group.primaryPhotoId = group.photos[0]?.id || null;
-    bulkRegister.selectedPhotos.delete(photoId);
-    bulkRegister.lastSelectedPhoto = null;
-    if (!group.photos.length) {
-      bulkRegister.groups = bulkRegister.groups.filter(g => g.id !== group.id);
-      bulkRegister.results.delete(group.id);
-      bulkRegister.dirtyGroups.delete(group.id);
-      bulkRegister.attempts.delete(group.id);
-    } else {
-      bulkRegister.dirtyGroups.add(group.id);
-    }
-    renderBulkRegister();
+    photo?.url?.startsWith("blob:") && URL.revokeObjectURL(photo.url), group.photos = group.photos.filter(p => p.id !== photoId), group.primaryPhotoId === photoId && (group.primaryPhotoId = group.photos[0]?.id || null), bulkRegister.selectedPhotos.delete(photoId), bulkRegister.lastSelectedPhoto = null, group.photos.length ? bulkRegister.dirtyGroups.add(group.id) : (bulkRegister.groups = bulkRegister.groups.filter(g => g.id !== group.id), bulkRegister.results.delete(group.id), bulkRegister.dirtyGroups.delete(group.id), bulkRegister.attempts.delete(group.id)), renderBulkRegister();
   }
-
   function flatBulkPhotoIds() {
     return bulkRegister.groups.flatMap(group => group.photos.map(photo => photo.id));
   }
-
   function selectBulkPhoto(photoId, event) {
     const ids = flatBulkPhotoIds();
     if (event.shiftKey && bulkRegister.lastSelectedPhoto && ids.includes(bulkRegister.lastSelectedPhoto)) {
-      const from = ids.indexOf(bulkRegister.lastSelectedPhoto);
-      const to = ids.indexOf(photoId);
-      const range = ids.slice(Math.min(from, to), Math.max(from, to) + 1);
-      if (!(event.metaKey || event.ctrlKey)) bulkRegister.selectedPhotos.clear();
-      range.forEach(id => bulkRegister.selectedPhotos.add(id));
-    } else if (event.metaKey || event.ctrlKey) {
-      if (bulkRegister.selectedPhotos.has(photoId)) bulkRegister.selectedPhotos.delete(photoId);
-      else bulkRegister.selectedPhotos.add(photoId);
-      bulkRegister.lastSelectedPhoto = photoId;
-    } else {
-      bulkRegister.selectedPhotos.clear();
-      bulkRegister.selectedPhotos.add(photoId);
-      bulkRegister.lastSelectedPhoto = photoId;
-    }
+      const from = ids.indexOf(bulkRegister.lastSelectedPhoto),
+        to = ids.indexOf(photoId),
+        range = ids.slice(Math.min(from, to), Math.max(from, to) + 1);
+      event.metaKey || event.ctrlKey || bulkRegister.selectedPhotos.clear(), range.forEach(id => bulkRegister.selectedPhotos.add(id));
+    } else event.metaKey || event.ctrlKey ? (bulkRegister.selectedPhotos.has(photoId) ? bulkRegister.selectedPhotos.delete(photoId) : bulkRegister.selectedPhotos.add(photoId), bulkRegister.lastSelectedPhoto = photoId) : (bulkRegister.selectedPhotos.clear(), bulkRegister.selectedPhotos.add(photoId), bulkRegister.lastSelectedPhoto = photoId);
     renderBulkRegister();
   }
-
   function moveSelectedBulkPhotos(targetGroupId, beforePhotoId = null) {
     const selectedIds = flatBulkPhotoIds().filter(id => bulkRegister.selectedPhotos.has(id));
     if (!selectedIds.length) return;
     const target = bulkRegister.groups.find(group => group.id === targetGroupId);
     if (!target) return;
-    const selectedSet = new Set(selectedIds);
-    const moving = [];
+    const selectedSet = new Set(selectedIds),
+      moving = [];
     bulkRegister.groups.forEach(group => group.photos.forEach(photo => {
-      if (selectedSet.has(photo.id)) moving.push(photo);
+      selectedSet.has(photo.id) && moving.push(photo);
     }));
     const targetRemaining = target.photos.filter(photo => !selectedSet.has(photo.id));
     if (targetRemaining.length + moving.length > BULK_AI_MAX_GROUP_PHOTOS) {
       toast("자산 1개당 사진은 최대 10장까지 첨부할 수 있습니다.");
       return;
     }
-    const crossGroup=moving.some(photo=>!target.photos.some(p=>p.id===photo.id));
-    const affected = new Set(crossGroup ? [targetGroupId] : []);
+    const crossGroup = moving.some(photo => !target.photos.some(p => p.id === photo.id)),
+      affected = new Set(crossGroup ? [targetGroupId] : []);
     bulkRegister.groups.forEach(group => {
-      if (crossGroup && group.photos.some(photo => selectedSet.has(photo.id))) affected.add(group.id);
-      group.photos = group.photos.filter(photo => !selectedSet.has(photo.id));
+      crossGroup && group.photos.some(photo => selectedSet.has(photo.id)) && affected.add(group.id), group.photos = group.photos.filter(photo => !selectedSet.has(photo.id));
     });
     let insertAt = beforePhotoId ? targetRemaining.findIndex(photo => photo.id === beforePhotoId) : -1;
-    if (insertAt < 0) insertAt = targetRemaining.length;
-    target.photos = [...targetRemaining.slice(0, insertAt), ...moving, ...targetRemaining.slice(insertAt)];
-    bulkRegister.groups.forEach(group => {
-      if (!group.photos.some(photo => photo.id === group.primaryPhotoId)) group.primaryPhotoId = group.photos[0]?.id || null;
-    });
-    bulkRegister.groups.filter(group => !group.photos.length).forEach(group => {
-      bulkRegister.results.delete(group.id);
-      bulkRegister.attempts.delete(group.id);
-      bulkRegister.dirtyGroups.delete(group.id);
-    });
-    bulkRegister.groups = bulkRegister.groups.filter(group => group.photos.length);
-    affected.forEach(groupId => {
-      if (bulkRegister.groups.some(group => group.id === groupId)) bulkRegister.dirtyGroups.add(groupId);
-    });
-    bulkRegister.selectedPhotos.clear();
-    bulkRegister.lastSelectedPhoto = null;
-    renderBulkRegister();
+    insertAt < 0 && (insertAt = targetRemaining.length), target.photos = [...targetRemaining.slice(0, insertAt), ...moving, ...targetRemaining.slice(insertAt)], bulkRegister.groups.forEach(group => {
+      group.photos.some(photo => photo.id === group.primaryPhotoId) || (group.primaryPhotoId = group.photos[0]?.id || null);
+    }), bulkRegister.groups.filter(group => !group.photos.length).forEach(group => {
+      bulkRegister.results.delete(group.id), bulkRegister.attempts.delete(group.id), bulkRegister.dirtyGroups.delete(group.id);
+    }), bulkRegister.groups = bulkRegister.groups.filter(group => group.photos.length), affected.forEach(groupId => {
+      bulkRegister.groups.some(group => group.id === groupId) && bulkRegister.dirtyGroups.add(groupId);
+    }), bulkRegister.selectedPhotos.clear(), bulkRegister.lastSelectedPhoto = null, renderBulkRegister();
   }
-
   function bulkTags(result) {
     return [...new Set(String(result?.tags || "").split("|").map(tag => tag.trim().replace(/\s+/g, " ")).filter(Boolean))].slice(0, window.ASSET_TAG_MAX_COUNT || 10);
   }
-
   function bulkUnknownTags(result) {
     const known = new Set(window.DATA.tags || []);
     return bulkTags(result).filter(tag => !known.has(tag));
   }
-
   function bulkCategoryIsValid(value) {
-    return !!value && viewableCategories().some(category =>
-      category.type === bulkRegister.type && `${category.group}/${category.sub}` === value);
+    return !!value && viewableCategories().some(category => category.type === bulkRegister.type && `${category.group}/${category.sub}` === value);
   }
-
   function updateBulkResult(groupId, field, value) {
     const result = bulkRegister.results.get(groupId);
-    if (!result) return;
-    result[field] = value;
-    if (field === "category") bulkRegister.duplicateErrors.clear();
-    if (result.status === "review" && !bulkResultHasError(result)) result.status = "success";
-    renderBulkRegister();
+    result && (result[field] = value, field === "category" && bulkRegister.duplicateErrors.clear(), result.status === "review" && !bulkResultHasError(result) && (result.status = "success"), renderBulkRegister());
   }
-
-  // 단건 등록의 분류 선택 모달과 같은 대분류/소분류 트리·검색·적용 흐름.
   function openBulkCategoryModal(groupId) {
     const result = bulkRegister.results.get(groupId);
     if (!result) return;
     const categories = viewableCategories().filter(category => category.type === bulkRegister.type);
-    let selected = result.category;
+    let selected2 = result.category;
     const back = document.createElement("div");
-    back.className = "modal-back";
-    back.innerHTML = `<div class="modal sm" role="dialog" aria-modal="true" aria-label="분류">
+    back.className = "modal-back", back.innerHTML = `<div class="modal sm" role="dialog" aria-modal="true" aria-label="분류">
       <h3>분류</h3><div class="body"><input type="text" class="picker-search" data-search placeholder="검색" autocomplete="off"><div class="catpick-list" data-list></div></div>
       <div class="foot"><button class="btn" type="button" data-cancel>취소</button><button class="btn primary" type="button" data-apply>적용</button></div>
-    </div>`;
-    document.body.appendChild(back);
-    const list = back.querySelector("[data-list]");
-    const renderList = () => {
-      const query = back.querySelector("[data-search]").value.trim().toLowerCase();
-      const groups = new Map();
-      categories.forEach(category => {
-        if (!groups.has(category.group)) groups.set(category.group, []);
-        groups.get(category.group).push(category);
-      });
-      list.innerHTML = [...groups].map(([group, subs]) => {
-        const shown = subs.filter(category => !query || group.toLowerCase().includes(query) || category.sub.toLowerCase().includes(query));
-        return shown.length ? `<div class="catpick-group"><div class="catpick-group-name">${bulkEsc(group)}</div>${shown.map(category => {
-          const index = categories.indexOf(category);
-          return `<button type="button" class="catpick-row${selected === `${category.group}/${category.sub}` ? " active" : ""}" data-category-index="${index}">${bulkEsc(category.sub)}</button>`;
-        }).join("")}</div>` : "";
-      }).join("") || `<p class="tag-manage-empty">${categories.length ? "결과가 없습니다." : "표시할 목록이 없습니다."}</p>`;
-      back.querySelector("[data-apply]").disabled=!selected;
-      list.querySelectorAll("[data-category-index]").forEach(button => button.onclick = () => {
-        const category = categories[Number(button.dataset.categoryIndex)];
-        selected = `${category.group}/${category.sub}`;
-        renderList();
-      });
+    </div>`, document.body.appendChild(back);
+    const list = back.querySelector("[data-list]"),
+      renderList = () => {
+        const query = back.querySelector("[data-search]").value.trim().toLowerCase(),
+          groups = /* @__PURE__ */new Map();
+        categories.forEach(category => {
+          groups.has(category.group) || groups.set(category.group, []), groups.get(category.group).push(category);
+        }), list.innerHTML = [...groups].map(([group, subs]) => {
+          const shown = subs.filter(category => !query || group.toLowerCase().includes(query) || category.sub.toLowerCase().includes(query));
+          return shown.length ? `<div class="catpick-group"><div class="catpick-group-name">${bulkEsc(group)}</div>${shown.map(category => {
+            const index = categories.indexOf(category);
+            return `<button type="button" class="catpick-row${selected2 === `${category.group}/${category.sub}` ? " active" : ""}" data-category-index="${index}">${bulkEsc(category.sub)}</button>`;
+          }).join("")}</div>` : "";
+        }).join("") || `<p class="tag-manage-empty">${categories.length ? "결과가 없습니다." : "표시할 목록이 없습니다."}</p>`, back.querySelector("[data-apply]").disabled = !selected2, list.querySelectorAll("[data-category-index]").forEach(button => button.onclick = () => {
+          const category = categories[Number(button.dataset.categoryIndex)];
+          selected2 = `${category.group}/${category.sub}`, renderList();
+        });
+      };
+    renderList(), back.querySelector("[data-search]").oninput = renderList, back.querySelector("[data-cancel]").onclick = () => back.remove(), back.querySelector("[data-apply]").onclick = () => {
+      back.remove(), updateBulkResult(groupId, "category", selected2);
     };
-    renderList();
-    back.querySelector("[data-search]").oninput = renderList;
-    back.querySelector("[data-cancel]").onclick = () => back.remove();
-    back.querySelector("[data-apply]").onclick = () => { back.remove(); updateBulkResult(groupId, "category", selected); };
   }
-
-  // 일괄 작업 확인 테이블에서 사용하던 체크박스형 태그 선택 모달을 사용한다.
   function openBulkTagModal(groupId) {
     const result = bulkRegister.results.get(groupId);
     if (!result) return;
-    const selected = new Set(bulkTags(result));
-    const back = document.createElement("div");
-    back.className = "modal-back";
-    back.innerHTML = `<div class="modal sm" role="dialog" aria-modal="true" aria-label="태그">
+    const selected2 = new Set(bulkTags(result)),
+      back = document.createElement("div");
+    back.className = "modal-back", back.innerHTML = `<div class="modal sm" role="dialog" aria-modal="true" aria-label="태그">
       <h3>태그</h3><div class="body"><p class="bulk-tag-limit">최대 ${window.ASSET_TAG_MAX_COUNT || 10}개까지 선택할 수 있습니다.</p><div class="bulk-tag-options" data-options></div></div>
       <div class="foot"><button class="btn bulk-tag-manage-button" type="button" data-manage>태그 관리</button><button class="btn" type="button" data-cancel>취소</button><button class="btn primary" type="button" data-apply>적용</button></div>
-    </div>`;
-    document.body.appendChild(back);
-    const options = back.querySelector("[data-options]");
-    const renderOptions = () => {
-      const known = window.DATA.tags || [];
-      const unknown = [...selected].filter(tag => !known.includes(tag));
-      options.innerHTML = `${unknown.length ? `<div class="bulk-tag-unknown"><b>등록되지 않은 태그</b>${unknown.map(tag => `<button type="button" data-remove-unknown="${bulkEsc(tag)}">${bulkEsc(tag)} ×</button>`).join("")}</div>` : ""}
-        ${known.map((tag, index) => `<label><input type="checkbox" data-tag-index="${index}" ${selected.has(tag) ? "checked" : selected.size >= window.ASSET_TAG_MAX_COUNT ? "disabled" : ""}>${bulkEsc(tag)}</label>`).join("")}`;
-      options.querySelectorAll("[data-tag-index]").forEach(input => input.onchange = () => {
-        const tag = known[Number(input.dataset.tagIndex)];
-        if (input.checked && selected.size >= (window.ASSET_TAG_MAX_COUNT || 10)) {
-          input.checked = false;
-          toast(`태그는 최대 ${window.ASSET_TAG_MAX_COUNT || 10}개까지 선택할 수 있습니다.`);
-          return;
-        }
-        if (input.checked) selected.add(tag);
-        else selected.delete(tag);
-        renderOptions();
+    </div>`, document.body.appendChild(back);
+    const options = back.querySelector("[data-options]"),
+      renderOptions = () => {
+        const known = window.DATA.tags || [],
+          unknown = [...selected2].filter(tag => !known.includes(tag));
+        options.innerHTML = `${unknown.length ? `<div class="bulk-tag-unknown"><b>등록되지 않은 태그</b>${unknown.map(tag => `<button type="button" data-remove-unknown="${bulkEsc(tag)}">${bulkEsc(tag)} ×</button>`).join("")}</div>` : ""}
+        ${known.map((tag, index) => `<label><input type="checkbox" data-tag-index="${index}" ${selected2.has(tag) ? "checked" : selected2.size >= window.ASSET_TAG_MAX_COUNT ? "disabled" : ""}>${bulkEsc(tag)}</label>`).join("")}`, options.querySelectorAll("[data-tag-index]").forEach(input => input.onchange = () => {
+          const tag = known[Number(input.dataset.tagIndex)];
+          if (input.checked && selected2.size >= (window.ASSET_TAG_MAX_COUNT || 10)) {
+            input.checked = !1, toast(`태그는 최대 ${window.ASSET_TAG_MAX_COUNT || 10}개까지 선택할 수 있습니다.`);
+            return;
+          }
+          input.checked ? selected2.add(tag) : selected2.delete(tag), renderOptions();
+        }), options.querySelectorAll("[data-remove-unknown]").forEach(button => button.onclick = () => {
+          selected2.delete(button.dataset.removeUnknown), renderOptions();
+        });
+      };
+    renderOptions(), back.querySelector("[data-manage]").onclick = () => {
+      window.openAssetTagManageModal && window.openAssetTagManageModal(({
+        renamed,
+        deletedOrigs
+      }) => {
+        const remap = tags => tags.filter(tag => !deletedOrigs.includes(tag)).map(tag => renamed.find(item => item.from === tag)?.to || tag);
+        bulkRegister.results.forEach(item => {
+          item.tags = [...new Set(remap(bulkTags(item)))].join("|");
+        });
+        const nextSelected = remap([...selected2]);
+        selected2.clear(), nextSelected.forEach(tag => selected2.add(tag)), renderOptions(), renderBulkRegister();
       });
-      options.querySelectorAll("[data-remove-unknown]").forEach(button => button.onclick = () => {
-        selected.delete(button.dataset.removeUnknown);
-        renderOptions();
-      });
+    }, back.querySelector("[data-cancel]").onclick = () => back.remove(), back.querySelector("[data-apply]").onclick = () => {
+      back.remove(), updateBulkResult(groupId, "tags", [...selected2].join("|"));
     };
-    renderOptions();
-    back.querySelector("[data-manage]").onclick = () => {
-      if (window.openAssetTagManageModal) window.openAssetTagManageModal(({ renamed, deletedOrigs }) => {
-        const remap = tags => tags.filter(tag => !deletedOrigs.includes(tag))
-          .map(tag => renamed.find(item => item.from === tag)?.to || tag);
-        bulkRegister.results.forEach(item => { item.tags = [...new Set(remap(bulkTags(item)))].join("|"); });
-        const nextSelected = remap([...selected]);
-        selected.clear();
-        nextSelected.forEach(tag => selected.add(tag));
-        renderOptions();
-        renderBulkRegister(); // 동일한 미등록 태그를 사용한 모든 자산 행을 다시 검사한다.
-      });
-    };
-    back.querySelector("[data-cancel]").onclick = () => back.remove();
-    back.querySelector("[data-apply]").onclick = () => { back.remove(); updateBulkResult(groupId, "tags", [...selected].join("|")); };
   }
-
   function bulkFieldEnabled(result, field) {
-    const category = (window.DATA.categories || []).find(item =>
-      `${item.group}/${item.sub}` === result.category && item.type === bulkRegister.type);
+    const category = (window.DATA.categories || []).find(item => `${item.group}/${item.sub}` === result.category && item.type === bulkRegister.type);
     return !category || !(category.hiddenFields || []).includes(field);
   }
-
   function bulkValidMonth(value) {
-    if (!value) return true;
+    if (!value) return !0;
     const match = /^(\d{4})[.-](\d{2})$/.exec(value);
-    if (!match || Number(match[1]) < 1 || Number(match[2]) < 1 || Number(match[2]) > 12) return false;
-    const today = new Date();
+    if (!match || Number(match[1]) < 1 || Number(match[2]) < 1 || Number(match[2]) > 12) return !1;
+    const today = /* @__PURE__ */new Date();
     return `${match[1]}-${match[2]}` <= `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
   }
-
   function bulkValidDate(value) {
-    if (!value) return true;
+    if (!value) return !0;
     const match = /^(\d{4})[.-](\d{2})[.-](\d{2})$/.exec(value);
-    if (!match || Number(match[1]) < 1) return false;
+    if (!match || Number(match[1]) < 1) return !1;
     const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
-    return date.getFullYear() === Number(match[1]) && date.getMonth() + 1 === Number(match[2])
-      && date.getDate() === Number(match[3]);
+    return date.getFullYear() === Number(match[1]) && date.getMonth() + 1 === Number(match[2]) && date.getDate() === Number(match[3]);
   }
-
   function bulkInputErrors(result) {
-    if (!result || result.status === "technical") return { technical: true };
+    if (!result || result.status === "technical") return {
+      technical: !0
+    };
     const errors = {};
-    if (!bulkCategoryIsValid(result.category)) errors.category = true;
+    bulkCategoryIsValid(result.category) || (errors.category = !0);
     const product = String(result.product || "").trim();
-    if (!product || product.length > 50) errors.product = true;
-    if (bulkRegister.type === "individual") {
+    (!product || product.length > 50) && (errors.product = !0);
+    {
       const no = String(result.assetNo || "").trim();
-      if (no && (no.length > 30 || !/^[A-Za-z0-9_-]+$/.test(no))) errors.assetNo = true;
-      for (const field of ["serial", "imei"]) {
-        if (bulkFieldEnabled(result, field) && String(result[field] || "").length > 40) errors[field] = true;
-      }
-    } else if (window.AssetQuantity.parse(result.totalQty) === null) {
-      errors.totalQty = true;
+      no && (no.length > 30 || !/^[A-Za-z0-9_-]+$/.test(no)) && (errors.assetNo = !0);
+      for (const field of ["serial", "imei"]) bulkFieldEnabled(result, field) && String(result[field] || "").length > 40 && (errors[field] = !0);
     }
-    for (const field of ["manufactured", "purchaseDate"]) {
-      if (bulkFieldEnabled(result, field) && !bulkValidMonth(String(result[field] || "").trim())) {
-        errors[field] = true;
-      }
-    }
-    if (bulkFieldEnabled(result, "expiry") && !bulkValidDate(String(result.expiry || "").trim())) {
-      errors.expiry = true;
-    }
-    if (bulkFieldEnabled(result, "purchasePrice")) {
+    for (const field of ["manufactured", "purchaseDate"]) bulkFieldEnabled(result, field) && !bulkValidMonth(String(result[field] || "").trim()) && (errors[field] = !0);
+    if (bulkFieldEnabled(result, "expiry") && !bulkValidDate(String(result.expiry || "").trim()) && (errors.expiry = !0), bulkFieldEnabled(result, "purchasePrice")) {
       const price = String(result.price || "").replace(/,/g, "").trim();
-      if (price && !/^(?:0|[1-9]\d{0,11})(?:\.\d{1,5})?$/.test(price)) errors.price = true;
+      price && !/^(?:0|[1-9]\d{0,11})(?:\.\d{1,5})?$/.test(price) && (errors.price = !0);
     }
-    if (bulkUnknownTags(result).length) errors.tags = true;
-    if (window.AssetMemo.count(result.note || "") > 500) errors.note = true;
-    return errors;
+    for(const f of window.DATA.extraFields.filter(f=>!f.deleted)){const cat=window.DATA.categories.find(c=>`${c.group}/${c.sub}`===result.category);if(window.AssetExtra.enabled(cat,f.id)&&String((result.extraValues||{})[f.id]||'').length>100)errors[f.id]=true;}
+    return bulkUnknownTags(result).length && (errors.tags = !0), window.AssetMemo.count(result.note || "") > 500 && (errors.note = !0), errors;
   }
-
   function bulkResultHasError(result, groupId) {
     return Object.keys(bulkInputErrors(result)).length > 0 || !!bulkRegister.duplicateErrors.get(groupId)?.size;
   }
-
   function checkBulkDuplicates() {
     bulkRegister.duplicateErrors.clear();
-    const byNumber = new Map(), byQuantityName = new Map();
-    const add = (groupId, field) => {
-      const errors = bulkRegister.duplicateErrors.get(groupId) || new Set();
-      errors.add(field);
-      bulkRegister.duplicateErrors.set(groupId, errors);
-    };
-    (window.DATA.assets || []).filter(asset => !asset.deleted_at).forEach(asset => {
-      if (asset.assetNo) byNumber.set(asset.assetNo, null);
-      if (asset.type === "quantity") byQuantityName.set(`${asset.group}/${asset.sub}\u0000${asset.product.trim()}`, null);
-    });
-    bulkActiveGroups().forEach(group => {
+    const byNumber = /* @__PURE__ */new Map(),
+      byQuantityName = /* @__PURE__ */new Map(),
+      add = (groupId, field) => {
+        const errors = bulkRegister.duplicateErrors.get(groupId) || /* @__PURE__ */new Set();
+        errors.add(field), bulkRegister.duplicateErrors.set(groupId, errors);
+      };
+    return (window.DATA.assets || []).filter(asset => !asset.deleted_at).forEach(asset => {
+      asset.assetNo && byNumber.set(asset.assetNo, null);
+    }), bulkActiveGroups().forEach(group => {
       const result = bulkRegister.results.get(group.id);
-      if (!result || result.status === "technical") return;
-      if (bulkRegister.type === "individual") {
+      if (!(!result || result.status === "technical")) {
         const key = String(result.assetNo || "").trim();
-        if (key) {
-          if (byNumber.has(key)) {
-            add(group.id, "assetNo");
-            const previous = byNumber.get(key);
-            if (previous) add(previous, "assetNo");
-          } else byNumber.set(key, group.id);
-        }
-      } else if (bulkCategoryIsValid(result.category)) {
-        const key = `${result.category}\u0000${String(result.product || "").trim()}`;
-        if (String(result.product || "").trim()) {
-          if (byQuantityName.has(key)) {
-            add(group.id, "product");
-            const previous = byQuantityName.get(key);
-            if (previous) add(previous, "product");
-          } else byQuantityName.set(key, group.id);
-        }
+        if (key) if (byNumber.has(key)) {
+          add(group.id, "assetNo");
+          const previous = byNumber.get(key);
+          previous && add(previous, "assetNo");
+        } else byNumber.set(key, group.id);
       }
-    });
-    return bulkRegister.duplicateErrors.size === 0;
+    }), bulkRegister.duplicateErrors.size === 0;
   }
-
-  function bulkActiveGroups() { return bulkRegister.groups.filter(g=>!bulkRegister.excluded.has(g.id)); }
+  function bulkActiveGroups() {
+    return bulkRegister.groups.filter(g => !bulkRegister.excluded.has(g.id));
+  }
   function bulkVisibleGroups() {
-    return bulkActiveGroups().filter(g=>bulkRegister.results.has(g.id)
-      && (!bulkRegister.errorsOnly || bulkResultHasError(bulkRegister.results.get(g.id),g.id)));
+    return bulkActiveGroups().filter(g => bulkRegister.results.has(g.id) && (!bulkRegister.errorsOnly || bulkResultHasError(bulkRegister.results.get(g.id), g.id)));
   }
-  function bulkErrorCount() { return bulkActiveGroups().filter(g=>bulkRegister.results.has(g.id) && bulkResultHasError(bulkRegister.results.get(g.id),g.id)).length; }
+  function bulkErrorCount() {
+    return bulkActiveGroups().filter(g => bulkRegister.results.has(g.id) && bulkResultHasError(bulkRegister.results.get(g.id), g.id)).length;
+  }
   function bulkCanSave() {
-    const groups=bulkActiveGroups();
-    return groups.length>0 && groups.every(g=>bulkRegister.results.has(g.id) && !bulkRegister.dirtyGroups.has(g.id)
-      && !bulkResultHasError(bulkRegister.results.get(g.id),g.id));
+    const groups = bulkActiveGroups();
+    return groups.length > 0 && groups.every(g => bulkRegister.results.has(g.id) && !bulkRegister.dirtyGroups.has(g.id) && !bulkResultHasError(bulkRegister.results.get(g.id), g.id));
   }
   function bulkResultTableHtml() {
     if (!bulkRegister.hasAnalyzed) return "";
-    if(!bulkErrorCount())bulkRegister.errorsOnly=false;
-    // Shopl 일괄 추가 양식의 컬럼 순서와 동일하게 제공한다. No.만 확인 테이블의 행 번호다.
-    const typeField = bulkRegister.type === "individual" ? "고유관리번호" : "전체 수량";
-    const columns = ['<input type="checkbox" data-result-all aria-label="현재 페이지 전체 선택">', "No.", "대분류 *", "소분류 *", "품목명 *", (bulkRegister.type === "individual" ? `${typeField} <span title="${window.ASSET_NUMBER_GUIDE}">ⓘ</span>` : `${typeField} *`), "유효기한", "태그",
-      ...(bulkRegister.type === "individual" ? ["S/N", "IMEI"] : []), "제조연월", "구매연월", "구매가격", "메모"];
-    const visible=bulkVisibleGroups(), pages=Math.max(1,Math.ceil(visible.length/bulkRegister.pageSize));
-    bulkRegister.page=Math.min(bulkRegister.page,pages);
-    const offset=(bulkRegister.page-1)*bulkRegister.pageSize;
-    const rows = visible.slice(offset,offset+bulkRegister.pageSize).map((group,index) => {
-      const result=bulkRegister.results.get(group.id);
-      const errors = bulkInputErrors(result);
-      for (const field of bulkRegister.duplicateErrors.get(group.id) || []) errors[field] = true;
-      const tagNames = bulkTags(result);
-      const [categoryGroup = "", categorySub = ""] = String(result.category || "").split("/");
-      const inputCell = (field, { mode = "text", placeholder = "입력", max = "", value = result[field] || "" } = {}) => {
-        const setting = field === "price" ? "purchasePrice" : field;
-        const enabled = ["product", "assetNo", "totalQty"].includes(field) || bulkFieldEnabled(result, setting);
-        // OFF 필드는 확인 테이블의 같은 컬럼을 유지하되 빈 비활성 입력칸으로 표시한다.
-        // AI 원본값은 초안에 남아 있어도 등록값·검증 대상에는 포함하지 않는다.
-        const date=["expiry","manufactured","purchaseDate"].includes(field);
-        return `<td><div class="${date ? "bulk-date-cell" : ""}"><input data-result-field="${field}" data-gid="${group.id}" value="${enabled ? bulkEsc(value) : ""}" placeholder="${enabled ? placeholder : ""}" inputmode="${mode}" ${max ? `maxlength="${max}"` : ""} ${enabled ? "" : "disabled"} class="${enabled && errors[field] ? "is-error" : ""}" aria-invalid="${!!(enabled && errors[field])}">${date ? `<button type="button" class="bulk-calendar" data-calendar="${field}" data-gid="${group.id}" aria-label="${field === "expiry" ? "날짜" : "연월"} 선택" ${enabled ? "" : "disabled"}>▦</button><input class="bulk-native-date" type="${field === "expiry" ? "date" : "month"}" data-calendar-value="${field}" data-gid="${group.id}" tabindex="-1" aria-hidden="true" ${field !== "expiry" ? `max="${new Date().toISOString().slice(0,7)}"` : ""}>` : ""}</div></td>`;
-      };
-      return `<tr class="${Object.keys(errors).length ? "bulk-result-error" : ""}" data-result-row="${group.id}">
-        <td><input type="checkbox" data-result-check="${group.id}" aria-label="행 선택" ${bulkRegister.selectedRows.has(group.id) ? "checked" : ""}></td><td>${offset+index+1}</td>
+    bulkErrorCount() || (bulkRegister.errorsOnly = !1);
+    const columns = ['<input type="checkbox" data-result-all aria-label="현재 페이지 전체 선택">', "No.", "대분류 *", "소분류 *", "품목명 *", `고유관리번호 <span title="${window.ASSET_NUMBER_GUIDE}">ⓘ</span>`, "유효기한", "태그", "제조연월", "구매연월", "구매가격", "메모", ...window.DATA.extraFields.filter(f=>!f.deleted).map(f=>bulkEsc(f.name))],
+      visible = bulkVisibleGroups(),
+      pages = Math.max(1, Math.ceil(visible.length / bulkRegister.pageSize));
+    bulkRegister.page = Math.min(bulkRegister.page, pages);
+    const offset = (bulkRegister.page - 1) * bulkRegister.pageSize,
+      rows = visible.slice(offset, offset + bulkRegister.pageSize).map((group, index) => {
+        const result = bulkRegister.results.get(group.id),
+          errors = bulkInputErrors(result);
+        for (const field of bulkRegister.duplicateErrors.get(group.id) || []) errors[field] = !0;
+        const tagNames = bulkTags(result),
+          [categoryGroup = "", categorySub = ""] = String(result.category || "").split("/"),
+          inputCell = (field, {
+            mode = "text",
+            placeholder = "입력",
+            max = "",
+            value = result[field] || ""
+          } = {}) => {
+            const setting = field === "price" ? "purchasePrice" : field,
+              enabled = ["product", "assetNo"].includes(field) || bulkFieldEnabled(result, setting),
+              date = ["expiry", "manufactured", "purchaseDate"].includes(field);
+            return `<td><div class="${date ? "bulk-date-cell" : ""}"><input data-result-field="${field}" data-gid="${group.id}" value="${enabled ? bulkEsc(value) : ""}" placeholder="${enabled ? placeholder : ""}" inputmode="${mode}" ${max ? `maxlength="${max}"` : ""} ${enabled ? "" : "disabled"} class="${enabled && errors[field] ? "is-error" : ""}" aria-invalid="${!!(enabled && errors[field])}">${date ? `<button type="button" class="bulk-calendar" data-calendar="${field}" data-gid="${group.id}" aria-label="${field === "expiry" ? "날짜" : "연월"} 선택" ${enabled ? "" : "disabled"}>▦</button><input class="bulk-native-date" type="${field === "expiry" ? "date" : "month"}" data-calendar-value="${field}" data-gid="${group.id}" tabindex="-1" aria-hidden="true" ${field !== "expiry" ? `max="${(/* @__PURE__ */new Date()).toISOString().slice(0, 7)}"` : ""}>` : ""}</div></td>`;
+          };
+        return `<tr class="${Object.keys(errors).length ? "bulk-result-error" : ""}" data-result-row="${group.id}">
+        <td><input type="checkbox" data-result-check="${group.id}" aria-label="행 선택" ${bulkRegister.selectedRows.has(group.id) ? "checked" : ""}></td><td>${offset + index + 1}</td>
         <td><button type="button" class="bulk-pick-field ${errors.category ? "is-error" : ""}" data-pick-category="${group.id}" aria-label="대분류 선택" aria-invalid="${!!errors.category}">${categoryGroup ? bulkEsc(categoryGroup) : "선택"}<span>›</span></button></td>
         <td><button type="button" class="bulk-pick-field ${errors.category ? "is-error" : ""}" data-pick-category="${group.id}" aria-label="소분류 선택" aria-invalid="${!!errors.category}">${categorySub ? bulkEsc(categorySub) : "선택"}<span>›</span></button></td>
-        ${inputCell("product", { max: 50 })}
-        ${bulkRegister.type === "individual" ? inputCell("assetNo", { max: 30 }) : inputCell("totalQty", { mode: "numeric", max: 9, value:window.AssetQuantity.format(result.totalQty ?? "") })}
-        ${inputCell("expiry", { placeholder: "YYYY.MM.DD", max: 10, mode: "numeric" })}
+        ${inputCell("product", {
+          max: 50
+        })}
+        ${inputCell("assetNo", {
+          max: 30
+        })}
+        ${inputCell("expiry", {
+          placeholder: "YYYY.MM.DD",
+          max: 10,
+          mode: "numeric"
+        })}
         <td><button type="button" class="bulk-pick-field ${errors.tags ? "is-error" : ""}" data-pick-tags="${group.id}" aria-invalid="${!!errors.tags}">${tagNames.length ? `${bulkEsc(tagNames[0])}${tagNames.length > 1 ? ` +${tagNames.length - 1}` : ""}` : "선택"}<span>›</span></button></td>
-        ${bulkRegister.type === "individual" ? inputCell("serial", { max: 40 }) + inputCell("imei", { max: 40 }) : ""}
-        ${inputCell("manufactured", { placeholder: "YYYY.MM", max: 7, mode: "numeric" })}
-        ${inputCell("purchaseDate", { placeholder: "YYYY.MM", max: 7, mode: "numeric" })}
-        ${inputCell("price", { mode: "decimal", value: window.formatPurchasePriceInput(result.price) })}
+
+        ${inputCell("manufactured", {
+          placeholder: "YYYY.MM",
+          max: 7,
+          mode: "numeric"
+        })}
+        ${inputCell("purchaseDate", {
+          placeholder: "YYYY.MM",
+          max: 7,
+          mode: "numeric"
+        })}
+        ${inputCell("price", {
+          mode: "decimal",
+          value: window.formatPurchasePriceInput(result.price)
+        })}
         <td><button type="button" class="bulk-pick-field bulk-note-button ${errors.note ? "is-error" : ""}" data-pick-note="${group.id}" aria-invalid="${!!errors.note}">${window.AssetMemo.has(result.note) ? bulkEsc(window.AssetMemo.plain(result.note).slice(0, 32)) : "입력"}<span>›</span></button></td>
+        ${window.DATA.extraFields.filter(f=>!f.deleted).map(f=>{const cat=window.DATA.categories.find(c=>`${c.group}/${c.sub}`===result.category),enabled=window.AssetExtra.enabled(cat,f.id),v=(result.extraValues||{})[f.id]||'';return `<td><input data-result-extra="${f.id}" data-gid="${group.id}" value="${enabled?bulkEsc(v):''}" placeholder="${enabled?'입력':''}" ${enabled?'':'disabled'} class="${enabled&&String(v).length>100?'is-error':''}"></td>`;}).join('')}
       </tr>`;
-    }).join("");
-    const errorCount=bulkErrorCount();
-    if(!errorCount) bulkRegister.errorsOnly=false;
-    return `<section class="bulk-results-card">
-      <div class="bulk-results-head"><div><h3>업로드한 자산</h3><p>전체 ${bulkActiveGroups().filter(g=>bulkRegister.results.has(g.id)).length}</p></div><div class="bulk-results-actions"><label class="bulk-errors-toggle" ${errorCount ? "" : "hidden"}><span>오류 라인만 보기</span><input type="checkbox" data-errors-only ${bulkRegister.errorsOnly ? "checked" : ""}><i aria-hidden="true"></i></label></div></div>
-      ${visible.length ? `<div class="bulk-results-table-wrap"><table class="bulk-results-table"><thead><tr>${columns.map(label=>`<th>${label}</th>`).join("")}</tr></thead><tbody>${rows}</tbody></table></div>` : ""}
-      <div class="pager"><button class="btn" data-result-delete ${bulkRegister.selectedRows.size ? "" : "disabled"}>삭제</button><button class="btn" data-result-prev ${bulkRegister.page<=1 ? "disabled" : ""}>‹</button><span>${bulkRegister.page} / ${pages}</span><button class="btn" data-result-next ${bulkRegister.page>=pages ? "disabled" : ""}>›</button><select data-result-size aria-label="페이지당 행 수">${[100,200,300].map(n=>`<option ${n===bulkRegister.pageSize ? "selected" : ""}>${n}</option>`).join("")}</select></div>
+      }).join(""),
+      errorCount = bulkErrorCount();
+    return errorCount || (bulkRegister.errorsOnly = !1), `<section class="bulk-results-card">
+      <div class="bulk-results-head"><div><h3>업로드한 자산</h3><p>전체 ${bulkActiveGroups().filter(g => bulkRegister.results.has(g.id)).length}</p></div><div class="bulk-results-actions"><label class="bulk-errors-toggle" ${errorCount ? "" : "hidden"}><span>오류 라인만 보기</span><input type="checkbox" data-errors-only ${bulkRegister.errorsOnly ? "checked" : ""}><i aria-hidden="true"></i></label></div></div>
+      ${visible.length ? `<div class="bulk-results-table-wrap"><table class="bulk-results-table"><thead><tr>${columns.map(label => `<th>${label}</th>`).join("")}</tr></thead><tbody>${rows}</tbody></table></div>` : ""}
+      <div class="pager"><button class="btn" data-result-delete ${bulkRegister.selectedRows.size ? "" : "disabled"}>삭제</button><button class="btn" data-result-prev ${bulkRegister.page <= 1 ? "disabled" : ""}>‹</button><span>${bulkRegister.page} / ${pages}</span><button class="btn" data-result-next ${bulkRegister.page >= pages ? "disabled" : ""}>›</button><select data-result-size aria-label="페이지당 행 수">${[100, 200, 300].map(n => `<option ${n === bulkRegister.pageSize ? "selected" : ""}>${n}</option>`).join("")}</select></div>
     </section>`;
   }
-
   function bulkMethodPanelHtml() {
     if (bulkRegister.method !== "ai") {
       const hasFile = !!bulkRegister.fileName;
       return `<div class="bulk-step bulk-file-step">
         <span class="bulk-step-label">STEP 2</span><h3>파일 선택</h3>
         <p>${bulkRegister.method === "company" ? "회사에서 사용하던 자산 양식을 업로드해 주세요." : "Shopl 양식에 입력한 파일을 업로드해 주세요."}</p>
-        ${bulkRegister.method === "template" ? `<button class="btn" type="button" data-open-template>선택한 유형의 양식 열기 ↗</button>` : ""}
+        ${bulkRegister.method === "template" ? '<button class="btn" type="button" data-open-template>양식 열기 ↗</button>' : ""}
         <label class="bulk-file-drop ${hasFile ? "has-file" : ""}" data-file-drop>
           <input type="file" accept=".xlsx,.xls" data-bulk-file hidden>
-          ${hasFile ? `<b>✓ 파일 업로드가 완료되었습니다.</b><span>${bulkEsc(bulkRegister.fileName)}</span>` : '<b>파일을 끌어 넣거나 찾아보기로 선택해 주세요.</b><span>엑셀 XLSX, XLS 형식의 파일을 지원합니다.</span>'}
+          ${hasFile ? `<b>✓ 파일 업로드가 완료되었습니다.</b><span>${bulkEsc(bulkRegister.fileName)}</span>` : "<b>파일을 끌어 넣거나 찾아보기로 선택해 주세요.</b><span>엑셀 XLSX, XLS 형식의 파일을 지원합니다.</span>"}
         </label>
         <div class="bulk-panel-actions"><button class="btn" type="button" data-find-file>찾아보기</button><button class="btn primary" type="button" data-apply-file ${hasFile ? "" : "disabled"}>적용</button></div>
       </div>`;
     }
-    const selected = bulkRegister.selectedPhotos.size;
-    const groupCards = bulkRegister.groups.map((group, groupIndex) => {
-      const result = bulkRegister.results.get(group.id);
-      const title = result?.product?.trim() ? `자산 ${groupIndex + 1} · ${bulkEsc(result.product.trim())}` : `자산 ${groupIndex + 1}`;
-      const photos = group.photos.map((photo, photoIndex) => `<div class="bulk-photo ${bulkRegister.selectedPhotos.has(photo.id) ? "selected" : ""}" draggable="true" data-photo-id="${photo.id}" data-group-id="${group.id}">
+    const selected2 = bulkRegister.selectedPhotos.size,
+      groupCards = bulkRegister.groups.map((group, groupIndex) => {
+        const result = bulkRegister.results.get(group.id),
+          title = result?.product?.trim() ? `자산 ${groupIndex + 1} · ${bulkEsc(result.product.trim())}` : `자산 ${groupIndex + 1}`,
+          photos = group.photos.map((photo, photoIndex) => `<div class="bulk-photo ${bulkRegister.selectedPhotos.has(photo.id) ? "selected" : ""}" draggable="true" data-photo-id="${photo.id}" data-group-id="${group.id}">
         <img src="${photo.url}" alt="${bulkEsc(photo.name)}"><button type="button" class="bulk-photo-primary${group.primaryPhotoId === photo.id ? " active" : ""}" data-primary-photo="${photo.id}" aria-label="사진 ${photoIndex + 1}${group.primaryPhotoId === photo.id ? " 대표" : " 대표로 지정"}">${group.primaryPhotoId === photo.id ? "★" : "☆"}</button><button type="button" class="bulk-photo-remove" data-remove-photo="${photo.id}" aria-label="사진 삭제">×</button>
       </div>`).join("");
-      return `<article class="bulk-photo-group" data-drop-group="${group.id}">
+        return `<article class="bulk-photo-group" data-drop-group="${group.id}">
         <header><b>${title}</b><span>${group.photos.length}/10</span></header>
         <div class="bulk-photo-list">${photos}${group.photos.length < BULK_AI_MAX_GROUP_PHOTOS ? `<label class="bulk-group-add" aria-label="같은 자산 사진 추가">＋<input type="file" accept="image/jpeg,image/png" multiple data-group-file="${group.id}" hidden></label>` : ""}</div>
       </article>`;
-    }).join("");
-    const canApply = bulkActiveGroups().some(g=>!bulkRegister.results.has(g.id) || bulkRegister.dirtyGroups.has(g.id));
+      }).join(""),
+      canApply = bulkActiveGroups().some(g => !bulkRegister.results.has(g.id) || bulkRegister.dirtyGroups.has(g.id));
     return `<div class="bulk-step bulk-ai-step">
       <span class="bulk-step-label">STEP 2</span><div class="bulk-ai-title"><div><h3>파일 선택</h3><p>사진을 자산별로 묶은 뒤 AI 분석을 적용해 주세요. AI가 입력한 값을 확인하고 필요한 내용을 수정해서 등록할 수 있습니다.</p></div></div>
-      ${selected ? `<div class="bulk-ai-toolbar"><span>${selected}장 선택</span><button type="button" data-clear-photo-selection>선택 해제</button></div>` : ""}
+      ${selected2 ? `<div class="bulk-ai-toolbar"><span>${selected2}장 선택</span><button type="button" data-clear-photo-selection>선택 해제</button></div>` : ""}
       <div class="bulk-ai-drop" data-ai-drop>${groupCards || '<div class="bulk-ai-empty"><b>자산 사진을 추가해 주세요.</b><span>사진을 한 번에 여러 장 선택할 수 있으며, 처음에는 사진 1장당 자산 그룹 1개로 추가됩니다.</span></div>'}</div>
       <div class="bulk-panel-actions">${new URLSearchParams(location.search).get("qa") === "bulk-ai" ? '<button class="btn" type="button" data-add-qa-photos>샘플 사진 3장 추가</button>' : ""}<label class="btn"><input type="file" accept="image/jpeg,image/png" multiple data-global-photo hidden>찾아보기</label>${bulkRegister.hasAnalyzed ? `<button type="button" class="btn" data-reset-analysis ${bulkActiveGroups().length ? "" : "disabled"}>재분석</button>` : ""}<button class="btn primary" type="button" data-analyze ${canApply ? "" : "disabled"}>적용</button></div>
     </div>`;
   }
-
   function renderBulkRegister() {
-    const content = document.getElementById("content");
-    const saveEnabled = bulkCanSave();
+    const content = document.getElementById("content"),
+      saveEnabled = bulkCanSave();
     content.innerHTML = `<div class="bulk-page">
       <div class="bulk-page-head"><div><button type="button" data-bulk-back aria-label="뒤로가기">‹</button><h2>자산 일괄 추가</h2></div><button class="btn primary" type="button" data-bulk-save ${saveEnabled ? "" : "disabled"}>일괄 추가</button></div>
       <section class="bulk-upload-card">
@@ -1700,52 +1420,60 @@
               <div class="bulk-method-row"><label><input type="radio" name="bulk-method" value="template" ${bulkRegister.method === "template" ? "checked" : ""}><span>템플릿을 다운로드한 후, 형식에 맞게 입력하여 업로드할게요.</span></label><button type="button" class="help-icon bulk-method-help" aria-label="Shopl 양식 등록 방식 도움말" data-tip="템플릿에 맞춰 입력한 파일을 업로드하면 더 정확하고 빠르게 자산을 등록할 수 있습니다.">?</button></div>
               <div class="bulk-method-row"><label><input type="radio" name="bulk-method" value="ai" ${bulkRegister.method === "ai" ? "checked" : ""}><span>AI로 자산 사진을 분석해 업로드할게요.</span></label><button type="button" class="help-icon bulk-method-help" aria-label="AI 사진 등록 방식 도움말" data-tip="자산 사진을 올리고 자산별로 묶으면 AI가 정보를 분석해 등록할 내용을 채웁니다. 결과를 확인하고 필요한 정보를 수정한 뒤 등록할 수 있습니다.">?</button></div>
             </div>
-            <div class="bulk-type-box"><b>자산 유형</b><div><label><input type="radio" name="bulk-type" value="individual" ${bulkRegister.type === "individual" ? "checked" : ""}> 개별 자산</label><label><input type="radio" name="bulk-type" value="quantity" ${bulkRegister.type === "quantity" ? "checked" : ""}> 수량 자산</label></div></div>
           </div>
           ${bulkMethodPanelHtml()}
         </div>
       </section>
       ${bulkRegister.method === "ai" ? bulkResultTableHtml() : ""}
-    </div>`;
-
-    content.querySelector("[data-bulk-back]").onclick = leaveBulkRegister;
+    </div>`, content.querySelector("[data-bulk-back]").onclick = leaveBulkRegister;
     const resetAnalysis = content.querySelector("[data-reset-analysis]");
-    if (resetAnalysis) resetAnalysis.onclick = () => openBulkDiscardConfirm(() => openBulkAnalyzeLoading(true), {
-      title:"다시 분석하시겠습니까?", body:"분석 결과와 직접 입력한 내용이 새 분석 결과로 변경됩니다."
-    });
-    content.querySelector("[data-bulk-save]").onclick = () => {
-      // 저장 직전 권한이 사라졌으면 더 이상 이 화면에서 할 수 있는 작업이 없으므로 초안을 닫고 현황으로 복귀한다.
-      // 실서비스 서버의 권한 상실 응답도 같은 화면 전이로 처리한다.
+    if (resetAnalysis && (resetAnalysis.onclick = () => openBulkDiscardConfirm(() => openBulkAnalyzeLoading(!0), {
+      title: "다시 분석하시겠습니까?",
+      body: "분석 결과와 직접 입력한 내용이 새 분석 결과로 변경됩니다."
+    })), content.querySelector("[data-bulk-save]").onclick = () => {
       if (!canManageAssets()) {
-        resetBulkRegister();
-        activeScreen = "list";
-        render();
-        toast("자산 관리 권한이 없습니다.");
+        returnFromBulk("자산 관리 권한이 없습니다.");
         return;
       }
       if (!bulkCanSave()) return;
-      // 형식·필수값은 입력 중 즉시 확인하고, 중복은 저장 시점의 기존 자산과 현재 모든 행을 함께 검사한다.
-      // 실서비스에서는 서버가 현재 권한·중복·상한을 다시 검증하고 한 작업으로 저장해야 한다.
       if (!checkBulkDuplicates()) {
-        renderBulkRegister();
-        content.querySelector(".bulk-result-error")?.scrollIntoView({ block: "center", behavior: "smooth" });
-        toast("오류가 있는 라인이 있습니다. 오류를 수정하거나, 해당 라인을 삭제해주세요.");
+        renderBulkRegister(), content.querySelector(".bulk-result-error")?.scrollIntoView({
+          block: "center",
+          behavior: "smooth"
+        }), toast("오류가 있는 라인이 있습니다. 오류를 수정하거나, 해당 라인을 삭제해주세요.");
         return;
       }
       const drafts = bulkActiveGroups().map(group => {
-        const result = bulkRegister.results.get(group.id);
-        const category = window.DATA.categories.find(cat => `${cat.group}/${cat.sub}` === result.category && cat.type === bulkRegister.type);
+        const result = bulkRegister.results.get(group.id),
+          category = window.DATA.categories.find(cat => `${cat.group}/${cat.sub}` === result.category && cat.type === bulkRegister.type);
         if (!category) return null;
-        const photos = group.photos.map(photo => ({ ...photo, color: photo.color || "#5b8def", at: new Date().toISOString(), by: "dana" }));
-        const month = value => value ? `${value.replaceAll(".", "-")}-01` : undefined;
-        return { type: bulkRegister.type, group: category.group, sub: category.sub, product: result.product,
-          assetNo: result.assetNo || "", totalQty: window.AssetQuantity.parse(result.totalQty), labels: bulkTags(result),
-          expiry: result.expiry ? result.expiry.replaceAll(".", "-") : undefined,
-          serial: result.serial || undefined, imei: result.imei || undefined,
-          manufactured: month(result.manufactured), purchaseDate: month(result.purchaseDate),
-          price: window.normalizePurchasePrice(result.price) || undefined, note: result.note || undefined,
-          _photos: photos, _primary: Math.max(0, group.photos.findIndex(photo => photo.id === group.primaryPhotoId)),
-          photo: "#5b8def", photoCount: photos.length };
+        const photos = group.photos.map(photo => ({
+            ...photo,
+            color: photo.color || "#5b8def",
+            at: (/* @__PURE__ */new Date()).toISOString(),
+            by: "dana"
+          })),
+          month = value => value ? `${value.replaceAll(".", "-")}-01` : void 0;
+        return {
+          type: bulkRegister.type,
+          group: category.group,
+          sub: category.sub,
+          product: result.product,
+          assetNo: result.assetNo || "",
+          labels: bulkTags(result),
+          extraValues:{...(result.extraValues||{})},
+          expiry: result.expiry ? result.expiry.replaceAll(".", "-") : void 0,
+          serial: result.serial || void 0,
+          imei: result.imei || void 0,
+          manufactured: month(result.manufactured),
+          purchaseDate: month(result.purchaseDate),
+          price: window.normalizePurchasePrice(result.price) || void 0,
+          note: result.note || void 0,
+          _photos: photos,
+          _primary: Math.max(0, group.photos.findIndex(photo => photo.id === group.primaryPhotoId)),
+          photo: "#5b8def",
+          photoCount: photos.length
+        };
       });
       try {
         if (drafts.some(draft => !draft)) throw new Error("CATEGORY_CHANGED");
@@ -1754,328 +1482,269 @@
         toast(error.code === "CATEGORY_CHANGED" || error.message === "CATEGORY_CHANGED" ? "설정이 변경되었습니다. 잠시 후 다시 시도해주세요." : "오류가 있는 라인이 있습니다. 오류를 수정하거나, 해당 라인을 삭제해주세요.");
         return;
       }
-      toast("자산이 추가되었습니다.");
-      state.search="";state.page=1;state.filters=emptyFilters();state.statFilter=null;state.sort={key:"updatedAt",dir:"desc"};state.view="all";
-      resetBulkRegister();
-      activeScreen = "list";
-      render();
-    };
-    content.querySelectorAll('input[name="bulk-method"]').forEach(input => input.onchange = () => {
+      if(sessionStorage.getItem('asset-bulk-origin')){returnFromBulk('자산이 추가되었습니다.');return;}
+      toast("자산이 추가되었습니다."), state.search = "", state.page = 1, state.filters = emptyFilters(), state.statFilter = null, state.sort = {
+        key: "updatedAt",
+        dir: "desc"
+      }, state.view = "all", resetBulkRegister(), activeScreen = "list", render();
+    }, content.querySelectorAll('input[name="bulk-method"]').forEach(input => input.onchange = () => {
       if (!input.checked || input.value === bulkRegister.method) return;
       const change = () => {
         const type = bulkRegister.type;
-        if (bulkHasDraft()) resetBulkRegister();
-        bulkRegister.method = input.value;
-        bulkRegister.type = type;
-        renderBulkRegister();
-        if (input.value === "template") window.open(BULK_REGISTER_SHEET_LINKS[bulkRegister.type], "_blank", "noopener");
+        bulkHasDraft() && resetBulkRegister(), bulkRegister.method = input.value, bulkRegister.type = type, renderBulkRegister(), input.value === "template" && window.open(BULK_REGISTER_SHEET_LINKS[bulkRegister.type], "_blank", "noopener");
       };
-      if (bulkHasDraft()) {
-        openBulkDiscardConfirm(change, { title: "등록 방식을 변경하시겠습니까?", body: "입력한 내용은 저장되지 않습니다." });
-        renderBulkRegister();
-      }
-      else change();
-    });
-    content.querySelectorAll('input[name="bulk-type"]').forEach(input => input.onchange = () => {
-      if (!input.checked || input.value === bulkRegister.type) return;
-      const change = () => {
-        const method = bulkRegister.method;
-        resetBulkRegister();
-        bulkRegister.method = method;
-        bulkRegister.type = input.value;
-        renderBulkRegister();
-        if (method === "template") window.open(BULK_REGISTER_SHEET_LINKS[input.value], "_blank", "noopener");
-      };
-      if (bulkHasDraft()) {
-        openBulkDiscardConfirm(change, { title: "자산 유형을 변경하시겠습니까?", body: "입력한 내용은 저장되지 않습니다." });
-        renderBulkRegister();
-      }
-      else change();
-    });
-
-    if (bulkRegister.method !== "ai") {
-      const fileInput = content.querySelector("[data-bulk-file]");
-      const applyFile = files => {
-        const file = [...files][0];
-        if (!file || !/\.xlsx?$/i.test(file.name) || file.size>500*1024*1024) { toast("XLSX, XLS 형식의 500MB 이하의 파일만 업로드할 수 있습니다."); return; }
-        bulkRegister.fileName = file.name;
-        renderBulkRegister();toast("파일 업로드가 완료되었습니다.");
-      };
-      content.querySelector("[data-find-file]").onclick = () => fileInput.click();
-      fileInput.onchange = () => applyFile(fileInput.files);
+      bulkHasDraft() ? (openBulkDiscardConfirm(change, {
+        title: "등록 방식을 변경하시겠습니까?",
+        body: "입력한 내용은 저장되지 않습니다."
+      }), renderBulkRegister()) : change();
+    }), bulkRegister.method !== "ai") {
+      const fileInput = content.querySelector("[data-bulk-file]"),
+        applyFile = files => {
+          const file = [...files][0];
+          if (!file || !/\.xlsx?$/i.test(file.name) || file.size > 500 * 1024 * 1024) {
+            toast("XLSX, XLS 형식의 500MB 이하의 파일만 업로드할 수 있습니다.");
+            return;
+          }
+          bulkRegister.fileName = file.name, renderBulkRegister(), toast("파일 업로드가 완료되었습니다.");
+        };
+      content.querySelector("[data-find-file]").onclick = () => fileInput.click(), fileInput.onchange = () => applyFile(fileInput.files);
       const drop = content.querySelector("[data-file-drop]");
-      drop.ondragover = event => { event.preventDefault(); drop.classList.add("dragover"); };
-      drop.ondragleave = () => drop.classList.remove("dragover");
-      drop.ondrop = event => { event.preventDefault(); drop.classList.remove("dragover"); applyFile(event.dataTransfer.files); };
-      content.querySelector("[data-apply-file]").onclick = () => toast("공통 일괄 등록 확인 화면으로 이동합니다.");
+      drop.ondragover = event => {
+        event.preventDefault(), drop.classList.add("dragover");
+      }, drop.ondragleave = () => drop.classList.remove("dragover"), drop.ondrop = event => {
+        event.preventDefault(), drop.classList.remove("dragover"), applyFile(event.dataTransfer.files);
+      }, content.querySelector("[data-apply-file]").onclick = () => toast("공통 일괄 등록 확인 화면으로 이동합니다.");
       const templateButton = content.querySelector("[data-open-template]");
-      if (templateButton) templateButton.onclick = () => window.open(BULK_REGISTER_SHEET_LINKS[bulkRegister.type], "_blank", "noopener");
+      templateButton && (templateButton.onclick = () => window.open(BULK_REGISTER_SHEET_LINKS[bulkRegister.type], "_blank", "noopener"));
       return;
     }
-
     content.querySelector("[data-global-photo]").onchange = event => addBulkPhotosAsGroups(event.target.files);
     const qaPhotos = content.querySelector("[data-add-qa-photos]");
-    if (qaPhotos) qaPhotos.onclick = addBulkQaPhotos;
+    qaPhotos && (qaPhotos.onclick = addBulkQaPhotos);
     const aiDrop = content.querySelector("[data-ai-drop]");
-    aiDrop.ondragover = event => { if (event.dataTransfer.types.includes("Files")) { event.preventDefault(); aiDrop.classList.add("dragover"); } };
-    aiDrop.ondragleave = event => { if (event.target === aiDrop) aiDrop.classList.remove("dragover"); };
-    aiDrop.ondrop = event => {
-      if (!event.dataTransfer.files.length || event.target.closest("[data-drop-group]")) return;
-      event.preventDefault(); aiDrop.classList.remove("dragover"); addBulkPhotosAsGroups(event.dataTransfer.files);
-    };
-    content.querySelectorAll("[data-group-file]").forEach(input => input.onchange = () => addBulkPhotosToGroup(input.dataset.groupFile, input.files));
-    content.querySelectorAll("[data-remove-photo]").forEach(button => button.onclick = event => { event.stopPropagation(); removeBulkPhoto(button.dataset.removePhoto); });
-    content.querySelectorAll("[data-primary-photo]").forEach(button => button.onclick = event => {
+    aiDrop.ondragover = event => {
+      event.dataTransfer.types.includes("Files") && (event.preventDefault(), aiDrop.classList.add("dragover"));
+    }, aiDrop.ondragleave = event => {
+      event.target === aiDrop && aiDrop.classList.remove("dragover");
+    }, aiDrop.ondrop = event => {
+      !event.dataTransfer.files.length || event.target.closest("[data-drop-group]") || (event.preventDefault(), aiDrop.classList.remove("dragover"), addBulkPhotosAsGroups(event.dataTransfer.files));
+    }, content.querySelectorAll("[data-group-file]").forEach(input => input.onchange = () => addBulkPhotosToGroup(input.dataset.groupFile, input.files)), content.querySelectorAll("[data-remove-photo]").forEach(button => button.onclick = event => {
+      event.stopPropagation(), removeBulkPhoto(button.dataset.removePhoto);
+    }), content.querySelectorAll("[data-primary-photo]").forEach(button => button.onclick = event => {
       event.stopPropagation();
       const group = bulkRegister.groups.find(item => item.photos.some(photo => photo.id === button.dataset.primaryPhoto));
-      if (!group || group.primaryPhotoId === button.dataset.primaryPhoto) return;
-      group.primaryPhotoId = button.dataset.primaryPhoto;
-      renderBulkRegister();
-    });
-    content.querySelectorAll("[data-photo-id]").forEach(photo => {
-      photo.onclick = event => { if (!event.target.closest("button")) selectBulkPhoto(photo.dataset.photoId, event); };
-      photo.ondragstart = event => {
-        if (!bulkRegister.selectedPhotos.has(photo.dataset.photoId)) {
-          bulkRegister.selectedPhotos.clear();
-          bulkRegister.selectedPhotos.add(photo.dataset.photoId);
-          bulkRegister.lastSelectedPhoto = photo.dataset.photoId;
-        }
-        event.dataTransfer.setData("text/plain", [...bulkRegister.selectedPhotos].join(","));
-        event.dataTransfer.effectAllowed = "move";
+      !group || group.primaryPhotoId === button.dataset.primaryPhoto || (group.primaryPhotoId = button.dataset.primaryPhoto, renderBulkRegister());
+    }), content.querySelectorAll("[data-photo-id]").forEach(photo => {
+      photo.onclick = event => {
+        event.target.closest("button") || selectBulkPhoto(photo.dataset.photoId, event);
+      }, photo.ondragstart = event => {
+        bulkRegister.selectedPhotos.has(photo.dataset.photoId) || (bulkRegister.selectedPhotos.clear(), bulkRegister.selectedPhotos.add(photo.dataset.photoId), bulkRegister.lastSelectedPhoto = photo.dataset.photoId), event.dataTransfer.setData("text/plain", [...bulkRegister.selectedPhotos].join(",")), event.dataTransfer.effectAllowed = "move";
+      }, photo.ondragover = event => {
+        event.preventDefault(), event.stopPropagation();
+      }, photo.ondrop = event => {
+        event.preventDefault(), event.stopPropagation(), moveSelectedBulkPhotos(photo.dataset.groupId, photo.dataset.photoId);
       };
-      photo.ondragover = event => { event.preventDefault(); event.stopPropagation(); };
-      photo.ondrop = event => { event.preventDefault(); event.stopPropagation(); moveSelectedBulkPhotos(photo.dataset.groupId, photo.dataset.photoId); };
-    });
-    content.querySelectorAll("[data-drop-group]").forEach(group => {
-      group.ondragover = event => { if (!event.dataTransfer.files.length) { event.preventDefault(); group.classList.add("dragover"); } };
-      group.ondragleave = () => group.classList.remove("dragover");
-      group.ondrop = event => {
-        event.preventDefault(); group.classList.remove("dragover");
-        if (event.dataTransfer.files.length) addBulkPhotosToGroup(group.dataset.dropGroup, event.dataTransfer.files);
-        else moveSelectedBulkPhotos(group.dataset.dropGroup);
+    }), content.querySelectorAll("[data-drop-group]").forEach(group => {
+      group.ondragover = event => {
+        event.dataTransfer.files.length || (event.preventDefault(), group.classList.add("dragover"));
+      }, group.ondragleave = () => group.classList.remove("dragover"), group.ondrop = event => {
+        event.preventDefault(), group.classList.remove("dragover"), event.dataTransfer.files.length ? addBulkPhotosToGroup(group.dataset.dropGroup, event.dataTransfer.files) : moveSelectedBulkPhotos(group.dataset.dropGroup);
       };
     });
     const clearSelection = content.querySelector("[data-clear-photo-selection]");
-    if (clearSelection) clearSelection.onclick = () => { bulkRegister.selectedPhotos.clear(); bulkRegister.lastSelectedPhoto = null; renderBulkRegister(); };
-    content.querySelector("[data-analyze]").onclick = () => openBulkAnalyzeLoading(false);
-    bindBulkResultInputs(content);
+    clearSelection && (clearSelection.onclick = () => {
+      bulkRegister.selectedPhotos.clear(), bulkRegister.lastSelectedPhoto = null, renderBulkRegister();
+    }), content.querySelector("[data-analyze]").onclick = () => openBulkAnalyzeLoading(!1), bindBulkResultInputs(content);
   }
-
   function analyzedBulkValues(groupIndex) {
-    if (bulkRegister.type === "individual") return {
-      category: "전자기기류/노트북", product: ["MacBook Pro 14", "무선 키보드", "ThinkPad X1 Carbon"][groupIndex % 3],
-      assetNo: `AI-2026-${String(groupIndex + 1).padStart(4, "0")}`, totalQty: "", price: ["2690000", "89000", "1850000"][groupIndex % 3], tags: "본사|IT",
-    };
     return {
-      category: "소모품/문구류", product: ["네임펜 세트", "A4 복사용지", "물티슈"][groupIndex % 3],
-      assetNo: "", totalQty: String([12, 20, 30][groupIndex % 3]), price: ["3500", "4200", "1800"][groupIndex % 3], tags: "소모품",
+      category: "전자기기류/노트북",
+      product: ["MacBook Pro 14", "무선 키보드", "ThinkPad X1 Carbon"][groupIndex % 3],
+      assetNo: `AI-2026-${String(groupIndex + 1).padStart(4, "0")}`,
+      price: ["2690000", "89000", "1850000"][groupIndex % 3],
+      tags: "본사|IT"
     };
   }
-
-  function openBulkAnalyzeLoading(force=false) {
-    const targets=bulkActiveGroups().filter(g=>force || !bulkRegister.results.has(g.id) || bulkRegister.dirtyGroups.has(g.id));
-    if(!targets.length) return;
-    const back=document.createElement("div"); back.className="modal-back"; back.style.zIndex=340;
-    const qa=new URLSearchParams(location.search).get("qa")==="bulk-ai";
-    back.innerHTML=`<div class="modal sm bulk-ai-loading-modal" role="dialog" aria-modal="true" aria-label="AI 분석 중"><button type="button" data-close aria-label="분석 취소">×</button><div><span class="areg-ai-spinner" aria-hidden="true"></span><b>AI가 자산 사진을 분석하고 있습니다.</b></div>${qa ? '<div class="areg-ai-test-actions"><button class="btn" data-bulk-outcome="success">성공</button><button class="btn" data-bulk-outcome="review">정보 부족</button><button class="btn" data-bulk-outcome="error">분석 오류</button></div>' : ""}</div>`;
-    let settled=false;
-    function close(){ clearTimeout(bulkAnalyzeTimer);bulkAnalyzeTimer=null;back.remove(); }
-    function finish(outcome){
-      if(settled) return; settled=true; close();
-      if(outcome==="error") {
-        // One technical group failure rejects the whole request, including an
-        // unchanged-photo reanalysis: previous table/edit/exclusion state stays.
-        targets.forEach(g=>bulkRegister.dirtyGroups.add(g.id));
-        renderBulkRegister(); toast("에러가 발생하였습니다. 잠시 후 다시 시도해보세요."); return;
-      }
-      const staged=new Map();
-      targets.forEach((g,i)=>{
-        const values=analyzedBulkValues(bulkRegister.groups.indexOf(g));
-        if(qa && i===0 && new URLSearchParams(location.search).get("scenario")==="memo-over-limit")values.note="메".repeat(501);
-        staged.set(g.id,{...values,status:"success"});
-        if(outcome==="review" && i===0) staged.set(g.id,{...values,category:"",status:"review"});
-      });
-      // Atomic publication happens only after all target groups succeed.
-      staged.forEach((v,id)=>{bulkRegister.results.set(id,v);bulkRegister.dirtyGroups.delete(id);});
-      bulkRegister.duplicateErrors.clear();bulkRegister.selectedRows.clear();bulkRegister.page=1;
-      bulkRegister.hasAnalyzed=true;bulkRegister.errorsOnly=bulkErrorCount()>0; renderBulkRegister();
+  function openBulkAnalyzeLoading(force = !1) {
+    const targets = bulkActiveGroups().filter(g => force || !bulkRegister.results.has(g.id) || bulkRegister.dirtyGroups.has(g.id));
+    if (!targets.length) return;
+    const back = document.createElement("div");
+    back.className = "modal-back", back.style.zIndex = 340;
+    const qa = new URLSearchParams(location.search).get("qa") === "bulk-ai";
+    back.innerHTML = `<div class="modal sm bulk-ai-loading-modal" role="dialog" aria-modal="true" aria-label="AI 분석 중"><button type="button" data-close aria-label="분석 취소">×</button><div><span class="areg-ai-spinner" aria-hidden="true"></span><b>AI가 자산 사진을 분석하고 있습니다.</b></div>${qa ? '<div class="areg-ai-test-actions"><button class="btn" data-bulk-outcome="success">성공</button><button class="btn" data-bulk-outcome="review">정보 부족</button><button class="btn" data-bulk-outcome="error">분석 오류</button></div>' : ""}</div>`;
+    let settled = !1;
+    function close() {
+      clearTimeout(bulkAnalyzeTimer), bulkAnalyzeTimer = null, back.remove();
     }
-    back.querySelector("[data-close]").onclick=()=>{settled=true;close();};
-    back.querySelectorAll("[data-bulk-outcome]").forEach(b=>b.onclick=()=>finish(b.dataset.bulkOutcome));
-    document.body.appendChild(back);
-    if(!qa && new URLSearchParams(location.search).get("hold")!=="loading") bulkAnalyzeTimer=setTimeout(()=>finish("success"),1100);
+    function finish(outcome) {
+      if (settled) return;
+      if (settled = !0, close(), outcome === "error") {
+        targets.forEach(g => bulkRegister.dirtyGroups.add(g.id)), renderBulkRegister(), toast("에러가 발생하였습니다. 잠시 후 다시 시도해보세요.");
+        return;
+      }
+      const staged = /* @__PURE__ */new Map();
+      targets.forEach((g, i) => {
+        const values = analyzedBulkValues(bulkRegister.groups.indexOf(g));
+        qa && i === 0 && new URLSearchParams(location.search).get("scenario") === "memo-over-limit" && (values.note = "메".repeat(501)), staged.set(g.id, {
+          ...values,
+          status: "success"
+        }), outcome === "review" && i === 0 && staged.set(g.id, {
+          ...values,
+          category: "",
+          status: "review"
+        });
+      }), staged.forEach((v, id) => {
+        bulkRegister.results.set(id, v), bulkRegister.dirtyGroups.delete(id);
+      }), bulkRegister.duplicateErrors.clear(), bulkRegister.selectedRows.clear(), bulkRegister.page = 1, bulkRegister.hasAnalyzed = !0, bulkRegister.errorsOnly = bulkErrorCount() > 0, renderBulkRegister();
+    }
+    back.querySelector("[data-close]").onclick = () => {
+      settled = !0, close();
+    }, back.querySelectorAll("[data-bulk-outcome]").forEach(b => b.onclick = () => finish(b.dataset.bulkOutcome)), document.body.appendChild(back), !qa && new URLSearchParams(location.search).get("hold") !== "loading" && (bulkAnalyzeTimer = setTimeout(() => finish("success"), 1100));
   }
-
   function bindBulkResultInputs(content) {
-    const checks=[...content.querySelectorAll("[data-result-check]")];
-    const all=content.querySelector("[data-result-all]");
-    const syncSelection=()=>{
-      if(all){ all.checked=checks.length>0 && checks.every(c=>bulkRegister.selectedRows.has(c.dataset.resultCheck)); all.indeterminate=!all.checked && checks.some(c=>bulkRegister.selectedRows.has(c.dataset.resultCheck)); }
-      const del=content.querySelector("[data-result-delete]");if(del)del.disabled=!bulkRegister.selectedRows.size;
-    };
-    checks.forEach(c=>c.onchange=()=>{if(c.checked)bulkRegister.selectedRows.add(c.dataset.resultCheck);else bulkRegister.selectedRows.delete(c.dataset.resultCheck);syncSelection();});
-    if(all)all.onchange=()=>{checks.forEach(c=>{c.checked=all.checked;if(c.checked)bulkRegister.selectedRows.add(c.dataset.resultCheck);else bulkRegister.selectedRows.delete(c.dataset.resultCheck);});syncSelection();};
-    syncSelection();
-    const del=content.querySelector("[data-result-delete]");
-    if(del)del.onclick=()=>openBulkDiscardConfirm(()=>{
-      bulkRegister.selectedRows.forEach(id=>{bulkRegister.excluded.add(id);bulkRegister.dirtyGroups.delete(id);});
-      bulkRegister.selectedRows.clear();bulkRegister.duplicateErrors.clear();renderBulkRegister();toast("삭제되었습니다.");
-    },{title:"삭제하시겠습니까?",body:"",confirmLabel:"삭제"});
-    const movePage=delta=>{bulkRegister.page+=delta;bulkRegister.selectedRows.clear();renderBulkRegister();};
-    const prev=content.querySelector("[data-result-prev]"),next=content.querySelector("[data-result-next]"),size=content.querySelector("[data-result-size]");
-    if(prev)prev.onclick=()=>movePage(-1);if(next)next.onclick=()=>movePage(1);
-    if(size)size.onchange=()=>{bulkRegister.pageSize=Number(size.value);bulkRegister.page=1;bulkRegister.selectedRows.clear();renderBulkRegister();};
-    content.querySelectorAll("[data-calendar]").forEach(b=>b.onclick=()=>{
-      const picker=content.querySelector(`[data-calendar-value="${b.dataset.calendar}"][data-gid="${b.dataset.gid}"]`);
-      const field=content.querySelector(`[data-result-field="${b.dataset.calendar}"][data-gid="${b.dataset.gid}"]`);
-      picker.value=field.value.replaceAll(".","-");picker.showPicker();
-    });
-    content.querySelectorAll("[data-calendar-value]").forEach(p=>p.onchange=()=>{
-      updateBulkResult(p.dataset.gid,p.dataset.calendarValue,p.value.replaceAll("-","."));
+    content.querySelectorAll('[data-result-extra]').forEach(el=>el.oninput=()=>{const result=bulkRegister.results.get(el.dataset.gid);result.extraValues||={};result.extraValues[el.dataset.resultExtra]=el.value;el.classList.toggle('is-error',el.value.length>100);content.querySelector('[data-bulk-save]').disabled=!bulkCanSave();});
+    const checks = [...content.querySelectorAll("[data-result-check]")],
+      all = content.querySelector("[data-result-all]"),
+      syncSelection = () => {
+        all && (all.checked = checks.length > 0 && checks.every(c => bulkRegister.selectedRows.has(c.dataset.resultCheck)), all.indeterminate = !all.checked && checks.some(c => bulkRegister.selectedRows.has(c.dataset.resultCheck)));
+        const del2 = content.querySelector("[data-result-delete]");
+        del2 && (del2.disabled = !bulkRegister.selectedRows.size);
+      };
+    checks.forEach(c => c.onchange = () => {
+      c.checked ? bulkRegister.selectedRows.add(c.dataset.resultCheck) : bulkRegister.selectedRows.delete(c.dataset.resultCheck), syncSelection();
+    }), all && (all.onchange = () => {
+      checks.forEach(c => {
+        c.checked = all.checked, c.checked ? bulkRegister.selectedRows.add(c.dataset.resultCheck) : bulkRegister.selectedRows.delete(c.dataset.resultCheck);
+      }), syncSelection();
+    }), syncSelection();
+    const del = content.querySelector("[data-result-delete]");
+    del && (del.onclick = () => openBulkDiscardConfirm(() => {
+      bulkRegister.selectedRows.forEach(id => {
+        bulkRegister.excluded.add(id), bulkRegister.dirtyGroups.delete(id);
+      }), bulkRegister.selectedRows.clear(), bulkRegister.duplicateErrors.clear(), renderBulkRegister(), toast("삭제되었습니다.");
+    }, {
+      title: "삭제하시겠습니까?",
+      body: "",
+      confirmLabel: "삭제"
+    }));
+    const movePage = delta => {
+        bulkRegister.page += delta, bulkRegister.selectedRows.clear(), renderBulkRegister();
+      },
+      prev = content.querySelector("[data-result-prev]"),
+      next = content.querySelector("[data-result-next]"),
+      size = content.querySelector("[data-result-size]");
+    prev && (prev.onclick = () => movePage(-1)), next && (next.onclick = () => movePage(1)), size && (size.onchange = () => {
+      bulkRegister.pageSize = Number(size.value), bulkRegister.page = 1, bulkRegister.selectedRows.clear(), renderBulkRegister();
+    }), content.querySelectorAll("[data-calendar]").forEach(b => b.onclick = () => {
+      const picker = content.querySelector(`[data-calendar-value="${b.dataset.calendar}"][data-gid="${b.dataset.gid}"]`),
+        field = content.querySelector(`[data-result-field="${b.dataset.calendar}"][data-gid="${b.dataset.gid}"]`);
+      picker.value = field.value.replaceAll(".", "-"), picker.showPicker();
+    }), content.querySelectorAll("[data-calendar-value]").forEach(p => p.onchange = () => {
+      updateBulkResult(p.dataset.gid, p.dataset.calendarValue, p.value.replaceAll("-", "."));
     });
     const errorsOnly = content.querySelector("[data-errors-only]");
-    if (errorsOnly) errorsOnly.onchange = () => {
-      bulkRegister.errorsOnly = errorsOnly.checked;
-      bulkRegister.page=1;bulkRegister.selectedRows.clear();
-      renderBulkRegister();
-    };
-    content.querySelectorAll("[data-pick-category]").forEach(button => button.onclick = () => openBulkCategoryModal(button.dataset.pickCategory));
-    content.querySelectorAll("[data-pick-tags]").forEach(button => button.onclick = () => openBulkTagModal(button.dataset.pickTags));
-    content.querySelectorAll("[data-pick-note]").forEach(button => button.onclick = () => {
+    errorsOnly && (errorsOnly.onchange = () => {
+      bulkRegister.errorsOnly = errorsOnly.checked, bulkRegister.page = 1, bulkRegister.selectedRows.clear(), renderBulkRegister();
+    }), content.querySelectorAll("[data-pick-category]").forEach(button => button.onclick = () => openBulkCategoryModal(button.dataset.pickCategory)), content.querySelectorAll("[data-pick-tags]").forEach(button => button.onclick = () => openBulkTagModal(button.dataset.pickTags)), content.querySelectorAll("[data-pick-note]").forEach(button => button.onclick = () => {
       const result = bulkRegister.results.get(button.dataset.pickNote);
-      if (!result) return;
-      window.AssetMemo.open({ value: result.note || "", onSave: value => {
-        updateBulkResult(button.dataset.pickNote, "note", value);
-      } });
-    });
-    content.querySelectorAll("[data-result-field]").forEach(field => {
-      if (field.dataset.resultField === "price") window.bindPurchasePriceInput(field);
+      result && window.AssetMemo.open({
+        value: result.note || "",
+        onSave: value => {
+          updateBulkResult(button.dataset.pickNote, "note", value);
+        }
+      });
+    }), content.querySelectorAll("[data-result-field]").forEach(field => {
+      field.dataset.resultField === "price" && window.bindPurchasePriceInput(field);
       const update = () => {
         const result = bulkRegister.results.get(field.dataset.gid);
         if (!result) return;
         const key = field.dataset.resultField;
-        if (key === "assetNo") field.value = field.value.replace(/[^A-Za-z0-9_-]/g, "");
-        if (key === "totalQty") field.value = field.value.replace(/[^0-9]/g, "");
-        if (key === "manufactured" || key === "purchaseDate" || key === "expiry") {
+        if (key === "assetNo" && (field.value = field.value.replace(/[^A-Za-z0-9_-]/g, "")), key === "manufactured" || key === "purchaseDate" || key === "expiry") {
           const digits = field.value.replace(/\D/g, "").slice(0, key === "expiry" ? 8 : 6);
-          field.value = key === "expiry"
-            ? (digits.length > 6 ? `${digits.slice(0, 4)}.${digits.slice(4, 6)}.${digits.slice(6)}` : digits.length > 4 ? `${digits.slice(0, 4)}.${digits.slice(4)}` : digits)
-            : (digits.length > 4 ? `${digits.slice(0, 4)}.${digits.slice(4)}` : digits);
+          field.value = key === "expiry" ? digits.length > 6 ? `${digits.slice(0, 4)}.${digits.slice(4, 6)}.${digits.slice(6)}` : digits.length > 4 ? `${digits.slice(0, 4)}.${digits.slice(4)}` : digits : digits.length > 4 ? `${digits.slice(0, 4)}.${digits.slice(4)}` : digits;
         }
-        result[key] = field.value;
-        if (key === "product" || key === "assetNo") bulkRegister.duplicateErrors.clear();
+        result[key] = field.value, (key === "product" || key === "assetNo") && bulkRegister.duplicateErrors.clear();
         const invalid = !!bulkInputErrors(result)[key];
-        field.classList.toggle("is-error", invalid);
-        field.setAttribute("aria-invalid", String(invalid));
-        field.closest("tr")?.classList.toggle("bulk-result-error", bulkResultHasError(result, field.dataset.gid));
-        if (result.status === "review" && !bulkResultHasError(result, field.dataset.gid)) result.status = "success";
-        const toggle=content.querySelector(".bulk-errors-toggle");
-        if(toggle) { toggle.hidden=bulkErrorCount()===0; if(toggle.hidden){bulkRegister.errorsOnly=false;toggle.querySelector("input").checked=false;} }
+        field.classList.toggle("is-error", invalid), field.setAttribute("aria-invalid", String(invalid)), field.closest("tr")?.classList.toggle("bulk-result-error", bulkResultHasError(result, field.dataset.gid)), result.status === "review" && !bulkResultHasError(result, field.dataset.gid) && (result.status = "success");
+        const toggle = content.querySelector(".bulk-errors-toggle");
+        toggle && (toggle.hidden = bulkErrorCount() === 0, toggle.hidden && (bulkRegister.errorsOnly = !1, toggle.querySelector("input").checked = !1));
         const save = content.querySelector("[data-bulk-save]");
-        if (save) save.disabled = !bulkCanSave();
+        save && (save.disabled = !bulkCanSave());
       };
-      field.oninput = update;
-      field.onchange = () => { update(); renderBulkRegister(); };
+      field.oninput = update, field.onchange = () => {
+        update(), renderBulkRegister();
+      };
     });
   }
-
-  // 일괄 작업 메뉴. 일괄 추가는 자산 관리 권한을 다시 확인한 뒤 위 공통 업로드 화면으로 진입한다.
-  // 일괄 배정·보유 변경은 아직 별도 프로토타입을 만들지 않았고, 보유 수량 감소는 잔여 수량을 조정하는
-  // "수량 변경"으로 해석한다. 전체 수량도 함께 줄이는 "수량 차감"은 단건에서만 제공한다.
   function openBulkMenu(anchor) {
     document.querySelectorAll(".dropdown-menu, .hover-tip").forEach(m => m.remove());
-    // 버튼 표시 후 권한이 바뀌어도 메뉴를 여는 시점의 허용 항목만 제공한다.
     const actions = bulkActions();
     if (!actions.length) return;
     const menu = document.createElement("div");
-    menu.className = "dropdown-menu";
-    menu.innerHTML = actions.map(label => `<button type="button" data-bulk-action="${label}">${label}</button>`).join("");
+    menu.className = "dropdown-menu", menu.innerHTML = actions.map(label => `<button type="button" data-bulk-action="${label}">${label}</button>`).join("");
     const r = anchor.getBoundingClientRect();
-    menu.style.cssText = `position:fixed;top:${r.bottom + 4}px;right:${window.innerWidth - r.right}px;min-width:${Math.max(r.width, 160)}px`;
-    document.body.appendChild(menu);
+    menu.style.cssText = `position:fixed;top:${r.bottom + 4}px;right:${window.innerWidth - r.right}px;min-width:${Math.max(r.width, 160)}px`, document.body.appendChild(menu);
     let tip = null;
     menu.querySelectorAll("button").forEach(b => {
       b.onclick = event => {
-        event.stopPropagation();
-        if (b.dataset.bulkAction === "일괄 추가") {
+        if (event.stopPropagation(), b.dataset.bulkAction === "일괄 추가") {
           if (!canManageAssets()) return;
-          menu.remove();
-          resetBulkRegister();
-          activeScreen = "bulk-register";
-          render();
-        } else {
-          toast("일괄 배정 화면은 기획서에서 확인해 주세요.");
-        }
-      };
-      b.addEventListener("mouseenter", () => {
+          menu.remove(), resetBulkRegister(), activeScreen = "bulk-register", render();
+        } else toast("일괄 배정 화면은 기획서에서 확인해 주세요.");
+      }, b.addEventListener("mouseenter", () => {
         if (b.dataset.bulkAction === "일괄 추가") return;
-        tip = document.createElement("div");
-        tip.className = "hover-tip";
-        tip.textContent = "PM: 기획서에서 명세 확인";
-        document.body.appendChild(tip);
+        tip = document.createElement("div"), tip.className = "hover-tip", tip.textContent = "PM: 기획서에서 명세 확인", document.body.appendChild(tip);
         const br = b.getBoundingClientRect();
-        // 메뉴 자체가 화면 우측에 붙어있어 항목 오른쪽에 띄우면 화면 밖으로 잘림 — 왼쪽에 띄움
         tip.style.cssText = `position:fixed;top:${br.top + br.height / 2}px;right:${window.innerWidth - br.left + 8}px;transform:translateY(-50%);`;
+      }), b.addEventListener("mouseleave", () => {
+        tip && (tip.remove(), tip = null);
       });
-      b.addEventListener("mouseleave", () => { if (tip) { tip.remove(); tip = null; } });
-    });
-    setTimeout(() => {
+    }), setTimeout(() => {
       const close = e => {
-        if (!menu.contains(e.target)) { menu.remove(); if (tip) tip.remove(); document.removeEventListener("click", close); }
+        menu.contains(e.target) || (menu.remove(), tip && tip.remove(), document.removeEventListener("click", close));
       };
       document.addEventListener("click", close);
     });
   }
-
-  /* ---------- filter modal ---------- */
   function openFilterModal() {
     const draft = JSON.parse(JSON.stringify(state.filters));
-    let group = "type";
-    let query = "";
-
-    const GROUPS = [
-      { k: "type", name: "자산 유형" },
-      { k: "category", name: "분류" },
-      { k: "status", name: "상태" },
-      { k: "expiry", name: "유효기한" },
-      { k: "labels", name: "태그" },
-      { k: "note", name: "메모" },
-    ];
-    const SEARCHABLE = ["category", "labels"];
-    // 첫번째로 선택된 옵션 라벨 + 나머지 개수(예: "노트북 +2") — 아무것도 선택 안 했으면 빈 문자열(전체라고 적지 않음)
-    const summary = k => {
-      let labels = [];
-      // 소분류만 봐선 어느 대분류인지 알 수 없어서 "대분류 › 소분류"로 표시
-      if (k === "category") labels = draft.category.map(c => { const [g, s] = c.split("/"); return s ? `${g} › ${s}` : g; });
-      else if (k === "type") labels = draft.type.map(v => TYPE_LABEL[v]);
-      else if (k === "status") labels = draft.status.map(v => STATUS_LABEL[v][0]);
-      else if (k === "expiry") labels = draft.expiry.map(v => EXP_LABEL[v]);
-      else if (k === "labels") labels = draft.labels;
-      else if (k === "note") labels = draft.note.map(v => v === "has" ? "있음" : "없음");
-      if (!labels.length) return "";
-      const rest = labels.length > 1 ? ` +${labels.length - 1}` : "";
-      return `${labels[0]}${rest}`;
-    };
-    // 그룹별 "전체 선택" 대상이 되는 leaf 값 목록(검색 중이면 검색에 걸리는 것만)
+    let group = "status",
+      query = "";
+    const GROUPS = [{
+        k: "status",
+        name: "상태"
+      }, {
+        k: "expiry",
+        name: "유효기한"
+      }, {
+        k: "labels",
+        name: "태그"
+      }, {
+        k: "note",
+        name: "메모"
+      }],
+      SEARCHABLE = ["category", "labels"],
+      summary = k => {
+        let labels = [];
+        if (k === "category" ? labels = draft.category.map(c => {
+          const [g, s] = c.split("/");
+          return s ? `${g} › ${s}` : g;
+        }) : k === "type" ? labels = draft.type.map(v => TYPE_LABEL[v]) : k === "status" ? labels = draft.status.map(v => STATUS_LABEL[v][0]) : k === "expiry" ? labels = draft.expiry.map(v => EXP_LABEL[v]) : k === "labels" ? labels = draft.labels : k === "note" && (labels = draft.note.map(v => v === "has" ? "있음" : "없음")), !labels.length) return "";
+        const rest = labels.length > 1 ? ` +${labels.length - 1}` : "";
+        return `${labels[0]}${rest}`;
+      };
     function visibleValues() {
       const q = query.trim().toLowerCase();
       if (group === "category") {
         const out = [];
-        CAT_GROUPS.forEach((subs, g) => {
-          const groupMatches = !q || g.toLowerCase().includes(q);
-          const filtered = subs.filter(s => groupMatches || s.toLowerCase().includes(q));
-          if (!filtered.length) return;
-          filtered.forEach(s => out.push(`${g}/${s}`));
-        });
-        return out;
+        return CAT_GROUPS.forEach((subs, g) => {
+          const groupMatches = !q || g.toLowerCase().includes(q),
+            filtered = subs.filter(s => groupMatches || s.toLowerCase().includes(q));
+          filtered.length && filtered.forEach(s => out.push(`${g}/${s}`));
+        }), out;
       }
-      if (group === "type") return Object.keys(TYPE_LABEL);
-      if (group === "status") return STATUS_ORDER;
-      if (group === "expiry") return Object.keys(EXP_LABEL);
-      if (group === "note") return ["has", "none"];
-      return ALL_LABELS.filter(l => !q || l.toLowerCase().includes(q));
+      return group === "type" ? Object.keys(TYPE_LABEL) : group === "status" ? STATUS_ORDER : group === "expiry" ? Object.keys(EXP_LABEL) : group === "note" ? ["has", "none"] : ALL_LABELS.filter(l => !q || l.toLowerCase().includes(q));
     }
-
     const back = modal(`
       <div class="modal lg">
         <h3>필터</h3>
@@ -2089,11 +1758,10 @@
           <button class="btn primary" id="f-apply">적용</button>
         </div>
       </div>`);
-
     function drawGroups() {
       back.querySelector("#f-groups").innerHTML = GROUPS.map(g => {
-        const active = draft[g.k] && draft[g.k].length;
-        const s = summary(g.k);
+        const active = draft[g.k] && draft[g.k].length,
+          s = summary(g.k);
         return `<button data-g="${g.k}" class="${g.k === group ? "active" : ""}">
           <span class="g-text">
             <span class="g-name">${g.name}</span>
@@ -2101,153 +1769,101 @@
           </span>
           ${active ? '<span class="dot"></span>' : ""}
         </button>`;
-      }).join("");
-      back.querySelectorAll("#f-groups button").forEach(b =>
-        b.onclick = () => { group = b.dataset.g; query = ""; drawGroups(); drawOpts(); });
+      }).join(""), back.querySelectorAll("#f-groups button").forEach(b => b.onclick = () => {
+        group = b.dataset.g, query = "", drawGroups(), drawOpts();
+      });
     }
-
     function optRow(checked, label, val, cls = "") {
       return `<label class="opt ${cls}"><input type="checkbox" data-v="${val}" ${checked ? "checked" : ""}>${label}</label>`;
     }
-
-    // 검색 인풋은 그룹 전환시에만 새로 그리고, 타이핑 중엔 목록(#f-dynamic)만 갱신
-    // — 매 키 입력마다 인풋 자체를 다시 그리면 한글 조합(자모 분리)이 깨짐
     function drawOpts() {
-      const box = back.querySelector("#f-opts");
-      const showSearch = SEARCHABLE.includes(group);
+      const box = back.querySelector("#f-opts"),
+        showSearch = SEARCHABLE.includes(group);
       box.innerHTML = `
         ${showSearch ? `<input type="text" class="picker-search" id="f-search" placeholder="검색" value="${query.replace(/"/g, "&quot;")}">` : ""}
         <div id="f-dynamic"></div>
-      `;
-      if (showSearch) {
-        box.querySelector("#f-search").oninput = e => { query = e.target.value; renderDynamic(); };
-      }
-      renderDynamic();
+      `, showSearch && (box.querySelector("#f-search").oninput = e => {
+        query = e.target.value, renderDynamic();
+      }), renderDynamic();
     }
-
     function renderDynamic() {
-      const dyn = back.querySelector("#f-dynamic");
-      const q = query.trim().toLowerCase();
+      const dyn = back.querySelector("#f-dynamic"),
+        q = query.trim().toLowerCase();
       let listHtml = "";
-      if (group === "category") {
-        listHtml = [...CAT_GROUPS.entries()].map(([g, subs]) => {
-          // 검색어가 대분류명 자체에 걸리면 대분류 통째로, 소분류명에만 걸리면 대분류 헤더 없이 소분류만 나열
-          const groupMatches = !q || g.toLowerCase().includes(q);
-          const filtered = subs.filter(s => groupMatches || s.toLowerCase().includes(q));
-          if (!filtered.length) return "";
-          const keys = filtered.map(s => `${g}/${s}`);
-          const all = keys.every(k => draft.category.includes(k));
-          const parent = groupMatches ? optRow(all, `<b>${g}</b>`, `grp:${g}`) : "";
-          const kids = filtered.map(s => optRow(draft.category.includes(`${g}/${s}`), s, `${g}/${s}`, groupMatches ? "child" : "")).join("");
-          return parent + kids;
-        }).join("");
-        if (!listHtml) listHtml = `<p class="muted" style="padding:12px 2px">${CAT_GROUPS.size ? "결과가 없습니다." : "표시할 목록이 없습니다."}</p>`;
-      } else if (group === "type") {
-        listHtml = Object.entries(TYPE_LABEL).map(([v, l]) => optRow(draft.type.includes(v), l, v)).join("");
-      } else if (group === "status") {
-        listHtml = STATUS_ORDER.map(v => optRow(draft.status.includes(v), STATUS_LABEL[v][0], v)).join("");
-      } else if (group === "expiry") {
-        listHtml = Object.entries(EXP_LABEL).map(([v, l]) => optRow(draft.expiry.includes(v), l, v)).join("");
-      } else if (group === "labels") {
+      if (group === "category") listHtml = [...CAT_GROUPS.entries()].map(([g, subs]) => {
+        const groupMatches = !q || g.toLowerCase().includes(q),
+          filtered = subs.filter(s => groupMatches || s.toLowerCase().includes(q));
+        if (!filtered.length) return "";
+        const all = filtered.map(s => `${g}/${s}`).every(k => draft.category.includes(k)),
+          parent = groupMatches ? optRow(all, `<b>${g}</b>`, `grp:${g}`) : "",
+          kids = filtered.map(s => optRow(draft.category.includes(`${g}/${s}`), s, `${g}/${s}`, groupMatches ? "child" : "")).join("");
+        return parent + kids;
+      }).join(""), listHtml || (listHtml = `<p class="muted" style="padding:12px 2px">${CAT_GROUPS.size ? "결과가 없습니다." : "표시할 목록이 없습니다."}</p>`);else if (group === "type") listHtml = Object.entries(TYPE_LABEL).map(([v, l]) => optRow(draft.type.includes(v), l, v)).join("");else if (group === "status") listHtml = STATUS_ORDER.map(v => optRow(draft.status.includes(v), STATUS_LABEL[v][0], v)).join("");else if (group === "expiry") listHtml = Object.entries(EXP_LABEL).map(([v, l]) => optRow(draft.expiry.includes(v), l, v)).join("");else if (group === "labels") {
         const filtered = ALL_LABELS.filter(l => !q || l.toLowerCase().includes(q));
-        listHtml = filtered.length ? filtered.map(l => optRow(draft.labels.includes(l), l, l)).join("")
-          : `<p class="muted" style="padding:12px 2px">${ALL_LABELS.length ? "결과가 없습니다." : "표시할 목록이 없습니다."}</p>`;
-      } else if (group === "note") {
-        listHtml = [{ v: "has", l: "있음" }, { v: "none", l: "없음" }]
-          .map(o => optRow(draft.note.includes(o.v), o.l, o.v)).join("");
-      }
-
-      const vis = visibleValues();
-      const allChecked = vis.length > 0 && vis.every(v => (draft[group] || []).includes(v));
+        listHtml = filtered.length ? filtered.map(l => optRow(draft.labels.includes(l), l, l)).join("") : `<p class="muted" style="padding:12px 2px">${ALL_LABELS.length ? "결과가 없습니다." : "표시할 목록이 없습니다."}</p>`;
+      } else group === "note" && (listHtml = [{
+        v: "has",
+        l: "있음"
+      }, {
+        v: "none",
+        l: "없음"
+      }].map(o => optRow(draft.note.includes(o.v), o.l, o.v)).join(""));
+      const vis = visibleValues(),
+        allChecked = vis.length > 0 && vis.every(v => (draft[group] || []).includes(v));
       dyn.innerHTML = `
         <div class="picker-toolbar">
           <label class="picker-check"><input type="checkbox" id="f-select-all" ${allChecked ? "checked" : ""}><span>전체</span></label>
           <span class="right"><button class="filter-reset" id="f-group-reset" aria-label="이 항목 초기화">${RESET_ICON}</button></span>
         </div>
         ${listHtml}
-      `;
-
-      dyn.querySelector("#f-select-all").onchange = e => {
+      `, dyn.querySelector("#f-select-all").onchange = e => {
         const vals = visibleValues();
-        draft[group] = e.target.checked
-          ? [...new Set([...draft[group], ...vals])]
-          : draft[group].filter(v => !vals.includes(v));
-        renderDynamic(); drawGroups(); drawSum();
-      };
-      dyn.querySelector("#f-group-reset").onclick = () => {
-        draft[group] = [];
-        renderDynamic(); drawGroups(); drawSum();
-      };
-
-      dyn.querySelectorAll('input[type=checkbox][data-v]').forEach(cb => cb.onchange = () => {
+        draft[group] = e.target.checked ? [... /* @__PURE__ */new Set([...draft[group], ...vals])] : draft[group].filter(v => !vals.includes(v)), renderDynamic(), drawGroups(), drawSum();
+      }, dyn.querySelector("#f-group-reset").onclick = () => {
+        draft[group] = [], renderDynamic(), drawGroups(), drawSum();
+      }, dyn.querySelectorAll("input[type=checkbox][data-v]").forEach(cb => cb.onchange = () => {
         const v = cb.dataset.v;
         if (group === "category") {
           if (v.startsWith("grp:")) {
-            const g = v.slice(4);
-            // 대분류를 체크하면 그 자체도 소분류들과 별개로 draft에 들어가서, 칩도 "대분류 + 소분류 N개"로 각각 따로 뜸(병합 안 함)
-            const keys = CAT_GROUPS.get(g).filter(sub=>!query || g.toLowerCase().includes(query.toLowerCase()) || sub.toLowerCase().includes(query.toLowerCase())).map(sub=>`${g}/${sub}`);
-            draft.category = cb.checked
-              ? [...new Set([...draft.category, ...keys])]
-              : draft.category.filter(k => !keys.includes(k));
-          } else {
-            draft.category = cb.checked ? [...draft.category, v] : draft.category.filter(k => k !== v);
-          }
+            const g = v.slice(4),
+              keys = CAT_GROUPS.get(g).filter(sub => !query || g.toLowerCase().includes(query.toLowerCase()) || sub.toLowerCase().includes(query.toLowerCase())).map(sub => `${g}/${sub}`);
+            draft.category = cb.checked ? [... /* @__PURE__ */new Set([...draft.category, ...keys])] : draft.category.filter(k => !keys.includes(k));
+          } else draft.category = cb.checked ? [...draft.category, v] : draft.category.filter(k => k !== v);
         } else {
           const arr = draft[group];
           draft[group] = cb.checked ? [...arr, v] : arr.filter(x => x !== v);
         }
-        renderDynamic(); drawGroups(); drawSum();
-      });
-      drawSum();
+        renderDynamic(), drawGroups(), drawSum();
+      }), drawSum();
     }
-    // 현재 그룹이 아니라 전체 그룹 누적 선택 개수(참고 이미지의 "선택됨 N"과 동일한 의미)
     function drawSum() {
       const n = GROUPS.reduce((sum, g) => sum + (draft[g.k] || []).length, 0);
       back.querySelector("#f-sum").textContent = `선택됨 ${n}`;
     }
-
     back.querySelector("#f-apply").onclick = () => {
-      state.filters = draft; state.statFilter=null;
-      state.page = 1;
-      back.remove();
-      render();
-    };
-
-    drawGroups();
-    drawOpts();
+      state.filters = draft, state.statFilter = null, state.page = 1, back.remove(), render();
+    }, drawGroups(), drawOpts();
   }
-
-  // 품목별 전용 필터 — 이 뷰는 분류 하나만 필터로 의미가 있어서(자산 유형은 목록 위 유형 선택으로 구분),
-  // 6개 그룹짜리 필터 모달 대신 분류 그룹 하나만 떼어낸 가벼운 팝업으로 제공
   function openCategoryFilterModal() {
-    // 등록 자산 수가 아니라 소분류의 유형·조회 권한으로 옵션을 제한한다.
-    // 같은 대분류에 다른 유형의 소분류가 있어도 선택한 유형의 하위 항목만 제공한다.
-    const groups = new Map();
+    const groups = /* @__PURE__ */new Map();
     viewableCategories().filter(cat => cat.type === state.productType).forEach(cat => {
-      if (!groups.has(cat.group)) groups.set(cat.group, []);
-      groups.get(cat.group).push(cat.sub);
+      groups.has(cat.group) || groups.set(cat.group, []), groups.get(cat.group).push(cat.sub);
     });
-    const draft = [...state.filters.category];
+    const draft = [...(classificationScopes[state.view]||[])];
     let query = "";
-
     function optRow(checked, label, val, cls = "") {
       return `<label class="opt ${cls}"><input type="checkbox" data-v="${val}" ${checked ? "checked" : ""}>${label}</label>`;
     }
     function visibleValues() {
-      const q = query.trim().toLowerCase();
-      const out = [];
-      groups.forEach((subs, g) => {
-        const groupMatches = !q || g.toLowerCase().includes(q);
-        const filtered = subs.filter(s => groupMatches || s.toLowerCase().includes(q));
-        if (!filtered.length) return;
-        filtered.forEach(s => out.push(`${g}/${s}`));
-      });
-      return out;
+      const q = query.trim().toLowerCase(),
+        out = [];
+      return groups.forEach((subs, g) => {
+        const groupMatches = !q || g.toLowerCase().includes(q),
+          filtered = subs.filter(s => groupMatches || s.toLowerCase().includes(q));
+        filtered.length && filtered.forEach(s => out.push(`${g}/${s}`));
+      }), out;
     }
-
-    // 선택한 유형에 조회 가능한 소분류가 하나도 없으면 검색·전체·초기화·목록 없이 빈 상태 안내만 두고 [적용]을 비활성화한다.
-    if (!groups.size) {
-      const emptyBack = modal(`
+    if (!groups.size) return modal(`
         <div class="modal">
           <h3>분류</h3>
           <div class="body">
@@ -2258,9 +1874,6 @@
             <button class="btn primary" id="cf-apply" disabled>적용</button>
           </div>
         </div>`);
-      return emptyBack;
-    }
-
     const back = modal(`
       <div class="modal">
         <h3>분류</h3>
@@ -2273,76 +1886,73 @@
           <button class="btn primary" id="cf-apply">적용</button>
         </div>
       </div>`);
-
     function renderList() {
       let listHtml = [...groups.entries()].map(([g, subs]) => {
-        const q = query.trim().toLowerCase();
-        const groupMatches = !q || g.toLowerCase().includes(q);
-        const filtered = subs.filter(s => groupMatches || s.toLowerCase().includes(q));
+        const q = query.trim().toLowerCase(),
+          groupMatches = !q || g.toLowerCase().includes(q),
+          filtered = subs.filter(s => groupMatches || s.toLowerCase().includes(q));
         if (!filtered.length) return "";
-        const keys = filtered.map(s => `${g}/${s}`);
-        const all = keys.every(k => draft.includes(k));
-        const parent = groupMatches ? optRow(all, `<b>${g}</b>`, `grp:${g}`) : "";
-        const kids = filtered.map(s => optRow(draft.includes(`${g}/${s}`), s, `${g}/${s}`, groupMatches ? "child" : "")).join("");
+        const all = filtered.map(s => `${g}/${s}`).every(k => draft.includes(k)),
+          parent = groupMatches ? optRow(all, `<b>${g}</b>`, `grp:${g}`) : "",
+          kids = filtered.map(s => optRow(draft.includes(`${g}/${s}`), s, `${g}/${s}`, groupMatches ? "child" : "")).join("");
         return parent + kids;
       }).join("");
-      if (!listHtml) listHtml = `<p class="muted" style="padding:12px 2px">${CAT_GROUPS.size ? "결과가 없습니다." : "표시할 목록이 없습니다."}</p>`;
-
-      const vis = visibleValues();
-      const allChecked = vis.length > 0 && vis.every(v => draft.includes(v));
-      const dyn = back.querySelector("#cf-dynamic");
+      listHtml || (listHtml = `<p class="muted" style="padding:12px 2px">${CAT_GROUPS.size ? "결과가 없습니다." : "표시할 목록이 없습니다."}</p>`);
+      const vis = visibleValues(),
+        allChecked = vis.length > 0 && vis.every(v => draft.includes(v)),
+        dyn = back.querySelector("#cf-dynamic");
       dyn.innerHTML = `
         <div class="picker-toolbar">
           <label class="picker-check"><input type="checkbox" id="cf-select-all" ${allChecked ? "checked" : ""}><span>전체</span></label>
           <span class="right"><button class="filter-reset" id="cf-reset" aria-label="초기화">${RESET_ICON}</button></span>
         </div>
         ${listHtml}
-      `;
-      dyn.querySelector("#cf-select-all").onchange = e => {
+      `, dyn.querySelector("#cf-select-all").onchange = e => {
         const vals = visibleValues();
-        if (e.target.checked) vals.forEach(v => { if (!draft.includes(v)) draft.push(v); });
-        else vals.forEach(v => { const i = draft.indexOf(v); if (i > -1) draft.splice(i, 1); });
-        renderList();
-      };
-      dyn.querySelector("#cf-reset").onclick = () => { draft.length = 0; renderList(); };
-      dyn.querySelectorAll("input[type=checkbox][data-v]").forEach(cb => cb.onchange = () => {
+        e.target.checked ? vals.forEach(v => {
+          draft.includes(v) || draft.push(v);
+        }) : vals.forEach(v => {
+          const i = draft.indexOf(v);
+          i > -1 && draft.splice(i, 1);
+        }), renderList();
+      }, dyn.querySelector("#cf-reset").onclick = () => {
+        draft.length = 0, renderList();
+      }, dyn.querySelectorAll("input[type=checkbox][data-v]").forEach(cb => cb.onchange = () => {
         const v = cb.dataset.v;
         if (v.startsWith("grp:")) {
-          const g = v.slice(4);
-          // 대분류를 체크하면 그 자체도 소분류들과 별개로 draft에 들어가서, 칩도 "대분류 + 소분류 N개"로 각각 따로 뜸(병합 안 함)
-          const keys = groups.get(g).filter(sub=>!query || g.toLowerCase().includes(query.toLowerCase()) || sub.toLowerCase().includes(query.toLowerCase())).map(sub=>`${g}/${sub}`);
-          if (cb.checked) keys.forEach(k => { if (!draft.includes(k)) draft.push(k); });
-          else keys.forEach(k => { const i = draft.indexOf(k); if (i > -1) draft.splice(i, 1); });
-        } else if (cb.checked) draft.push(v);
-        else { const i = draft.indexOf(v); if (i > -1) draft.splice(i, 1); }
+          const g = v.slice(4),
+            keys = groups.get(g).filter(sub => !query || g.toLowerCase().includes(query.toLowerCase()) || sub.toLowerCase().includes(query.toLowerCase())).map(sub => `${g}/${sub}`);
+          cb.checked ? keys.forEach(k => {
+            draft.includes(k) || draft.push(k);
+          }) : keys.forEach(k => {
+            const i = draft.indexOf(k);
+            i > -1 && draft.splice(i, 1);
+          });
+        } else if (cb.checked) draft.push(v);else {
+          const i = draft.indexOf(v);
+          i > -1 && draft.splice(i, 1);
+        }
         renderList();
       });
     }
-    renderList();
-
-    back.querySelector("#cf-search").oninput = e => { query = e.target.value; renderList(); };
-    back.querySelector("#cf-apply").onclick = () => {
-      state.filters.category = draft;
-      state.page = 1;
-      back.remove();
-      render();
+    renderList(), back.querySelector("#cf-search").oninput = e => {
+      query = e.target.value, renderList();
+    }, back.querySelector("#cf-apply").onclick = () => {
+      const ordered=viewableCategories().map(c=>`${c.group}/${c.sub}`),picked=ordered.filter(key=>draft.includes(key));
+      classificationScopes[state.view]=picked.length===ordered.length?[]:picked;
+      try{localStorage.setItem(scopeStorageKey(state.view),JSON.stringify(classificationScopes[state.view]));}catch{}
+      state.statFilter=null;state.page=1;back.remove();render();
     };
   }
-
-  // 구성원별 전용 "직원 필터" — 대시보드 공용 컴포넌트 목업. 실제 조직도 연동·필터 반영 로직은 이 프로토타입 범위 밖이라
-  // 버튼을 누르면 뜨는 모달의 형태(좌측 카테고리 + 우측 검색·트리)만 재현, 적용해도 실제 목록엔 반영되지 않음
   function openMemberFilterModal() {
     let cat = "그룹";
-
     function nodeRow(n, isChild) {
-      const kids = n.children ? n.children.map(c => nodeRow(c, true)).join("") : "";
+      const kids = n.children ? n.children.map(c => nodeRow(c, !0)).join("") : "";
       return `<label class="opt ${isChild ? "child" : ""}"><input type="checkbox" checked>${n.name}</label>${kids}`;
     }
     function optsHtml() {
-      if (cat === "그룹") return MEMBER_GROUP_TREE.map(n => nodeRow(n, false)).join("");
-      return MEMBER_JOB_TITLES.map(j => `<label class="opt"><input type="checkbox" checked>${j}</label>`).join("");
+      return cat === "그룹" ? MEMBER_GROUP_TREE.map(n => nodeRow(n, !1)).join("") : MEMBER_JOB_TITLES.map(j => `<label class="opt"><input type="checkbox" checked>${j}</label>`).join("");
     }
-
     const back = modal(`
       <div class="modal lg">
         <h3>직원 필터</h3>
@@ -2366,26 +1976,13 @@
           <button class="btn primary" id="mf-apply">적용</button>
         </div>
       </div>`);
-
     back.querySelectorAll("#mf-groups button").forEach(b => b.onclick = () => {
-      cat = b.dataset.g;
-      back.querySelectorAll("#mf-groups button").forEach(x => x.classList.toggle("active", x === b));
-      back.querySelector("#mf-opts-list").innerHTML = optsHtml();
-    });
-    back.querySelector("#mf-apply").onclick = () => {
-      back.remove();
-      toast(`"직원 필터" 적용 (프로토타입 — 실제 반영 없음)`);
+      cat = b.dataset.g, back.querySelectorAll("#mf-groups button").forEach(x => x.classList.toggle("active", x === b)), back.querySelector("#mf-opts-list").innerHTML = optsHtml();
+    }), back.querySelector("#mf-apply").onclick = () => {
+      back.remove(), toast('"직원 필터" 적용 (프로토타입 — 실제 반영 없음)');
     };
   }
-
-  // 근무지별 전용 "근무지 필터" — 역시 공통 컴포넌트 목업(직원 필터와 동일 취급). 실제 화면엔 도/도시 외에도
-  // 이 프로토타입과 무관한 필드가 많았지만, 우리 근무지 데이터로 실제 의미가 통하는 "도"(전국 17개 광역단위,
-  // 실존하는 일반 행정구역명이라 특정 회사 데이터 아님)만 대표로 구현 — 적당한 수준의 목업, 실제 필터링 없음
-  const WS_PROVINCES = [
-    "도 미지정", "강원도", "경기도", "경상남도", "경상북도", "광주광역시", "대구광역시", "대전광역시",
-    "부산광역시", "서울특별시", "세종특별자치시", "울산광역시", "인천광역시", "전라남도", "전라북도",
-    "제주특별자치도", "충청남도", "충청북도",
-  ];
+  const WS_PROVINCES = ["도 미지정", "강원도", "경기도", "경상남도", "경상북도", "광주광역시", "대구광역시", "대전광역시", "부산광역시", "서울특별시", "세종특별자치시", "울산광역시", "인천광역시", "전라남도", "전라북도", "제주특별자치도", "충청남도", "충청북도"];
   function openWorksiteFilterModal() {
     const back = modal(`
       <div class="modal lg">
@@ -2409,38 +2006,27 @@
         </div>
       </div>`);
     back.querySelector("#wf-apply").onclick = () => {
-      back.remove();
-      toast(`"근무지 필터" 적용 (프로토타입 — 실제 반영 없음)`);
+      back.remove(), toast('"근무지 필터" 적용 (프로토타입 — 실제 반영 없음)');
     };
   }
-
-  /* ---------- other modals ---------- */
-  function modal(html, { closeOnBackdrop = false } = {}) {
+  function modal(html, {
+    closeOnBackdrop = !1
+  } = {}) {
     const back = document.createElement("div");
-    back.className = "modal-back";
-    back.innerHTML = html;
-    back.addEventListener("click", e => { if (closeOnBackdrop && e.target === back) back.remove(); });
-    back.querySelectorAll("[data-close]").forEach(b => b.onclick = () => back.remove());
-    document.body.appendChild(back);
-    return back;
+    return back.className = "modal-back", back.innerHTML = html, back.addEventListener("click", e => {
+      closeOnBackdrop && e.target === back && back.remove();
+    }), back.querySelectorAll("[data-close]").forEach(b => b.onclick = () => back.remove()), document.body.appendChild(back), back;
   }
-
-  // 자산 추가 팝업은 js/asset-register.js의 window.openAssetAddModal()로 분류 화면과 공용
-
   function openQrDownloadModal() {
-    // 별도 정렬 UI 없이 품목명 가나다순 고정 — 이름으로 훑어보기 가장 쉬운 기본 정렬
-    const list = getFiltered().sort((a, b) => a.product.localeCompare(b.product, "ko"));
-    const PAGE_SIZE = 20;
-    let query = "";
-    let page = 1;
-    const sel = new Set();
-
+    const list = getFiltered().sort((a, b) => a.product.localeCompare(b.product, "ko")),
+      PAGE_SIZE = 20;
+    let query = "",
+      page = 1;
+    const sel = /* @__PURE__ */new Set();
     function filteredList() {
       const q = query.trim().toLowerCase();
-      if (!q) return list;
-      return list.filter(a => `${a.product} ${a.assetNo || ""}`.toLowerCase().includes(q));
+      return q ? list.filter(a => `${a.product} ${a.assetNo || ""}`.toLowerCase().includes(q)) : list;
     }
-
     const m = modal(`
       <div class="modal lg">
         <h3>QR 다운로드</h3>
@@ -2460,14 +2046,15 @@
           </div>
         </div>
       </div>`);
-    m.querySelector("#qr-search").oninput = e => { query = e.target.value; page = 1; renderList(); };
-
+    m.querySelector("#qr-search").oninput = e => {
+      query = e.target.value, page = 1, renderList();
+    };
     function renderList() {
-      const fl = filteredList();
-      const totalPages = Math.max(1, Math.ceil(fl.length / PAGE_SIZE));
-      if (page > totalPages) page = totalPages;
-      const pageItems = fl.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-      const rowsEl = m.querySelector("#qr-rows");
+      const fl = filteredList(),
+        totalPages = Math.max(1, Math.ceil(fl.length / PAGE_SIZE));
+      page > totalPages && (page = totalPages);
+      const pageItems = fl.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+        rowsEl = m.querySelector("#qr-rows");
       rowsEl.innerHTML = pageItems.map(a => `<label class="picker-member-row">
         <input type="checkbox" data-id="${a.id}" ${sel.has(a.id) ? "checked" : ""}>
         <span class="picker-member-info" style="flex:1">
@@ -2476,56 +2063,37 @@
         <span class="muted">${a.group} › ${a.sub}</span>
       </label>`).join("") || '<p class="muted" style="padding:16px 0">대상 자산이 없습니다.</p>';
       const pageAllChecked = pageItems.length > 0 && pageItems.every(a => sel.has(a.id));
-      m.querySelector("#qr-page-all").checked = pageAllChecked;
-      m.querySelector("#qr-page-all").onchange = e => {
-        pageItems.forEach(a => e.target.checked ? sel.add(a.id) : sel.delete(a.id));
-        renderList();
-      };
-      rowsEl.querySelectorAll("input[data-id]").forEach(cb => cb.onchange = () => {
-        cb.checked ? sel.add(cb.dataset.id) : sel.delete(cb.dataset.id);
-        renderList();
-      });
-
-      m.querySelector("#qr-pager").innerHTML = `
+      m.querySelector("#qr-page-all").checked = pageAllChecked, m.querySelector("#qr-page-all").onchange = e => {
+        pageItems.forEach(a => e.target.checked ? sel.add(a.id) : sel.delete(a.id)), renderList();
+      }, rowsEl.querySelectorAll("input[data-id]").forEach(cb => cb.onchange = () => {
+        cb.checked ? sel.add(cb.dataset.id) : sel.delete(cb.dataset.id), renderList();
+      }), m.querySelector("#qr-pager").innerHTML = `
         <button data-qp="prev" ${page === 1 ? "disabled" : ""}>‹</button>
         <span style="padding:0 6px;font-size:12.5px;color:var(--text-sub)">${page} / ${totalPages}</span>
         <button data-qp="next" ${page === totalPages ? "disabled" : ""}>›</button>
-      `;
-      m.querySelectorAll("[data-qp]").forEach(b => b.onclick = () => {
-        page += b.dataset.qp === "prev" ? -1 : 1;
-        renderList();
-      });
-
-      m.querySelector("#qr-sum").textContent = `선택됨 ${sel.size}`;
-      m.querySelector("#qr-go").disabled = sel.size === 0;
+      `, m.querySelectorAll("[data-qp]").forEach(b => b.onclick = () => {
+        page += b.dataset.qp === "prev" ? -1 : 1, renderList();
+      }), m.querySelector("#qr-sum").textContent = `선택됨 ${sel.size}`, m.querySelector("#qr-go").disabled = sel.size === 0;
     }
-
     m.querySelector("#qr-go").onclick = () => {
-      const items = list.filter(a => sel.has(a.id));
-      const d = new Date(), p2 = n => String(n).padStart(2, "0");
-      const ts = `${d.getFullYear()}${p2(d.getMonth() + 1)}${p2(d.getDate())}_${p2(d.getHours())}${p2(d.getMinutes())}${p2(d.getSeconds())}`;
+      const items = list.filter(a => sel.has(a.id)),
+        d = /* @__PURE__ */new Date(),
+        p2 = n => String(n).padStart(2, "0"),
+        ts = `${d.getFullYear()}${p2(d.getMonth() + 1)}${p2(d.getDate())}_${p2(d.getHours())}${p2(d.getMinutes())}${p2(d.getSeconds())}`;
       if (items.length === 1) {
-        const a = [...items].sort((a,b)=>String(a.assetNo || "").localeCompare(String(b.assetNo || ""))).find(a=>window.assetPhotos(a).length) || items[0];
-        // 구조설계안 5.4 사진 다운로드와 동일한 식별 라벨 규칙(개별=고유관리번호, 수량=품목명) + QR 접두어
-        const label = a.type === "individual" ? (a.assetNo || a.id) : a.product;
-        const fileName = window.assetDownloadFileName(`QR_${label}_${ts}.png`);
+        const a = [...items].sort((a2, b) => String(a2.assetNo || "").localeCompare(String(b.assetNo || ""))).find(a2 => window.assetPhotos(a2).length) || items[0],
+          label = a.assetNo || a.id,
+          fileName = window.assetDownloadFileName(`QR_${label}_${ts}.png`);
         toast(`"${fileName}" 다운로드 (프로토타입 — 반영 없음)`);
-      } else {
-        toast(`"Asset_QR_${ts}.zip" (${items.length}건) 다운로드 (프로토타입 — 반영 없음)`);
-      }
+      } else toast(`"Asset_QR_${ts}.zip" (${items.length}건) 다운로드 (프로토타입 — 반영 없음)`);
       m.remove();
-    };
-
-    renderList();
+    }, renderList();
   }
-
   function toast(msg) {
     const t = document.createElement("div");
-    t.textContent = msg;
-    t.style.cssText = "position:fixed;left:50%;bottom:32px;transform:translateX(-50%);background:#1b1d1f;color:#fff;padding:10px 16px;border-radius:8px;font-size:12.5px;z-index:200;box-shadow:0 8px 24px rgba(0,0,0,.25)";
-    document.body.appendChild(t);
-    setTimeout(() => t.remove(), 1800);
+    t.textContent = msg, t.style.cssText = "position:fixed;left:50%;bottom:32px;transform:translateX(-50%);background:#1b1d1f;color:#fff;padding:10px 16px;border-radius:8px;font-size:12.5px;z-index:200;box-shadow:0 8px 24px rgba(0,0,0,.25)", document.body.appendChild(t), setTimeout(() => t.remove(), 1800);
   }
-
-  window.AssetsScreen = { render };
+  window.AssetsScreen = {
+    render
+  };
 })();

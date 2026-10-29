@@ -1,623 +1,1168 @@
-/* Sample data for the prototype. Not a real schema — mirrors 구조설계안 fields. */
-window.DATA = (function () {
-  // 분류: 대분류 > 소분류(개별형/수량형)
-  // hiddenFields: 소분류 필드 노출 설정에서 off된 선택 필드(구조안 3.3). 상세에서 해당 행 자체를 숨김
-  // view/assign: 자산 조회 권한 / 배정·보유 변경 권한(구조안 4.3) — assign은 항상 view의 부분집합
-  const categories = [
-    { group: "가구류", sub: "책상", type: "individual", hiddenFields: ["expiry"], view: "회사의 모든 구성원", assign: "모든 관리자 및 리더" },
-    { group: "가구류", sub: "의자", type: "individual", hiddenFields: ["expiry"], view: "회사의 모든 구성원", assign: "모든 관리자 및 리더" },
+window.DATA = function () {
+  const categories = [{
+      group: "가구류",
+      sub: "책상",
+      type: "individual",
+      hiddenFields: ["expiry"],
+      view: "회사의 모든 구성원",
+      assign: "모든 관리자 및 리더"
+    }, {
+      group: "가구류",
+      sub: "의자",
+      type: "individual",
+      hiddenFields: ["expiry"],
+      view: "회사의 모든 구성원",
+      assign: "모든 관리자 및 리더"
+    },
     // 서랍장: 등록된 자산이 아직 없는 소분류 샘플 — 분류 관리 모달에서 "활성 상태(삭제 가능)" 삭제 버튼을 보여주기 위한 용도
-    { group: "가구류", sub: "서랍장", type: "individual", hiddenFields: ["expiry"], view: "회사의 모든 구성원", assign: "모든 관리자 및 리더" },
-    { group: "전자기기류", sub: "노트북", type: "individual", view: "모든 관리자 및 리더", assign: "모든 관리자 및 리더" },
-    { group: "전자기기류", sub: "모니터", type: "individual", view: "모든 관리자 및 리더", assign: "특정 관리자/리더",
-      assignTarget: { groups: [], jobTitles: [], members: ["이서연", "최유진"] } },
+    {
+      group: "가구류",
+      sub: "서랍장",
+      type: "individual",
+      hiddenFields: ["expiry"],
+      view: "회사의 모든 구성원",
+      assign: "모든 관리자 및 리더"
+    }, {
+      group: "전자기기류",
+      sub: "노트북",
+      type: "individual",
+      view: "모든 관리자 및 리더",
+      assign: "모든 관리자 및 리더"
+    }, {
+      group: "전자기기류",
+      sub: "모니터",
+      type: "individual",
+      view: "모든 관리자 및 리더",
+      assign: "특정 관리자/리더",
+      assignTarget: {
+        groups: [],
+        jobTitles: [],
+        members: ["이서연", "최유진"]
+      }
+    },
     // 권한 대상 조회 모달 확인용 — 기본 데모 사용자(김민수, 개발팀·팀장)가 계속 대상에 포함되도록 지정
-    { group: "전자기기류", sub: "케이블·액세서리", type: "quantity", view: "회사의 모든 구성원", assign: "특정 그룹 및 직무/직급",
-      assignTarget: { groups: ["개발팀", "영업팀"], jobTitles: ["팀장"], members: [] } },
-    { group: "소모품", sub: "유니폼", type: "quantity", view: "회사의 모든 구성원", assign: "특정 관리자/리더" },
-    { group: "소모품", sub: "문구류", type: "quantity", view: "회사의 모든 구성원", assign: "회사의 모든 구성원" },
-  ];
-
-  // 대분류만 생성되고 아직 소분류가 없는 상태(생성 직후 등)도 가능 — 샘플로 하나 둠
-  const emptyGroups = ["비품"];
-
-  // 개별 자산: 활성 배정(assignments) 0~N건. 각 레코드는 worksite/employee 중 정확히 1개.
-  // 수량 자산: stocks 행별 수량. 각 행은 worksite/employee 중 정확히 1개.
-  const assets = [
-    { id: "A001", type: "individual", assetNo: "IT-2024-0012", product: "그램 16 (2024)", group: "전자기기류", sub: "노트북",
-      status: "assigned", serial: "SN-8842-AA", createdAt: "2024-03-12", purchaseDate: "2024-03-11", price: 1890000, manufactured: "2024-01-20",
-      expiry: "2027-03-10", note: "키보드 자판 일부 마모 확인 — 2025-06 교체 요청 이력 있음. 배정 반납 시 상태 재확인 필요. 트랙패드 클릭감 저하 민원 1건 접수돼 다음 정기 점검 때 같이 확인 요망.", photo: "#4b7bec", photoCount: 6,
+    {
+      group: "전자기기류",
+      sub: "케이블·액세서리",
+      type: "individual",
+      view: "회사의 모든 구성원",
+      assign: "특정 그룹 및 직무/직급",
+      assignTarget: {
+        groups: ["개발팀", "영업팀"],
+        jobTitles: ["팀장"],
+        members: []
+      }
+    }, {
+      group: "소모품",
+      sub: "유니폼",
+      type: "individual",
+      view: "회사의 모든 구성원",
+      assign: "특정 관리자/리더"
+    }, {
+      group: "소모품",
+      sub: "문구류",
+      type: "individual",
+      view: "회사의 모든 구성원",
+      assign: "회사의 모든 구성원"
+    }],
+    emptyGroups = ["비품"],
+    assets = [{
+      id: "A001",
+      type: "individual",
+      assetNo: "IT-2024-0012",
+      product: "그램 16 (2024)",
+      group: "전자기기류",
+      sub: "노트북",
+      status: "assigned",
+      serial: "SN-8842-AA",
+      createdAt: "2024-03-12",
+      purchaseDate: "2024-03-11",
+      price: 189e4,
+      manufactured: "2024-01-20",
+      expiry: "2027-03-10",
+      note: "키보드 자판 일부 마모 확인 — 2025-06 교체 요청 이력 있음. 배정 반납 시 상태 재확인 필요. 트랙패드 클릭감 저하 민원 1건 접수돼 다음 정기 점검 때 같이 확인 요망.",
+      photo: "#4b7bec",
+      photoCount: 6,
       // 공동 배정 샘플(구조설계안 2.3) — 앱 자산 상세의 "공동 배정 대상" 정보 섹션 확인용으로 이서연을 공동 배정자로 추가(2026-09-27)
-      labels: ["본사", "개발팀"], assignments: [{ employee: "김민수", worksite: null, since: "2024-03-15" }, { employee: "이서연", worksite: null, since: "2024-05-01" }] },
+      labels: ["본사", "개발팀"],
+      assignments: [{
+        employee: "김민수",
+        worksite: null,
+        since: "2024-03-15"
+      }, {
+        employee: "이서연",
+        worksite: null,
+        since: "2024-05-01"
+      }]
+    },
     // 배정 추가 상한 테스트용 — 자산 하나당 활성 배정 최대 5건(구조설계안 2.1·6)을 꽉 채운 샘플(2026-09-30,
-    // 원래 status:"stock"/assignments:[] 재고 샘플이었으나 A015/A016도 같은 역할이라 이걸로 대체)
-    { id: "A002", type: "individual", assetNo: "IT-2024-0013", product: "그램 16 (2024)", group: "전자기기류", sub: "노트북",
-      status: "assigned", serial: "SN-8842-AB", createdAt: "2024-03-12", purchaseDate: "2024-03-11", price: 1890000, expiry: "2027-03-10",
-      labels: ["본사"], assignments: [
-        { employee: "김민수", worksite: null, since: "2024-04-01" },
-        { employee: "이서연", worksite: null, since: "2024-05-01" },
-        { employee: "박지훈", worksite: null, since: "2024-06-01" },
-        { employee: "정우성", worksite: null, since: "2024-07-01" },
-        { employee: null, worksite: "강남점", since: "2024-08-01" },
-      ] },
+    // 원래 status:"stock"/assignments:[] 배정 가능 샘플이었으나 A015/A016도 같은 역할이라 이걸로 대체)
+    {
+      id: "A002",
+      type: "individual",
+      assetNo: "IT-2024-0013",
+      product: "그램 16 (2024)",
+      group: "전자기기류",
+      sub: "노트북",
+      status: "assigned",
+      serial: "SN-8842-AB",
+      createdAt: "2024-03-12",
+      purchaseDate: "2024-03-11",
+      price: 189e4,
+      expiry: "2027-03-10",
+      labels: ["본사"],
+      assignments: [{
+        employee: "김민수",
+        worksite: null,
+        since: "2024-04-01"
+      }, {
+        employee: "이서연",
+        worksite: null,
+        since: "2024-05-01"
+      }, {
+        employee: "박지훈",
+        worksite: null,
+        since: "2024-06-01"
+      }, {
+        employee: "정우성",
+        worksite: null,
+        since: "2024-07-01"
+      }, {
+        employee: null,
+        worksite: "강남점",
+        since: "2024-08-01"
+      }]
+    },
     // 같은 품목(그램 16 (2024))을 여러 인원에게 배정하는 실사용 규모(인원 50명 미만인 회사도 동일 모델 10대+ 보유 흔함) 반영용 —
     // 정보는 A001/A002와 대부분 동일(같은 구매 배치), 고유관리번호/상태/배정 대상만 다름
-    { id: "A011", type: "individual", assetNo: "IT-2024-0014", product: "그램 16 (2024)", group: "전자기기류", sub: "노트북",
-      status: "assigned", serial: "SN-8842-AC", createdAt: "2024-03-12", purchaseDate: "2024-03-11", price: 1890000, expiry: "2027-03-10",
-      labels: ["개발팀"], assignments: [{ employee: "이서연", worksite: null, since: "2024-04-02" }] },
-    { id: "A012", type: "individual", assetNo: "IT-2024-0015", product: "그램 16 (2024)", group: "전자기기류", sub: "노트북",
-      status: "assigned", serial: "SN-8842-AD", createdAt: "2024-03-12", purchaseDate: "2024-03-11", price: 1890000, expiry: "2027-03-10",
-      labels: [], assignments: [{ employee: "박지훈", worksite: null, since: "2024-05-11" }] },
-    { id: "A013", type: "individual", assetNo: "IT-2024-0016", product: "그램 16 (2024)", group: "전자기기류", sub: "노트북",
-      status: "assigned", serial: "SN-8842-AE", createdAt: "2024-03-12", purchaseDate: "2024-03-11", price: 1890000, expiry: "2027-03-10",
-      labels: ["본사"], assignments: [{ employee: "정우성", worksite: null, since: "2024-06-20" }] },
-    { id: "A014", type: "individual", assetNo: "IT-2024-0017", product: "그램 16 (2024)", group: "전자기기류", sub: "노트북",
-      status: "assigned", serial: "SN-8842-AF", createdAt: "2024-03-12", purchaseDate: "2024-03-11", price: 1890000, expiry: "2027-03-10",
-      labels: [], assignments: [{ employee: "김철수", worksite: null, since: "2024-07-15" }] },
-    { id: "A015", type: "individual", assetNo: "IT-2024-0018", product: "그램 16 (2024)", group: "전자기기류", sub: "노트북",
-      status: "stock", serial: "SN-8842-AG", createdAt: "2024-03-12", purchaseDate: "2024-03-11", price: 1890000, expiry: "2027-03-10",
-      labels: [], assignments: [] },
-    { id: "A016", type: "individual", assetNo: "IT-2024-0019", product: "그램 16 (2024)", group: "전자기기류", sub: "노트북",
-      status: "stock", serial: "SN-8842-AH", createdAt: "2024-03-12", purchaseDate: "2024-03-11", price: 1890000, expiry: "2027-03-10",
-      labels: [], assignments: [] },
-    { id: "A017", type: "individual", assetNo: "IT-2024-0020", product: "그램 16 (2024)", group: "전자기기류", sub: "노트북",
-      status: "stock", serial: "SN-8842-AI", createdAt: "2024-03-12", purchaseDate: "2024-03-11", price: 1890000, expiry: "2027-03-10",
-      labels: ["본사"], assignments: [] },
-    { id: "A018", type: "individual", assetNo: "IT-2024-0021", product: "그램 16 (2024)", group: "전자기기류", sub: "노트북",
-      status: "repair", serial: "SN-8842-AJ", createdAt: "2024-03-12", purchaseDate: "2024-03-11", price: 1890000, expiry: "2027-03-10",
-      note: "2026-08 키보드 오작동으로 수리/점검 접수, 센터 입고", labels: ["수리이력"],
-      assignments: [{ employee: "최유진", worksite: null, since: "2024-08-01" }] },
-    { id: "A019", type: "individual", assetNo: "IT-2024-0022", product: "그램 16 (2024)", group: "전자기기류", sub: "노트북",
-      status: "lost", serial: "SN-8842-AK", createdAt: "2024-03-12", purchaseDate: "2024-03-11", price: 1890000, expiry: "2027-03-10",
-      note: "2026-07 재택 반출 후 미회수, 분실 신고", labels: ["분실추적"],
-      assignments: [{ employee: "한소희", worksite: null, since: "2024-09-05" }] },
-    { id: "A020", type: "individual", assetNo: "IT-2024-0023", product: "그램 16 (2024)", group: "전자기기류", sub: "노트북",
-      status: "disposed", serial: "SN-8842-AL", createdAt: "2024-03-12", purchaseDate: "2024-03-11", price: 1890000, expiry: "2027-03-10",
-      labels: [], assignments: [] },
-    { id: "A003", type: "individual", assetNo: "IT-2023-0090", product: "맥북 프로 14", group: "전자기기류", sub: "노트북",
-      status: "repair", serial: "C02XR-99", createdAt: "2023-08-03", purchaseDate: "2023-08-02", price: 2690000, expiry: "", photo: "#8854d0", photoCount: 8,
-      note: "2026-08 배터리 스웰링으로 수리/점검 접수, 센터 입고", labels: ["디자인팀"],
-      assignments: [{ employee: "이서연", worksite: null, since: "2023-08-10" }] },
-    { id: "A004", type: "individual", assetNo: "FN-2022-0031", product: "시디즈 T50", group: "가구류", sub: "의자",
-      status: "assigned", serial: "", createdAt: "2022-05-23", purchaseDate: "2022-05-20", price: 320000, expiry: "", photo: "#26a69a",
-      labels: ["강남점"], assignments: [{ employee: null, worksite: "강남점", since: "2022-06-01" }] },
-    { id: "A005", type: "individual", assetNo: "FN-2022-0032", product: "시디즈 T50", group: "가구류", sub: "의자",
-      status: "assigned", serial: "", createdAt: "2022-05-23", purchaseDate: "2022-05-20", price: 320000, expiry: "",
-      labels: [], assignments: [
-        { employee: "박지훈", worksite: null, since: "2023-01-04" },
-        { employee: null, worksite: "강남점", since: "2023-06-01" },
-        { employee: null, worksite: "판교점", since: "2024-02-11" },
-      ] },
-    { id: "A006", type: "individual", assetNo: "IT-2021-0005", product: "델 U2720Q", group: "전자기기류", sub: "모니터",
-      status: "lost", serial: "CN-0KL-77", createdAt: "2021-11-16", purchaseDate: "2021-11-15", price: 690000, expiry: "",
-      note: "2026-07 재택 반출 후 미회수, 분실 신고", labels: ["분실추적"],
-      assignments: [{ employee: "정우성", worksite: null, since: "2022-01-10" }] },
-    { id: "A007", type: "individual", assetNo: "IT-2020-0001", product: "HP 프로북 450", group: "전자기기류", sub: "노트북",
-      status: "disposed", serial: "5CD-0-AA", createdAt: "2020-02-03", purchaseDate: "2020-02-01", price: 950000, expiry: "",
-      labels: [], assignments: [] },
-    { id: "A008", type: "individual", assetNo: "FN-2025-0101", product: "데스커 1400", group: "가구류", sub: "책상",
-      status: "assigned", serial: "", createdAt: "2025-01-21", purchaseDate: "2025-01-20", price: 210000, expiry: "", photo: "#8395a7",
-      labels: ["판교점"], assignments: [{ employee: null, worksite: "판교점", since: "2025-02-01" }] },
-    { id: "A009", type: "individual", assetNo: "FN-2025-0102", product: "데스커 1400", group: "가구류", sub: "책상",
-      status: "stock", serial: "", createdAt: "2025-03-11", purchaseDate: "2025-03-10", price: 210000, expiry: "",
-      labels: [], assignments: [] },
-    { id: "A010", type: "individual", assetNo: "IT-2022-0210", product: "씽크패드 X1", group: "전자기기류", sub: "노트북",
-      status: "stock", serial: "PF-2K9X-11", createdAt: "2022-06-10", purchaseDate: "2022-06-09", price: 1650000, expiry: "2026-07-01",
-      labels: [], assignments: [] },
+    {
+      id: "A011",
+      type: "individual",
+      assetNo: "IT-2024-0014",
+      product: "그램 16 (2024)",
+      group: "전자기기류",
+      sub: "노트북",
+      status: "assigned",
+      serial: "SN-8842-AC",
+      createdAt: "2024-03-12",
+      purchaseDate: "2024-03-11",
+      price: 189e4,
+      expiry: "2027-03-10",
+      labels: ["개발팀"],
+      assignments: [{
+        employee: "이서연",
+        worksite: null,
+        since: "2024-04-02"
+      }]
+    }, {
+      id: "A012",
+      type: "individual",
+      assetNo: "IT-2024-0015",
+      product: "그램 16 (2024)",
+      group: "전자기기류",
+      sub: "노트북",
+      status: "assigned",
+      serial: "SN-8842-AD",
+      createdAt: "2024-03-12",
+      purchaseDate: "2024-03-11",
+      price: 189e4,
+      expiry: "2027-03-10",
+      labels: [],
+      assignments: [{
+        employee: "박지훈",
+        worksite: null,
+        since: "2024-05-11"
+      }]
+    }, {
+      id: "A013",
+      type: "individual",
+      assetNo: "IT-2024-0016",
+      product: "그램 16 (2024)",
+      group: "전자기기류",
+      sub: "노트북",
+      status: "assigned",
+      serial: "SN-8842-AE",
+      createdAt: "2024-03-12",
+      purchaseDate: "2024-03-11",
+      price: 189e4,
+      expiry: "2027-03-10",
+      labels: ["본사"],
+      assignments: [{
+        employee: "정우성",
+        worksite: null,
+        since: "2024-06-20"
+      }]
+    }, {
+      id: "A014",
+      type: "individual",
+      assetNo: "IT-2024-0017",
+      product: "그램 16 (2024)",
+      group: "전자기기류",
+      sub: "노트북",
+      status: "assigned",
+      serial: "SN-8842-AF",
+      createdAt: "2024-03-12",
+      purchaseDate: "2024-03-11",
+      price: 189e4,
+      expiry: "2027-03-10",
+      labels: [],
+      assignments: [{
+        employee: "김철수",
+        worksite: null,
+        since: "2024-07-15"
+      }]
+    }, {
+      id: "A015",
+      type: "individual",
+      assetNo: "IT-2024-0018",
+      product: "그램 16 (2024)",
+      group: "전자기기류",
+      sub: "노트북",
+      status: "stock",
+      serial: "SN-8842-AG",
+      createdAt: "2024-03-12",
+      purchaseDate: "2024-03-11",
+      price: 189e4,
+      expiry: "2027-03-10",
+      labels: [],
+      assignments: []
+    }, {
+      id: "A016",
+      type: "individual",
+      assetNo: "IT-2024-0019",
+      product: "그램 16 (2024)",
+      group: "전자기기류",
+      sub: "노트북",
+      status: "stock",
+      serial: "SN-8842-AH",
+      createdAt: "2024-03-12",
+      purchaseDate: "2024-03-11",
+      price: 189e4,
+      expiry: "2027-03-10",
+      labels: [],
+      assignments: []
+    }, {
+      id: "A017",
+      type: "individual",
+      assetNo: "IT-2024-0020",
+      product: "그램 16 (2024)",
+      group: "전자기기류",
+      sub: "노트북",
+      status: "stock",
+      serial: "SN-8842-AI",
+      createdAt: "2024-03-12",
+      purchaseDate: "2024-03-11",
+      price: 189e4,
+      expiry: "2027-03-10",
+      labels: ["본사"],
+      assignments: []
+    }, {
+      id: "A018",
+      type: "individual",
+      assetNo: "IT-2024-0021",
+      product: "그램 16 (2024)",
+      group: "전자기기류",
+      sub: "노트북",
+      status: "repair",
+      serial: "SN-8842-AJ",
+      createdAt: "2024-03-12",
+      purchaseDate: "2024-03-11",
+      price: 189e4,
+      expiry: "2027-03-10",
+      note: "2026-08 키보드 오작동으로 수리/점검 접수, 센터 입고",
+      labels: ["수리이력"],
+      assignments: [{
+        employee: "최유진",
+        worksite: null,
+        since: "2024-08-01"
+      }]
+    }, {
+      id: "A019",
+      type: "individual",
+      assetNo: "IT-2024-0022",
+      product: "그램 16 (2024)",
+      group: "전자기기류",
+      sub: "노트북",
+      status: "lost",
+      serial: "SN-8842-AK",
+      createdAt: "2024-03-12",
+      purchaseDate: "2024-03-11",
+      price: 189e4,
+      expiry: "2027-03-10",
+      note: "2026-07 재택 반출 후 미회수, 분실 신고",
+      labels: ["분실추적"],
+      assignments: [{
+        employee: "한소희",
+        worksite: null,
+        since: "2024-09-05"
+      }]
+    }, {
+      id: "A020",
+      type: "individual",
+      assetNo: "IT-2024-0023",
+      product: "그램 16 (2024)",
+      group: "전자기기류",
+      sub: "노트북",
+      status: "disposed",
+      serial: "SN-8842-AL",
+      createdAt: "2024-03-12",
+      purchaseDate: "2024-03-11",
+      price: 189e4,
+      expiry: "2027-03-10",
+      labels: [],
+      assignments: []
+    }, {
+      id: "A003",
+      type: "individual",
+      assetNo: "IT-2023-0090",
+      product: "맥북 프로 14",
+      group: "전자기기류",
+      sub: "노트북",
+      status: "repair",
+      serial: "C02XR-99",
+      createdAt: "2023-08-03",
+      purchaseDate: "2023-08-02",
+      price: 269e4,
+      expiry: "",
+      photo: "#8854d0",
+      photoCount: 8,
+      note: "2026-08 배터리 스웰링으로 수리/점검 접수, 센터 입고",
+      labels: ["디자인팀"],
+      assignments: [{
+        employee: "이서연",
+        worksite: null,
+        since: "2023-08-10"
+      }]
+    }, {
+      id: "A004",
+      type: "individual",
+      assetNo: "FN-2022-0031",
+      product: "시디즈 T50",
+      group: "가구류",
+      sub: "의자",
+      status: "assigned",
+      serial: "",
+      createdAt: "2022-05-23",
+      purchaseDate: "2022-05-20",
+      price: 32e4,
+      expiry: "",
+      photo: "#26a69a",
+      labels: ["강남점"],
+      assignments: [{
+        employee: null,
+        worksite: "강남점",
+        since: "2022-06-01"
+      }]
+    }, {
+      id: "A005",
+      type: "individual",
+      assetNo: "FN-2022-0032",
+      product: "시디즈 T50",
+      group: "가구류",
+      sub: "의자",
+      status: "assigned",
+      serial: "",
+      createdAt: "2022-05-23",
+      purchaseDate: "2022-05-20",
+      price: 32e4,
+      expiry: "",
+      labels: [],
+      assignments: [{
+        employee: "박지훈",
+        worksite: null,
+        since: "2023-01-04"
+      }, {
+        employee: null,
+        worksite: "강남점",
+        since: "2023-06-01"
+      }, {
+        employee: null,
+        worksite: "판교점",
+        since: "2024-02-11"
+      }]
+    }, {
+      id: "A006",
+      type: "individual",
+      assetNo: "IT-2021-0005",
+      product: "델 U2720Q",
+      group: "전자기기류",
+      sub: "모니터",
+      status: "lost",
+      serial: "CN-0KL-77",
+      createdAt: "2021-11-16",
+      purchaseDate: "2021-11-15",
+      price: 69e4,
+      expiry: "",
+      note: "2026-07 재택 반출 후 미회수, 분실 신고",
+      labels: ["분실추적"],
+      assignments: [{
+        employee: "정우성",
+        worksite: null,
+        since: "2022-01-10"
+      }]
+    }, {
+      id: "A007",
+      type: "individual",
+      assetNo: "IT-2020-0001",
+      product: "HP 프로북 450",
+      group: "전자기기류",
+      sub: "노트북",
+      status: "disposed",
+      serial: "5CD-0-AA",
+      createdAt: "2020-02-03",
+      purchaseDate: "2020-02-01",
+      price: 95e4,
+      expiry: "",
+      labels: [],
+      assignments: []
+    }, {
+      id: "A008",
+      type: "individual",
+      assetNo: "FN-2025-0101",
+      product: "데스커 1400",
+      group: "가구류",
+      sub: "책상",
+      status: "assigned",
+      serial: "",
+      createdAt: "2025-01-21",
+      purchaseDate: "2025-01-20",
+      price: 21e4,
+      expiry: "",
+      photo: "#8395a7",
+      labels: ["판교점"],
+      assignments: [{
+        employee: null,
+        worksite: "판교점",
+        since: "2025-02-01"
+      }]
+    }, {
+      id: "A009",
+      type: "individual",
+      assetNo: "FN-2025-0102",
+      product: "데스커 1400",
+      group: "가구류",
+      sub: "책상",
+      status: "stock",
+      serial: "",
+      createdAt: "2025-03-11",
+      purchaseDate: "2025-03-10",
+      price: 21e4,
+      expiry: "",
+      labels: [],
+      assignments: []
+    }, {
+      id: "A010",
+      type: "individual",
+      assetNo: "IT-2022-0210",
+      product: "씽크패드 X1",
+      group: "전자기기류",
+      sub: "노트북",
+      status: "stock",
+      serial: "PF-2K9X-11",
+      createdAt: "2022-06-10",
+      purchaseDate: "2022-06-09",
+      price: 165e4,
+      expiry: "2026-07-01",
+      labels: [],
+      assignments: []
+    },
     // 구성원별·근무지별 "배정된 자산" 칩·모달의 5개 초과 오버플로("+N") 케이스를 화면에서 실제로 볼 수 있게,
     // 구성원 1명(오세훈)·근무지 1곳(본사)에 소분류 7종(5개 초과)을 걸치도록 자산을 추가함(서랍장은 분류 관리
     // 모달의 "활성 상태 삭제" 테스트용 빈 소분류라 그대로 비워둠)
-    { id: "A021", type: "individual", assetNo: "FN-2025-0103", product: "데스커 1400", group: "가구류", sub: "책상",
-      status: "assigned", serial: "", createdAt: "2025-01-21", purchaseDate: "2025-01-20", price: 210000, expiry: "",
-      labels: [], assignments: [{ employee: "오세훈", worksite: null, since: "2025-03-02" }] },
-    { id: "A022", type: "individual", assetNo: "FN-2022-0033", product: "시디즈 T50", group: "가구류", sub: "의자",
-      status: "assigned", serial: "", createdAt: "2022-05-23", purchaseDate: "2022-05-20", price: 320000, expiry: "",
-      labels: [], assignments: [{ employee: "오세훈", worksite: null, since: "2022-07-14" }] },
-    { id: "A023", type: "individual", assetNo: "IT-2023-0091", product: "맥북 프로 14", group: "전자기기류", sub: "노트북",
-      status: "assigned", serial: "C02XR-A1", createdAt: "2023-08-03", purchaseDate: "2023-08-02", price: 2690000, expiry: "",
-      labels: [], assignments: [{ employee: "오세훈", worksite: null, since: "2023-09-01" }] },
-    { id: "A024", type: "individual", assetNo: "IT-2021-0006", product: "델 U2720Q", group: "전자기기류", sub: "모니터",
-      status: "assigned", serial: "CN-0KL-78", createdAt: "2021-11-16", purchaseDate: "2021-11-15", price: 690000, expiry: "",
-      labels: [], assignments: [{ employee: "오세훈", worksite: null, since: "2022-02-05" }] },
-    { id: "A025", type: "individual", assetNo: "FN-2025-0104", product: "데스커 1400", group: "가구류", sub: "책상",
-      status: "assigned", serial: "", createdAt: "2025-01-21", purchaseDate: "2025-01-20", price: 210000, expiry: "",
-      labels: ["본사"], assignments: [{ employee: null, worksite: "본사", since: "2025-04-10" }] },
-    { id: "A026", type: "individual", assetNo: "FN-2022-0034", product: "시디즈 T50", group: "가구류", sub: "의자",
-      status: "assigned", serial: "", createdAt: "2022-05-23", purchaseDate: "2022-05-20", price: 320000, expiry: "",
-      labels: ["본사"], assignments: [{ employee: null, worksite: "본사", since: "2022-08-20" }] },
-    { id: "A027", type: "individual", assetNo: "IT-2022-0211", product: "씽크패드 X1", group: "전자기기류", sub: "노트북",
-      status: "assigned", serial: "PF-2K9X-12", createdAt: "2022-06-10", purchaseDate: "2022-06-09", price: 1650000, expiry: "2026-07-01",
-      labels: ["본사"], assignments: [{ employee: null, worksite: "본사", since: "2022-09-01" }] },
-    { id: "A028", type: "individual", assetNo: "IT-2021-0007", product: "델 U2720Q", group: "전자기기류", sub: "모니터",
-      status: "assigned", serial: "CN-0KL-79", createdAt: "2021-11-16", purchaseDate: "2021-11-15", price: 690000, expiry: "",
-      labels: ["본사"], assignments: [{ employee: null, worksite: "본사", since: "2022-03-01" }] },
+    {
+      id: "A021",
+      type: "individual",
+      assetNo: "FN-2025-0103",
+      product: "데스커 1400",
+      group: "가구류",
+      sub: "책상",
+      status: "assigned",
+      serial: "",
+      createdAt: "2025-01-21",
+      purchaseDate: "2025-01-20",
+      price: 21e4,
+      expiry: "",
+      labels: [],
+      assignments: [{
+        employee: "오세훈",
+        worksite: null,
+        since: "2025-03-02"
+      }]
+    }, {
+      id: "A022",
+      type: "individual",
+      assetNo: "FN-2022-0033",
+      product: "시디즈 T50",
+      group: "가구류",
+      sub: "의자",
+      status: "assigned",
+      serial: "",
+      createdAt: "2022-05-23",
+      purchaseDate: "2022-05-20",
+      price: 32e4,
+      expiry: "",
+      labels: [],
+      assignments: [{
+        employee: "오세훈",
+        worksite: null,
+        since: "2022-07-14"
+      }]
+    }, {
+      id: "A023",
+      type: "individual",
+      assetNo: "IT-2023-0091",
+      product: "맥북 프로 14",
+      group: "전자기기류",
+      sub: "노트북",
+      status: "assigned",
+      serial: "C02XR-A1",
+      createdAt: "2023-08-03",
+      purchaseDate: "2023-08-02",
+      price: 269e4,
+      expiry: "",
+      labels: [],
+      assignments: [{
+        employee: "오세훈",
+        worksite: null,
+        since: "2023-09-01"
+      }]
+    }, {
+      id: "A024",
+      type: "individual",
+      assetNo: "IT-2021-0006",
+      product: "델 U2720Q",
+      group: "전자기기류",
+      sub: "모니터",
+      status: "assigned",
+      serial: "CN-0KL-78",
+      createdAt: "2021-11-16",
+      purchaseDate: "2021-11-15",
+      price: 69e4,
+      expiry: "",
+      labels: [],
+      assignments: [{
+        employee: "오세훈",
+        worksite: null,
+        since: "2022-02-05"
+      }]
+    }, {
+      id: "A025",
+      type: "individual",
+      assetNo: "FN-2025-0104",
+      product: "데스커 1400",
+      group: "가구류",
+      sub: "책상",
+      status: "assigned",
+      serial: "",
+      createdAt: "2025-01-21",
+      purchaseDate: "2025-01-20",
+      price: 21e4,
+      expiry: "",
+      labels: ["본사"],
+      assignments: [{
+        employee: null,
+        worksite: "본사",
+        since: "2025-04-10"
+      }]
+    }, {
+      id: "A026",
+      type: "individual",
+      assetNo: "FN-2022-0034",
+      product: "시디즈 T50",
+      group: "가구류",
+      sub: "의자",
+      status: "assigned",
+      serial: "",
+      createdAt: "2022-05-23",
+      purchaseDate: "2022-05-20",
+      price: 32e4,
+      expiry: "",
+      labels: ["본사"],
+      assignments: [{
+        employee: null,
+        worksite: "본사",
+        since: "2022-08-20"
+      }]
+    }, {
+      id: "A027",
+      type: "individual",
+      assetNo: "IT-2022-0211",
+      product: "씽크패드 X1",
+      group: "전자기기류",
+      sub: "노트북",
+      status: "assigned",
+      serial: "PF-2K9X-12",
+      createdAt: "2022-06-10",
+      purchaseDate: "2022-06-09",
+      price: 165e4,
+      expiry: "2026-07-01",
+      labels: ["본사"],
+      assignments: [{
+        employee: null,
+        worksite: "본사",
+        since: "2022-09-01"
+      }]
+    }, {
+      id: "A028",
+      type: "individual",
+      assetNo: "IT-2021-0007",
+      product: "델 U2720Q",
+      group: "전자기기류",
+      sub: "모니터",
+      status: "assigned",
+      serial: "CN-0KL-79",
+      createdAt: "2021-11-16",
+      purchaseDate: "2021-11-15",
+      price: 69e4,
+      expiry: "",
+      labels: ["본사"],
+      assignments: [{
+        employee: null,
+        worksite: "본사",
+        since: "2022-03-01"
+      }]
+    },
     // 근무지 자산 "조회 가능한 자산이 하나도 없는 근무지" 빈 상태 데모용(2026-09-30) — 역삼점(김민수의 담당
     // 근무지, app.js MY_WORKSITES)의 유일한 자산이 모니터(조회 권한 "모든 관리자 및 리더", 관리자/리더 필드가
     // 없는 이 프로토타입에선 전원 필터링)라 근무지 자산 화면에서 역삼점 카드가 "전체 0"+빈 상태로 뜸
-    { id: "A029", type: "individual", assetNo: "IT-2021-0008", product: "델 U2720Q", group: "전자기기류", sub: "모니터",
-      status: "assigned", serial: "CN-0KL-80", createdAt: "2021-11-16", purchaseDate: "2021-11-15", price: 690000, expiry: "",
-      labels: ["역삼점"], assignments: [{ employee: null, worksite: "역삼점", since: "2022-03-01" }] },
-
-    // total_qty 120, 배분합계 115 — 잔여 5개(미배분, 소진 아님) 시연용. 한소희는 0개 보유(소진이 아닌
-    // 품목에 속한 0개짜리 보유 대상이라 "미보유대상" 통계에 실제로 잡히는 유일한 샘플)
-    { id: "A101", type: "quantity", assetNo: "", product: "2026 하복 유니폼", group: "소모품", sub: "유니폼",
-      status: "held", totalQty: 120, serial: "", createdAt: "2026-04-02", purchaseDate: "2026-04-01", price: 18000, manufactured: "2026-03-15",
-      expiry: "2027-04-01", note: "L/XL 사이즈 위주 소진 빠름", photo: "#e67e22", photoCount: 10,
-      labels: ["하복"], stocks: [
-        { worksite: "강남점", employee: null, qty: 60 },
-        { worksite: "판교점", employee: null, qty: 40 },
-        { worksite: null, employee: "김철수", qty: 12 },
-        { worksite: null, employee: "오세훈", qty: 3 },
-        { worksite: null, employee: "한소희", qty: 0 },
-      ] },
-    { id: "A102", type: "quantity", assetNo: "", product: "USB-C 케이블 2m", group: "전자기기류", sub: "케이블·액세서리",
-      status: "held", totalQty: 47, serial: "", createdAt: "2025-09-11", purchaseDate: "2025-09-10", price: 9000, expiry: "",
-      labels: [], stocks: [
-        { worksite: "본사", employee: null, qty: 34 },
-        { worksite: "강남점", employee: null, qty: 8 },
-        { worksite: null, employee: "오세훈", qty: 5 },
-      ] },
-    { id: "A103", type: "quantity", assetNo: "", product: "A4 복사용지", group: "소모품", sub: "문구류",
-      status: "held", totalQty: 10, serial: "", createdAt: "2026-06-02", purchaseDate: "2026-06-01", price: 4200, expiry: "2028-06-01",
-      labels: ["소모"], stocks: [
-        { worksite: "본사", employee: null, qty: 0 },
-        { worksite: null, employee: "오세훈", qty: 10 },
-      ] },
-    { id: "A104", type: "quantity", assetNo: "", product: "2025 동복 유니폼", group: "소모품", sub: "유니폼",
-      status: "held", totalQty: 33, serial: "", createdAt: "2025-10-02", purchaseDate: "2025-10-01", price: 24000, expiry: "2026-09-08",
-      labels: ["동복"], stocks: [
-        { worksite: "판교점", employee: null, qty: 25 },
-        { worksite: "본사", employee: null, qty: 8 },
-      ] },
-    // 보유 대상 0건(전액 미배분) 샘플 — 상세 페이지 보유 현황 빈 상태 문구 + 전체 탭 "재고" 상태 확인용.
-    // total_qty는 있는데(20개 구매) 아직 아무에게도 배분 안 한 상태 — 배분합계 0 → 재고
-    { id: "A105", type: "quantity", assetNo: "", product: "무선 마우스", group: "전자기기류", sub: "케이블·액세서리",
-      status: "stock", totalQty: 20, serial: "", createdAt: "2026-08-01", purchaseDate: "2026-07-30", price: 25000, expiry: "",
-      labels: [], stocks: [] },
-    // 보유 대상 21건(20개 페이지네이션 확인용 — 근무지 3곳+기존 구성원 12명만으론 15건뿐이라 부족해서
+    {
+      id: "A029",
+      type: "individual",
+      assetNo: "IT-2021-0008",
+      product: "델 U2720Q",
+      group: "전자기기류",
+      sub: "모니터",
+      status: "assigned",
+      serial: "CN-0KL-80",
+      createdAt: "2021-11-16",
+      purchaseDate: "2021-11-15",
+      price: 69e4,
+      expiry: "",
+      labels: ["역삼점"],
+      assignments: [{
+        employee: null,
+        worksite: "역삼점",
+        since: "2022-03-01"
+      }]
+    }, {
+      id: "A101",
+      type: "individual",
+      assetNo: "DEMO-A101",
+      product: "2026 하복 유니폼",
+      group: "소모품",
+      sub: "유니폼",
+      status: "assigned",
+      serial: "",
+      createdAt: "2026-04-02",
+      purchaseDate: "2026-04-01",
+      price: 18e3,
+      manufactured: "2026-03-15",
+      expiry: "2027-04-01",
+      note: "L/XL 사이즈 위주 소진 빠름",
+      photo: "#e67e22",
+      photoCount: 10,
+      labels: ["하복"],
+      assignments: [{
+        worksite: "강남점",
+        employee: null,
+        since: "2026-06-01"
+      }]
+    }, {
+      id: "A102",
+      type: "individual",
+      assetNo: "DEMO-A102",
+      product: "USB-C 케이블 2m",
+      group: "전자기기류",
+      sub: "케이블·액세서리",
+      status: "assigned",
+      serial: "",
+      createdAt: "2025-09-11",
+      purchaseDate: "2025-09-10",
+      price: 9e3,
+      expiry: "",
+      labels: [],
+      assignments: [{
+        worksite: "본사",
+        employee: null,
+        since: "2026-06-01"
+      }]
+    }, {
+      id: "A103",
+      type: "individual",
+      assetNo: "DEMO-A103",
+      product: "A4 복사용지 한 박스",
+      group: "소모품",
+      sub: "문구류",
+      status: "assigned",
+      serial: "",
+      createdAt: "2026-06-02",
+      purchaseDate: "2026-06-01",
+      price: 4200,
+      expiry: "2028-06-01",
+      labels: ["소모"],
+      assignments: [{
+        employee: "오세훈",
+        worksite: null,
+        since: "2026-06-01"
+      }]
+    }, {
+      id: "A104",
+      type: "individual",
+      assetNo: "DEMO-A104",
+      product: "2025 동복 유니폼",
+      group: "소모품",
+      sub: "유니폼",
+      status: "assigned",
+      serial: "",
+      createdAt: "2025-10-02",
+      purchaseDate: "2025-10-01",
+      price: 24e3,
+      expiry: "2026-09-08",
+      labels: ["동복"],
+      assignments: [{
+        worksite: "판교점",
+        employee: null,
+        since: "2026-06-01"
+      }]
+    }, {
+      id: "A105",
+      type: "individual",
+      assetNo: "DEMO-A105",
+      product: "무선 마우스",
+      group: "전자기기류",
+      sub: "케이블·액세서리",
+      status: "stock",
+      serial: "",
+      createdAt: "2026-08-01",
+      purchaseDate: "2026-07-30",
+      price: 25e3,
+      expiry: "",
+      labels: [],
+      assignments: []
+    },
     // 신규 구성원 6명 추가. 다만 이번엔 데모 전용이라 MEMBERS/MEMBER_INFO/EMP_GROUP엔 등록 안 함(그 목록들에
-    // 없어도 assignIdentity()가 "—"로 무해하게 처리) — "보유 대상 추가" 후보 목록엔 안 뜨는 점 참고
-    { id: "A106", type: "quantity", assetNo: "", product: "네임펜 세트", group: "소모품", sub: "문구류",
-      status: "held", totalQty: 70, serial: "", createdAt: "2026-03-02", purchaseDate: "2026-03-01", price: 3500, expiry: "",
-      labels: [], stocks: [
-        { worksite: "강남점", employee: null, qty: 8 },
-        { worksite: "판교점", employee: null, qty: 6 },
-        { worksite: "본사", employee: null, qty: 10 },
-        { worksite: null, employee: "김민수", qty: 2 },
-        { worksite: null, employee: "이서연", qty: 3 },
-        { worksite: null, employee: "박지훈", qty: 1 },
-        { worksite: null, employee: "정우성", qty: 4 },
-        { worksite: null, employee: "김철수", qty: 0 },
-        { worksite: null, employee: "최유진", qty: 2 },
-        { worksite: null, employee: "한소희", qty: 3 },
-        { worksite: null, employee: "장민호", qty: 1 },
-        { worksite: null, employee: "오세훈", qty: 5 },
-        { worksite: null, employee: "배수지", qty: 2 },
-        { worksite: null, employee: "윤재현", qty: 3 },
-        { worksite: null, employee: "임하늘", qty: 1 },
-        { worksite: null, employee: "신동욱", qty: 2 },
-        { worksite: null, employee: "구자영", qty: 1 },
-        { worksite: null, employee: "황민재", qty: 3 },
-        { worksite: null, employee: "서지우", qty: 2 },
-        { worksite: null, employee: "권태호", qty: 4 },
-        { worksite: null, employee: "나윤아", qty: 1 },
-      ] },
-  ];
-
-  // 태그 마스터 목록 — 기존 자산들에 찍힌 distinct 라벨로 초기 시드(태그 관리 모달 도입 이후로는 이 배열이 기준이 됨)
-  const tags = [...new Set(assets.flatMap(a => a.labels || []))].sort((a, b) => a.localeCompare(b, "ko"));
-
-  // 최근 수정일시 — 실제로는 AssetActivity(5.5)에서 자산별 최근 이벤트 시각을 파생하는 것과 동일한 개념.
-  // 상세 화면 이력(detail.js의 activityOf)이 만들어내는 이벤트와 같은 소스 기준으로, 그중 가장 늦은 날짜를 미리 계산해둠
+    {
+      id: "A106",
+      type: "individual",
+      assetNo: "DEMO-A106",
+      product: "네임펜 세트",
+      group: "소모품",
+      sub: "문구류",
+      status: "assigned",
+      serial: "",
+      createdAt: "2026-03-02",
+      purchaseDate: "2026-03-01",
+      price: 3500,
+      expiry: "",
+      labels: [],
+      assignments: [{
+        employee: "김민수",
+        worksite: null,
+        since: "2026-06-01"
+      }]
+    }],
+    tags = [...new Set(assets.flatMap(a => a.labels || []))].sort((a, b) => a.localeCompare(b, "ko"));
   assets.forEach(a => {
     const dates = [a.createdAt || a.purchaseDate || "2024-01-01"];
-    (a.assignments || []).forEach(x => dates.push(x.since));
-    if ((a.stocks || []).length) dates.push(a.purchaseDate || "2025-01-01");
-    if (a.status === "repair") dates.push("2026-08-14");
-    if (a.status === "lost") dates.push("2026-07-21");
-    if (a.status === "disposed") dates.push("2025-12-30");
-    if (a.note) dates.push("2026-06-02");
-    a.updatedAt = dates.reduce((max, d) => (d > max ? d : max));
+    (a.assignments || []).forEach(x => dates.push(x.since)), a.status === "repair" && dates.push("2026-08-14"), a.status === "lost" && dates.push("2026-07-21"), a.status === "disposed" && dates.push("2025-12-30"), a.note && dates.push("2026-06-02"), a.updatedAt = dates.reduce((max, d) => d > max ? d : max);
   });
-
-  // 자산 삭제는 상세 → 목록으로 실제 페이지 이동(location.href)이 뒤따르는데, 이 앱은 인메모리 전용이라
-  // 이동한 페이지에서 이 스크립트가 처음부터 다시 실행되며 방금 한 splice가 무효화됨 — 그래서 삭제 직전에
-  // sessionStorage에 남겨둔 id를 여기서 한 번 더 적용해 페이지가 바뀌어도 삭제가 유지되게 함
   const deletedAssets = [];
   try {
     const saved = sessionStorage.getItem("justDeletedAssetRecord");
-    if (saved) { deletedAssets.push(JSON.parse(saved)); sessionStorage.removeItem("justDeletedAssetRecord"); }
+    saved && (deletedAssets.push(JSON.parse(saved)), sessionStorage.removeItem("justDeletedAssetRecord"));
     const delId = sessionStorage.getItem("justDeletedAssetId");
     if (delId) {
       sessionStorage.removeItem("justDeletedAssetId");
       const idx = assets.findIndex(a => a.id === delId);
-      if (idx > -1) assets.splice(idx, 1);
+      idx > -1 && assets.splice(idx, 1);
     }
-  } catch (e) { /* sessionStorage 접근 불가 환경 대비 */ }
-
-  // 배정/보유 대상의 상태를 기존 구성원·근무지 응답에서 전달받는 프로토타입 연결 지점.
-  // employee: active/retired, worksite: active/inactive. 값이 없는 기존 데모 대상은 활성으로 가정한다.
-  // 실제 앱에서는 이름 키 대신 기존 대상 ID/상태 응답을 사용하며, 자산 상태와 혼동하지 않는다.
-  // 상태가 바뀌어도 기존 배정/보유 레코드나 수량은 여기서 자동 변경하지 않는다.
-  const targetStatuses = { employee: {}, worksite: {} };
-  return { categories, assets, deletedAssets, emptyGroups, tags, targetStatuses };
-})();
-
-/* 자산 관리 공통 날짜 표기: yyyy.mm.dd(요일) hh:mm / 날짜만: yyyy.mm.dd(요일) */
+  } catch {}
+  return {
+    categories,
+    assets,
+    deletedAssets,
+    emptyGroups,
+    tags,
+    targetStatuses: {
+      employee: {},
+      worksite: {}
+    }
+  };
+}();
 (function () {
-  const DAYS = ["일", "월", "화", "수", "목", "금", "토"];
-  const p = n => String(n).padStart(2, "0");
-  const parse = s => new Date(String(s).replace(" ", "T"));
-  window.fmtDate = s => { if (!s) return "—"; const d = parse(s); return `${d.getFullYear()}.${p(d.getMonth() + 1)}.${p(d.getDate())}(${DAYS[d.getDay()]})`; };
-  window.fmtDateTime = s => { if (!s) return "—"; const d = parse(s); return `${window.fmtDate(s)} ${p(d.getHours())}:${p(d.getMinutes())}`; };
-  // 제조연월·구매연월 전용(2026-09-30, 일 단위 제거 — 저장은 그대로 YYYY-MM-01이라 일자를 무시하고 연월만 표기)
-  window.fmtMonth = s => { if (!s) return "—"; const d = parse(s); return `${d.getFullYear()}.${p(d.getMonth() + 1)}`; };
+  const DAYS = ["일", "월", "화", "수", "목", "금", "토"],
+    p = n => String(n).padStart(2, "0"),
+    parse = s => new Date(String(s).replace(" ", "T"));
+  window.fmtDate = s => {
+    if (!s) return "—";
+    const d = parse(s);
+    return `${d.getFullYear()}.${p(d.getMonth() + 1)}.${p(d.getDate())}(${DAYS[d.getDay()]})`;
+  }, window.fmtDateTime = s => {
+    if (!s) return "—";
+    const d = parse(s);
+    return `${window.fmtDate(s)} ${p(d.getHours())}:${p(d.getMinutes())}`;
+  }, window.fmtMonth = s => {
+    if (!s) return "—";
+    const d = parse(s);
+    return `${d.getFullYear()}.${p(d.getMonth() + 1)}`;
+  };
 })();
-
-/* 그룹·직무/직급 권한 판정(2026-10-13): 기존 Shopl 그룹/직무 대상 선택 기준을 준용한다.
-   같은 축의 여러 선택은 OR, 그룹과 직무/직급 사이에는 AND. 한 축만 지정하면 다른 축은 전체이며
-   양쪽 모두 미선택은 미설정(조회 허용 아님). 하위 그룹은 선택기에서 함께 선택한 실제 목록으로 판정한다.
-   아래 직무/직급은 기존 데모 구성원을 위한 샘플일 뿐, 직무명으로 관리자/리더 역할을 추정하지 않는다.
-   실 서비스는 그룹 ID·직무/직급 ID와 명시적 전체 플래그를 사용하고 회사 권한/조회 예외를 별도 판정한다. */
 window.ASSET_MEMBER_JOB_TITLES = {
-  "김민수": "팀장", "이서연": "매니저", "박지훈": "매니저", "정우성": "사원",
-  "김철수": "팀장", "최유진": "주임", "한소희": "사원", "장민호": "매니저",
-  "오세훈": "주임", "배수지": "사원", "윤재현": "매니저", "임하늘": null,
+  김민수: "팀장",
+  이서연: "매니저",
+  박지훈: "매니저",
+  정우성: "사원",
+  김철수: "팀장",
+  최유진: "주임",
+  한소희: "사원",
+  장민호: "매니저",
+  오세훈: "주임",
+  배수지: "사원",
+  윤재현: "매니저",
+  임하늘: null
 };
 window.matchesAssetGroupPositionTarget = function (target, group, jobTitle) {
-  const groups = target?.groups || [], jobs = target?.jobTitles || [];
-  if (!groups.length && !jobs.length) return false;
-  const matchesGroup = !groups.length || groups.includes(group);
-  const matchesJob = !jobs.length || (jobTitle !== undefined && jobs.includes(jobTitle || "직무/직급 없음"));
+  const groups = target?.groups || [],
+    jobs = target?.jobTitles || [];
+  if (!groups.length && !jobs.length) return !1;
+  const matchesGroup = !groups.length || groups.includes(group),
+    matchesJob = !jobs.length || jobTitle !== void 0 && jobs.includes(jobTitle || "직무/직급 없음");
   return matchesGroup && matchesJob;
 };
 window.isAssetGroupPositionSubset = function (target, viewTarget) {
-  const groups = target?.groups || [], jobs = target?.jobTitles || [];
-  const viewGroups = viewTarget?.groups || [], viewJobs = viewTarget?.jobTitles || [];
-  if ((!groups.length && !jobs.length) || (!viewGroups.length && !viewJobs.length)) return false;
-  return [[groups, viewGroups], [jobs, viewJobs]]
-    .every(([selected, allowed]) => !allowed.length || (selected.length > 0 && selected.every(value => allowed.includes(value))));
+  const groups = target?.groups || [],
+    jobs = target?.jobTitles || [],
+    viewGroups = viewTarget?.groups || [],
+    viewJobs = viewTarget?.jobTitles || [];
+  return !groups.length && !jobs.length || !viewGroups.length && !viewJobs.length ? !1 : [[groups, viewGroups], [jobs, viewJobs]].every(([selected, allowed]) => !allowed.length || selected.length > 0 && selected.every(value => allowed.includes(value)));
 };
-
-/* 구매가격 통화 표기 — 자산마다 다른 게 아니라 클라이언트(회사) 단위로 하나만 설정되는 전역 값(구조설계안 3.4).
-   통화 코드마다 기호 위치(접두/접미)가 달라서 표시 로직을 한 곳에 모아둠 — CLIENT_CURRENCY만 바꾸면
-   화면·엑셀 전체의 구매가격 표기가 같이 바뀜. 지금은 회사 설정 화면이 없어 상수로 고정(기본값 KRW) */
 (function () {
   const CURRENCY_FORMATS = {
-    KRW: { symbol: "원", position: "suffix" },
-    USD: { symbol: "$", position: "prefix" },
-    JPY: { symbol: "円", position: "suffix" },
-    EUR: { symbol: "€", position: "prefix" },
+    KRW: {
+      symbol: "원",
+      position: "suffix"
+    },
+    USD: {
+      symbol: "$",
+      position: "prefix"
+    },
+    JPY: {
+      symbol: "円",
+      position: "suffix"
+    },
+    EUR: {
+      symbol: "€",
+      position: "prefix"
+    }
   };
   window.CLIENT_CURRENCY = "KRW";
-  // 구매가격 공통 정책(2026-10-13): 구분자를 제외한 정수부 12자리, 소수부 5자리.
-  // 정수 표시의 15자에 소수점/소수부는 별도로 더해진다. 숫자로 변환하면 큰 소수 금액의
-  // 끝자리가 반올림되므로 편집·저장·표시는 십진 문자열로 처리한다(기존 숫자 시드도 호환).
-  const PRICE_INTEGER_DIGITS = 12;
-  const PRICE_FRACTION_DIGITS = 5;
+  const PRICE_INTEGER_DIGITS = 12,
+    PRICE_FRACTION_DIGITS = 5;
   function priceInputText(value) {
     const raw = String(value ?? "").replace(/,/g, "").replace(/[^0-9.]/g, "");
     if (!raw) return "";
     const [integer, ...fractions] = raw.split(".");
-    const whole = integer.replace(/^0+(?=\d)/, "").slice(0, PRICE_INTEGER_DIGITS) || "0";
-    return whole + (fractions.length ? "." + fractions.join("").slice(0, PRICE_FRACTION_DIGITS) : "");
+    return (integer.replace(/^0+(?=\d)/, "").slice(0, PRICE_INTEGER_DIGITS) || "0") + (fractions.length ? "." + fractions.join("").slice(0, PRICE_FRACTION_DIGITS) : "");
   }
   window.normalizePurchasePrice = function (value) {
     const raw = priceInputText(value);
     if (!raw) return "";
-    const [integer, fraction = ""] = raw.split(".");
-    const significantFraction = fraction.replace(/0+$/, "");
+    const [integer, fraction = ""] = raw.split("."),
+      significantFraction = fraction.replace(/0+$/, "");
     return integer + (significantFraction ? "." + significantFraction : "");
-  };
-  window.formatPurchasePriceInput = function (value) {
+  }, window.formatPurchasePriceInput = function (value) {
     const raw = priceInputText(value);
     if (!raw) return "";
     const [integer, fraction] = raw.split(".");
-    return integer.replace(/\B(?=(\d{3})+(?!\d))/g, ",") + (fraction !== undefined ? "." + fraction : "");
-  };
-  window.bindPurchasePriceInput = function (input) {
+    return integer.replace(/\B(?=(\d{3})+(?!\d))/g, ",") + (fraction !== void 0 ? "." + fraction : "");
+  }, window.bindPurchasePriceInput = function (input) {
     input.addEventListener("input", () => {
-      const position = input.selectionStart;
-      const charactersBefore = input.value.slice(0, position).replace(/[^0-9.]/g, "").length;
-      input.value = window.formatPurchasePriceInput(input.value);
-      if (position != null) {
-        let cursor = 0, seen = 0;
-        while (cursor < input.value.length && seen < charactersBefore) {
-          if (/[0-9.]/.test(input.value[cursor])) seen++;
-          cursor++;
-        }
+      const position = input.selectionStart,
+        charactersBefore = input.value.slice(0, position).replace(/[^0-9.]/g, "").length;
+      if (input.value = window.formatPurchasePriceInput(input.value), position != null) {
+        let cursor = 0,
+          seen = 0;
+        for (; cursor < input.value.length && seen < charactersBefore;) /[0-9.]/.test(input.value[cursor]) && seen++, cursor++;
         input.setSelectionRange(cursor, cursor);
       }
     });
-  };
-  window.formatPrice = function (amount) {
+  }, window.formatPrice = function (amount) {
     if (amount == null || amount === "") return "";
-    const fmt = CURRENCY_FORMATS[window.CLIENT_CURRENCY] || CURRENCY_FORMATS.KRW;
-    const n = window.formatPurchasePriceInput(window.normalizePurchasePrice(amount));
+    const fmt = CURRENCY_FORMATS[window.CLIENT_CURRENCY] || CURRENCY_FORMATS.KRW,
+      n = window.formatPurchasePriceInput(window.normalizePurchasePrice(amount));
     return fmt.position === "prefix" ? `${fmt.symbol}${n}` : `${n}${fmt.symbol}`;
   };
 })();
-
-/* 자산 사진 정책(2026-10-13): 사진당 20MB 수준의 기존 Shopl 공통 첨부 정책을 준용한다.
-   대시보드 직접 파일은 JPEG/JPG·PNG 및 디코딩 검증, 앱은 공통 카메라/갤러리·변환/축소 경로를 사용한다.
-   바이트 계산과 용량 검사 시점·변환 품질은 플랫폼 공통 코드에 위임하며 PSID의 10MB 예외는 가져오지 않는다.
-   현재 사진 첨부는 색상 스와치 목업으로 실 파일 선택·용량 검사·압축·서버 업로드를 수행하지 않는다.
-   실 서비스 구현에서 아래 장수 제한과 공통 첨부 검증/전처리를 함께 적용해야 한다. */
 window.ASSET_PHOTO_MAX_COUNT = 10;
 window.ASSET_TAG_MAX_COUNT = 10;
-
-/* 공통 사진 헬퍼 — 목록·상세가 같은 대표 사진을 쓰도록 공유 */
 window.tintHex = function (hex, amt) {
-  const n = parseInt(hex.slice(1), 16);
-  const cl = v => Math.max(0, Math.min(255, v));
-  const r = cl((n >> 16) + amt), g = cl(((n >> 8) & 255) + amt), b = cl((n & 255) + amt);
+  const n = parseInt(hex.slice(1), 16),
+    cl = v => Math.max(0, Math.min(255, v)),
+    r = cl((n >> 16) + amt),
+    g = cl((n >> 8 & 255) + amt),
+    b = cl((n & 255) + amt);
   return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
 };
-window.assetPhotos = (function () {
-  const TINTS = [0, 26, -24, 42, -40, 14, -12, 34, -30, 8];
-  const DATES = ["2026-08-28 14:10", "2026-08-28 14:12", "2026-07-15 09:33", "2026-07-15 09:34", "2026-06-02 17:20", "2026-06-02 17:22", "2026-05-20 11:05", "2026-05-20 11:06", "2026-04-10 08:48", "2026-04-10 08:49"];
-  const BY = ["dana", "김민수", "dana", "이서연", "dana", "김민수", "dana", "이서연", "dana", "김민수"];
+window.assetPhotos = /* @__PURE__ */function () {
+  const TINTS = [0, 26, -24, 42, -40, 14, -12, 34, -30, 8],
+    DATES = ["2026-08-28 14:10", "2026-08-28 14:12", "2026-07-15 09:33", "2026-07-15 09:34", "2026-06-02 17:20", "2026-06-02 17:22", "2026-05-20 11:05", "2026-05-20 11:06", "2026-04-10 08:48", "2026-04-10 08:49"],
+    BY = ["dana", "김민수", "dana", "이서연", "dana", "김민수", "dana", "이서연", "dana", "김민수"];
   return function (a) {
-    if (a._photos) return a._photos;
-    if (!a.photo) return (a._photos = []);
-    a._primary = 0;
-    return (a._photos = TINTS.slice(0, a.photoCount || 5).map((t, i) => ({
+    return a._photos ? a._photos : a.photo ? (a._primary = 0, a._photos = TINTS.slice(0, a.photoCount || 5).map((t, i) => ({
       id: `${a.id}-p${i + 1}`,
       color: t === 0 ? a.photo : window.tintHex(a.photo, t),
-      at: DATES[i], by: BY[i],
-    })));
+      at: DATES[i],
+      by: BY[i]
+    }))) : a._photos = [];
   };
-})();
-
-/* 사진 활동 이력(2026-10-13 확정, 설계 기록 D-20261013-34 · 활동 이력 정책 2절)
- * - 사진 추가·삭제는 저장 1회당 "자산 사진 관리: 사진 변경" 1건. 추가와 삭제가 섞여도 1건이며
- *   기존 = 저장 전 목록 전체, 변경 = 저장 후 목록 전체(0장이면 "없음").
- * - "자산 사진 관리: 대표 사진 변경"은 저장 전후 대표가 다르고 양쪽 모두 대표가 있을 때만 기록한다.
- *   직접 지정과 대표 삭제에 따른 승계를 같게 다룬다. 0장에서 첫 추가·전부 삭제는 사진 변경만 남는다.
- * - 둘 다 해당하면 사진 변경 → 대표 사진 변경 순서로 기록한다. 원복해 전후가 같으면 아무것도 남기지 않는다.
- * - 자산 추가 때 첨부한 사진은 "자산 등록"에 포함하므로 추가 저장에서는 이 헬퍼를 호출하지 않는다.
- * 사진은 배열 위치가 아니라 id로 식별한다. 이력에는 복사본을 넣어 삭제된 사진도 계속 보여준다.
- * 프로토타입 사진은 색상 목업이라 썸네일도 색상 칸으로 그린다. */
-window.assetPhotoId = (function () {
+}();
+window.assetPhotoId = /* @__PURE__ */function () {
   let seq = 0;
   return () => `photo-${Date.now().toString(36)}-${++seq}`;
-})();
+}();
 window.assetPhotoActivities = function (beforePhotos, beforePrimary, afterPhotos, afterPrimary) {
-  const key = p => p.id || [p.color, p.at, p.by].join("|");
-  const copy = list => (list || []).map(p => ({ ...p }));
-  const before = copy(beforePhotos), after = copy(afterPhotos);
-  const entries = [];
-  const sameList = before.length === after.length && before.every((p, i) => key(p) === key(after[i]));
-  if (!sameList) entries.push({ script: "자산 사진 관리: 사진 변경", photoValue: true, before, after });
-  const beforeMain = before[beforePrimary || 0] || null, afterMain = after[afterPrimary || 0] || null;
-  if (beforeMain && afterMain && key(beforeMain) !== key(afterMain)) {
-    entries.push({ script: "자산 사진 관리: 대표 사진 변경", photoValue: true, before: [beforeMain], after: [afterMain] });
-  }
-  return entries;
+  const key = p => p.id || [p.color, p.at, p.by].join("|"),
+    copy = list => (list || []).map(p => ({
+      ...p
+    })),
+    before = copy(beforePhotos),
+    after = copy(afterPhotos),
+    entries = [];
+  before.length === after.length && before.every((p, i) => key(p) === key(after[i])) || entries.push({
+    script: "자산 사진 관리: 사진 변경",
+    photoValue: !0,
+    before,
+    after
+  });
+  const beforeMain = before[beforePrimary || 0] || null,
+    afterMain = after[afterPrimary || 0] || null;
+  return beforeMain && afterMain && key(beforeMain) !== key(afterMain) && entries.push({
+    script: "자산 사진 관리: 대표 사진 변경",
+    photoValue: !0,
+    before: [beforeMain],
+    after: [afterMain]
+  }), entries;
 };
 window.assetPhotoThumbsHtml = function (list) {
-  if (!list || !list.length) return "없음";
-  return `<span class="hval-photos">${list.map(p => `<span class="hval-photo" style="background:${p.color}"></span>`).join("")}</span>`;
+  return !list || !list.length ? "없음" : `<span class="hval-photos">${list.map(p => `<span class="hval-photo" style="background:${p.color}"></span>`).join("")}</span>`;
 };
-
-/* 같은 저장에서 생긴 여러 활동의 표시 순서(2026-10-13 확정, 설계 기록 D-20261013-35 · 활동 이력 정책 4.1)
- * 이력은 최신이 위이고, 한 번의 저장으로 생긴 활동들은 자산 수정 입력 항목 순서대로 위에서 아래로 보여준다.
- * 사진만 저장한 경우도 사진 변경 → 대표 사진 변경 순서이다.
- * 각 화면의 logActivity는 새 항목을 맨 위에 넣으므로, 표시 순서의 역순으로 기록해야 화면에서 순서대로 보인다. */
-window.ASSET_ACTIVITY_ORDER = [
-  "자산 정보 수정: 소분류 이동", "자산 정보 수정: 품목명 수정",
-  "자산 사진 관리: 사진 변경", "자산 사진 관리: 대표 사진 변경",
-  "자산 정보 수정: 고유관리번호 수정", "자산 정보 수정: 전체 수량 변경",
-  "자산 정보 수정: 유효기한 변경", "자산 정보 수정: 태그 수정",
-  "자산 정보 수정: S/N 수정", "자산 정보 수정: IMEI 수정",
-  "자산 정보 수정: 제조연월 변경", "자산 정보 수정: 구매연월 변경",
-  "자산 정보 수정: 구매가격 변경", "자산 정보 수정: 메모 수정",
-];
+window.ASSET_ACTIVITY_ORDER = ["자산 정보 수정: 소분류 이동", "자산 정보 수정: 품목명 수정", "자산 사진 관리: 사진 변경", "자산 사진 관리: 대표 사진 변경", "자산 정보 수정: 고유관리번호 수정", "자산 정보 수정: 유효기한 변경", "자산 정보 수정: 태그 수정", "자산 정보 수정: S/N 수정", "자산 정보 수정: IMEI 수정", "자산 정보 수정: 제조연월 변경", "자산 정보 수정: 구매연월 변경", "자산 정보 수정: 구매가격 변경", "자산 정보 수정: 메모 수정"];
 window.logAssetActivities = function (entries, log) {
-  const rank = e => { const i = window.ASSET_ACTIVITY_ORDER.indexOf(e.script); return i < 0 ? window.ASSET_ACTIVITY_ORDER.length : i; };
-  entries.map((e, i) => ({ e, i })).sort((x, y) => rank(x.e) - rank(y.e) || x.i - y.i).reverse().forEach(x => log(x.e));
+  const rank = e => {
+    const i = window.ASSET_ACTIVITY_ORDER.indexOf(e.script);
+    return i < 0 ? window.ASSET_ACTIVITY_ORDER.length : i;
+  };
+  entries.map((e, i) => ({
+    e,
+    i
+  })).sort((x, y) => rank(x.e) - rank(y.e) || x.i - y.i).reverse().forEach(x => log(x.e));
 };
-
-/* 다운로드 파일명 계약(2026-10-13): 품목명 원문은 유지하고 파일명에만 적용한다.
- * 부적합 문자는 _, 같은 묶음의 동명 파일은 확장자 앞 (2), (3)...로 구분한다.
- * 실제 ZIP/엑셀 생성은 별도 개발 대상이며 현재 다운로드 버튼은 토스트 목업이다.
- */
 window.assetDownloadFileName = function (value) {
-  let name = String(value ?? '').replace(/[<>:"/\\|?*\u0000-\u001f]/g, '_').replace(/[. ]+$/g, '_');
-  if (/^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\.|$)/i.test(name)) name = '_' + name;
-  return name || '_';
+  let name = String(value ?? "").replace(/[<>:"/\\|?*\u0000-\u001f]/g, "_").replace(/[. ]+$/g, "_");
+  return /^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\.|$)/i.test(name) && (name = "_" + name), name || "_";
 };
 window.assetDownloadFileNames = function (values) {
-  const used = new Set();
+  const used = /* @__PURE__ */new Set();
   return values.map(value => {
-    const name = window.assetDownloadFileName(value);
-    const dot = name.lastIndexOf('.'), stem = dot > 0 ? name.slice(0, dot) : name;
-    const extension = dot > 0 ? name.slice(dot) : '';
-    let next = name, number = 2;
-    while (used.has(next.toLowerCase())) next = `${stem} (${number++})${extension}`;
-    used.add(next.toLowerCase());
-    return next;
+    const name = window.assetDownloadFileName(value),
+      dot = name.lastIndexOf("."),
+      stem = dot > 0 ? name.slice(0, dot) : name,
+      extension = dot > 0 ? name.slice(dot) : "";
+    let next = name,
+      number = 2;
+    for (; used.has(next.toLowerCase());) next = `${stem} (${number++})${extension}`;
+    return used.add(next.toLowerCase()), next;
   });
 };
-// 삭제 이력은 사용자 화면에 별도 표시하지 않는다. 원본·활동·수행자·시점은 내부 보존한다.
-// 정적 데모에서는 활성 배열에서 제외하고 별도 인메모리 기록으로 보존(API의 soft-delete 구현 아님).
 window.archiveDeletedAsset = function (asset, actor) {
   const record = JSON.parse(JSON.stringify(asset));
-  record.deleted_at = new Date().toISOString(); record.deleted_by = actor;
-  window.DATA.deletedAssets.push(record);
+  record.deleted_at = (/* @__PURE__ */new Date()).toISOString(), record.deleted_by = actor, window.DATA.deletedAssets.push(record);
   const index = window.DATA.assets.indexOf(asset);
-  if (index > -1) window.DATA.assets.splice(index, 1);
-  return record;
+  return index > -1 && window.DATA.assets.splice(index, 1), record;
 };
-
-/* 2026-10-28: 승인된 신규 등록 자동 채번·폐기 복구의 메모리 데모.
- * 운영에서는 인증된 회사/역할, 회사 시간대, DB 고유 제약과 원자적 카운터,
- * 저장 요청 식별키를 서버에서 검증해야 한다. URL과 이 메모리는 권한/영속 저장 구현이 아니다.
- * 신규 등록의 최종 성공 시에만 발급한다. 수정·AI 적용·업로드 적용에서는 호출하지 않는다. */
 (function () {
-  const counters = new Map();
-  const params = new URLSearchParams(location.search);
-  const mobile = /(?:leader|app)\.html$/.test(location.pathname);
+  const counters = /* @__PURE__ */new Map(),
+    params = new URLSearchParams(location.search),
+    mobile = /(?:leader|app)\.html$/.test(location.pathname);
   window.AssetPrototypeActor = {
-    role: params.get("qa") === "restore" ? (params.get("role") === "admin" ? "admin" : "leader") : (mobile ? "leader" : "admin"),
-    companyId: "demo-company", timeZone: "Asia/Seoul",
-  };
-  window.ASSET_NUMBER_GUIDE = "입력하지 않으면 자산 등록 시 자동으로 발급됩니다. (형식: ASSET-YYYY-000001)";
+    role: params.get("qa") === "restore" ? params.get("role") === "admin" ? "admin" : "leader" : mobile ? "leader" : "admin",
+    companyId: "demo-company",
+    timeZone: "Asia/Seoul"
+  }, window.ASSET_NUMBER_GUIDE = "입력하지 않으면 자산 등록 시 자동으로 발급됩니다. (형식: ASSET-YYYY-000001)";
   function stamp(now, timeZone) {
-    const parts = new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(now);
-    const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
+    const parts = new Intl.DateTimeFormat("en-CA", {
+        timeZone,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        hourCycle: "h23"
+      }).formatToParts(now),
+      values = Object.fromEntries(parts.map(part => [part.type, part.value]));
     return `${values.year}-${values.month}-${values.day} ${values.hour}:${values.minute}`;
   }
-  function fail(code) { const error = new Error(code); error.code = code; throw error; }
+  function fail(code) {
+    const error = new Error(code);
+    throw error.code = code, error;
+  }
   window.AssetRegistration = {
     registerBatch(drafts, options = {}) {
-      if (!Array.isArray(drafts) || !drafts.length) fail("EMPTY_BATCH");
-      const actor = window.AssetPrototypeActor;
-      const companyId = options.companyId || actor.companyId;
-      const at = stamp(options.now || new Date(), options.timeZone || actor.timeZone);
-      const year = at.slice(0, 4), key = `${companyId}:${year}`;
-      // 같은 탭의 데모 회사별 채번을 분리한다. 기존 시드는 기본 회사 데이터다.
-      const existing = window.DATA.assets.filter(asset => !asset.deleted_at && (asset.companyId || actor.companyId) === companyId);
-      const used = new Set(existing.filter(asset => asset.type === "individual").map(asset => asset.assetNo).filter(Boolean));
-      const names = new Set(existing.filter(asset => asset.type === "quantity").map(asset => `${asset.group}\0${asset.sub}\0${asset.product.trim()}`));
-      const prepared = drafts.map(draft => {
-        const asset = { ...draft, companyId, product: String(draft.product || "").trim(), assetNo: String(draft.assetNo || "").trim() };
-        const category = window.DATA.categories.find(cat => cat.group === asset.group && cat.sub === asset.sub && cat.type === asset.type);
-        if (!category) fail("CATEGORY_CHANGED");
-        if (!asset.product || asset.product.length > 50) fail("INVALID_PRODUCT");
-        if (asset.type === "individual") {
-          if (asset.assetNo && !/^[A-Za-z0-9_-]{1,30}$/.test(asset.assetNo)) fail("INVALID_ASSET_NO");
-          // 같은 저장의 수기 번호를 모두 예약한 뒤 빈 값에 발급해 충돌을 피한다.
-          if (asset.assetNo) { if (used.has(asset.assetNo)) fail("DUPLICATE_ASSET_NO"); used.add(asset.assetNo); }
-        } else {
-          if (!Number.isInteger(asset.totalQty) || asset.totalQty < 0 || asset.totalQty > 999999999) fail("INVALID_QUANTITY");
-          const name = `${asset.group}\0${asset.sub}\0${asset.product}`;
-          if (names.has(name)) fail("DUPLICATE_PRODUCT");
-          names.add(name);
-        }
-        const hidden = category.hiddenFields || [];
-        for (const field of ["expiry", "serial", "imei", "manufactured", "purchaseDate", "price"]) {
-          if (hidden.includes(field === "price" ? "purchasePrice" : field)) delete asset[field];
-        }
-        return asset;
-      });
-      let sequence = counters.get(key) || 0;
-      let nextId = [...window.DATA.assets, ...(window.DATA.deletedAssets || [])].reduce((max, asset) => Math.max(max, /^A\d+$/.test(asset.id) ? Number(asset.id.slice(1)) : 0), 0);
+      (!Array.isArray(drafts) || !drafts.length) && fail("EMPTY_BATCH");
+      const actor = window.AssetPrototypeActor,
+        companyId = options.companyId || actor.companyId,
+        at = stamp(options.now || /* @__PURE__ */new Date(), options.timeZone || actor.timeZone),
+        year = at.slice(0, 4),
+        key = `${companyId}:${year}`,
+        existing = window.DATA.assets.filter(asset => !asset.deleted_at && (asset.companyId || actor.companyId) === companyId),
+        used = new Set(existing.filter(asset => !0).map(asset => asset.assetNo).filter(Boolean)),
+        prepared = drafts.map(draft => {
+          const asset = {
+              ...draft,
+              companyId,
+              type: "individual",
+              // 목업 호환용 내부 값. 사용자 유형 선택은 제공하지 않는다.
+              product: String(draft.product || "").trim(),
+              assetNo: String(draft.assetNo || "").trim()
+            },
+            category = window.DATA.categories.find(cat => cat.group === asset.group && cat.sub === asset.sub);
+          category || fail("CATEGORY_CHANGED"), (!asset.product || asset.product.length > 50) && fail("INVALID_PRODUCT"), asset.assetNo && !/^[A-Za-z0-9_-]{1,30}$/.test(asset.assetNo) && fail("INVALID_ASSET_NO"), asset.assetNo && (used.has(asset.assetNo) && fail("DUPLICATE_ASSET_NO"), used.add(asset.assetNo));
+          delete asset.totalQty;
+          delete asset.stocks; // 회사 양식의 수량을 등록 개수로 해석하지 않는다.
+          const hidden = category.hiddenFields || [];
+          asset.extraValues = Object.fromEntries((window.DATA.extraFields || []).filter(f => !f.deleted && (category.extraEnabled || []).includes(f.id)).map(f => [f.id,String((draft.extraValues||{})[f.id]||"").trim().slice(0,100)]));
+          delete asset.serial; delete asset.imei;
+          for (const field of ["expiry", "serial", "imei", "manufactured", "purchaseDate", "price"]) hidden.includes(field === "price" ? "purchasePrice" : field) && delete asset[field];
+          return asset;
+        });
+      let sequence = counters.get(key) || 0,
+        nextId = [...window.DATA.assets, ...(window.DATA.deletedAssets || [])].reduce((max, asset) => Math.max(max, /^A\d+$/.test(asset.id) ? Number(asset.id.slice(1)) : 0), 0);
       const created = prepared.map(asset => {
-        if (asset.type === "individual" && !asset.assetNo) {
-          do { asset.assetNo = `ASSET-${year}-${String(++sequence).padStart(6, "0")}`; } while (used.has(asset.assetNo));
+        if (!asset.assetNo) {
+          do asset.assetNo = `ASSET-${year}-${String(++sequence).padStart(6, "0")}`; while (used.has(asset.assetNo));
           used.add(asset.assetNo);
         }
-        return { ...asset, id: `A${String(++nextId).padStart(3, "0")}`, status: "stock", createdAt: at.slice(0, 10),
-          assignments: asset.type === "individual" ? [] : undefined, stocks: asset.type === "quantity" ? [] : undefined,
-          _activityLog: [{ d: at, who: options.who || "dana", script: "자산 등록" }] };
+        return {
+          ...asset,
+          id: `A${String(++nextId).padStart(3, "0")}`,
+          status: "stock",
+          createdAt: at.slice(0, 10),
+          assignments: [],
+          _activityLog: [{
+            d: at,
+            who: options.who || "dana",
+            script: "자산 등록"
+          }]
+        };
       });
-      // 검증 중에는 DATA와 카운터를 바꾸지 않는다. 성공한 전체 작업만 반영한다.
-      window.DATA.assets.push(...created);
-      counters.set(key, sequence);
-      return created;
-    },
-  };
-  window.canRestoreDisposedAsset = asset => window.AssetPrototypeActor.role === "admin"
-    && window.DATA.assets.includes(asset) && !asset.deleted_at && asset.type === "individual" && asset.status === "disposed";
-  window.restoreDisposedAsset = (asset, who = "dana") => {
-    if (window.AssetPrototypeActor.role !== "admin") fail("PERMISSION_DENIED");
-    if (!window.canRestoreDisposedAsset(asset)) fail("ASSET_CHANGED");
-    if (!asset._activityLog) fail("HISTORY_NOT_INITIALIZED");
-    asset.status = "stock";
-    asset.assignments = [];
-    asset._activityLog.unshift({ d: stamp(new Date(), window.AssetPrototypeActor.timeZone), who,
-      script: "상태 변경: 폐기 복구", before: "폐기", after: "재고" });
-  };
-  window.openAssetRestoreConfirm = (asset, onDone, who) => {
+      return window.DATA.assets.push(...created), counters.set(key, sequence), created;
+    }
+  }, window.canRestoreDisposedAsset = asset => window.hasPrototypeAssetManagePermission() && window.DATA.assets.includes(asset) && !asset.deleted_at && !0 && asset.status === "disposed", window.restoreDisposedAsset = (asset, who = "dana") => {
+    !window.hasPrototypeAssetManagePermission() && fail("PERMISSION_DENIED"), window.canRestoreDisposedAsset(asset) || fail("ASSET_CHANGED"), asset._activityLog || fail("HISTORY_NOT_INITIALIZED"), asset.status = "stock", asset.assignments = [], asset._activityLog.unshift({
+      d: stamp(/* @__PURE__ */new Date(), window.AssetPrototypeActor.timeZone),
+      who,
+      script: "상태 변경: 폐기 복구",
+      before: "폐기",
+      after: "배정 가능"
+    });
+  }, window.openAssetRestoreConfirm = (asset, onDone, who) => {
     if (!window.canRestoreDisposedAsset(asset)) return;
     const back = document.createElement("div");
-    back.className = "modal-back"; back.style.zIndex = 340;
-    back.innerHTML = `<div class="modal sm" role="dialog" aria-modal="true" aria-label="폐기 자산 복구">
-      <h3>폐기 자산을 복구하시겠습니까?</h3><div class="body">배정이 없는 재고 상태로 복구됩니다. 기존 배정은 복원되지 않습니다.</div>
-      <div class="foot"><button type="button" class="btn" data-restore-cancel>취소</button><button type="button" class="btn primary" data-restore-confirm>확인</button></div></div>`;
-    back.querySelector("[data-restore-cancel]").onclick = () => back.remove();
-    back.querySelector("[data-restore-confirm]").onclick = () => {
+    back.className = "modal-back", back.style.zIndex = 340, back.innerHTML = `<div class="modal sm" role="dialog" aria-modal="true" aria-label="폐기 자산 복구">
+      <h3>폐기 자산을 복구하시겠습니까?</h3><div class="body">배정이 없는 배정 가능 상태로 복구됩니다. 기존 배정은 복원되지 않습니다.</div>
+      <div class="foot"><button type="button" class="btn" data-restore-cancel>취소</button><button type="button" class="btn primary" data-restore-confirm>확인</button></div></div>`, back.querySelector("[data-restore-cancel]").onclick = () => back.remove(), back.querySelector("[data-restore-confirm]").onclick = () => {
       let message;
-      try { window.restoreDisposedAsset(asset, who); message = "자산이 복구되었습니다."; }
-      catch (error) {
+      try {
+        window.restoreDisposedAsset(asset, who), message = "자산이 복구되었습니다.";
+      } catch (error) {
         if (!["PERMISSION_DENIED", "ASSET_CHANGED"].includes(error.code)) {
           const notice = document.createElement("div");
-          notice.textContent = "에러가 발생하였습니다. 잠시 후 다시 시도해보세요.";
-          notice.style.cssText = "position:fixed;left:50%;bottom:32px;transform:translateX(-50%);background:#1b1d1f;color:#fff;padding:10px 16px;border-radius:8px;z-index:400";
-          document.body.appendChild(notice); setTimeout(() => notice.remove(), 1800);
+          notice.textContent = "에러가 발생하였습니다. 잠시 후 다시 시도해보세요.", notice.style.cssText = "position:fixed;left:50%;bottom:32px;transform:translateX(-50%);background:#1b1d1f;color:#fff;padding:10px 16px;border-radius:8px;z-index:400", document.body.appendChild(notice), setTimeout(() => notice.remove(), 1800);
           return;
         }
-        message = error.code === "PERMISSION_DENIED" ? "관리자만 폐기 자산을 복구할 수 있습니다." : "설정이 변경되었습니다. 잠시 후 다시 시도해주세요.";
+        message = error.code === "PERMISSION_DENIED" ? "자산 관리 권한이 없습니다." : "설정이 변경되었습니다. 잠시 후 다시 시도해주세요.";
       }
-      back.remove(); onDone(message);
-    };
-    document.body.appendChild(back);
+      back.remove(), onDone(message);
+    }, document.body.appendChild(back);
   };
 })();
+window.formatAssetCount = value => Number(value || 0).toLocaleString("en-US");
 
-
-// D-20261023-03/04, D-20261026-19: integer quantities use nine digits;
-// commas are presentation only. Imported invalid values stay intact until edited.
-window.AssetQuantity = (() => {
-  const MAX = 999999999;
-  const parse = value => {
-    const s = String(value ?? "").replace(/,/g, "");
-    return /^(0|[1-9][0-9]{0,8})$/.test(s) ? Number(s) : null;
+// D-20261029-40/41: company definitions, category visibility, per-asset values.
+// This prototype keeps data in memory; server authorization must enforce the same boundaries.
+(function () {
+  const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+  const fixed = [
+    {id:'expiry',name:'유효기한',description:'교체·점검 기한 등을 기록합니다. 만료 예정이거나 만료된 자산을 현황에서 확인할 수 있습니다.'},
+    {id:'manufactured',name:'제조연월',description:'자산이 제조된 연월을 기록합니다.'},
+    {id:'purchaseDate',name:'구매연월',description:'자산을 구매한 연월을 기록합니다.'},
+    {id:'purchasePrice',name:'구매가격',description:'자산 1개를 구매한 가격을 기록합니다.'}
+  ];
+  window.DATA.extraFields ||= [];
+  window.hasPrototypeAssetManagePermission = () => {
+    const p = new URLSearchParams(location.search);
+    if (p.has('manage')) return p.get('manage') === '1';
+    if (window.AssetPermissionQa?.enabled) return !!window.AssetPermissionQa.managePermission;
+    if (p.get('role') === 'viewer') return false;
+    if (p.get('role') === 'admin' || p.get('role') === 'manager') return true;
+    return !/(?:^|\/)app\.html$/.test(location.pathname);
   };
-  const format = value => {
-    const n = parse(value);
-    return n === null ? String(value ?? "") : n.toLocaleString("en-US");
-  };
-  const selector = '#areg-totalqty-input,[data-add-field="totalQty"],[data-qinput],[data-deduct-input],[data-result-field="totalQty"]';
-  const matches = el => el instanceof HTMLInputElement && el.matches(selector) && !el.disabled;
-  const deduct = el => el.hasAttribute("data-deduct-input");
-  function show(el) {
-    el.removeAttribute("maxlength");
-    const digitsBefore = el.value.slice(0, el.selectionStart ?? el.value.length).replace(/,/g, "").length;
-    const old = el.value, value = format(old);
-    if (value === old) return;
-    el.value = value;
-    if (el === document.activeElement) {
-      let pos=0, count=0;
-      while (pos < value.length && count < digitsBefore) { if (/\d/.test(value[pos])) count++; pos++; }
-      el.setSelectionRange(pos,pos);
+  const category = a => a && window.DATA.categories.find(c => c.group === a.group && c.sub === a.sub);
+  const enabled = (cat,id) => !!cat && (fixed.some(f=>f.id===id) ? !(cat.hiddenFields||[]).includes(id) : (cat.extraEnabled||[]).includes(id));
+  const visible = (cat,id,manage=window.hasPrototypeAssetManagePermission()) => enabled(cat,id) && (manage || !(cat.privateFields||[]).includes(id));
+  const fields = () => [...fixed,...window.DATA.extraFields.filter(f=>!f.deleted)];
+  function values(a,manage) {
+    const cat=category(a);
+    return fields().filter(f=>visible(cat,f.id,manage)).map(f=>({ ...f,value: f.id==='purchasePrice' ? a.price : fixed.some(x=>x.id===f.id) ? a[f.id] : (a.extraValues||{})[f.id] }));
+  }
+  function detailRows(a,manage,expiryFormat) {
+    return values(a,manage).map(f=>{
+      let value=f.value == null || f.value==='' ? '—' : esc(f.value);
+      if(f.value && f.id==='expiry') value=expiryFormat ? expiryFormat(f.value) : window.fmtDate(f.value);
+      if(f.value && ['manufactured','purchaseDate'].includes(f.id)) value=window.fmtMonth(f.value);
+      if(f.value!=null && f.id==='purchasePrice') value=window.formatPrice(f.value);
+      return `<div><div class="k">${esc(f.name)}</div><div class="v">${value}</div></div>`;
+    }).join('');
+  }
+  // D-20261029-43: 상세 정보는 기본 항목·QR·메모 다음에 추가 정보를 소제목 없이 같은 목록으로 이어 나열한다.
+  function detailHtml(a,manage,expiryFormat) {
+    const rows=detailRows(a,manage,expiryFormat);
+    return rows ? `<div class="kv2">${rows}</div>` : '';
+  }
+  function historyVisible(asset,entry,manage=window.hasPrototypeAssetManagePermission()) {
+    if(manage) return true;
+    const id=entry.fieldId || fixed.find(f=>(entry.script||'').startsWith(`자산 정보 수정: ${f.name} `))?.id;
+    return !id || !(category(asset)?.privateFields||[]).includes(id);
+  }
+  function customInputs(cat,values={},attr='data-extra-input',manage=true) {
+    return window.DATA.extraFields.filter(f=>!f.deleted && visible(cat,f.id,manage)).map(f=>`<div class="field mapp-add-field"><label>${esc(f.name)}</label><input type="text" ${attr}="${esc(f.id)}" maxlength="100" placeholder="입력" value="${esc(values[f.id]||'')}"></div>`).join('');
+  }
+  function readInputs(scope,attr='data-extra-input') {
+    return Object.fromEntries([...scope.querySelectorAll(`[${attr}]`)].map(el=>[el.getAttribute(attr),el.value.trim().slice(0,100)]));
+  }
+  function applyCustom(asset,input,log) {
+    asset.extraValues ||= {};
+    for(const f of window.DATA.extraFields.filter(f=>!f.deleted)) {
+      if(!(f.id in input) || !visible(category(asset),f.id)) continue;
+      const value=String(input[f.id]||'').trim().slice(0,100), before=asset.extraValues[f.id]||'';
+      if(before===value) continue;
+      asset.extraValues[f.id]=value;
+      log?.({script:`자산 정보 수정: ${f.name} 수정`,fieldId:f.id,fieldName:f.name,before,after:value});
     }
   }
-  function replacement(el, text) {
-    if (!/^[\d,]*$/.test(text)) return null;
-    const a = el.selectionStart ?? el.value.length, b = el.selectionEnd ?? a;
-    const left = el.value.slice(0,a).replace(/,/g,""), right = el.value.slice(b).replace(/,/g,"");
-    const insert = text.replace(/,/g,"").slice(0, Math.max(0,9-left.length-right.length));
-    const next = left+insert+right;
-    if (next && !(deduct(el) ? /^[1-9]\d{0,8}$/ : /^(0|[1-9]\d{0,8})$/).test(next)) return null;
-    return {value:next, caret:left.length+insert.length};
+  function bindDetailTabs(root) {
+    root.querySelectorAll('[data-detail-tab]').forEach(button=>button.onclick=()=>{
+      root.querySelectorAll('[data-detail-tab]').forEach(b=>b.classList.toggle('active',b===button));
+      root.querySelectorAll('[data-detail-panel]').forEach(panel=>panel.hidden=panel.dataset.detailPanel!==button.dataset.detailTab);
+    });
   }
-  if (typeof document !== "undefined") {
-    document.addEventListener("beforeinput", e => {
-      if (!matches(e.target) || !e.inputType.startsWith("insert") || e.data == null) return;
-      const next = replacement(e.target,e.data);
-      if (!next || next.value === e.target.value.replace(/,/g,"")) e.preventDefault();
-    },true);
-    document.addEventListener("paste", e => {
-      if (!matches(e.target)) return;
-      e.preventDefault(); e.stopImmediatePropagation();
-      const next = replacement(e.target,e.clipboardData.getData("text").trim());
-      if (!next) return;
-      e.target.value=next.value; e.target.setSelectionRange(next.caret,next.caret);
-      e.target.dispatchEvent(new Event("input",{bubbles:true}));
-    },true);
-    // Existing screen handlers store plain integer text, then this final bubble
-    // listener formats its presentation. Save readers always call parse().
-    document.addEventListener("input", e => {
-      if (!matches(e.target)) return;
-      const el=e.target, raw=el.value.replace(/,/g,"");
-      if (/^\d*$/.test(raw)) el.value=raw.slice(0,9);
-    },true);
-    window.addEventListener("input", e => { if(matches(e.target)) show(e.target); });
-    document.addEventListener("focusin", e => { if(matches(e.target)) show(e.target); });
-    document.addEventListener("click", () => queueMicrotask(() => document.querySelectorAll(selector).forEach(show)));
-    new MutationObserver(() => document.querySelectorAll(selector).forEach(show)).observe(document.documentElement,{childList:true,subtree:true});
-  }
-  return {MAX,parse,format};
+  const tabs = () => '<div class="asset-detail-tabs"><button type="button" class="active" data-detail-tab="assignment">배정</button><button type="button" data-detail-tab="info">정보</button><button type="button" data-detail-tab="history">이력</button></div>';
+  window.AssetExtra={fixed,fields,category,enabled,visible,values,detailRows,detailHtml,historyVisible,customInputs,readInputs,applyCustom,bindDetailTabs,tabs,esc};
 })();
+
+(function(){if(new URLSearchParams(location.search).get('qa')!=='extra-info')return;window.DATA.extraFields.push({id:'qa-serial',name:'S/N'},{id:'qa-owner',name:'구매 담당자'});for(const c of window.DATA.categories){c.extraEnabled=['qa-serial','qa-owner'];c.privateFields=['purchasePrice','qa-owner'];}for(const a of window.DATA.assets)a.extraValues={'qa-serial':a.serial||'DEMO-SN-'+a.id,'qa-owner':'구매팀'};})();
+
+// The sample Sheets remain reference files. The production export must use current
+// company definitions and authorization, never send hidden values to the client.
+window.AssetExtra.exportColumns=()=>window.AssetExtra.fields().map(f=>({id:f.id,name:f.name}));
+window.AssetExtra.exportValues=(asset,manage=window.hasPrototypeAssetManagePermission())=>Object.fromEntries(window.AssetExtra.fields().map(f=>[f.id,window.AssetExtra.visible(window.AssetExtra.category(asset),f.id,manage)?(f.id==='purchasePrice'?asset.price:window.AssetExtra.fixed.some(x=>x.id===f.id)?asset[f.id]:asset.extraValues?.[f.id])??'':'']));

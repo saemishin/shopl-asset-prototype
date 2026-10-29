@@ -1,69 +1,67 @@
-/* 자산 등록 팝업 — 현황/분류 화면 공용. 최종 신규 저장은 탭 메모리 등록과 자동 발급을 함께 처리한다.
-   assets.js의 "자산 추가" 버튼과 category.js의 소분류별 빈 자산 목록 [자산 추가] 버튼이 이 하나를 같이 씀. */
 (function () {
-  // 태그는 앞뒤 공백 제거·연속 공백 한 칸으로 정규화하되 대소문자는 유지한다.
   const normalizeTagName = value => value.trim().replace(/\s+/g, " ");
-  // 일괄 작업의 태그 구분자 |는 명칭에 입력하지 않는다. 다른 특수문자는 허용한다.
-  // 입력·붙여넣기에서 조용히 제외하며 선택 영역과 커서, 기존 20자 제한을 유지한다.
   function bindTagNameInput(input, onInput) {
     function insertWithoutSeparator(event, text) {
       if (!text || !text.includes("|")) return;
       event.preventDefault();
-      const start = input.selectionStart, end = input.selectionEnd;
-      const room = input.maxLength < 0 ? text.length : Math.max(0, input.maxLength - input.value.length + end - start);
-      const allowed = text.replace(/\|/g, "").slice(0, room);
-      if (!allowed) return;
-      input.setRangeText(allowed, start, end, "end");
-      input.dispatchEvent(new Event("input", { bubbles: true }));
+      const start = input.selectionStart,
+        end = input.selectionEnd,
+        room = input.maxLength < 0 ? text.length : Math.max(0, input.maxLength - input.value.length + end - start),
+        allowed = text.replace(/\|/g, "").slice(0, room);
+      allowed && (input.setRangeText(allowed, start, end, "end"), input.dispatchEvent(new Event("input", {
+        bubbles: !0
+      })));
     }
     input.addEventListener("beforeinput", event => {
-      if (!event.isComposing) insertWithoutSeparator(event, event.data);
-    });
-    input.addEventListener("paste", event => insertWithoutSeparator(event, event.clipboardData.getData("text")));
-    input.addEventListener("input", () => {
+      event.isComposing || insertWithoutSeparator(event, event.data);
+    }), input.addEventListener("paste", event => insertWithoutSeparator(event, event.clipboardData.getData("text"))), input.addEventListener("input", () => {
       const before = input.value;
       if (before.includes("|")) {
-        const start = before.slice(0, input.selectionStart).replace(/\|/g, "").length;
-        const end = before.slice(0, input.selectionEnd).replace(/\|/g, "").length;
-        input.value = before.replace(/\|/g, "");
-        input.setSelectionRange(start, end);
+        const start = before.slice(0, input.selectionStart).replace(/\|/g, "").length,
+          end = before.slice(0, input.selectionEnd).replace(/\|/g, "").length;
+        input.value = before.replace(/\|/g, ""), input.setSelectionRange(start, end);
       }
       onInput();
     });
   }
   function toast(msg) {
     const t = document.createElement("div");
-    t.textContent = msg;
-    t.style.cssText = "position:fixed;left:50%;bottom:32px;transform:translateX(-50%);background:#1b1d1f;color:#fff;padding:10px 16px;border-radius:8px;font-size:12.5px;z-index:300;box-shadow:0 8px 24px rgba(0,0,0,.25)";
-    document.body.appendChild(t);
-    setTimeout(() => t.remove(), 1800);
+    t.textContent = msg, t.style.cssText = "position:fixed;left:50%;bottom:32px;transform:translateX(-50%);background:#1b1d1f;color:#fff;padding:10px 16px;border-radius:8px;font-size:12.5px;z-index:300;box-shadow:0 8px 24px rgba(0,0,0,.25)", document.body.appendChild(t), setTimeout(() => t.remove(), 1800);
   }
-  const CLOSE_ICON_SM = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg>`;
-  const TRASH_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M9.5 7l.7 13a1 1 0 0 0 1 1h5.6a1 1 0 0 0 1-1l.7-13"/></svg>`;
-  const TAG_COLORS = [
-    { fg: "#3461c9", bg: "#eaf1ff" },
-    { fg: "#6b3fd4", bg: "#f1ecff" },
-    { fg: "#c23c56", bg: "#fdecef" },
-    { fg: "#1f8f5f", bg: "#e8f8f0" },
-    { fg: "#b5790a", bg: "#fdf3e0" },
-    { fg: "#1f8fae", bg: "#e6f6fa" },
-  ];
+  const CLOSE_ICON_SM = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+    TRASH_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M9.5 7l.7 13a1 1 0 0 0 1 1h5.6a1 1 0 0 0 1-1l.7-13"/></svg>',
+    TAG_COLORS = [{
+      fg: "#3461c9",
+      bg: "#eaf1ff"
+    }, {
+      fg: "#6b3fd4",
+      bg: "#f1ecff"
+    }, {
+      fg: "#c23c56",
+      bg: "#fdecef"
+    }, {
+      fg: "#1f8f5f",
+      bg: "#e8f8f0"
+    }, {
+      fg: "#b5790a",
+      bg: "#fdf3e0"
+    }, {
+      fg: "#1f8fae",
+      bg: "#e6f6fa"
+    }];
   function tagColor(name) {
     let h = 0;
     for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) % 997;
     return TAG_COLORS[Math.abs(h) % TAG_COLORS.length];
   }
-
-  // 태그 관리 — 태그는 구조설계안 §5.3상 별도 엔티티 없이 자산의 문자열 리스트지만, 오타·변형이 계속 쌓이기만 하고
-  // 정리할 수 없는 문제 때문에 window.DATA.tags를 마스터 목록으로 두고 이 화면에서만 추가/이름변경/삭제를 관리함.
-  // 분류 관리 모달과 동일한 draft 편집 모델: 변경은 [저장]을 눌러야 실제 데이터(마스터 목록 + 각 자산의 labels)에 반영됨.
   function openTagManageModal(onSaved) {
-    const master = (window.DATA && window.DATA.tags) || [];
-    let draft = master.map(t => ({ name: t, orig: t }));
-
+    const master = window.DATA && window.DATA.tags || [];
+    let draft = master.map(t => ({
+      name: t,
+      orig: t
+    }));
     const back = document.createElement("div");
-    back.className = "modal-back";
-    back.innerHTML = `
+    back.className = "modal-back", back.innerHTML = `
       <div class="modal sm">
         <h3>태그 관리</h3>
         <div class="body">
@@ -78,44 +76,33 @@
           <button type="button" class="btn" data-tm-cancel>취소</button>
           <button type="button" class="btn primary" data-tm-save disabled>저장</button>
         </div>
-      </div>`;
-    document.body.appendChild(back);
-
-    const listEl = back.querySelector("[data-tm-list]");
-    const addInput = back.querySelector("[data-tm-input]");
-    const addBtn = back.querySelector("[data-tm-add]");
-    const addErr = back.querySelector("[data-tm-add-err]");
-    const saveBtn = back.querySelector("[data-tm-save]");
-
-    // 태그명은 구조설계안상 대소문자 구분이라 중복 판정도 공백 정규화 후 대소문자 그대로 정확히 일치할 때만
+      </div>`, document.body.appendChild(back);
+    const listEl = back.querySelector("[data-tm-list]"),
+      addInput = back.querySelector("[data-tm-input]"),
+      addBtn = back.querySelector("[data-tm-add]"),
+      addErr = back.querySelector("[data-tm-add-err]"),
+      saveBtn = back.querySelector("[data-tm-save]");
     function dupNameSet() {
       const counts = {};
-      draft.forEach(t => { const n = normalizeTagName(t.name); if (n) counts[n] = (counts[n] || 0) + 1; });
-      return new Set(Object.keys(counts).filter(n => counts[n] > 1));
+      return draft.forEach(t => {
+        const n = normalizeTagName(t.name);
+        n && (counts[n] = (counts[n] || 0) + 1);
+      }), new Set(Object.keys(counts).filter(n => counts[n] > 1));
     }
-    // "변경 있음" 여부는 플래그가 아니라 원본(master)과의 실제 내용 비교로 판정 —
-    // 추가했다가 도로 지우는 것처럼 순가감이 상쇄돼 원래 상태로 돌아왔으면 저장 비활성화가 맞음
     function isDirty() {
-      const current = [...new Set(draft.map(t => normalizeTagName(t.name)).filter(Boolean))].sort((a, b) => a.localeCompare(b, "ko"));
-      const orig = [...master].sort((a, b) => a.localeCompare(b, "ko"));
-      if (current.length !== orig.length) return true;
-      return current.some((v, i) => v !== orig[i]);
+      const current = [...new Set(draft.map(t => normalizeTagName(t.name)).filter(Boolean))].sort((a, b) => a.localeCompare(b, "ko")),
+        orig = [...master].sort((a, b) => a.localeCompare(b, "ko"));
+      return current.length !== orig.length ? !0 : current.some((v, i) => v !== orig[i]);
     }
     function updateValidity() {
       const dups = dupNameSet();
       listEl.querySelectorAll("[data-tm-rename]").forEach(inp => {
-        const name = normalizeTagName(inp.value);
-        const invalid = !name || dups.has(name);
-        inp.classList.toggle("has-err", invalid);
-        inp.setAttribute("aria-invalid", String(invalid));
-        listEl.querySelector(`[data-tm-required="${inp.dataset.tmRename}"]`).hidden = !!name;
-        listEl.querySelector(`[data-tm-duplicate="${inp.dataset.tmRename}"]`).hidden = !name || !dups.has(name);
+        const name = normalizeTagName(inp.value),
+          invalid = !name || dups.has(name);
+        inp.classList.toggle("has-err", invalid), inp.setAttribute("aria-invalid", String(invalid)), listEl.querySelector(`[data-tm-required="${inp.dataset.tmRename}"]`).hidden = !!name, listEl.querySelector(`[data-tm-duplicate="${inp.dataset.tmRename}"]`).hidden = !name || !dups.has(name);
       });
       const addDup = draft.some(t => normalizeTagName(t.name) === normalizeTagName(addInput.value));
-      addInput.classList.toggle("has-err", !!normalizeTagName(addInput.value) && addDup);
-      addErr.hidden = !(normalizeTagName(addInput.value) && addDup);
-      addBtn.disabled = !normalizeTagName(addInput.value) || addDup;
-      saveBtn.disabled = !isDirty() || dups.size > 0 || draft.some(t => !normalizeTagName(t.name));
+      addInput.classList.toggle("has-err", !!normalizeTagName(addInput.value) && addDup), addErr.hidden = !(normalizeTagName(addInput.value) && addDup), addBtn.disabled = !normalizeTagName(addInput.value) || addDup, saveBtn.disabled = !isDirty() || dups.size > 0 || draft.some(t => !normalizeTagName(t.name));
     }
     function renderList() {
       listEl.innerHTML = draft.length ? draft.map((t, i) => `
@@ -129,71 +116,53 @@
             <button type="button" class="cat-manage-icon" data-tm-del="${i}" aria-label="삭제"
               data-tip="삭제 시 이 태그를 사용 중인 자산에서 모두 삭제됩니다.">${TRASH_ICON}</button>
           </div>
-        </div>`).join("") : `<p class="tag-manage-empty">등록된 태그가 없습니다.</p>`;
-      listEl.querySelectorAll("[data-tm-rename]").forEach(input => bindTagNameInput(input, () => {
-        draft[+input.dataset.tmRename].name = input.value;
-        updateValidity();
-      }));
-      updateValidity();
+        </div>`).join("") : '<p class="tag-manage-empty">등록된 태그가 없습니다.</p>', listEl.querySelectorAll("[data-tm-rename]").forEach(input => bindTagNameInput(input, () => {
+        draft[+input.dataset.tmRename].name = input.value, updateValidity();
+      })), updateValidity();
     }
     renderList();
-
     function addRow() {
       const name = normalizeTagName(addInput.value).slice(0, 20);
-      if (!name || draft.some(t => normalizeTagName(t.name) === name)) { addInput.focus(); return; }
-      draft.unshift({ name, orig: null });
-      addInput.value = "";
-      renderList();
+      if (!name || draft.some(t => normalizeTagName(t.name) === name)) {
+        addInput.focus();
+        return;
+      }
+      draft.unshift({
+        name,
+        orig: null
+      }), addInput.value = "", renderList();
     }
-    addBtn.onclick = addRow;
-    bindTagNameInput(addInput, updateValidity);
-    addInput.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); addRow(); } });
-
-    listEl.addEventListener("click", e => {
+    return addBtn.onclick = addRow, bindTagNameInput(addInput, updateValidity), addInput.addEventListener("keydown", e => {
+      e.key === "Enter" && (e.preventDefault(), addRow());
+    }), listEl.addEventListener("click", e => {
       const d = e.target.closest("[data-tm-del]");
-      if (d) { draft.splice(+d.dataset.tmDel, 1); renderList(); }
-    });
-
-    back.querySelector("[data-tm-cancel]").onclick = () => back.remove();
-    // Input/selection/confirmation modal: backdrop clicks do not dismiss.
-
-    saveBtn.onclick = () => {
+      d && (draft.splice(+d.dataset.tmDel, 1), renderList());
+    }), back.querySelector("[data-tm-cancel]").onclick = () => back.remove(), saveBtn.onclick = () => {
       if (!isDirty() || dupNameSet().size > 0 || draft.some(t => !normalizeTagName(t.name))) return;
-      const finalNames = [...new Set(draft.map(t => normalizeTagName(t.name)).filter(Boolean))].sort((a, b) => a.localeCompare(b, "ko"));
-      const remainingOrigs = new Set(draft.filter(t => t.orig).map(t => t.orig));
-      const deletedOrigs = master.filter(t => !remainingOrigs.has(t));
-      const renamed = draft
-        .filter(t => t.orig && t.orig !== normalizeTagName(t.name))
-        .map(t => ({ from: t.orig, to: normalizeTagName(t.name) }));
-
-      [...(window.DATA.assets || []),...(window.DATA.deletedAssets || [])].forEach(a => {
-        if (!a.labels || !a.labels.length) return;
-        a.labels = a.labels
-          .filter(l => !deletedOrigs.includes(l))
-          .map(l => { const r = renamed.find(rn => rn.from === l); return r ? r.to : l; });
+      const finalNames = [...new Set(draft.map(t => normalizeTagName(t.name)).filter(Boolean))].sort((a, b) => a.localeCompare(b, "ko")),
+        remainingOrigs = new Set(draft.filter(t => t.orig).map(t => t.orig)),
+        deletedOrigs = master.filter(t => !remainingOrigs.has(t)),
+        renamed = draft.filter(t => t.orig && t.orig !== normalizeTagName(t.name)).map(t => ({
+          from: t.orig,
+          to: normalizeTagName(t.name)
+        }));
+      [...(window.DATA.assets || []), ...(window.DATA.deletedAssets || [])].forEach(a => {
+        !a.labels || !a.labels.length || (a.labels = a.labels.filter(l => !deletedOrigs.includes(l)).map(l => {
+          const r = renamed.find(rn => rn.from === l);
+          return r ? r.to : l;
+        }));
+      }), master.length = 0, master.push(...finalNames), back.remove(), toast("저장되었습니다."), onSaved && onSaved({
+        renamed,
+        deletedOrigs
       });
-      master.length = 0;
-      master.push(...finalNames);
-
-      back.remove();
-      toast("저장되었습니다.");
-      if (onSaved) onSaved({ renamed, deletedOrigs });
-    };
-
-    return back;
+    }, back;
   }
-
-  // 일괄 등록 확인 테이블도 단건 등록과 같은 태그 마스터 관리 모달을 재사용한다.
   window.openAssetTagManageModal = openTagManageModal;
-
-  // 소분류 선택 모달 — 검색 + 대분류/소분류 트리, 단일 선택, 푸터 [취소]/[적용]. 필터 모달의 분류 트리 구조를 단일 선택용으로 단순화.
   function openCategoryPickModal(categories, currentValue, onApply) {
-    let selected = currentValue;
-    let query = "";
-
+    let selected = currentValue,
+      query = "";
     const back = document.createElement("div");
-    back.className = "modal-back";
-    back.innerHTML = `
+    back.className = "modal-back", back.innerHTML = `
       <div class="modal sm">
         <h3>분류</h3>
         <div class="body">
@@ -204,81 +173,65 @@
           <button type="button" class="btn" data-cp-cancel>취소</button>
           <button type="button" class="btn primary" data-cp-apply>적용</button>
         </div>
-      </div>`;
-    document.body.appendChild(back);
-
-    const listEl = back.querySelector("[data-cp-list]");
-    const searchInput = back.querySelector("[data-cp-search]");
-
+      </div>`, document.body.appendChild(back);
+    const listEl = back.querySelector("[data-cp-list]"),
+      searchInput = back.querySelector("[data-cp-search]");
     function groupsOf() {
-      const m = new Map();
-      categories.forEach(c => { if (!m.has(c.group)) m.set(c.group, []); m.get(c.group).push(c.sub); });
-      return m;
+      const m = /* @__PURE__ */new Map();
+      return categories.forEach(c => {
+        m.has(c.group) || m.set(c.group, []), m.get(c.group).push(c.sub);
+      }), m;
     }
     function renderList() {
       const hasOptions = categories.length > 0;
-      searchInput.hidden = !hasOptions;
-      back.querySelector("[data-cp-apply]").disabled = !categories.some(c => `${c.group}|${c.sub}` === selected);
-      if (!hasOptions) {
+      if (searchInput.hidden = !hasOptions, back.querySelector("[data-cp-apply]").disabled = !categories.some(c => `${c.group}|${c.sub}` === selected), !hasOptions) {
         listEl.innerHTML = '<p class="tag-manage-empty">표시할 목록이 없습니다.</p>';
         return;
       }
       const q = query.trim().toLowerCase();
       let html = "";
       groupsOf().forEach((subs, g) => {
-        const groupMatches = !q || g.toLowerCase().includes(q);
-        const filtered = subs.filter(s => groupMatches || s.toLowerCase().includes(q));
-        if (!filtered.length) return;
-        html += `<div class="catpick-group">
+        const groupMatches = !q || g.toLowerCase().includes(q),
+          filtered = subs.filter(s => groupMatches || s.toLowerCase().includes(q));
+        filtered.length && (html += `<div class="catpick-group">
           <div class="catpick-group-name">${g}</div>
           ${filtered.map(s => {
-            const v = `${g}|${s}`;
-            return `<button type="button" class="catpick-row${selected === v ? " active" : ""}" data-v="${v}">${s}</button>`;
-          }).join("")}
-        </div>`;
+          const v = `${g}|${s}`;
+          return `<button type="button" class="catpick-row${selected === v ? " active" : ""}" data-v="${v}">${s}</button>`;
+        }).join("")}
+        </div>`);
+      }), listEl.innerHTML = html || '<p class="tag-manage-empty">결과가 없습니다.</p>', listEl.querySelectorAll("[data-v]").forEach(b => b.onclick = () => {
+        selected = b.dataset.v, renderList();
       });
-      listEl.innerHTML = html || `<p class="tag-manage-empty">결과가 없습니다.</p>`;
-      listEl.querySelectorAll("[data-v]").forEach(b => b.onclick = () => { selected = b.dataset.v; renderList(); });
     }
-    renderList();
-
-    searchInput.addEventListener("input", () => { query = searchInput.value; renderList(); });
-    back.querySelector("[data-cp-cancel]").onclick = () => back.remove();
-    // Input/selection/confirmation modal: backdrop clicks do not dismiss.
-    back.querySelector("[data-cp-apply]").onclick = () => {
-      if (back.querySelector("[data-cp-apply]").disabled) return;
-      back.remove();
-      onApply(selected);
-    };
-
-    return back;
+    return renderList(), searchInput.addEventListener("input", () => {
+      query = searchInput.value, renderList();
+    }), back.querySelector("[data-cp-cancel]").onclick = () => back.remove(), back.querySelector("[data-cp-apply]").onclick = () => {
+      back.querySelector("[data-cp-apply]").disabled || (back.remove(), onApply(selected));
+    }, back;
   }
-
-  // 자산 수정(prefill) 시 유효기한 외 구매연월·제조연월 등의 "미래 아님" 검증 기준으로 씀 — 이 앱 전체가 쓰는
-  // 고정 데모 날짜(2026-09-04)와 동일하게 맞춤(detail.js의 TODAY/todayStr과 동일 값)
-  const TODAY = new Date("2026-09-04");
+  const TODAY = /* @__PURE__ */new Date("2026-09-04");
   function todayStr() {
     const p = n => String(n).padStart(2, "0");
     return `${TODAY.getFullYear()}-${p(TODAY.getMonth() + 1)}-${p(TODAY.getDate())}`;
   }
-
-  // 소분류 이동 트리 — 자산 수정에서 소분류를 바꿀 때 사용(자산 삭제와 마찬가지로 detail.js의 "···" 메뉴에
-  // 있던 "소분류 이동"을 여기 자산 수정 폼으로 흡수). 현재 소분류를 선택한 상태로 열고(Web_dc_22 16번), 자산
-  // 추가 분류 선택과 같은 검색(대분류명이 맞으면 그 대분류의 소분류 전체, 아니면 소분류명 부분 일치)을 제공한다.
-  // 다른 자산 유형의 소분류는 구조설계안 6장 제약이라 비활성화+툴팁으로 안내
   function openCategoryMoveModal(categories, currentGroup, currentSub, currentType, onApply) {
-    let picked = { group: currentGroup, sub: currentSub };
-    let query = "";
-    const groupMap = {}, order = [];
+    let picked = {
+        group: currentGroup,
+        sub: currentSub
+      },
+      query = "";
+    const groupMap = {},
+      order = [];
     categories.forEach(c => {
-      if (!groupMap[c.group]) { groupMap[c.group] = []; order.push(c.group); }
-      groupMap[c.group].push(c);
+      groupMap[c.group] || (groupMap[c.group] = [], order.push(c.group)), groupMap[c.group].push(c);
     });
-    const groups = order.map(group => ({ group, subs: groupMap[group] }));
-
-    const back = document.createElement("div");
-    back.className = "modal-back";
-    back.innerHTML = `
+    const groups = order.map(group => ({
+        group,
+        subs: groupMap[group]
+      })),
+      back = document.createElement("div");
+    back.className = "modal-back", back.innerHTML = `
       <div class="modal picker-modal">
         <h3>분류</h3>
         <div class="body" style="display:flex;flex-direction:column;max-height:60vh">
@@ -289,62 +242,53 @@
           <button type="button" class="btn" data-cancel>취소</button>
           <button type="button" class="btn primary" data-apply>적용</button>
         </div>
-      </div>`;
-    document.body.appendChild(back);
-    const body = back.querySelector("[data-body]");
-    const applyBtn = back.querySelector("[data-apply]");
-    const searchInput = back.querySelector("[data-move-search]");
-
+      </div>`, document.body.appendChild(back);
+    const body = back.querySelector("[data-body]"),
+      applyBtn = back.querySelector("[data-apply]"),
+      searchInput = back.querySelector("[data-move-search]");
     function draw() {
-      const q = query.trim().toLowerCase();
-      const html = groups.map(g => {
-        const groupMatches = !q || g.group.toLowerCase().includes(q);
-        const subs = g.subs.filter(c => groupMatches || c.sub.toLowerCase().includes(q));
-        if (!subs.length) return "";
-        return `
+      const q = query.trim().toLowerCase(),
+        html = groups.map(g => {
+          const groupMatches = !q || g.group.toLowerCase().includes(q),
+            subs = g.subs.filter(c => groupMatches || c.sub.toLowerCase().includes(q));
+          return subs.length ? `
         <div class="submove-group">
           <div class="submove-group-name">${g.group}</div>
           ${subs.map(c => {
-            const isOtherType = c.type !== currentType;
-            const tip = isOtherType ? "다른 자산 유형으로는 이동할 수 없습니다." : "";
             const checked = picked && picked.group === g.group && picked.sub === c.sub;
             return `
-            <label class="radio-row${isOtherType ? " is-disabled" : ""}"${tip ? ` data-tip="${tip}"` : ""}>
-              <input type="radio" name="catmove" data-group="${g.group}" data-sub="${c.sub}"${isOtherType ? " disabled" : ""}${checked ? " checked" : ""}>
+            <label class="radio-row">
+              <input type="radio" name="catmove" data-group="${g.group}" data-sub="${c.sub}"${checked ? " checked" : ""}>
               <span>${c.sub}</span>
             </label>`;
           }).join("")}
-        </div>`;
-      }).join("");
-      body.innerHTML = html || '<p class="tag-manage-empty">결과가 없습니다.</p>';
-      body.querySelectorAll('input[name="catmove"]').forEach(r => r.onchange = () => {
-        picked = { group: r.dataset.group, sub: r.dataset.sub };
-        applyBtn.disabled = false;
-      });
-      applyBtn.disabled = !picked;
+        </div>` : "";
+        }).join("");
+      body.innerHTML = html || '<p class="tag-manage-empty">결과가 없습니다.</p>', body.querySelectorAll('input[name="catmove"]').forEach(r => r.onchange = () => {
+        picked = {
+          group: r.dataset.group,
+          sub: r.dataset.sub
+        }, applyBtn.disabled = !1;
+      }), applyBtn.disabled = !picked;
     }
-    draw();
-
-    searchInput.addEventListener("input", () => { query = searchInput.value; draw(); });
-    // Input/selection/confirmation modal: backdrop clicks do not dismiss.
-    back.querySelector("[data-cancel]").onclick = () => back.remove();
-    applyBtn.onclick = () => { if (!picked) return; back.remove(); onApply(picked); };
+    draw(), searchInput.addEventListener("input", () => {
+      query = searchInput.value, draw();
+    }), back.querySelector("[data-cancel]").onclick = () => back.remove(), applyBtn.onclick = () => {
+      picked && (back.remove(), onApply(picked));
+    };
   }
-
   window.openAssetAddModal = function (opts) {
     opts = opts || {};
-    // 구조설계안 4.1/4.2: 등록·수정은 자산 관리 권한 전용이며 권한자는 모든 분류를 조회한다.
-    // 대시보드는 관리자 계정으로 가정(assets.js/detail.js와 동일). 따라서 추가·이동 후보는 전체 분류.
-    // 실제 계정 연동 시 관리권한 검사 후 조회 가능한 분류만 이 경계에서 제공한다.
-    const hasAssetManagePermission = () => true;
+    const hasAssetManagePermission = () => !0;
     if (!hasAssetManagePermission()) return null;
-    const categories = ((window.DATA && window.DATA.categories) || []).filter(() => hasAssetManagePermission());
-    const preselectValue = opts.group && opts.sub ? `${opts.group}|${opts.sub}` : null;
-    const findCat = v => { const [g, s] = (v || "").split("|"); return categories.find(c => c.group === g && c.sub === s); };
+    const categories = (window.DATA && window.DATA.categories || []).filter(() => hasAssetManagePermission()),
+      preselectValue = opts.group && opts.sub ? `${opts.group}|${opts.sub}` : null,
+      findCat = v => {
+        const [g, s] = (v || "").split("|");
+        return categories.find(c => c.group === g && c.sub === s);
+      };
     let type = (findCat(preselectValue) || {}).type || "individual";
-
-    // 배정일 수정(detail.js)과 동일한 마스킹 정책(YYYY.MM.DD, 8자리 숫자) — 단, 유효기한은 만료일 성격상 미래 날짜도 허용
-    const IC_CAL = `<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>`;
+    const IC_CAL = '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>';
     function dateFieldHtml() {
       return `
         <div class="dfield">
@@ -352,42 +296,35 @@
           <span class="dfield-pick">${IC_CAL}<input type="date" data-dnative tabindex="-1"></span>
         </div>`;
     }
-    // 실제 달력에 있는 날짜인지(윤년 2월 29일까지 포함, 2월 30일·4월 31일 등은 거름) — Date에 넣었다가
-    // 그대로 되돌아오는지로 판정(달을 벗어난 일수는 Date가 다음 달로 넘겨버리는 걸 이용한 표준적인 방법)
     const isRealDate = (y, m, dd) => {
       const dt = new Date(y, m - 1, dd);
       return dt.getFullYear() === y && dt.getMonth() === m - 1 && dt.getDate() === dd;
     };
-    // maxIso가 있으면(구매연월·제조연월) 미래 날짜 불가, 없으면(유효기한) 만료일 성격상 미래 날짜도 허용.
-    // getValue()는 8자리를 다 채운 유효한 날짜면 ISO, 완전히 비어있으면 "", 불완전/무효(달력에 없는 날짜·범위밖)면
-    // null을 돌려줌 — null을 저장 버튼 비활성·에러 메시지 판정에 그대로 씀(2026-09-30, 이전엔 무효해도 조용히 무시).
-    // getValue.touched: 포커스가 한 번 빠져나간 적 있는지 — 입력 중엔(포커스 안 빠짐) 에러 문구를 숨기고
-    // 저장 버튼 비활성만 실시간으로 걸기 위한 플래그(타이핑 도중 바로 빨간 글씨가 뜨는 걸 방지)
     function wireDateField(scope, maxIso) {
-      const text = scope.querySelector("[data-dtext]");
-      const native = scope.querySelector("[data-dnative]");
-      if (maxIso) native.max = maxIso;
-      const digitsOf = v => v.replace(/\D/g, "").slice(0, 8);
-      const format = d => d.length > 6 ? `${d.slice(0, 4)}.${d.slice(4, 6)}.${d.slice(6)}`
-                         : d.length > 4 ? `${d.slice(0, 4)}.${d.slice(4)}` : d;
-      const getValue = () => {
-        const d = digitsOf(text.value);
-        if (!d.length) return "";
-        if (d.length !== 8) return null;
-        const y = +d.slice(0, 4), m = +d.slice(4, 6), dd = +d.slice(6, 8);
-        if (!isRealDate(y, m, dd)) return null;
-        const iso = `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}`;
-        return maxIso && iso > maxIso ? null : iso;
-      };
-      getValue.touched = false;
-      text.addEventListener("input", () => { text.value = format(digitsOf(text.value)); getValue.touched = false; checkValid(); });
-      text.addEventListener("blur", () => { getValue.touched = true; checkValid(); });
-      native.addEventListener("change", () => { if (native.value) text.value = native.value.replace(/-/g, "."); getValue.touched = true; checkValid(); });
-      return getValue;
+      const text = scope.querySelector("[data-dtext]"),
+        native = scope.querySelector("[data-dnative]");
+      maxIso && (native.max = maxIso);
+      const digitsOf = v => v.replace(/\D/g, "").slice(0, 8),
+        format = d => d.length > 6 ? `${d.slice(0, 4)}.${d.slice(4, 6)}.${d.slice(6)}` : d.length > 4 ? `${d.slice(0, 4)}.${d.slice(4)}` : d,
+        getValue = () => {
+          const d = digitsOf(text.value);
+          if (!d.length) return "";
+          if (d.length !== 8) return null;
+          const y = +d.slice(0, 4),
+            m = +d.slice(4, 6),
+            dd = +d.slice(6, 8);
+          if (!isRealDate(y, m, dd)) return null;
+          const iso = `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}`;
+          return maxIso && iso > maxIso ? null : iso;
+        };
+      return getValue.touched = !1, text.addEventListener("input", () => {
+        text.value = format(digitsOf(text.value)), getValue.touched = !1, checkValid();
+      }), text.addEventListener("blur", () => {
+        getValue.touched = !0, checkValid();
+      }), native.addEventListener("change", () => {
+        native.value && (text.value = native.value.replace(/-/g, ".")), getValue.touched = !0, checkValid();
+      }), getValue;
     }
-    // 제조연월·구매연월 전용(2026-09-30, 일 단위 제거 — "제조연월일"·"구매일"이었던 걸 연월 단위로 단순화).
-    // 네이티브 피커도 <input type=date> 대신 <input type=month>(일 선택 UI 자체가 없음)로 교체. 저장 값은
-    // 일자를 "01"로 고정해 기존 날짜 문자열 처리(정렬·이력 타임스탬프 등)와 호환 유지 — 표기만 fmtMonth로 연월까지만
     function monthFieldHtml() {
       return `
         <div class="dfield">
@@ -396,38 +333,36 @@
         </div>`;
     }
     function wireMonthField(scope, maxIso) {
-      const text = scope.querySelector("[data-dtext]");
-      const native = scope.querySelector("[data-dnative]");
-      const maxMonth = maxIso ? maxIso.slice(0, 7) : null;
-      if (maxMonth) native.max = maxMonth;
-      const digitsOf = v => v.replace(/\D/g, "").slice(0, 6);
-      const format = d => d.length > 4 ? `${d.slice(0, 4)}.${d.slice(4)}` : d;
-      const getValue = () => {
-        const d = digitsOf(text.value);
-        if (!d.length) return "";
-        if (d.length !== 6) return null;
-        const y = d.slice(0, 4), m = d.slice(4, 6);
-        if (+m < 1 || +m > 12) return null;
-        const ym = `${y}-${m}`;
-        return maxMonth && ym > maxMonth ? null : `${ym}-01`;
-      };
-      getValue.touched = false;
-      text.addEventListener("input", () => { text.value = format(digitsOf(text.value)); getValue.touched = false; checkValid(); });
-      text.addEventListener("blur", () => { getValue.touched = true; checkValid(); });
-      native.addEventListener("change", () => { if (native.value) text.value = native.value.replace("-", "."); getValue.touched = true; checkValid(); });
-      return getValue;
+      const text = scope.querySelector("[data-dtext]"),
+        native = scope.querySelector("[data-dnative]"),
+        maxMonth = maxIso ? maxIso.slice(0, 7) : null;
+      maxMonth && (native.max = maxMonth);
+      const digitsOf = v => v.replace(/\D/g, "").slice(0, 6),
+        format = d => d.length > 4 ? `${d.slice(0, 4)}.${d.slice(4)}` : d,
+        getValue = () => {
+          const d = digitsOf(text.value);
+          if (!d.length) return "";
+          if (d.length !== 6) return null;
+          const y = d.slice(0, 4),
+            m = d.slice(4, 6);
+          if (+m < 1 || +m > 12) return null;
+          const ym = `${y}-${m}`;
+          return maxMonth && ym > maxMonth ? null : `${ym}-01`;
+        };
+      return getValue.touched = !1, text.addEventListener("input", () => {
+        text.value = format(digitsOf(text.value)), getValue.touched = !1, checkValid();
+      }), text.addEventListener("blur", () => {
+        getValue.touched = !0, checkValid();
+      }), native.addEventListener("change", () => {
+        native.value && (text.value = native.value.replace("-", ".")), getValue.touched = !0, checkValid();
+      }), getValue;
     }
-
-    const tags = [];
-    // 사진 — 실 파일 업로드 없이 색상 스와치로 시뮬레이션(구조설계안 5.4: 자산당 최대 10장, 항상 1장 대표).
-    // detail.js의 photosOf(){color,at,by} 형태와 동일해서 저장 시 asset._photos에 그대로 대입 가능
-    const PHOTO_COLORS = ["#5b8def", "#8f6ef0", "#eb7f8b", "#3fb37f", "#e0a63c", "#4dabf7", "#c2554e", "#3f9ba0", "#9a6bd6", "#5aa06a"];
-    let photos = [];
-    let primaryIdx = 0;
-
+    const tags = [],
+      PHOTO_COLORS = ["#5b8def", "#8f6ef0", "#eb7f8b", "#3fb37f", "#e0a63c", "#4dabf7", "#c2554e", "#3f9ba0", "#9a6bd6", "#5aa06a"];
+    let photos = [],
+      primaryIdx = 0;
     const back = document.createElement("div");
-    back.className = "modal-back";
-    back.innerHTML = `
+    back.className = "modal-back", back.innerHTML = `
       <div class="modal scroll-body areg">
         <div class="areg-head">
           <h3>${opts.asset ? "자산 수정" : "자산 추가"}</h3>
@@ -452,7 +387,6 @@
               ${opts.asset ? "" : `<p class="hint">${window.ASSET_NUMBER_GUIDE}</p>`}
               <p class="field-err" data-assetno-err hidden>동일한 명칭이 존재합니다.</p>
             </div>
-            <div class="field" id="areg-totalqty-field"><label>전체 수량 <span class="req">*</span></label><input type="text" inputmode="numeric" id="areg-totalqty-input" placeholder="입력" maxlength="9"></div>
             <div class="field" id="areg-expiry-field"><label>유효기한</label>${dateFieldHtml()}
               <p class="field-err" data-date-err hidden>유효한 날짜가 아닙니다.</p>
             </div>
@@ -483,203 +417,155 @@
           <button type="button" class="btn" data-close>취소</button>
           <button type="button" class="btn primary" id="areg-save" disabled>저장</button>
         </div>
-      </div>`;
-    // Input/selection/confirmation modal: backdrop clicks do not dismiss.
-    back.querySelectorAll("[data-close]").forEach(b => b.onclick = () => { if (!b.disabled) requestClose(); });
-    document.body.appendChild(back);
-
-    const modalEl = back.querySelector(".modal");
-    const rightCol = back.querySelector("#areg-col-right");
-    const nameField = back.querySelector("#areg-name-field");
-    const nameInput = back.querySelector("#areg-name");
-    const nameErr = back.querySelector("[data-name-err]");
-    const photoRow = back.querySelector("#areg-photo-row");
-    const assetNoField = back.querySelector("#areg-assetno");
-    const assetNoInput = back.querySelector("#areg-assetno-input");
-    const assetNoErr = back.querySelector("[data-assetno-err]");
-    const totalQtyField = back.querySelector("#areg-totalqty-field");
-    const totalQtyInput = back.querySelector("#areg-totalqty-input");
-    const tagFieldEl = back.querySelector("#areg-tag-field");
-    const expiryField = back.querySelector("#areg-expiry-field");
-    const serialField = back.querySelector("#areg-serial-field");
-    const serialInput = back.querySelector("#areg-serial-input");
-    const imeiField = back.querySelector("#areg-imei-field");
-    const imeiInput = back.querySelector("#areg-imei-input");
-    const manufacturedField = back.querySelector("#areg-manufactured-field");
-    const purchaseDateField = back.querySelector("#areg-purchasedate-field");
-    const purchasePriceField = back.querySelector("#areg-purchaseprice-field");
-    const purchasePriceInput = back.querySelector("#areg-purchaseprice-input");
-    const noteField = back.querySelector("#areg-note-field");
-    const noteInput = back.querySelector("#areg-note-input");
+      </div>`, back.querySelectorAll("[data-close]").forEach(b => b.onclick = () => {
+      b.disabled || requestClose();
+    }), document.body.appendChild(back);
+    const modalEl = back.querySelector(".modal"),
+      rightCol = back.querySelector("#areg-col-right"),
+      nameField = back.querySelector("#areg-name-field"),
+      nameInput = back.querySelector("#areg-name"),
+      nameErr = back.querySelector("[data-name-err]"),
+      photoRow = back.querySelector("#areg-photo-row"),
+      assetNoField = back.querySelector("#areg-assetno"),
+      assetNoInput = back.querySelector("#areg-assetno-input"),
+      assetNoErr = back.querySelector("[data-assetno-err]"),
+      tagFieldEl = back.querySelector("#areg-tag-field"),
+      expiryField = back.querySelector("#areg-expiry-field"),
+      serialField = back.querySelector("#areg-serial-field"),
+      serialInput = back.querySelector("#areg-serial-input"),
+      imeiField = back.querySelector("#areg-imei-field"),
+      imeiInput = back.querySelector("#areg-imei-input"),
+      manufacturedField = back.querySelector("#areg-manufactured-field"),
+      purchaseDateField = back.querySelector("#areg-purchasedate-field"),
+      purchasePriceField = back.querySelector("#areg-purchaseprice-field"),
+      purchasePriceInput = back.querySelector("#areg-purchaseprice-input"),
+      noteField = back.querySelector("#areg-note-field"),
+      noteInput = back.querySelector("#areg-note-input");
     window.AssetMemo.mountTextarea(noteInput);
     const saveBtn = back.querySelector("#areg-save");
-    let initialEditValues = null;
-    let savedNumberError = null, savedNameError = null;
-
-    const getExpiry = wireDateField(expiryField);
-    const getManufactured = wireMonthField(manufacturedField, todayStr());
-    const getPurchaseDate = wireMonthField(purchaseDateField, todayStr());
-
-    // 고유관리번호는 QR 라벨 파일명의 식별키로 그대로 쓰여서, 파일명에 부적합한 문자가 섞이지 않도록 영문·숫자·하이픈·언더스코어만 허용.
-    // 수정 모드에선 자기 자신은 중복 검사에서 제외(안 그러면 기존 값 그대로 저장하려 해도 항상 "중복"으로 걸림)
+    let initialEditValues = null,
+      savedNumberError = null,
+      savedNameError = null;
+    const getExpiry = wireDateField(expiryField),
+      getManufactured = wireMonthField(manufacturedField, todayStr()),
+      getPurchaseDate = wireMonthField(purchaseDateField, todayStr());
     function assetNoDup(v) {
-      if (!v) return false;
-      return (window.DATA.assets || []).some(a => a !== opts.asset && a.assetNo && a.assetNo === v);
+      return v ? (window.DATA.assets || []).some(a => a !== opts.asset && a.assetNo && a.assetNo === v) : !1;
     }
-    // 수량형은 동일 소분류 안에서 품목명이 유일하다. 개별형은 같은 품목의 여러 유닛을 허용한다.
-    // 검색만 대소문자를 무시하며 중복 판정은 저장값대로 구분한다. 수정 대상 자신은 제외한다.
-    function quantityNameDup(v) {
-      const cat = findCat(catValue);
-      if (type !== "quantity" || !cat || !v) return false;
-      return (window.DATA.assets || []).some(a => a !== opts.asset && !a.deleted_at && a.type === "quantity"
-        && a.group === cat.group && a.sub === cat.sub && a.product.trim() === v);
-    }
-    // 날짜 필드(유효기한·제조연월·구매연월) 공통 유효성 판정 — 필드가 숨겨져 있으면(카테고리 필드 노출
-    // 설정에서 꺼짐) 검사 대상에서 제외. 저장 버튼 비활성은 무효면 항상 실시간으로 걸지만, 에러 문구는
-    // getValue.touched(포커스가 한 번 빠져나간 적 있는지)가 true일 때만 보여줌(2026-09-30 — 타이핑 도중
-    // 계속 빨간 글씨가 뜨는 걸 방지)
     function dateFieldValid(fieldEl, getValue) {
-      if (fieldEl.style.display === "none") return true;
-      const invalid = getValue() === null;
-      const errEl = fieldEl.querySelector("[data-date-err]");
-      const showErr = invalid && getValue.touched;
-      if (errEl) errEl.hidden = !showErr;
-      fieldEl.querySelector("[data-dtext]").classList.toggle("has-err", showErr);
-      return !invalid;
+      if (fieldEl.style.display === "none") return !0;
+      const invalid = getValue() === null,
+        errEl = fieldEl.querySelector("[data-date-err]"),
+        showErr = invalid && getValue.touched;
+      return errEl && (errEl.hidden = !showErr), fieldEl.querySelector("[data-dtext]").classList.toggle("has-err", showErr), !invalid;
     }
     function editValues() {
-      // 표기 차이·태그 순서만으로는 변경으로 보지 않는다. 연월은 저장할 때와 같은 단위로 비교한다.
-      const dateValue = (field, getValue) => getValue() === null ? field.querySelector("[data-dtext]").value : getValue();
-      const price = window.normalizePurchasePrice(purchasePriceInput.value);
+      const dateValue = (field, getValue) => getValue() === null ? field.querySelector("[data-dtext]").value : getValue(),
+        price = window.normalizePurchasePrice(purchasePriceInput.value);
       return {
-        category: catValue, name: nameInput.value.trim(), assetNo: assetNoInput.value.trim(),
-        totalQty: totalQtyInput.value ? window.AssetQuantity.parse(totalQtyInput.value) : "",
-        expiry: dateValue(expiryField, getExpiry), manufactured: dateValue(manufacturedField, getManufactured),
-        purchaseDate: dateValue(purchaseDateField, getPurchaseDate), price,
-        serial: serialInput.value.trim(), imei: imeiInput.value.trim(), note: noteInput.value.trim(),
-        tags: [...tags].sort(), photos: photos.map(photo => ({ ...photo })), primary: primaryIdx,
+        category: catValue,
+        extraValues:window.AssetExtra.readInputs(back),
+        name: nameInput.value.trim(),
+        assetNo: assetNoInput.value.trim(),
+        expiry: dateValue(expiryField, getExpiry),
+        manufactured: dateValue(manufacturedField, getManufactured),
+        purchaseDate: dateValue(purchaseDateField, getPurchaseDate),
+        price,
+        serial: serialInput.value.trim(),
+        imei: imeiInput.value.trim(),
+        note: noteInput.value.trim(),
+        tags: [...tags].sort(),
+        photos: photos.map(photo => ({
+          ...photo
+        })),
+        primary: primaryIdx
       };
     }
     function editDirty() {
       return !!initialEditValues && JSON.stringify(editValues()) !== JSON.stringify(initialEditValues);
     }
     function hasAddInput() {
-      // 분류를 포함해 실제 선택·입력값이 하나라도 남아 있으면 이탈 확인한다. 공백만 있거나 모두 지운 값,
-      // 자동완성·태그 후보 검색어처럼 저장되지 않는 임시 검색어는 제외한다.
-      const inputs = [nameInput, assetNoInput, totalQtyInput, serialInput, imeiInput, purchasePriceInput, noteInput,
-        ...[expiryField, manufacturedField, purchaseDateField].map(field => field.querySelector("[data-dtext]"))];
+      const inputs = [nameInput, assetNoInput, serialInput, imeiInput, purchasePriceInput, noteInput, ...[expiryField, manufacturedField, purchaseDateField].map(field => field.querySelector("[data-dtext]"))];
       return !!catValue || inputs.some(input => input.value.trim()) || tags.length > 0 || photos.length > 0;
     }
     function requestClose() {
-      closeMenu(); closeProdMenu();
-      if (opts.asset ? !editDirty() : !hasAddInput()) { back.remove(); return; }
+      if (closeMenu(), closeProdMenu(), opts.asset ? !editDirty() : !hasAddInput()) {
+        back.remove();
+        return;
+      }
       if (document.querySelector("[data-register-exit]")) return;
-      const title = opts.asset ? "수정을 중단하시겠습니까?" : "작성을 중단하시겠습니까?";
-      const body = opts.asset ? "수정을 중단할 경우 변경된 내용은 저장되지 않습니다." : "지금까지 작성한 내용은 저장되지 않습니다.";
-      const cb = document.createElement("div");
-      cb.className = "modal-back";
-      cb.style.zIndex = 340;
-      cb.innerHTML = `<div class="modal sm" data-register-exit role="dialog" aria-modal="true" aria-label="${title}">
+      const title = opts.asset ? "수정을 중단하시겠습니까?" : "작성을 중단하시겠습니까?",
+        body = opts.asset ? "수정을 중단할 경우 변경된 내용은 저장되지 않습니다." : "지금까지 작성한 내용은 저장되지 않습니다.",
+        cb = document.createElement("div");
+      cb.className = "modal-back", cb.style.zIndex = 340, cb.innerHTML = `<div class="modal sm" data-register-exit role="dialog" aria-modal="true" aria-label="${title}">
         <h3>${title}</h3>
         <div class="body" style="font-size:14px">${body}</div>
-        <div class="foot"><button type="button" class="btn" data-register-stay>취소</button><button type="button" class="btn primary" data-register-leave>확인</button></div></div>`;
-      document.body.appendChild(cb);
-      cb.querySelector("[data-register-stay]").onclick = () => cb.remove();
-      cb.querySelector("[data-register-leave]").onclick = () => { cb.remove(); back.remove(); };
-      // Input/selection/confirmation modal: backdrop clicks do not dismiss.
+        <div class="foot"><button type="button" class="btn" data-register-stay>취소</button><button type="button" class="btn primary" data-register-leave>확인</button></div></div>`, document.body.appendChild(cb), cb.querySelector("[data-register-stay]").onclick = () => cb.remove(), cb.querySelector("[data-register-leave]").onclick = () => {
+        cb.remove(), back.remove();
+      };
     }
     function checkValid() {
-      const name = nameInput.value.trim();
-      const nameKey = `${catValue}|${name}`;
-      if (savedNameError !== nameKey) savedNameError = null;
-      const nameDup = opts.asset ? quantityNameDup(name) : savedNameError === nameKey;
-      nameErr.hidden = !nameDup;
-      nameInput.classList.toggle("has-err", nameDup);
-      nameInput.setAttribute("aria-invalid", String(nameDup));
-      const nameOk = name.length > 0 && !nameDup;
-      const noVal = assetNoInput.value.trim();
-      if (savedNumberError !== noVal) savedNumberError = null;
-      const dup = type !== "quantity" && !!noVal && (opts.asset ? assetNoDup(noVal) : savedNumberError === noVal);
-      assetNoErr.hidden = !dup;
-      assetNoInput.classList.toggle("has-err", dup);
-      const noOk = type === "quantity" ? true : ((!opts.asset || noVal.length > 0) && !dup);
-      const totalQtyValue = totalQtyInput.value.trim();
-      const heldQty = opts.asset && type === "quantity"
-        ? (opts.asset.stocks || []).reduce((sum, stock) => sum + stock.qty, 0)
-        : 0;
-      const totalQtyOk = type === "quantity"
-        ? window.AssetQuantity.parse(totalQtyValue) !== null && window.AssetQuantity.parse(totalQtyValue) >= heldQty
-        : true;
-      const expiryOk = dateFieldValid(expiryField, getExpiry);
-      const manufacturedOk = dateFieldValid(manufacturedField, getManufactured);
-      const purchaseDateOk = dateFieldValid(purchaseDateField, getPurchaseDate);
-      saveBtn.disabled = !(catValue && nameOk && noOk && totalQtyOk && expiryOk && manufacturedOk && purchaseDateOk && (!opts.asset || editDirty()));
+      const name = nameInput.value.trim(),
+        nameKey = `${catValue}|${name}`;
+      savedNameError !== nameKey && (savedNameError = null);
+      const nameDup = opts.asset ? !1 : savedNameError === nameKey;
+      nameErr.hidden = !nameDup, nameInput.classList.toggle("has-err", nameDup), nameInput.setAttribute("aria-invalid", String(nameDup));
+      const nameOk = name.length > 0 && !nameDup,
+        noVal = assetNoInput.value.trim();
+      savedNumberError !== noVal && (savedNumberError = null);
+      const dup = !!noVal && (opts.asset ? assetNoDup(noVal) : savedNumberError === noVal);
+      assetNoErr.hidden = !dup, assetNoInput.classList.toggle("has-err", dup);
+      const noOk = (!opts.asset || noVal.length > 0) && !dup,
+        expiryOk = dateFieldValid(expiryField, getExpiry),
+        manufacturedOk = dateFieldValid(manufacturedField, getManufactured),
+        purchaseDateOk = dateFieldValid(purchaseDateField, getPurchaseDate);
+      saveBtn.disabled = !(catValue && nameOk && noOk && expiryOk && manufacturedOk && purchaseDateOk && (!opts.asset || editDirty()));
     }
-    // 품목명 자동완성 — "소분류+품목명" 조합이 품목 단위라, 같은 소분류에 이미 등록된 품목명을 제안해서
-    // 띄어쓰기·표기 차이로 같은 품목이 여러 이름으로 쪼개지는 걸 막음. 태그와 달리 목록에 없는 새 이름도 항상 입력 가능(강제 선택 아님)
-    let prodMenu = null, prodHi = -1;
-    function closeProdMenu() { if (prodMenu) { prodMenu.remove(); prodMenu = null; } prodHi = -1; }
+    let prodMenu = null,
+      prodHi = -1;
+    function closeProdMenu() {
+      prodMenu && (prodMenu.remove(), prodMenu = null), prodHi = -1;
+    }
     function productOptions() {
       if (!catValue) return [];
       const cat = findCat(catValue);
-      // 개별형 소분류에서만 제안한다. 수량형은 기존 품목명을 고르면 곧바로 중복이라 제안하지 않는다(D-20261023-09).
-      if (!cat || cat.type !== "individual") return [];
-      const q = nameInput.value.trim().toLowerCase();
-      const names = [...new Set((window.DATA.assets || [])
-        .filter(a => a.group === cat.group && a.sub === cat.sub)
-        .map(a => a.product).filter(Boolean))];
-      // 포커스만 하고 아직 안 쳤으면(q 없음) 전체 목록을 보여줌(태그 검색과 동일) — 검색어가 있는데 매칭이
-      // 없으면 자동완성 성격상 "결과 없음" 표시 없이 그냥 드롭다운을 띄우지 않음(새 품목명 입력이 정상 상태)
+      if (!cat) return [];
+      const q = nameInput.value.trim().toLowerCase(),
+        names = [...new Set((window.DATA.assets || []).filter(a => a.group === cat.group && a.sub === cat.sub).map(a => a.product).filter(Boolean))];
       return q ? names.filter(n => n.toLowerCase().includes(q)) : names;
     }
     function openProdMenu() {
-      const opts = productOptions();
-      closeProdMenu();
-      if (!opts.length) return;
-      prodMenu = document.createElement("div");
-      prodMenu.className = "dropdown-menu";
-      prodHi = 0;
-      prodMenu.innerHTML = opts.map((n, i) => `<button type="button" data-v="${n}" class="${i === 0 ? "active" : ""}">${n}</button>`).join("");
+      const opts2 = productOptions();
+      if (closeProdMenu(), !opts2.length) return;
+      prodMenu = document.createElement("div"), prodMenu.className = "dropdown-menu", prodHi = 0, prodMenu.innerHTML = opts2.map((n, i) => `<button type="button" data-v="${n}" class="${i === 0 ? "active" : ""}">${n}</button>`).join("");
       const r = nameInput.getBoundingClientRect();
-      prodMenu.style.cssText = `position:fixed;top:${r.bottom + 4}px;left:${r.left}px;min-width:${r.width}px`;
-      document.body.appendChild(prodMenu);
-      prodMenu.querySelectorAll("[data-v]").forEach(b => b.onclick = () => {
-        nameInput.value = b.dataset.v;
-        closeProdMenu();
-        checkValid();
+      prodMenu.style.cssText = `position:fixed;top:${r.bottom + 4}px;left:${r.left}px;min-width:${r.width}px`, document.body.appendChild(prodMenu), prodMenu.querySelectorAll("[data-v]").forEach(b => b.onclick = () => {
+        nameInput.value = b.dataset.v, closeProdMenu(), checkValid();
       });
     }
     function moveProdHi(delta) {
       if (!prodMenu) return;
       const btns = [...prodMenu.querySelectorAll("button")];
-      if (!btns.length) return;
-      if (btns[prodHi]) btns[prodHi].classList.remove("active");
-      prodHi = Math.max(0, Math.min(btns.length - 1, prodHi + delta));
-      btns[prodHi].classList.add("active");
-      btns[prodHi].scrollIntoView({ block: "nearest" });
+      btns.length && (btns[prodHi] && btns[prodHi].classList.remove("active"), prodHi = Math.max(0, Math.min(btns.length - 1, prodHi + delta)), btns[prodHi].classList.add("active"), btns[prodHi].scrollIntoView({
+        block: "nearest"
+      }));
     }
-    nameInput.addEventListener("input", () => { checkValid(); openProdMenu(); });
-    nameInput.addEventListener("focus", () => { if (!nameInput.disabled) openProdMenu(); });
-    nameInput.addEventListener("keydown", e => {
-      if (!prodMenu) return;
-      if (e.key === "ArrowDown") { e.preventDefault(); moveProdHi(1); }
-      else if (e.key === "ArrowUp") { e.preventDefault(); moveProdHi(-1); }
-      else if (e.key === "Enter") {
+    nameInput.addEventListener("input", () => {
+      checkValid(), openProdMenu();
+    }), nameInput.addEventListener("focus", () => {
+      nameInput.disabled || openProdMenu();
+    }), nameInput.addEventListener("keydown", e => {
+      if (prodMenu) if (e.key === "ArrowDown") e.preventDefault(), moveProdHi(1);else if (e.key === "ArrowUp") e.preventDefault(), moveProdHi(-1);else if (e.key === "Enter") {
         e.preventDefault();
-        const btns = [...prodMenu.querySelectorAll("button")];
-        const b = btns[prodHi];
-        if (b) { nameInput.value = b.dataset.v; closeProdMenu(); checkValid(); }
-      } else if (e.key === "Escape") { closeProdMenu(); }
-    });
-    document.addEventListener("click", e => {
-      if (prodMenu && !prodMenu.contains(e.target) && e.target !== nameInput) closeProdMenu();
-    });
-    assetNoInput.addEventListener("input", () => {
-      // value를 그냥 덮어쓰면 커서가 항상 맨 끝으로 튀어서, 중간에 타이핑하다 막힌 것처럼 느껴짐 —
-      // 제거된 글자 수만큼 커서 위치를 보정해서 원래 있던 자리에 그대로 남게 함
-      const before = assetNoInput.value;
-      const pos = assetNoInput.selectionStart;
-      const filtered = before.replace(/[^A-Za-z0-9\-_]/g, "");
+        const b = [...prodMenu.querySelectorAll("button")][prodHi];
+        b && (nameInput.value = b.dataset.v, closeProdMenu(), checkValid());
+      } else e.key === "Escape" && closeProdMenu();
+    }), document.addEventListener("click", e => {
+      prodMenu && !prodMenu.contains(e.target) && e.target !== nameInput && closeProdMenu();
+    }), assetNoInput.addEventListener("input", () => {
+      const before = assetNoInput.value,
+        pos = assetNoInput.selectionStart,
+        filtered = before.replace(/[^A-Za-z0-9\-_]/g, "");
       if (filtered !== before) {
         const removedBefore = before.slice(0, pos).length - before.slice(0, pos).replace(/[^A-Za-z0-9\-_]/g, "").length;
         assetNoInput.value = filtered;
@@ -687,300 +573,186 @@
         assetNoInput.setSelectionRange(newPos, newPos);
       }
       checkValid();
-    });
-    totalQtyInput.addEventListener("input", () => {
-      totalQtyInput.value = totalQtyInput.value.replace(/[^0-9]/g, "");
-      checkValid();
-    });
-    // 정수부 12자리·소수부 5자리 및 콤마 표시는 앱과 공통 처리한다.
-    window.bindPurchasePriceInput(purchasePriceInput);
-
-    // 소분류 — 검색 + 대분류/소분류 트리 모달(openCategoryPickModal)에서 단일 선택.
-    // 기본은 비워둔 상태(자동 첫 항목 선택 없음) — 미선택 상태에선 소분류 필드만 보이고 나머지는 아예 숨김
-    // (골라야 알 수 있는 유형별 필드를 미리 잠긴 채로 보여주는 것보다, 선택 후 필요한 것만 드러나는 쪽이 더 간결)
-    const catWrap = back.querySelector("#areg-catwrap");
-    const catDisplay = back.querySelector("#areg-cat-display");
-    let catValue = null;
-    // 분류 미선택 직접 입력에서만 추출값을 일회 보관한다. 일반 분류 변경에는 재사용하지 않는다.
-    let activeAiDraft = null;
-    const categoryDrafts = new Map();
-
-    function catLabel(v) { const c = findCat(v); return c ? `${c.group} › ${c.sub}` : ""; }
-    // 소분류별 필드 노출 설정(구조설계안 3.3 hiddenFields) 반영 — S/N·IMEI는 개별형 전용이라 유형 조건과 같이 봄.
-    // 소분류·품목명은 왼쪽 컬럼에 항상 노출(둘 다 필수라 처음부터 입력 가능), 오른쪽 컬럼 전체가 소분류
-    // 선택 여부로 나타났다 사라지며 모달 너비도 같이 확장(.areg.wide, CSS transition)
+    }), window.bindPurchasePriceInput(purchasePriceInput);
+    const catWrap = back.querySelector("#areg-catwrap"),
+      catDisplay = back.querySelector("#areg-cat-display");
+    let catValue = null,
+      activeAiDraft = null;
+    const categoryDrafts = /* @__PURE__ */new Map();
+    function catLabel(v) {
+      const c = findCat(v);
+      return c ? `${c.group} › ${c.sub}` : "";
+    }
     function applyFieldVisibility() {
-      const show = !!catValue;
-      const cat = findCat(catValue);
-      const hiddenFields = (cat && cat.hiddenFields) || [];
-      rightCol.style.display = show ? "flex" : "none";
-      modalEl.classList.toggle("wide", show);
-      // 사진·태그·메모는 구조설계안상 소분류 필드 노출 설정과 무관하게 항상 노출되는 필드라 hiddenFields 체크 없음
-      assetNoField.style.display = show && type !== "quantity" ? "" : "none";
-      // 총 수량은 개별형엔 없는 개념(실물 1개=Asset 1건이라 총 수량이 항상 1, 구조설계안 3.4)
-      totalQtyField.style.display = show && type !== "individual" ? "" : "none";
-      expiryField.style.display = show && !hiddenFields.includes("expiry") ? "" : "none";
-      serialField.style.display = show && type === "individual" && !hiddenFields.includes("serial") ? "" : "none";
-      imeiField.style.display = show && type === "individual" && !hiddenFields.includes("imei") ? "" : "none";
-      manufacturedField.style.display = show && !hiddenFields.includes("manufactured") ? "" : "none";
-      purchaseDateField.style.display = show && !hiddenFields.includes("purchaseDate") ? "" : "none";
-      purchasePriceField.style.display = show && !hiddenFields.includes("purchasePrice") ? "" : "none";
-    }
+ const cat=findCat(catValue), manage=window.hasPrototypeAssetManagePermission();
+ rightCol.style.display='flex';modalEl.classList.remove('wide');assetNoField.style.display='';
+ serialField.style.display='none';imeiField.style.display='none';
+ const rows=[['expiry',expiryField],['manufactured',manufacturedField],['purchaseDate',purchaseDateField],['purchasePrice',purchasePriceField]];
+ let section=back.querySelector('[data-extra-section]');
+ if(!section){section=document.createElement('section');section.className='extra-info-section';section.dataset.extraSection='';section.innerHTML='<h4>추가 정보</h4><div data-custom-inputs></div>';const noteField=rightCol.querySelector('#areg-note-field');noteField?rightCol.insertBefore(section,noteField):rightCol.appendChild(section);}
+ for(const [id,field] of rows){field.style.display=!cat||window.AssetExtra.visible(cat,id,manage)?'':'none';field.querySelectorAll('input,button').forEach(el=>el.disabled=!cat);section.insertBefore(field,section.querySelector('[data-custom-inputs]'));}
+ const custom=section.querySelector('[data-custom-inputs]'), current=window.AssetExtra.readInputs(custom);
+ custom.innerHTML=window.AssetExtra.customInputs(cat,{...(opts.asset?.extraValues||{}),...current});
+ section.hidden=!!cat && !window.AssetExtra.values({group:cat.group,sub:cat.sub},manage).length;
+}
     function renderCatDisplay() {
-      if (catValue) { catDisplay.textContent = catLabel(catValue); catDisplay.style.color = "var(--text)"; }
-      else { catDisplay.textContent = "선택"; catDisplay.style.color = "var(--text-mut)"; }
+      catValue ? (catDisplay.textContent = catLabel(catValue), catDisplay.style.color = "var(--text)") : (catDisplay.textContent = "선택", catDisplay.style.color = "var(--text-mut)");
     }
-    // 소분류를 바꿀 때마다(선택 해제 포함) 이미 입력해둔 값은 전부 초기화 — 다른 소분류의 값이 뒤섞여 남아있지 않도록.
-    // 자산 수정(opts.asset)에서는 selectCat에서 이 함수 호출 자체를 건너뜀(아래) — 소분류만 바꿨는데 이미 채워진
-    // 기존 값(S/N·구매가격 등)이 날아가면 안 되기 때문. 신규 등록은 잃을 값이 없어 초기화가 안전하고 자연스러움.
-    // 품목명은 예외 — 왼쪽 컬럼(소분류와 독립)에 있고 소분류와 무관하게 항상 유효한 값이라 초기화 대상에서 제외
     function resetOtherFields() {
-      assetNoInput.value = "";
-      assetNoErr.hidden = true;
-      assetNoInput.classList.remove("has-err");
-      totalQtyInput.value = "";
-      tags.length = 0;
-      renderChips();
-      photos.length = 0;
-      primaryIdx = 0;
-      renderPhotos();
-      [expiryField, manufacturedField, purchaseDateField].forEach(f => {
-        f.querySelector("[data-dtext]").value = "";
-        f.querySelector("[data-dnative]").value = "";
-      });
-      serialInput.value = "";
-      imeiInput.value = "";
-      purchasePriceInput.value = "";
-      noteInput.value = "";
-      window.AssetMemo.syncTextarea(noteInput);
+      back.querySelectorAll("[data-extra-input]").forEach(el=>el.value="");
+      assetNoInput.value = "", assetNoErr.hidden = !0, assetNoInput.classList.remove("has-err"), tags.length = 0, renderChips(), photos.length = 0, primaryIdx = 0, renderPhotos(), [expiryField, manufacturedField, purchaseDateField].forEach(f => {
+        f.querySelector("[data-dtext]").value = "", f.querySelector("[data-dnative]").value = "";
+      }), serialInput.value = "", imeiInput.value = "", purchasePriceInput.value = "", noteInput.value = "", window.AssetMemo.syncTextarea(noteInput);
     }
-    // Each subcategory owns its unsaved fields. Product is shared; returning to
-    // a visited subcategory restores its own draft, never an old AI extraction.
     function captureCategoryDraft() {
-      return { fields: [assetNoInput,totalQtyInput,serialInput,imeiInput,purchasePriceInput,noteInput].map(el => el.value),
-        dates: [expiryField,manufacturedField,purchaseDateField].map(el => el.querySelector("[data-dtext]").value),
-        tags: tags.slice(), photos: photos.map(p => ({...p})), primaryIdx };
+      return {
+        extraValues:window.AssetExtra.readInputs(back),
+        fields: [assetNoInput, serialInput, imeiInput, purchasePriceInput, noteInput].map(el => el.value),
+        dates: [expiryField, manufacturedField, purchaseDateField].map(el => el.querySelector("[data-dtext]").value),
+        tags: tags.slice(),
+        photos: photos.map(p => ({
+          ...p
+        })),
+        primaryIdx
+      };
     }
     function restoreCategoryDraft(saved) {
-      [assetNoInput,totalQtyInput,serialInput,imeiInput,purchasePriceInput,noteInput].forEach((el,i) => el.value=saved.fields[i]);
-      [expiryField,manufacturedField,purchaseDateField].forEach((el,i) => {
-        el.querySelector("[data-dtext]").value=saved.dates[i];
-        el.querySelector("[data-dnative]").value=saved.dates[i].replaceAll(".","-");
-      });
-      tags.splice(0,tags.length,...saved.tags); photos=saved.photos.map(p=>({...p})); primaryIdx=saved.primaryIdx;
-      window.AssetMemo.syncTextarea(noteInput); renderChips(); renderPhotos();
+      back.querySelectorAll("[data-extra-input]").forEach(el=>el.value=(saved.extraValues||{})[el.dataset.extraInput]||"");
+      [assetNoInput, serialInput, imeiInput, purchasePriceInput, noteInput].forEach((el, i) => el.value = saved.fields[i]), [expiryField, manufacturedField, purchaseDateField].forEach((el, i) => {
+        el.querySelector("[data-dtext]").value = saved.dates[i], el.querySelector("[data-dnative]").value = saved.dates[i].replaceAll(".", "-");
+      }), tags.splice(0, tags.length, ...saved.tags), photos = saved.photos.map(p => ({
+        ...p
+      })), primaryIdx = saved.primaryIdx, window.AssetMemo.syncTextarea(noteInput), renderChips(), renderPhotos();
     }
     function selectCat(v) {
-      const changed = v !== catValue;
-      const uncategorizedPhotos = !catValue ? photos.map(p=>({...p})) : null;
-      if (changed && !opts.asset && catValue) categoryDrafts.set(catValue,captureCategoryDraft());
-      catValue = v;
+      const changed = v !== catValue,
+        uncategorizedPhotos = catValue ? null : photos.map(p => ({
+          ...p
+        }));
+      changed && !opts.asset && catValue && categoryDrafts.set(catValue, captureCategoryDraft()), catValue = v;
       const cat = findCat(v);
-      type = (cat && cat.type) || "individual";
-      renderCatDisplay(); applyFieldVisibility();
-      if (changed && !opts.asset) {
-        resetOtherFields();
-        if (categoryDrafts.has(v)) restoreCategoryDraft(categoryDrafts.get(v));
-        else if (uncategorizedPhotos?.length) { photos=uncategorizedPhotos; renderPhotos(); }
-        if (activeAiDraft) { const pending=activeAiDraft; activeAiDraft=null; applyAiValues(pending,{replace:true}); }
+      if (type = cat && cat.type || "individual", renderCatDisplay(), applyFieldVisibility(), changed && !opts.asset && (resetOtherFields(), categoryDrafts.has(v) ? restoreCategoryDraft(categoryDrafts.get(v)) : uncategorizedPhotos?.length && (photos = uncategorizedPhotos, renderPhotos()), activeAiDraft)) {
+        const pending = activeAiDraft;
+        activeAiDraft = null, applyAiValues(pending, {
+          replace: !0
+        });
       }
       checkValid();
     }
     function setDateInputs(fieldEl, iso) {
-      const native = fieldEl.querySelector("[data-dnative]");
-      const isMonth = native.type === "month";
-      const shown = iso && isMonth ? iso.slice(0, 7) : iso;
-      fieldEl.querySelector("[data-dtext]").value = shown ? shown.replace(/-/g, ".") : "";
-      native.value = shown || "";
+      const native = fieldEl.querySelector("[data-dnative]"),
+        isMonth = native.type === "month",
+        shown = iso && isMonth ? iso.slice(0, 7) : iso;
+      fieldEl.querySelector("[data-dtext]").value = shown ? shown.replace(/-/g, ".") : "", native.value = shown || "";
     }
-    // 자산 수정 진입 시 기존 값 전체를 채움 — selectCat을 거치지 않아(resetOtherFields 우회) 안전
     function prefillFromAsset(asset) {
-      catValue = `${asset.group}|${asset.sub}`;
-      type = asset.type;
-      renderCatDisplay();
-      applyFieldVisibility();
-      nameInput.value = asset.product || "";
-      if (type !== "quantity") assetNoInput.value = asset.assetNo || "";
-      if (type !== "individual") totalQtyInput.value = asset.totalQty != null ? String(asset.totalQty) : "";
-      tags.length = 0;
-      (asset.labels || []).forEach(l => tags.push(l));
-      renderChips();
-      photos.length = 0;
-      window.assetPhotos(asset).forEach(p => photos.push({ ...p }));
-      primaryIdx = asset._primary || 0;
-      renderPhotos();
-      setDateInputs(expiryField, asset.expiry);
-      if (type === "individual") {
-        serialInput.value = asset.serial || "";
-        imeiInput.value = asset.imei || "";
-      }
-      setDateInputs(manufacturedField, asset.manufactured);
-      setDateInputs(purchaseDateField, asset.purchaseDate);
-      purchasePriceInput.value = window.formatPurchasePriceInput(asset.price);
-      noteInput.value = asset.note || "";
-      window.AssetMemo.syncTextarea(noteInput);
-      checkValid();
+      catValue = `${asset.group}|${asset.sub}`, type = asset.type, renderCatDisplay(), applyFieldVisibility(), nameInput.value = asset.product || "", assetNoInput.value = asset.assetNo || "", tags.length = 0, (asset.labels || []).forEach(l => tags.push(l)), renderChips(), photos.length = 0, window.assetPhotos(asset).forEach(p => photos.push({
+        ...p
+      })), primaryIdx = asset._primary || 0, renderPhotos(), setDateInputs(expiryField, asset.expiry), serialInput.value = asset.serial || "", imeiInput.value = asset.imei || "", setDateInputs(manufacturedField, asset.manufactured), setDateInputs(purchaseDateField, asset.purchaseDate), purchasePriceInput.value = window.formatPurchasePriceInput(asset.price), noteInput.value = asset.note || "", window.AssetMemo.syncTextarea(noteInput), checkValid();
     }
     catWrap.addEventListener("click", () => {
-      if (opts.asset) {
-        openCategoryMoveModal(categories, opts.asset.group, opts.asset.sub, opts.asset.type, v => selectCat(`${v.group}|${v.sub}`));
-      } else {
-        openCategoryPickModal(categories, catValue, v => selectCat(v));
-      }
-    });
-
-    // 소분류 초기값 반영(과 그에 딸린 resetOtherFields 호출)은 태그 위젯(renderChips 등)까지 다 준비된
-    // 뒤로 미룸 — 그 전에 부르면 아직 선언되기 전(TDZ)인 tagInput/chipsEl을 참조해서 에러.
-    // applyFieldVisibility()는 tagFieldEl(단순 DOM 참조)만 써서 TDZ 위험 없이 먼저 불러도 안전
-    renderCatDisplay();
-    applyFieldVisibility();
-
-    // 태그 입력 위젯 — 마스터 목록(window.DATA.tags)에서 검색해 선택만 가능(즉석 생성 없음). 새 태그는 [태그 관리]에서만 추가
-    const tagWrap = back.querySelector("#areg-tagwrap");
-    const tagInput = tagWrap.querySelector("[data-taginput]");
-    const chipsEl = tagWrap.querySelector("[data-chips]");
-    let menu = null, hiIndex = -1;
-    function closeMenu() { if (menu) { menu.remove(); menu = null; } hiIndex = -1; }
+      opts.asset ? openCategoryMoveModal(categories, opts.asset.group, opts.asset.sub, opts.asset.type, v => selectCat(`${v.group}|${v.sub}`)) : openCategoryPickModal(categories, catValue, v => selectCat(v));
+    }), renderCatDisplay(), applyFieldVisibility();
+    const tagWrap = back.querySelector("#areg-tagwrap"),
+      tagInput = tagWrap.querySelector("[data-taginput]"),
+      chipsEl = tagWrap.querySelector("[data-chips]");
+    let menu = null,
+      hiIndex = -1;
+    function closeMenu() {
+      menu && (menu.remove(), menu = null), hiIndex = -1;
+    }
     function renderChips() {
       chipsEl.innerHTML = tags.map(t => {
         const c = tagColor(t);
         return `<span class="tag-chip" style="background:${c.bg};border-color:${c.fg};color:${c.fg}">${t}<button type="button" data-untag="${t}" aria-label="태그 제거" style="color:${c.fg}">${CLOSE_ICON_SM}</button></span>`;
-      }).join("");
-      chipsEl.querySelectorAll("[data-untag]").forEach(b => b.onclick = () => {
-        tags.splice(tags.indexOf(b.dataset.untag), 1);
-        renderChips();
-      });
-      tagInput.placeholder = tags.length ? "" : "검색";
-      checkValid();
+      }).join(""), chipsEl.querySelectorAll("[data-untag]").forEach(b => b.onclick = () => {
+        tags.splice(tags.indexOf(b.dataset.untag), 1), renderChips();
+      }), tagInput.placeholder = tags.length ? "" : "검색", checkValid();
     }
     function addTag(v) {
-      if (!v || tags.includes(v) || tags.length >= window.ASSET_TAG_MAX_COUNT) return;
-      tags.push(v);
-      tagInput.value = "";
-      renderChips();
-      closeMenu();
+      !v || tags.includes(v) || tags.length >= window.ASSET_TAG_MAX_COUNT || (tags.push(v), tagInput.value = "", renderChips(), closeMenu());
     }
     function tagOptions() {
       const q = tagInput.value.trim().toLowerCase();
-      const source = (window.DATA && window.DATA.tags) || [];
-      return source.filter(l => l.toLowerCase().includes(q) && !tags.includes(l));
+      return (window.DATA && window.DATA.tags || []).filter(l => l.toLowerCase().includes(q) && !tags.includes(l));
     }
     function openMenu() {
-      if (tags.length >= window.ASSET_TAG_MAX_COUNT) return; // 최대 개수에 도달하면 더 고를 필요 없음
-      const opts = tagOptions();
-      closeMenu();
-      menu = document.createElement("div");
-      menu.className = "dropdown-menu";
-      hiIndex = opts.length ? 0 : -1;
-      menu.innerHTML = opts.length
-        ? opts.map((l, i) => `<button type="button" data-pick="${l}" class="${i === 0 ? "active" : ""}">${l}</button>`).join("")
-        : `<div class="dropdown-empty">결과가 없습니다.</div>`;
+      if (tags.length >= window.ASSET_TAG_MAX_COUNT) return;
+      const opts2 = tagOptions();
+      closeMenu(), menu = document.createElement("div"), menu.className = "dropdown-menu", hiIndex = opts2.length ? 0 : -1, menu.innerHTML = opts2.length ? opts2.map((l, i) => `<button type="button" data-pick="${l}" class="${i === 0 ? "active" : ""}">${l}</button>`).join("") : '<div class="dropdown-empty">결과가 없습니다.</div>';
       const r = tagWrap.getBoundingClientRect();
-      menu.style.cssText = `position:fixed;top:${r.bottom + 4}px;left:${r.left}px;min-width:${r.width}px`;
-      document.body.appendChild(menu);
-      menu.querySelectorAll("[data-pick]").forEach(b => b.onclick = () => addTag(b.dataset.pick));
+      menu.style.cssText = `position:fixed;top:${r.bottom + 4}px;left:${r.left}px;min-width:${r.width}px`, document.body.appendChild(menu), menu.querySelectorAll("[data-pick]").forEach(b => b.onclick = () => addTag(b.dataset.pick));
     }
     function moveHi(delta) {
       if (!menu) return;
       const btns = [...menu.querySelectorAll("button")];
-      if (!btns.length) return;
-      if (btns[hiIndex]) btns[hiIndex].classList.remove("active");
-      hiIndex = Math.max(0, Math.min(btns.length - 1, hiIndex + delta));
-      btns[hiIndex].classList.add("active");
-      btns[hiIndex].scrollIntoView({ block: "nearest" });
+      btns.length && (btns[hiIndex] && btns[hiIndex].classList.remove("active"), hiIndex = Math.max(0, Math.min(btns.length - 1, hiIndex + delta)), btns[hiIndex].classList.add("active"), btns[hiIndex].scrollIntoView({
+        block: "nearest"
+      }));
     }
-    tagInput.addEventListener("input", openMenu);
-    tagInput.addEventListener("focus", openMenu);
-    tagInput.addEventListener("keydown", e => {
-      if (e.key === "ArrowDown") { e.preventDefault(); moveHi(1); }
-      else if (e.key === "ArrowUp") { e.preventDefault(); moveHi(-1); }
-      else if (e.key === "Enter") {
-        e.preventDefault();
-        if (menu) {
-          const btns = [...menu.querySelectorAll("button")];
-          const b = btns[hiIndex];
-          if (b) addTag(b.dataset.pick);
+    tagInput.addEventListener("input", openMenu), tagInput.addEventListener("focus", openMenu), tagInput.addEventListener("keydown", e => {
+      if (e.key === "ArrowDown") e.preventDefault(), moveHi(1);else if (e.key === "ArrowUp") e.preventDefault(), moveHi(-1);else if (e.key === "Enter") {
+        if (e.preventDefault(), menu) {
+          const b = [...menu.querySelectorAll("button")][hiIndex];
+          b && addTag(b.dataset.pick);
         }
-      } else if (e.key === "Escape") { closeMenu(); }
+      } else e.key === "Escape" && closeMenu();
+    }), document.addEventListener("click", e => {
+      menu && !menu.contains(e.target) && e.target !== tagInput && closeMenu();
     });
-    document.addEventListener("click", e => {
-      if (menu && !menu.contains(e.target) && e.target !== tagInput) closeMenu();
-    });
-    // 사진 — 타일 클릭 시 대표 지정(뷰어처럼 별도 메뉴를 띄우지 않고 폼 안에서 가볍게), 각 타일 우상단
-    // 호버 시 삭제(×), 마지막에 "+" 추가 타일(10장 도달 시 비활성)
     function renderPhotos() {
       const tiles = photos.map((p, i) => `
         <button type="button" class="areg-photo-tile${i === primaryIdx ? " primary" : ""}" data-photo-i="${i}" style="background:${p.color}" aria-label="사진 ${i + 1}${i === primaryIdx ? " (대표)" : ""}">
           ${i === primaryIdx ? '<span class="areg-photo-star">★</span>' : ""}
           <span class="areg-photo-del" data-photo-del="${i}" aria-label="삭제">${CLOSE_ICON_SM}</span>
-        </button>`).join("");
-      const addTile = `<button type="button" class="areg-photo-add" id="areg-photo-add-btn" aria-label="사진 추가" ${photos.length >= window.ASSET_PHOTO_MAX_COUNT ? "disabled" : ""}>+</button>`;
-      photoRow.innerHTML = tiles + addTile;
-      photoRow.querySelectorAll("[data-photo-i]").forEach(b => b.onclick = e => {
-        if (e.target.closest("[data-photo-del]")) return;
-        primaryIdx = +b.dataset.photoI;
-        renderPhotos();
-      });
-      photoRow.querySelectorAll("[data-photo-del]").forEach(b => b.onclick = e => {
+        </button>`).join(""),
+        addTile = `<button type="button" class="areg-photo-add" id="areg-photo-add-btn" aria-label="사진 추가" ${photos.length >= window.ASSET_PHOTO_MAX_COUNT ? "disabled" : ""}>+</button>`;
+      photoRow.innerHTML = tiles + addTile, photoRow.querySelectorAll("[data-photo-i]").forEach(b => b.onclick = e => {
+        e.target.closest("[data-photo-del]") || (primaryIdx = +b.dataset.photoI, renderPhotos());
+      }), photoRow.querySelectorAll("[data-photo-del]").forEach(b => b.onclick = e => {
         e.stopPropagation();
         const i = +b.dataset.photoDel;
-        photos.splice(i, 1);
-        // 대표 삭제 시 현재 사진 목록에서 가장 앞에 남은 사진을 자동 대표로 지정한다.
-        if (!photos.length || primaryIdx === i) primaryIdx = 0;
-        else if (primaryIdx > i) primaryIdx -= 1;
-        renderPhotos();
+        photos.splice(i, 1), !photos.length || primaryIdx === i ? primaryIdx = 0 : primaryIdx > i && (primaryIdx -= 1), renderPhotos();
       });
       const addBtn = photoRow.querySelector("#areg-photo-add-btn");
-      if (addBtn) addBtn.onclick = () => {
-        photos.push({ id: window.assetPhotoId(), color: PHOTO_COLORS[photos.length % PHOTO_COLORS.length], at: `${todayStr()} 00:00`, by: "dana" });
-        if (photos.length === 1) primaryIdx = 0;
-        renderPhotos();
-      };
-      checkValid();
+      addBtn && (addBtn.onclick = () => {
+        photos.push({
+          id: window.assetPhotoId(),
+          color: PHOTO_COLORS[photos.length % PHOTO_COLORS.length],
+          at: `${todayStr()} 00:00`,
+          by: "dana"
+        }), photos.length === 1 && (primaryIdx = 0), renderPhotos();
+      }), checkValid();
     }
     renderPhotos();
-
     function aiPhoto(offset) {
       return {
         id: window.assetPhotoId(),
         color: PHOTO_COLORS[(photos.length + offset) % PHOTO_COLORS.length],
         at: `${todayStr()} 00:00`,
-        by: "dana",
+        by: "dana"
       };
     }
-    function fieldIsShown(field) { return field.style.display !== "none"; }
+    function fieldIsShown(field) {
+      return field.style.display !== "none";
+    }
     function setAiValue(input, value, replace) {
-      if (replace) input.value = value == null ? "" : String(value);
-      else if (!input.value.trim() && value != null && value !== "") input.value = String(value);
+      replace ? input.value = value == null ? "" : String(value) : !input.value.trim() && value != null && value !== "" && (input.value = String(value));
     }
     function setAiDate(field, value, replace) {
-      if (!fieldIsShown(field)) return;
-      if (replace || !field.querySelector("[data-dtext]").value.trim()) setDateInputs(field, value || "");
+      fieldIsShown(field) && (replace || !field.querySelector("[data-dtext]").value.trim()) && setDateInputs(field, value || "");
     }
-    function applyAiValues(draft, { replace = true } = {}) {
-      if (!draft) return;
-      setAiValue(nameInput, draft.name, replace);
-      tags.splice(0,tags.length,...(draft.tags || []).filter(tag => window.DATA.tags.includes(tag)).slice(0,window.ASSET_TAG_MAX_COUNT));
-      renderChips();
-      if (fieldIsShown(assetNoField)) setAiValue(assetNoInput, draft.assetNo, replace);
-      if (fieldIsShown(totalQtyField)) setAiValue(totalQtyInput, draft.totalQty, replace);
-      if (fieldIsShown(serialField)) setAiValue(serialInput, draft.serial, replace);
-      if (fieldIsShown(imeiField)) setAiValue(imeiInput, draft.imei, replace);
-      if (fieldIsShown(purchasePriceField)) setAiValue(purchasePriceInput, draft.price == null ? "" : window.formatPurchasePriceInput(draft.price), replace);
-      if (fieldIsShown(noteField) && (replace || (!noteInput.value.trim() && draft.note))) {
-        noteInput.value = draft.note || "";
-        window.AssetMemo.syncTextarea(noteInput);
-      }
-      setAiDate(expiryField, draft.expiry, replace);
-      setAiDate(manufacturedField, draft.manufactured, replace);
-      setAiDate(purchaseDateField, draft.purchaseDate, replace);
-      checkValid();
+    function applyAiValues(draft, {
+      replace = !0
+    } = {}) {
+      back.querySelectorAll("[data-extra-input]").forEach(el=>el.value=String((draft?.extraValues||{})[el.dataset.extraInput]||""));
+      draft && (setAiValue(nameInput, draft.name, replace), tags.splice(0, tags.length, ...(draft.tags || []).filter(tag => window.DATA.tags.includes(tag)).slice(0, window.ASSET_TAG_MAX_COUNT)), renderChips(), fieldIsShown(assetNoField) && setAiValue(assetNoInput, draft.assetNo, replace), fieldIsShown(serialField) && setAiValue(serialInput, draft.serial, replace), fieldIsShown(imeiField) && setAiValue(imeiInput, draft.imei, replace), fieldIsShown(purchasePriceField) && setAiValue(purchasePriceInput, draft.price == null ? "" : window.formatPurchasePriceInput(draft.price), replace), fieldIsShown(noteField) && (replace || !noteInput.value.trim() && draft.note) && (noteInput.value = draft.note || "", window.AssetMemo.syncTextarea(noteInput)), setAiDate(expiryField, draft.expiry, replace), setAiDate(manufacturedField, draft.manufactured, replace), setAiDate(purchaseDateField, draft.purchaseDate, replace), checkValid());
     }
     function appendAiPhotos(newPhotos) {
       const room = Math.max(0, window.ASSET_PHOTO_MAX_COUNT - photos.length);
-      newPhotos.slice(0, room).forEach(photo => photos.push({ ...photo }));
-      if (photos.length && primaryIdx >= photos.length) primaryIdx = 0;
-      renderPhotos();
+      newPhotos.slice(0, room).forEach(photo => photos.push({
+        ...photo
+      })), photos.length && primaryIdx >= photos.length && (primaryIdx = 0), renderPhotos();
     }
     function recommendedCategory() {
       return categories.find(c => c.group === "전자기기류" && c.sub === "노트북") || categories[0] || null;
@@ -989,7 +761,7 @@
       return partial ? {
         name: "MacBook Pro 14",
         serial: "C02AI2026",
-        manufactured: "2026-01-01",
+        manufactured: "2026-01-01"
       } : {
         name: "MacBook Pro 14",
         assetNo: "AI-2026-0001",
@@ -997,36 +769,31 @@
         manufactured: "2026-01-01",
         purchaseDate: "2026-02-01",
         price: "2500000",
-        totalQty: "10",
-        tags: (window.DATA.tags || []).slice(0,2),
+        tags: (window.DATA.tags || []).slice(0, 2)
       };
     }
     function applyAiResult(draft, newPhotos, recommend) {
-      const previousPhotos=photos.map(p=>({...p})), previousPrimary=primaryIdx;
+      const previousPhotos = photos.map(p => ({
+          ...p
+        })),
+        previousPrimary = primaryIdx;
       if (recommend) {
-        const cat=recommendedCategory();
-        if(cat) selectCat(`${cat.group}|${cat.sub}`);
+        const cat = recommendedCategory();
+        cat && selectCat(`${cat.group}|${cat.sub}`);
       }
-      // Full replacement applies on both the first analysis and reanalysis.
-      // Photos are the sole exception: existing originals remain, new ones append.
-      activeAiDraft=null; applyAiValues(draft,{replace:true});
-      photos=previousPhotos; primaryIdx=previousPrimary; appendAiPhotos(newPhotos);
-      if(catValue) categoryDrafts.set(catValue,captureCategoryDraft());
+      activeAiDraft = null, applyAiValues(draft, {
+        replace: !0
+      }), photos = previousPhotos, primaryIdx = previousPrimary, appendAiPhotos(newPhotos), catValue && categoryDrafts.set(catValue, captureCategoryDraft());
     }
     function continueAiDirectly(draft, newPhotos) {
-      appendAiPhotos(newPhotos);
-      if (catValue) {
-        if(Object.keys(draft).length) applyAiValues(draft,{replace:true});
-      } else activeAiDraft=Object.keys(draft).length ? draft : null;
-      // No category opens the normal, unselected parent form. Apply pending
-      // extraction once after the user explicitly chooses the first category.
+      appendAiPhotos(newPhotos), catValue ? Object.keys(draft).length && applyAiValues(draft, {
+        replace: !0
+      }) : activeAiDraft = Object.keys(draft).length ? draft : null;
     }
     function openAiInputModal() {
-      closeMenu();
-      closeProdMenu();
+      closeMenu(), closeProdMenu();
       const aiBack = document.createElement("div");
-      aiBack.className = "modal-back areg-ai-back";
-      aiBack.innerHTML = `
+      aiBack.className = "modal-back areg-ai-back", aiBack.innerHTML = `
         <div class="modal areg-ai-modal" role="dialog" aria-modal="true" aria-label="AI로 입력">
           <div class="areg-ai-head">
             <h3>AI로 입력</h3>
@@ -1038,86 +805,65 @@
             <div class="areg-ai-state" data-ai-state></div>
             <button type="button" class="btn primary areg-ai-analyze" data-ai-analyze>분석하기</button>
           </div>
-        </div>`;
-      document.body.appendChild(aiBack);
-
-      const newPhotos = [];
-      const photosEl = aiBack.querySelector("[data-ai-photos]");
-      const stateEl = aiBack.querySelector("[data-ai-state]");
-      const analyzeBtn = aiBack.querySelector("[data-ai-analyze]");
-      let analyzing = false;
-
+        </div>`, document.body.appendChild(aiBack);
+      const newPhotos = [],
+        photosEl = aiBack.querySelector("[data-ai-photos]"),
+        stateEl = aiBack.querySelector("[data-ai-state]"),
+        analyzeBtn = aiBack.querySelector("[data-ai-analyze]");
+      let analyzing = !1;
       function closeAi() {
-        // 운영에서는 진행 중 요청을 취소할 수 있으면 중단하고, 취소할 수 없으면 닫힌 팝업의 늦은 응답을
-        // 부모 폼에 반영하지 않는다. 프로토타입은 실제 요청이 없어 팝업만 닫는다.
         aiBack.remove();
       }
       function requestAiClose() {
-        if (newPhotos.length === 0) { closeAi(); return; }
+        if (newPhotos.length === 0) {
+          closeAi();
+          return;
+        }
         if (document.querySelector("[data-ai-exit]")) return;
         const confirmBack = document.createElement("div");
-        confirmBack.className = "modal-back";
-        confirmBack.style.zIndex = 340;
-        confirmBack.innerHTML = `<div class="modal sm" data-ai-exit role="dialog" aria-modal="true" aria-label="AI 입력을 중단하시겠습니까?">
+        confirmBack.className = "modal-back", confirmBack.style.zIndex = 340, confirmBack.innerHTML = `<div class="modal sm" data-ai-exit role="dialog" aria-modal="true" aria-label="AI 입력을 중단하시겠습니까?">
           <h3>AI 입력을 중단하시겠습니까?</h3>
           <div class="body" style="font-size:14px">첨부한 사진과 분석 결과는 저장되지 않습니다.</div>
           <div class="foot"><button type="button" class="btn" data-ai-stay>취소</button><button type="button" class="btn primary" data-ai-leave>확인</button></div>
-        </div>`;
-        document.body.appendChild(confirmBack);
-        confirmBack.querySelector("[data-ai-stay]").onclick = () => confirmBack.remove();
-        confirmBack.querySelector("[data-ai-leave]").onclick = () => { confirmBack.remove(); closeAi(); };
-        // Input/selection/confirmation modal: backdrop clicks do not dismiss.
+        </div>`, document.body.appendChild(confirmBack), confirmBack.querySelector("[data-ai-stay]").onclick = () => confirmBack.remove(), confirmBack.querySelector("[data-ai-leave]").onclick = () => {
+          confirmBack.remove(), closeAi();
+        };
       }
       function renderAiPhotos() {
         const existingTiles = photos.map((photo, i) => `
           <span class="areg-ai-photo" style="background:${photo.color}" aria-label="사진 ${i + 1}">
             ${i === primaryIdx ? '<span class="areg-photo-star">★</span>' : ""}
-          </span>`).join("");
-        const newTiles = newPhotos.map((photo, i) => `
+          </span>`).join(""),
+          newTiles = newPhotos.map((photo, i) => `
           <span class="areg-ai-photo" style="background:${photo.color}" aria-label="새 사진 ${i + 1}">
             ${analyzing ? "" : `<button type="button" class="areg-ai-photo-del" data-ai-photo-del="${i}" aria-label="새 사진 삭제">${CLOSE_ICON_SM}</button>`}
-          </span>`).join("");
-        const total = photos.length + newPhotos.length;
-        const add = `<button type="button" class="areg-photo-add" data-ai-photo-add aria-label="사진 추가" ${analyzing || total >= window.ASSET_PHOTO_MAX_COUNT ? "disabled" : ""}>+</button>`;
-        photosEl.innerHTML = existingTiles + newTiles + add;
-        analyzeBtn.disabled = total === 0 || analyzing;
-        photosEl.querySelectorAll("[data-ai-photo-del]").forEach(button => button.onclick = () => {
-          newPhotos.splice(+button.dataset.aiPhotoDel, 1);
-          renderAiPhotos();
+          </span>`).join(""),
+          total = photos.length + newPhotos.length,
+          add = `<button type="button" class="areg-photo-add" data-ai-photo-add aria-label="사진 추가" ${analyzing || total >= window.ASSET_PHOTO_MAX_COUNT ? "disabled" : ""}>+</button>`;
+        photosEl.innerHTML = existingTiles + newTiles + add, analyzeBtn.disabled = total === 0 || analyzing, photosEl.querySelectorAll("[data-ai-photo-del]").forEach(button => button.onclick = () => {
+          newPhotos.splice(+button.dataset.aiPhotoDel, 1), renderAiPhotos();
         });
         const addBtn = photosEl.querySelector("[data-ai-photo-add]");
-        if (addBtn) addBtn.onclick = () => {
-          newPhotos.push(aiPhoto(newPhotos.length));
-          renderAiPhotos();
-        };
+        addBtn && (addBtn.onclick = () => {
+          newPhotos.push(aiPhoto(newPhotos.length)), renderAiPhotos();
+        });
       }
       function renderInitial() {
-        analyzing = false;
-        stateEl.innerHTML = "";
-        analyzeBtn.hidden = false;
-        renderAiPhotos();
+        analyzing = !1, stateEl.innerHTML = "", analyzeBtn.hidden = !1, renderAiPhotos();
       }
       function renderLoading() {
-        analyzing = true;
-        analyzeBtn.hidden = true;
-        stateEl.innerHTML = `
+        analyzing = !0, analyzeBtn.hidden = !0, stateEl.innerHTML = `
           <div class="areg-ai-loading"><span class="areg-ai-spinner" aria-hidden="true"></span><b>AI가 자산 정보를 분석하고 있습니다.</b></div>
           <div class="areg-ai-test-actions">
             <button type="button" class="btn" data-ai-outcome="success">성공</button>
             <button type="button" class="btn" data-ai-outcome="insufficient">정보 부족</button>
             <button type="button" class="btn" data-ai-outcome="error">분석 오류</button>
-          </div>`;
-        stateEl.querySelector('[data-ai-outcome="success"]').onclick = () => {
-          applyAiResult(mockAiDraft(false), newPhotos, true);
-          aiBack.remove();
-        };
-        stateEl.querySelector('[data-ai-outcome="insufficient"]').onclick = () => renderFailure("insufficient");
-        stateEl.querySelector('[data-ai-outcome="error"]').onclick = () => renderFailure("error");
-        renderAiPhotos();
+          </div>`, stateEl.querySelector('[data-ai-outcome="success"]').onclick = () => {
+          applyAiResult(mockAiDraft(!1), newPhotos, !0), aiBack.remove();
+        }, stateEl.querySelector('[data-ai-outcome="insufficient"]').onclick = () => renderFailure("insufficient"), stateEl.querySelector('[data-ai-outcome="error"]').onclick = () => renderFailure("error"), renderAiPhotos();
       }
       function renderFailure(kind) {
-        analyzing = false;
-        analyzeBtn.hidden = true;
+        analyzing = !1, analyzeBtn.hidden = !0;
         const insufficient = kind === "insufficient";
         stateEl.innerHTML = `
           <div class="areg-ai-result is-error">
@@ -1128,208 +874,134 @@
           <div class="areg-ai-result-actions">
             <button type="button" class="btn" data-ai-retry>다시 시도</button>
             <button type="button" class="btn primary" data-ai-direct>직접 입력</button>
-          </div>`;
-        stateEl.querySelector("[data-ai-retry]").onclick = renderLoading;
-        stateEl.querySelector("[data-ai-direct]").onclick = () => {
-          aiBack.remove();
-          continueAiDirectly(insufficient ? mockAiDraft(true) : {}, newPhotos);
-        };
-        renderAiPhotos();
+          </div>`, stateEl.querySelector("[data-ai-retry]").onclick = renderLoading, stateEl.querySelector("[data-ai-direct]").onclick = () => {
+          aiBack.remove(), continueAiDirectly(insufficient ? mockAiDraft(!0) : {}, newPhotos);
+        }, renderAiPhotos();
       }
-
-      renderInitial();
-      analyzeBtn.onclick = renderLoading;
-      aiBack.querySelector("[data-ai-cancel]").onclick = requestAiClose;
-      // Input/selection/confirmation modal: backdrop clicks do not dismiss.
+      renderInitial(), analyzeBtn.onclick = renderLoading, aiBack.querySelector("[data-ai-cancel]").onclick = requestAiClose;
     }
-
     const aiInputBtn = back.querySelector("[data-ai-input]");
-    if (aiInputBtn) aiInputBtn.onclick = openAiInputModal;
-
-    renderChips();
-    checkValid();
-    if (opts.asset) prefillFromAsset(opts.asset);
-    else if (preselectValue) selectCat(preselectValue);
-    if (opts.asset) initialEditValues = editValues();
-    checkValid();
-    // 날짜·품목명 외에도 메모/SN/IMEI/가격 등 모든 실제 편집 이벤트를 반영한다.
-    back.addEventListener("input", checkValid);
-    back.addEventListener("change", checkValid);
-
-    back.querySelector("#areg-tag-manage").onclick = () => {
-      closeMenu();
-      openTagManageModal(({ renamed, deletedOrigs }) => {
-        let changed = false;
+    return aiInputBtn && (aiInputBtn.onclick = openAiInputModal), renderChips(), checkValid(), opts.asset ? prefillFromAsset(opts.asset) : preselectValue && selectCat(preselectValue), opts.asset && (initialEditValues = editValues()), checkValid(), back.addEventListener("input", checkValid), back.addEventListener("change", checkValid), back.querySelector("#areg-tag-manage").onclick = () => {
+      closeMenu(), openTagManageModal(({
+        renamed,
+        deletedOrigs
+      }) => {
+        let changed = !1;
         for (let i = tags.length - 1; i >= 0; i--) {
-          if (deletedOrigs.includes(tags[i])) { tags.splice(i, 1); changed = true; continue; }
+          if (deletedOrigs.includes(tags[i])) {
+            tags.splice(i, 1), changed = !0;
+            continue;
+          }
           const r = renamed.find(rn => rn.from === tags[i]);
-          if (r) { tags[i] = r.to; changed = true; }
+          r && (tags[i] = r.to, changed = !0);
         }
-        // 태그 관리 저장은 마스터·기존 자산에 이미 반영되므로 자산 수정의 미저장 변경에서 제외한다.
-        if (initialEditValues) initialEditValues.tags = [...(opts.asset.labels || [])].sort();
-        if (changed) renderChips();
-        checkValid();
+        initialEditValues && (initialEditValues.tags = [...(opts.asset.labels || [])].sort()), changed && renderChips(), checkValid();
       });
-    };
-
-    // 수정은 기존 객체를 갱신하고 신규 등록은 최종 저장 성공 시 메모리 등록·자동 발급을 함께 처리한다.
-    // 운영 서버의 원자적 저장·중복 방지 계약은 data.js AssetRegistration 주석을 따른다.
-    // 바뀐 필드마다 "자산 정보 수정: OOO" 형식으로 각각 따로 기록(뭉뚱그린 한 건이 아니라 배정/보유 관리만큼
-    // 촘촘하게 — 필드별로 실제 값이 바뀐 것만 기록되고, 아무것도 안 바꾸고 저장하면 아무 것도 안 남음)
-    saveBtn.addEventListener("click", () => {
-      checkValid();
-      if (saveBtn.disabled) return;
-      closeMenu();
-      if (opts.asset) {
-        const asset = opts.asset;
-        // 한 번의 저장에서 생긴 활동을 모았다가 정해진 표시 순서로 한꺼번에 기록(data.js logAssetActivities)
-        const pending = [];
-        const logChange = (script, before, after) => {
-          pending.push({ script: `자산 정보 수정: ${script}`, before, after });
-        };
-        const cat = findCat(catValue);
+    }, saveBtn.addEventListener("click", () => {
+      if (checkValid(), !saveBtn.disabled) if (closeMenu(), opts.asset) {
+        const asset = opts.asset,
+          pending = [],
+          logChange = (script, before, after) => {
+            pending.push({
+              script: `자산 정보 수정: ${script}`,
+              before,
+              after
+            });
+          },
+          cat = findCat(catValue);
         if (cat && (cat.group !== asset.group || cat.sub !== asset.sub)) {
-          const before = `${asset.group} › ${asset.sub}`, after = `${cat.group} › ${cat.sub}`;
-          asset.group = cat.group;
-          asset.sub = cat.sub;
-          logChange("소분류 이동", before, after);
+          const before = `${asset.group} › ${asset.sub}`,
+            after = `${cat.group} › ${cat.sub}`;
+          asset.group = cat.group, asset.sub = cat.sub, logChange("소분류 이동", before, after);
         }
-        const dateFmt = d => d ? window.fmtDate(d) : "";
-        const setIf = (script, key, val, format) => {
-          if (key === "price" ? window.normalizePurchasePrice(asset[key]) === window.normalizePurchasePrice(val) : asset[key] === val) return;
-          const fmt = format || (v => v || "");
-          logChange(script, fmt(asset[key]), fmt(val));
-          asset[key] = val;
-        };
-        setIf("품목명 수정", "product", nameInput.value.trim());
-        if (type !== "quantity") setIf("고유관리번호 수정", "assetNo", assetNoInput.value.trim());
-        if (type !== "individual") setIf("전체 수량 변경", "totalQty", window.AssetQuantity.parse(totalQtyInput.value) || 0, v => `${window.AssetQuantity.format(v)}개`);
+        const dateFmt = d => d ? window.fmtDate(d) : "",
+          setIf = (script, key, val, format) => {
+            if (key === "price" ? window.normalizePurchasePrice(asset[key]) === window.normalizePurchasePrice(val) : asset[key] === val) return;
+            const setting=key==="price"?"purchasePrice":key;
+            if(window.AssetExtra.fixed.some(f=>f.id===setting)&&!window.AssetExtra.visible(findCat(catValue),setting,window.hasPrototypeAssetManagePermission()))return;
+            const fmt = format || (v => v || "");
+            logChange(script, fmt(asset[key]), fmt(val)), asset[key] = val;
+          };
+        setIf("품목명 수정", "product", nameInput.value.trim()), setIf("고유관리번호 수정", "assetNo", assetNoInput.value.trim());
         const newTags = [...tags];
-        if (JSON.stringify(newTags) !== JSON.stringify(asset.labels || [])) {
-          logChange("태그 수정", (asset.labels || []).join(", "), newTags.join(", "));
-          asset.labels = newTags;
-        }
+        JSON.stringify(newTags) !== JSON.stringify(asset.labels || []) && (logChange("태그 수정", (asset.labels || []).join(", "), newTags.join(", ")), asset.labels = newTags);
         const expiry = getExpiry();
-        if (expiry !== null) setIf("유효기한 변경", "expiry", expiry || undefined, dateFmt);
-        if (type === "individual") {
-          setIf("S/N 수정", "serial", serialInput.value.trim() || undefined);
-          setIf("IMEI 수정", "imei", imeiInput.value.trim() || undefined);
-        }
-        // 제조연월·구매연월은 연월만 다뤄서 setIf의 정확한 문자열 비교를 그대로 못 씀 — 기존 시드 데이터엔
-        // 일자가 "01"이 아닌 실제 날짜가 남아있어서(연월만 바뀐 건 아닌데) 그대로 비교하면 항상 "변경"으로
-        // 오탐지됨. 연월(앞 7자리)만 비교하고, 실제로 바뀐 경우에만 새 값(일자 "01" 고정)으로 저장
-        const monthFmt = d => d ? window.fmtMonth(d) : "";
-        const manufactured = getManufactured();
-        if (manufactured !== null && (manufactured || "").slice(0, 7) !== (asset.manufactured || "").slice(0, 7)) {
-          logChange("제조연월 변경", monthFmt(asset.manufactured), monthFmt(manufactured));
-          asset.manufactured = manufactured || undefined;
-        }
+        expiry !== null && setIf("유효기한 변경", "expiry", expiry || void 0, dateFmt);
+        const monthFmt = d => d ? window.fmtMonth(d) : "",
+          manufactured = getManufactured();
+        fieldIsShown(manufacturedField) && manufactured !== null && (manufactured || "").slice(0, 7) !== (asset.manufactured || "").slice(0, 7) && (logChange("제조연월 변경", monthFmt(asset.manufactured), monthFmt(manufactured)), asset.manufactured = manufactured || void 0);
         const purchaseDate = getPurchaseDate();
-        if (purchaseDate !== null && (purchaseDate || "").slice(0, 7) !== (asset.purchaseDate || "").slice(0, 7)) {
-          logChange("구매연월 변경", monthFmt(asset.purchaseDate), monthFmt(purchaseDate));
-          asset.purchaseDate = purchaseDate || undefined;
-        }
-        // 통화 표기는 클라이언트 단위 전역 설정 — window.formatPrice 참조(구조설계안 3.4, data.js)
+        fieldIsShown(purchaseDateField) && purchaseDate !== null && (purchaseDate || "").slice(0, 7) !== (asset.purchaseDate || "").slice(0, 7) && (logChange("구매연월 변경", monthFmt(asset.purchaseDate), monthFmt(purchaseDate)), asset.purchaseDate = purchaseDate || void 0);
         const price = window.normalizePurchasePrice(purchasePriceInput.value);
-        setIf("구매가격 변경", "price", price || undefined, v => (v != null ? window.formatPrice(v) : ""));
-        setIf("메모 수정", "note", noteInput.value.trim() || undefined);
-        // 사진은 저장 전후 목록·대표를 비교해 "자산 사진 관리" 활동으로 기록(data.js assetPhotoActivities)
-        pending.push(...window.assetPhotoActivities(window.assetPhotos(asset), asset._primary || 0, photos, primaryIdx));
-        if (opts.logActivity) window.logAssetActivities(pending, e => opts.logActivity(e));
-        asset._photos = photos;
-        asset._primary = primaryIdx;
-        back.remove();
-        toast("저장되었습니다.");
-        if (opts.onSaved) opts.onSaved();
+        setIf("구매가격 변경", "price", price || void 0, v => v != null ? window.formatPrice(v) : ""), setIf("메모 수정", "note", noteInput.value.trim() || void 0), window.AssetExtra.applyCustom(asset,window.AssetExtra.readInputs(back),e=>pending.push(e)), pending.push(...window.assetPhotoActivities(window.assetPhotos(asset), asset._primary || 0, photos, primaryIdx)), opts.logActivity && window.logAssetActivities(pending, e => opts.logActivity(e)), asset._photos = photos, asset._primary = primaryIdx, back.remove(), toast("저장되었습니다."), opts.onSaved && opts.onSaved();
       } else {
-        const cat = findCat(catValue);
-        const draft = {
-          type, group: cat.group, sub: cat.sub, product: nameInput.value.trim(),
-          assetNo: type === "individual" ? assetNoInput.value.trim() : "",
-          totalQty: type === "quantity" ? window.AssetQuantity.parse(totalQtyInput.value) : undefined,
-          expiry: getExpiry() || undefined, manufactured: getManufactured() || undefined,
-          purchaseDate: getPurchaseDate() || undefined,
-          serial: type === "individual" ? serialInput.value.trim() || undefined : undefined,
-          imei: type === "individual" ? imeiInput.value.trim() || undefined : undefined,
-          price: window.normalizePurchasePrice(purchasePriceInput.value) || undefined,
-          note: noteInput.value.trim() || undefined, labels: [...tags],
-          _photos: photos.map(photo => ({ ...photo })), _primary: primaryIdx,
-          photo: photos[primaryIdx]?.color, photoCount: photos.length,
-        };
-        try { window.AssetRegistration.registerBatch([draft]); }
-        catch (error) {
-          if (error.code === "DUPLICATE_ASSET_NO") savedNumberError = assetNoInput.value.trim();
-          if (error.code === "DUPLICATE_PRODUCT") savedNameError = `${catValue}|${nameInput.value.trim()}`;
-          checkValid();
-          toast(error.code === "CATEGORY_CHANGED" ? "설정이 변경되었습니다. 잠시 후 다시 시도해주세요." : "입력 내용을 확인해주세요.");
+        const cat = findCat(catValue),
+          draft = {
+            type,
+            group: cat.group,
+            sub: cat.sub,
+            product: nameInput.value.trim(),
+            extraValues:window.AssetExtra.readInputs(back),
+            assetNo: assetNoInput.value.trim(),
+            expiry: getExpiry() || void 0,
+            manufactured: getManufactured() || void 0,
+            purchaseDate: getPurchaseDate() || void 0,
+            serial: serialInput.value.trim() || void 0,
+            imei: imeiInput.value.trim() || void 0,
+            price: window.normalizePurchasePrice(purchasePriceInput.value) || void 0,
+            note: noteInput.value.trim() || void 0,
+            labels: [...tags],
+            _photos: photos.map(photo => ({
+              ...photo
+            })),
+            _primary: primaryIdx,
+            photo: photos[primaryIdx]?.color,
+            photoCount: photos.length
+          };
+        try {
+          window.AssetRegistration.registerBatch([draft]);
+        } catch (error) {
+          error.code === "DUPLICATE_ASSET_NO" && (savedNumberError = assetNoInput.value.trim()), error.code === "DUPLICATE_PRODUCT" && (savedNameError = `${catValue}|${nameInput.value.trim()}`), checkValid(), toast(error.code === "CATEGORY_CHANGED" ? "설정이 변경되었습니다. 잠시 후 다시 시도해주세요." : "입력 내용을 확인해주세요.");
           return;
         }
-        back.remove();
-        window.dispatchEvent(new Event("asset-registered"));
-        if (opts.onSaved) opts.onSaved();
-        toast("자산이 추가되었습니다.");
+        back.remove(), window.dispatchEvent(new Event("asset-registered")), opts.onSaved && opts.onSaved(), toast("자산이 추가되었습니다.");
       }
-    });
-
-    return back;
+    }), back;
   };
 })();
-
-/* 자산 추가 상태 확인 도구. 원본 화면을 복제하지 않고 ?qa=asset-add에서만 동작한다.
-   회사 데이터·태그 마스터의 빈 상태는 이 탭의 메모리에서만 재현한다. */
 (function () {
   const params = new URLSearchParams(location.search);
   if (params.get("qa") !== "asset-add") return;
-  const scenarios = [
-    ["default", "기본 입력"],
-    ["empty-category", "분류 없음"],
-    ["empty-tags", "태그 없음"],
-    ["tag-duplicate", "태그 수정 중복"],
-  ];
-  const scenario = scenarios.some(([key]) => key === params.get("scenario")) ? params.get("scenario") : "default";
-  if (scenario === "empty-category") {
-    window.DATA.categories = [];
-    window.DATA.assets = [];
-    window.DATA.emptyGroups = [];
-  } else if (scenario === "empty-tags") {
-    window.DATA.tags = [];
-    window.DATA.assets.forEach(asset => { asset.labels = []; });
-  }
+  const scenarios = [["default", "기본 입력"], ["empty-category", "분류 없음"], ["empty-tags", "태그 없음"], ["tag-duplicate", "태그 수정 중복"]],
+    scenario = scenarios.some(([key]) => key === params.get("scenario")) ? params.get("scenario") : "default";
+  scenario === "empty-category" ? (window.DATA.categories = [], window.DATA.assets = [], window.DATA.emptyGroups = []) : scenario === "empty-tags" && (window.DATA.tags = [], window.DATA.assets.forEach(asset => {
+    asset.labels = [];
+  }));
   function mount() {
     const panel = document.createElement("aside");
-    panel.className = "permission-qa-panel";
-    panel.setAttribute("aria-label", "자산 추가 QA 시나리오");
-    panel.innerHTML = `<div class="permission-qa-head"><strong>자산 추가 QA</strong><button type="button" data-register-qa-close aria-label="QA 종료">×</button></div>
-      <div class="permission-qa-actions">${scenarios.map(([key, label]) => `<button type="button" data-register-scenario="${key}" aria-pressed="${key === scenario}">${label}</button>`).join("")}</div>`;
-    document.body.appendChild(panel);
-    panel.querySelectorAll("[data-register-scenario]").forEach(button => {
+    panel.className = "permission-qa-panel", panel.setAttribute("aria-label", "자산 추가 QA 시나리오"), panel.innerHTML = `<div class="permission-qa-head"><strong>자산 추가 QA</strong><button type="button" data-register-qa-close aria-label="QA 종료">×</button></div>
+      <div class="permission-qa-actions">${scenarios.map(([key, label]) => `<button type="button" data-register-scenario="${key}" aria-pressed="${key === scenario}">${label}</button>`).join("")}</div>`, document.body.appendChild(panel), panel.querySelectorAll("[data-register-scenario]").forEach(button => {
       button.onclick = () => {
         const next = new URL(location.href);
-        next.searchParams.set("scenario", button.dataset.registerScenario);
-        location.href = next.toString();
+        next.searchParams.set("scenario", button.dataset.registerScenario), location.href = next.toString();
       };
-    });
-    panel.querySelector("[data-register-qa-close]").onclick = () => {
+    }), panel.querySelector("[data-register-qa-close]").onclick = () => {
       const next = new URL(location.href);
-      next.searchParams.delete("qa");
-      next.searchParams.delete("scenario");
-      location.href = next.toString();
+      next.searchParams.delete("qa"), next.searchParams.delete("scenario"), location.href = next.toString();
     };
-    const cat = window.DATA.categories[0];
-    const parent = window.openAssetAddModal(cat ? { group: cat.group, sub: cat.sub } : {});
-    if (!parent) return;
-    if (scenario === "empty-category") parent.querySelector("#areg-catwrap").click();
-    if (scenario === "empty-tags" || scenario === "tag-duplicate") {
-      parent.querySelector("#areg-tag-manage").click();
-      if (scenario === "tag-duplicate") {
-        const inputs = document.querySelectorAll("[data-tm-rename]");
-        if (inputs.length >= 2) {
-          inputs[1].value = inputs[0].value;
-          inputs[1].dispatchEvent(new Event("input", { bubbles: true }));
-        }
-      }
+    const cat = window.DATA.categories[0],
+      parent = window.openAssetAddModal(cat ? {
+        group: cat.group,
+        sub: cat.sub
+      } : {});
+    if (parent && (scenario === "empty-category" && parent.querySelector("#areg-catwrap").click(), (scenario === "empty-tags" || scenario === "tag-duplicate") && (parent.querySelector("#areg-tag-manage").click(), scenario === "tag-duplicate"))) {
+      const inputs = document.querySelectorAll("[data-tm-rename]");
+      inputs.length >= 2 && (inputs[1].value = inputs[0].value, inputs[1].dispatchEvent(new Event("input", {
+        bubbles: !0
+      })));
     }
   }
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", mount, { once: true });
-  else mount();
+  document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", mount, {
+    once: !0
+  }) : mount();
 })();
