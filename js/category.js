@@ -541,7 +541,7 @@
     }
     render();
 
-    p.addEventListener("click", e => { if (e.target === p) p.remove(); });
+    // Selection modal: backdrop clicks do not dismiss.
     p.querySelector("[data-close]").onclick = () => p.remove();
     okBtn.onclick = () => {
       if (okBtn.disabled) return;
@@ -679,7 +679,7 @@
     p.querySelector("[data-reset]").onclick = () => { selGroups.clear(); selJobTitles.clear(); renderAll(); };
     renderAll();
 
-    p.addEventListener("click", e => { if (e.target === p) p.remove(); });
+    // Selection modal: backdrop clicks do not dismiss.
     p.querySelector("[data-close]").onclick = () => p.remove();
     p.querySelector("[data-ok]").onclick = () => { p.remove(); onApply({ groups: [...selGroups], jobTitles: [...selJobTitles] }); };
   }
@@ -758,7 +758,7 @@
       };
       renderList();
       renderSelected();
-      p.addEventListener("click", e => { if (e.target === p) p.remove(); });
+    // Selection modal: backdrop clicks do not dismiss.
       p.querySelector("[data-close]").onclick = () => p.remove();
       p.querySelector("[data-ok]").onclick = () => { p.remove(); onApply([...sel]); };
       return;
@@ -794,7 +794,7 @@
     }
     p.querySelector(".picker-search").addEventListener("input", e => { query = e.target.value; renderList(); });
     renderList();
-    p.addEventListener("click", e => { if (e.target === p) p.remove(); });
+    // Selection modal: backdrop clicks do not dismiss.
     p.querySelector("[data-close]").onclick = () => p.remove();
     p.querySelector("[data-ok]").onclick = () => { p.remove(); onApply([...sel]); };
   }

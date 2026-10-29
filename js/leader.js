@@ -565,10 +565,10 @@
       product: "MacBook Pro 14", serial: "C02AI2026", manufactured: "2026-01",
     } : {
       product: "MacBook Pro 14", assetNo: "AI-2026-0001", totalQty: "10", serial: "C02AI2026",
-      manufactured: "2026-01", purchaseDate: "2026-02", purchasePrice: "2500000",
+      manufactured: "2026-01", purchaseDate: "2026-02", purchasePrice: "2500000", labels:(window.DATA.tags || []).slice(0,2),
     };
   }
-  function applyMobileAiDraft(draft, values, { replace = false } = {}) {
+  function applyMobileAiDraft(draft, values, { replace = true } = {}) {
     const cat = addCategory(draft);
     if (!cat || !values) return;
     const hidden = cat.hiddenFields || [];
@@ -576,7 +576,9 @@
       if (replace) draft[key] = values[key] == null ? "" : String(values[key]);
       else if (!String(draft[key] || "").trim() && values[key] != null && values[key] !== "") draft[key] = String(values[key]);
     };
-    fill("product");
+    fill("product");fill("note");
+    draft.labels=(values.labels || []).filter(tag=>window.DATA.tags.includes(tag)).slice(0,window.ASSET_TAG_MAX_COUNT);
+    draft._aiDraft=null; draft._aiPendingPhotos=null;
     if (cat.type === "individual") { fill("assetNo"); if (!hidden.includes("serial")) fill("serial"); if (!hidden.includes("imei")) fill("imei"); }
     else fill("totalQty");
     if (!hidden.includes("expiry")) fill("expiry");
@@ -587,6 +589,9 @@
       draft.purchasePrice = values.purchasePrice == null || values.purchasePrice === ""
         ? "" : window.formatPurchasePriceInput(values.purchasePrice);
     }
+  }
+  function copyCategoryDraft(draft) {
+    return JSON.parse(JSON.stringify(draft,(key,value)=>key==="_categoryDrafts" ? undefined : value));
   }
   function recommendedMobileAiCategory() {
     return window.DATA.categories.find(cat => cat.group === "전자기기류" && cat.sub === "노트북")
@@ -629,26 +634,29 @@
       back.remove();
     }
     function requestClose() {
-      if (draft.photos.length + newPhotos.length) confirmMobileAiExit(close);
+      if (newPhotos.length) confirmMobileAiExit(close);
       else close();
     }
     function renderPhotos() {
       const existing = draft.photos.map((photo, index) => `<span class="mapp-ai-photo" style="background:${photo.color}" aria-label="사진 ${index + 1}">${index === draft.primaryPhoto ? '<span class="mapp-ai-star">★</span>' : ""}</span>`).join("");
       const added = newPhotos.map((photo, index) => `<span class="mapp-ai-photo" style="background:${photo.color}" aria-label="새 사진 ${index + 1}">${analyzing ? "" : `<button type="button" data-ai-photo-delete="${index}" aria-label="새 사진 삭제">×</button>`}</span>`).join("");
       const total = draft.photos.length + newPhotos.length;
-      const add = !analyzing && total < window.ASSET_PHOTO_MAX_COUNT ? '<button type="button" class="mapp-ai-photo-add" data-ai-photo-add aria-label="사진 추가">+</button>' : "";
+      const add = `<button type="button" class="mapp-ai-photo-add" data-ai-photo-add aria-label="사진 추가" ${analyzing ? "disabled" : ""}>+</button>`;
       photosEl.innerHTML = existing + added + add;
       analyze.disabled = !total || analyzing;
       photosEl.querySelectorAll("[data-ai-photo-delete]").forEach(button => button.onclick = () => {
         newPhotos.splice(+button.dataset.aiPhotoDelete, 1); renderPhotos();
       });
       const addButton = photosEl.querySelector("[data-ai-photo-add]");
-      if (addButton) addButton.onclick = () => openAddDropdown(addButton, [
+      if (addButton) addButton.onclick = () => {
+        if(total>=window.ASSET_PHOTO_MAX_COUNT) { toast("자산 1개당 사진은 최대 10장까지 첨부할 수 있습니다.");return; }
+        openAddDropdown(addButton, [
         { key: "camera", label: "카메라로 촬영하기" }, { key: "gallery", label: "갤러리에서 불러오기" },
       ], () => {
         newPhotos.push({ id: window.assetPhotoId(), color: PHOTO_COLORS[(draft.photos.length + newPhotos.length) % PHOTO_COLORS.length], at: `${todayStr()} 00:00`, by: ME });
         renderPhotos();
       });
+      };
     }
     function appendPhotos() {
       const room = Math.max(0, window.ASSET_PHOTO_MAX_COUNT - draft.photos.length);
@@ -656,24 +664,21 @@
       if (draft.photos.length && draft.primaryPhoto >= draft.photos.length) draft.primaryPhoto = 0;
     }
     function applyResult(values, recommend) {
-      const replace = !!draft._aiHasSuccessfulResult;
-      draft._aiDraft = values;
-      draft._aiHasSuccessfulResult = true;
-      if (!draft.category && recommend) {
-        const cat = recommendedMobileAiCategory();
-        if (cat) draft.category = `${cat.group}|${cat.sub}`;
+      if(recommend){
+        const cat=recommendedMobileAiCategory(), next=cat ? `${cat.group}|${cat.sub}` : draft.category;
+        if(next!==draft.category && draft.category){
+          const cache=draft._categoryDrafts || (draft._categoryDrafts=new Map());
+          cache.set(draft.category,copyCategoryDraft(draft));
+        }
+        draft.category=next;
       }
-      applyMobileAiDraft(draft, values, { replace });
-      appendPhotos();
-      close(); onApplied();
+      applyMobileAiDraft(draft,values,{replace:true}); appendPhotos(); close();onApplied();
     }
     function direct(values) {
-      draft._aiDraft = values;
-      if (draft.category) {
-        applyMobileAiDraft(draft, values); appendPhotos(); close(); onApplied(); return;
-      }
-      draft._aiPendingPhotos = newPhotos.map(photo => ({ ...photo }));
-      close(); onChooseCategory();
+      appendPhotos();
+      if(draft.category){ if(Object.keys(values).length) applyMobileAiDraft(draft,values,{replace:true}); }
+      else draft._pendingAiOnce=Object.keys(values).length ? values : null;
+      close();onApplied();
     }
     function renderLoading() {
       analyzing = true; analyze.hidden = true;
@@ -926,7 +931,7 @@
   // 자산 화면(허브) — 대시보드 분류 관리 화면의 트리처럼 조회 권한 가진 대분류·소분류를 전부 보여주기만
   // 하고, 소분류를 눌러야 실제 목록(소분류 상세 화면)으로 드릴다운(2026-09-30 — 유형 칩까지 없애고 순수
   // 카테고리 탐색 화면으로 단순화. 카드가 보이는 곳은 소분류 상세 화면 하나뿐이라는 규칙은 그대로)
-  function assetsScreenHtml() {
+  function assetsScreenHtml(state) {
     const groups = categoryTree();
     return `
       <div class="mapp-topbar">
@@ -935,10 +940,10 @@
       </div>
       <div class="mapp-body">
         ${groups.length ? groups.map(g => `
-          <button type="button" class="mapp-menu-cap mapp-tree-group-head" data-tree-collapse aria-expanded="true" aria-label="접기/펼치기">
+          <button type="button" class="mapp-menu-cap mapp-tree-group-head" data-tree-collapse data-tree-group="${esc(g.group)}" aria-expanded="${!state.collapsedGroups.has(g.group)}" aria-label="접기/펼치기">
             <span>${g.group}</span>${CHEV_DOWN}
           </button>
-          <div class="mapp-ws-cat-tree" data-tree-collapsible>${g.subs.length ? g.subs.map(sub => `
+          <div class="mapp-ws-cat-tree" data-tree-collapsible ${state.collapsedGroups.has(g.group) ? "hidden" : ""}>${g.subs.length ? g.subs.map(sub => `
             <button type="button" class="mapp-ws-cat-row" data-sub-open data-sub="${sub}">
               <span>${sub}</span>
               <span class="mapp-ws-cat-count">${countForSub(sub)}<span class="mapp-menu-chev">›</span></span>
@@ -982,7 +987,7 @@
     return `
       <div class="mapp-topbar">
         <button type="button" class="mapp-back" data-mapp-back aria-label="뒤로">←</button>
-        ${MappAssetFilter.buttonHtml(popupFilters)}
+        ${subItems.length ? MappAssetFilter.buttonHtml(popupFilters) : ""}
       </div>
       <div class="mapp-subdetail-head">
         <h1 class="mapp-subdetail-title">${cat.group || ""} <span class="mapp-cat-sep">›</span> ${sub}</h1>
@@ -991,9 +996,7 @@
         ${subItems.length ? `<div class="mapp-chip-row">${statusChips.map(([k, l]) =>
           `<button type="button" class="mapp-chip${k === statusFilter ? " active" : ""}" data-status-chip="${k}" aria-pressed="${k === statusFilter}">${l}</button>`).join("")}</div>` : ""}
         ${subItems.length && STATUS_HELP[statusFilter] ? `<p class="hint">${STATUS_HELP[statusFilter]}</p>` : ""}
-        <div class="mapp-search">
-          <input type="text" data-mapp-search placeholder="${searchPlaceholder}">
-        </div>
+        ${subItems.length ? `<div class="mapp-search"><input type="text" data-mapp-search placeholder="${searchPlaceholder}"></div>` : ""}
         ${MappAssetFilter.appliedHtml(popupFilters, filterGroups)}
         <div class="mapp-count">전체 <b data-leader-result-count>${items.length}</b></div>
         ${items.length ? `<div class="mapp-card-list">${items.map(x => assetCardHtml(x)).join("")}</div><p class="mapp-ws-empty" data-mapp-empty hidden>결과가 없습니다.</p>` : `<p class="mapp-ws-empty" data-mapp-empty>${emptyMsg}</p>`}
@@ -1320,7 +1323,7 @@
     }
     p.querySelector(".picker-search").addEventListener("input", e => { query = e.target.value; renderList(); });
     renderList();
-    p.addEventListener("click", e => { if (e.target === p) p.remove(); });
+    // Selection modal: backdrop clicks do not dismiss.
     p.querySelector("[data-picker-close]").onclick = () => p.remove();
   }
   function openWorksitePickerPage(initial, onApply, exclude) {
@@ -1360,7 +1363,7 @@
     }
     p.querySelector(".picker-search").addEventListener("input", e => { query = e.target.value; renderList(); });
     renderList();
-    p.addEventListener("click", e => { if (e.target === p) p.remove(); });
+    // Selection modal: backdrop clicks do not dismiss.
     p.querySelector("[data-picker-close]").onclick = () => p.remove();
   }
   // 날짜 선택 — 바텀시트 캘린더(2026-09-29, 텍스트 입력 필드에서 전환 — 구성원/근무지처럼 "선택"으로 제공).
@@ -2061,11 +2064,11 @@
         ${target ? `<div class="mapp-directory-context mapp-scoped-context">${esc(target.value)}</div>` : ""}
         <div class="dhead-id"><div class="mapp-hero-wrap"><button type="button" class="mapp-hero-img" data-hero-viewer aria-label="사진 보기"${photos.length ? "" : " disabled"}>${cardThumb(a)}</button>${photos.length > 1 ? `<span class="mapp-hero-count">+${photos.length-1}</span>` : ""}${editable ? `<button type="button" class="mapp-hero-edit" data-hero-edit aria-label="사진 관리">${IC_EDIT}</button>` : ""}</div>
           <div><h1>${esc(a.product)}</h1><div class="dhead-sub">${badge}${indiv ? `<div>고유관리번호 <b>${esc(a.assetNo)}</b></div>` : ""}${target && indiv && current ? `<div>배정일 ${window.fmtDate(current.since)}</div>` : ""}</div></div></div>
-        ${!target && !indiv ? `<div class="mapp-leader-qty-summary"><div>전체<strong>${window.AssetQuantity.format(a.totalQty)}개</strong></div><div>보유<strong>${distributed}개</strong></div><div>잔여<strong>${a.totalQty-distributed}개</strong></div></div>` : ""}
+        ${!target && !indiv ? `<div class="mapp-leader-qty-summary"><div>전체<strong>${window.AssetQuantity.format(a.totalQty)}개</strong></div><div>보유<strong>${window.AssetQuantity.format(distributed)}개</strong></div><div>잔여<strong>${window.AssetQuantity.format(a.totalQty-distributed)}개</strong></div></div>` : ""}
         <div class="dsection"><div class="kv2">${kv}</div></div>
         ${target ? scopedPartySectionHtml(a, target) : `<div class="dsection"><div class="mapp-leader-holders-head"><h2>${indiv ? "배정 현황" : "보유 현황"}</h2>${editable ? `<button type="button" class="btn sm" data-holder-add>${indiv ? "배정 추가" : "보유 대상 추가"}</button>` : ""}</div>
           <div class="mapp-count">전체 <b>${(indiv ? a.assignments || [] : a.stocks || []).length}</b></div>
-          ${!indiv ? `<div class="mapp-leader-holder-search"><button type="button" class="mapp-leader-holder-kind" data-holder-category aria-label="검색 대상: 구성원" aria-haspopup="menu" aria-expanded="false"><span aria-hidden="true">${IC_EMP}</span><span class="chev" aria-hidden="true">${CHEV_DOWN}</span></button><input type="text" data-holder-query placeholder="이름/사번/휴대폰번호"></div>` : ""}
+          ${!indiv && (a.stocks || []).length ? `<div class="mapp-leader-holder-search"><button type="button" class="mapp-leader-holder-kind" data-holder-category aria-label="검색 대상: 구성원" aria-haspopup="menu" aria-expanded="false"><span aria-hidden="true">${IC_EMP}</span><span class="chev" aria-hidden="true">${CHEV_DOWN}</span></button><input type="text" data-holder-query placeholder="이름/사번/휴대폰번호"></div>` : ""}
           <div data-holder-list></div>
         </div>`}</div>`;
   }
@@ -2078,7 +2081,7 @@
       return x.employee && (x.employee.toLowerCase().includes(q) || !!member && (member.empNo.includes(q) || member.phone.includes(q)));
     }).sort((p,r) => indiv ? r.x.since.localeCompare(p.x.since) : r.x.qty-p.x.qty || (p.x.employee || p.x.worksite).localeCompare(r.x.employee || r.x.worksite,"ko"));
     const pages = Math.max(1,Math.ceil(rows.length/20)), page = Math.min(requestedPage,pages);
-    return { page, html: rows.length ? `<div class="acard-list">${rows.slice((page-1)*20,page*20).map(({x,idx}) => `<div class="acard${canManage(a) ? " has-actions" : ""}">${typeBadge(x)}${canManage(a) ? `<button type="button" class="mapp-holder-more" data-holder-more data-index="${idx}" aria-label="${esc(x.employee || x.worksite)} ${indiv ? "배정" : "보유"} 관리" aria-haspopup="menu" aria-expanded="false">${MORE_ICON}</button>` : ""}<div class="acard-id">${assignIdentity(x)}</div><div class="acard-foot"><span class="acard-date">${indiv ? `배정일 <b>${window.fmtDate(x.since)}</b>` : `보유 수량 <b>${window.AssetQuantity.format(x.qty)}개</b>`}</span></div></div>`).join("")}</div>${pages>1 ? `<div class="pager"><button data-holder-page="-1"${page===1 ? " disabled" : ""} aria-label="이전 페이지">‹</button><span>${page} / ${pages}</span><button data-holder-page="1"${page===pages ? " disabled" : ""} aria-label="다음 페이지">›</button></div>` : ""}` : `<p class="muted">${q ? "결과가 없습니다." : indiv ? "배정 대상이 없습니다." : "보유 대상이 없습니다."}</p>` };
+    return { page, html: rows.length ? `<div class="acard-list">${rows.slice(0,page*20).map(({x,idx}) => `<div class="acard${canManage(a) ? " has-actions" : ""}">${typeBadge(x)}${canManage(a) ? `<button type="button" class="mapp-holder-more" data-holder-more data-index="${idx}" aria-label="${esc(x.employee || x.worksite)} ${indiv ? "배정" : "보유"} 관리" aria-haspopup="menu" aria-expanded="false">${MORE_ICON}</button>` : ""}<div class="acard-id">${assignIdentity(x)}</div><div class="acard-foot"><span class="acard-date">${indiv ? `배정일 <b>${window.fmtDate(x.since)}</b>` : `보유 수량 <b>${window.AssetQuantity.format(x.qty)}개</b>`}</span></div></div>`).join("")}</div>${page<pages ? '<div data-holder-sentinel style="height:1px"></div>'  : ""}` : `<p class="muted">${q ? "결과가 없습니다." : indiv ? "배정 대상이 없습니다." : "보유 대상이 없습니다."}</p>` };
   }
   function openLeaderQr(a) {
     const back = mappOverlay("mapp-sheet-back", 90);
@@ -2089,7 +2092,7 @@
       const now = new Date(), pad = n => String(n).padStart(2,"0");
       const stamp = `${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
       const fileName = window.assetDownloadFileName(`QR_${a.type === "individual" ? a.assetNo : a.product}_${stamp}.png`);
-      toast(`"${fileName}" 다운로드 (프로토타입 — 반영 없음)`); back.remove();
+      toast("사진을 저장하였습니다."); // Prototype: production saves fileName to the photo library; keep the QR sheet open.
     };
   }
 
@@ -2129,19 +2132,13 @@
 
   function render() {
     const root = document.getElementById("app");
-    const state = { screen: "menu", menuExpanded: { member: false, worksite: false }, menuScroll: 0, sub: null, statusFilter: "all", popupFilters: MappAssetFilter.empty(), subSearch: "", addDraft: null, addOrigin: null, tagManageDraft: null, detailAssetId: null, listScroll: 0, holderQuery: "", holderCategory: "employee", holderPage: 1 };
+    const state = { screen: "menu", menuExpanded: { member: false, worksite: false }, menuScroll: 0, sub: null, statusFilter: "all", popupFilters: MappAssetFilter.empty(), subSearch: "", addDraft: null, addOrigin: null, tagManageDraft: null, detailAssetId: null, listScroll: 0, holderQuery: "", holderCategory: "employee", holderPage: 1, collapsedGroups:new Set() };
 
     function draw() {
       const featureScreens = ["plan-features", "asset-feature"];
       if (featureScreens.includes(state.screen) && !canConfigureFeatures()) state.screen = "menu";
-      if (!["menu", "member-profile", "worksite-profile", ...featureScreens].includes(state.screen) && !assetMgmtEnabled()) {
-        // 회사 기능 OFF/요금제 미충족이면 이미 열려 있던 상세·편집 페이지도 접근을 차단한다.
-        const filterCancel = document.querySelector(".mapp-asset-filter [data-filter-cancel]");
-        if (filterCancel) filterCancel.click(); // 공용 필터의 포커스/스크롤 이벤트도 정상 해제.
-        document.querySelectorAll(".mapp-fullpage-back, .mapp-sheet-back, .mapp-viewer-back, .dropdown-menu, .modal-back").forEach(node => node.remove());
-        delete state.directoryDetailFrom; state.detailTarget = null;
-        state.screen = "menu";
-      }
+      // Feature availability is read when building menus. Do not force-close
+      // an already opened asset screen on profile refresh (D-20261028-02).
       const showTabBar = state.screen === "menu";
       const screenHtml = state.screen === "menu" ? menuScreenHtml(state.menuExpanded)
         : state.screen === "member-profile" ? directoryProfileScreenHtml("member", state)
@@ -2156,7 +2153,7 @@
         : state.screen === "asset-add" ? assetAddScreenHtml(state.addDraft)
         : state.screen === "asset-add-category" ? assetAddCategoryScreenHtml(state.addDraft)
         : state.screen === "asset-add-tags" ? assetAddTagManageScreenHtml(state.tagManageDraft)
-        : assetsScreenHtml();
+        : assetsScreenHtml(state);
       root.innerHTML = `
         <div class="mapp-stage">
           <div class="mapp-phone">
@@ -2235,6 +2232,7 @@
         b.setAttribute("aria-expanded", String(!expanded));
         body.hidden = expanded;
         b.classList.toggle("collapsed", expanded);
+        if(expanded) state.collapsedGroups.add(b.dataset.treeGroup);else state.collapsedGroups.delete(b.dataset.treeGroup);
       });
       // 상태 칩을 선택하면 팝업 조건을 모두 해제. 팝업 적용 중에는 전체 칩도 비선택.
       root.querySelectorAll("[data-status-chip]").forEach(b => b.onclick = () => {
@@ -2260,15 +2258,24 @@
         const cards = [...root.querySelectorAll("[data-asset-card]")];
         const emptyMsg = root.querySelector("[data-mapp-empty]");
         searchInput.value = state.subSearch;
+        let searchObserver=null;
         const applySearch = () => {
+          searchObserver?.disconnect();
           state.subSearch = searchInput.value;
           const q = state.subSearch.trim().toLowerCase();
-          cards.forEach(card => {
-            const asset = assets.find(a => a.id === card.dataset.assetId);
-            const hay = asset ? `${asset.product}${asset.type === "individual" ? asset.assetNo || "" : ""}`.toLowerCase() : "";
-            card.hidden = !(!q || hay.includes(q));
+          const matching=cards.filter(card=>{
+            const asset=assets.find(a=>a.id===card.dataset.assetId);
+            return !q || `${asset?.product || ""} ${asset?.type==="individual" ? asset.assetNo || "" : ""}`.toLowerCase().includes(q);
           });
-          const visibleCount = cards.filter(card => !card.hidden).length;
+          const visibleCount=matching.length;
+          cards.forEach(card=>card.hidden=true);
+          let shown=0;
+          const list=root.querySelector(".mapp-card-list");
+          list?.querySelector("[data-list-sentinel]")?.remove();
+          const sentinel=document.createElement("div");sentinel.dataset.listSentinel="";sentinel.style.height="1px";
+          const reveal=()=>{matching.slice(shown,shown+20).forEach(c=>c.hidden=false);shown+=20;if(shown>=matching.length){sentinel.remove();observer.disconnect();}};
+          const observer=searchObserver=new IntersectionObserver(entries=>{if(entries.some(e=>e.isIntersecting))reveal();},{root:root.querySelector(".mapp-screen")});
+          reveal();if(shown<matching.length){list.append(sentinel);observer.observe(sentinel);}
           const count = root.querySelector("[data-leader-result-count]");
           if (count) count.textContent = visibleCount;
           if (emptyMsg && cards.length) emptyMsg.hidden = visibleCount > 0;
@@ -2390,11 +2397,14 @@
         if (add) add.onclick = () => dispatchAction(a.type === "individual" ? "assign-add" : "hold-add");
         const partiesViewAll = root.querySelector('[data-parties-viewall]');
         if (partiesViewAll) partiesViewAll.onclick = () => { state.screen = "asset-parties"; draw(); };
+        let holderObserver=null;
         function drawHolders() {
           const list = root.querySelector('[data-holder-list]');
           if (!list) return; // 대상 상세의 공동 대상은 조회 전용이며 전체 현황 관리 UI를 연결하지 않는다.
           const rendered = leaderHolderList(a, state.holderQuery, state.holderCategory, state.holderPage);
           state.holderPage = rendered.page; list.innerHTML = rendered.html;
+          holderObserver?.disconnect();const sentinel=list.querySelector("[data-holder-sentinel]");
+          if(sentinel){holderObserver=new IntersectionObserver(entries=>{if(entries.some(e=>e.isIntersecting)){state.holderPage++;drawHolders();}},{root:root.querySelector(".mapp-screen")});holderObserver.observe(sentinel);}
           list.querySelectorAll('[data-holder-page]').forEach(button => button.onclick = () => { state.holderPage += Number(button.dataset.holderPage); drawHolders(); list.scrollIntoView({block:"nearest"}); });
           list.querySelectorAll('[data-holder-more]').forEach(button => button.onclick = () => {
             const items = a.type === "individual"
@@ -2447,7 +2457,8 @@
       }
       if (state.screen === "asset-history") {
         const a = assets.find(x => x.id === state.detailAssetId), input = root.querySelector('[data-history-q]');
-        if (input) input.oninput = () => { root.querySelector('[data-history-list]').innerHTML = timelineHtml(a, input.value); };
+        if(input){input.value=a._prototypeHistoryQuery || "";root.querySelector('[data-history-list]').innerHTML=timelineHtml(a,input.value);
+          input.oninput=()=>{a._prototypeHistoryQuery=input.value;root.querySelector('[data-history-list]').innerHTML=timelineHtml(a,input.value);};}
       }
 
       if (state.screen === "asset-add") {
@@ -2689,18 +2700,12 @@
           // 현재 분류를 다시 선택하면 입력을 유지하고 팝업만 닫는다(대시보드와 동일).
           if (previous.editingId) previous.category = row.dataset.addCategoryPick;
           else if (row.dataset.addCategoryPick !== previous.category) {
-            state.addDraft = emptyAddDraft(category);
-            state.addDraft.product = product;
-            // AI가 분류를 찾지 못해 직접 선택으로 이어진 경우, 선택한 분류의 유형·노출 설정에 맞는
-            // 추출값과 팝업 사진을 이 시점에 적용한다. 일반 분류 변경도 AI 원본값은 가능한 빈 필드에 유지한다.
-            if (previous._aiDraft) {
-              state.addDraft._aiDraft = previous._aiDraft;
-              applyMobileAiDraft(state.addDraft, previous._aiDraft);
-            }
-            if (previous._aiPendingPhotos && previous._aiPendingPhotos.length) {
-              state.addDraft.photos = previous._aiPendingPhotos.slice(0, window.ASSET_PHOTO_MAX_COUNT).map(photo => ({ ...photo }));
-              state.addDraft.primaryPhoto = 0;
-            }
+            const cache=previous._categoryDrafts || new Map();
+            if(previous.category)cache.set(previous.category,copyCategoryDraft(previous));
+            state.addDraft=cache.has(row.dataset.addCategoryPick) ? copyCategoryDraft(cache.get(row.dataset.addCategoryPick)) : emptyAddDraft(category);
+            state.addDraft.product=product;state.addDraft._categoryDrafts=cache;
+            if(!previous.category && previous.photos.length){state.addDraft.photos=previous.photos.map(p=>({...p}));state.addDraft.primaryPhoto=previous.primaryPhoto;}
+            if(previous._pendingAiOnce)applyMobileAiDraft(state.addDraft,previous._pendingAiOnce,{replace:true});
           }
           state.screen = "asset-add";
           draw();
@@ -2732,9 +2737,12 @@
             const invalid = !name || duplicates.has(name);
             input.classList.toggle("has-err", invalid);
             input.setAttribute("aria-invalid", String(invalid));
+            let duplicateError=input.parentElement.querySelector("[data-tag-duplicate-error]");
+            if(!duplicateError){duplicateError=document.createElement("p");duplicateError.className="field-err";duplicateError.dataset.tagDuplicateError="";input.after(duplicateError);}
+            duplicateError.textContent="동일한 명칭이 존재합니다.";duplicateError.hidden=!duplicates.has(name);
             list.querySelector(`[data-add-tag-required="${input.dataset.addTagRename}"]`).hidden = !!name;
           });
-          listError.hidden = !duplicates.size;
+          listError.hidden = true;
           const createName = normalizeTagName(createInput.value);
           const createDuplicate = !!createName && tagDraft.some(tag => normalizeTagName(tag.name) === createName);
           createInput.classList.toggle("has-err", createDuplicate);

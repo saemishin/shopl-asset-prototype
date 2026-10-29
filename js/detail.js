@@ -1231,7 +1231,7 @@
     }
     p.querySelector(".picker-search").addEventListener("input", e => { query = e.target.value; renderList(); });
     renderList();
-    p.addEventListener("click", e => { if (e.target === p) p.remove(); });
+    // Selection modal: backdrop clicks do not dismiss.
     p.querySelector("[data-close]").onclick = () => p.remove();
     p.querySelector("[data-ok]").onclick = () => { p.remove(); onApply(picked); };
   }
@@ -1271,7 +1271,7 @@
     }
     p.querySelector(".picker-search").addEventListener("input", e => { query = e.target.value; renderList(); });
     renderList();
-    p.addEventListener("click", e => { if (e.target === p) p.remove(); });
+    // Selection modal: backdrop clicks do not dismiss.
     p.querySelector("[data-close]").onclick = () => p.remove();
     p.querySelector("[data-ok]").onclick = () => { p.remove(); onApply(picked); };
   }

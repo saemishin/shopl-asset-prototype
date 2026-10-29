@@ -197,7 +197,7 @@
     p.querySelector("[data-direct-add]").onclick = () => toast(`"직접 추가" — 이후 단계에서 정의`);
     renderList();
     renderSelected();
-    p.addEventListener("click", e => { if (e.target === p) p.remove(); });
+    // Selection modal: backdrop clicks do not dismiss.
     p.querySelector("[data-close]").onclick = () => p.remove();
     p.querySelector("[data-ok]").onclick = () => { p.remove(); onApply([...sel]); };
   }
