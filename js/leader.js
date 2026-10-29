@@ -464,7 +464,7 @@
     }
     if (cat.type === "quantity") return /^(0|[1-9][0-9]*)$/.test(draft.totalQty);
     const assetNo = draft.assetNo.trim();
-    return !!assetNo && !assets.some(a => a.id !== draft.editingId && a.assetNo === assetNo);
+    return (!draft.editingId || !!assetNo) && (draft.editingId ? !assets.some(a => !a.deleted_at && a.id !== draft.editingId && a.assetNo === assetNo) : !draft.assetNoDupValue);
   }
   function addInputHtml(label, key, draft, options) {
     const opts = options || {};
@@ -472,7 +472,7 @@
       ${opts.textarea
         ? `<textarea id="mapp-add-${key}" data-add-field="${key}" maxlength="${opts.maxlength || 500}" placeholder="입력">${esc(draft[key])}</textarea>`
         : `<input id="mapp-add-${key}" data-add-field="${key}" type="${opts.type || "text"}"${opts.inputmode ? ` inputmode="${opts.inputmode}"` : ""}${opts.maxlength ? ` maxlength="${opts.maxlength}"` : ""}${opts.list ? ` list="${opts.list}"` : ""} value="${esc(draft[key])}" placeholder="입력">`}
-      ${opts.error ? `<p class="field-err" data-add-error hidden>${opts.error}</p>` : ""}</div>`;
+      ${opts.hint ? `<p class="hint">${esc(opts.hint)}</p>` : ""}${opts.error ? `<p class="field-err" data-add-error hidden>${opts.error}</p>` : ""}</div>`;
   }
   function addProductFieldHtml(draft) {
     return `<div class="mapp-add-field"><label for="mapp-add-product">품목명 <span class="req">*</span></label>
@@ -519,7 +519,7 @@
         ${addProductFieldHtml(draft)}
         ${cat ? `
           <div class="mapp-add-field"><label>사진</label><div class="mapp-add-photos">${photoTiles}${draft.photos.length < window.ASSET_PHOTO_MAX_COUNT ? '<button type="button" class="mapp-add-photo-plus" data-add-photo aria-label="사진 추가">+</button>' : ""}</div></div>
-          ${cat.type === "individual" ? addInputHtml("고유관리번호", "assetNo", draft, { required: true, maxlength: 30, error: "동일한 고유관리번호가 존재합니다." }) : addInputHtml("전체 수량", "totalQty", draft, { required: true, inputmode: "numeric", maxlength: 6 })}${draft.editingId && cat.type === "quantity" ? '<p class="field-err" data-edit-qty-error hidden>배분 수량보다 적게 입력할 수 없습니다.</p>' : ""}
+          ${cat.type === "individual" ? addInputHtml("고유관리번호", "assetNo", draft, { required: !!draft.editingId, hint: draft.editingId ? "" : window.ASSET_NUMBER_GUIDE, maxlength: 30, error: "동일한 고유관리번호가 존재합니다." }) : addInputHtml("전체 수량", "totalQty", draft, { required: true, inputmode: "numeric", maxlength: 6 })}${draft.editingId && cat.type === "quantity" ? '<p class="field-err" data-edit-qty-error hidden>배분 수량보다 적게 입력할 수 없습니다.</p>' : ""}
           ${!hidden.includes("expiry") ? addExpiryFieldHtml(draft) : ""}
           <div class="mapp-add-field"><div class="mapp-add-field-label"><label>태그</label><button type="button" data-add-tag-manage>태그 관리</button></div><p class="hint mapp-add-tag-hint">최대 10개까지 선택할 수 있습니다.</p>
             <div class="mapp-add-tag-picker"><div class="tag-input-wrap"><div class="tag-chips" data-add-tag-chips>${addTagChipsHtml(draft.labels)}</div><input type="text" data-add-tag-search placeholder="${draft.labels.length ? "" : "검색"}" autocomplete="off"${draft.labels.length >= window.ASSET_TAG_MAX_COUNT ? " disabled" : ""}></div><div class="mapp-add-suggest" data-add-tag-menu hidden></div></div></div>
@@ -1163,8 +1163,8 @@
   function openStatusChangeConfirm(a, title, body, apply, onDone, danger, successMessage) {
     confirmModal(title, body, () => { apply(); toast(successMessage || "상태가 변경되었습니다."); onDone(); }, danger);
   }
-  // 폐기 처리 — 대시보드 detail.js의 openDisposeModal과 동일(되돌릴 수 없는 최종 상태라 자산 삭제와 같은
-  // DELETE 입력 확인 패턴). 문구·필드 구성 전부 대시보드와 통일(2026-09-28)
+  // 폐기 처리 — 배정 종료·편집 동결을 확인하는 DELETE 패턴. 관리자 복구도 이전 배정은 복원하지 않는다.
+  // 대시보드 detail.js의 openDisposeModal과 같은 패턴이다. 문구·필드 구성 전부 대시보드와 통일(2026-09-28)
   const WARN_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 9v4M12 16.5h.01M10.3 3.9 2.5 17.5a1.7 1.7 0 0 0 1.47 2.55h16.06a1.7 1.7 0 0 0 1.47-2.55L13.7 3.9a1.7 1.7 0 0 0-2.94 0z"/></svg>`;
   function openDisposeConfirmModal(a, onDone) {
     const cb = document.createElement("div");
@@ -1174,7 +1174,7 @@
       <div class="modal" style="width:380px">
         <h3>폐기 처리하시겠습니까?</h3>
         <div class="body">
-          <div class="danger-note">${WARN_ICON}<span>폐기 처리하면 되돌릴 수 없습니다. 기존 배정은 자동으로 종료되며, 이후 배정 추가·자산 수정이 제한됩니다.</span></div>
+          <div class="danger-note">${WARN_ICON}<span>기존 배정은 자동으로 종료되며, 이후 배정 추가·자산 수정이 제한됩니다. 관리자는 배정이 없는 재고 상태로 복구할 수 있습니다.</span></div>
           <div class="field" style="margin-top:14px;margin-bottom:0">
             <input type="text" data-del-input placeholder="입력">
           </div>
@@ -1908,6 +1908,7 @@
     disposed: [],
   };
   function statusActions(a) {
+    if (window.canRestoreDisposedAsset(a)) return [{ key: "dispose-restore", label: "폐기 복구" }];
     if (a.type !== "individual" || !canManage(a)) return [];
     return STATUS_TRANSITIONS[a.status].map(([key, label]) => ({ key, label, danger: key === "dispose" }));
   }
@@ -2313,6 +2314,7 @@
             if (target || !hasAssetManagePermission()) return;
             openDeleteAssetModal(a, () => { state.detailAssetId = null; state.screen = state.directoryDetailFrom || "sub-detail"; delete state.directoryDetailFrom; state.detailTarget = null; draw(); }); return;
           }
+          if (key === "dispose-restore") { window.openAssetRestoreConfirm(a, message => { afterMutate(); toast(message); }, ME); return; }
           if (!canManage(a)) return;
           if (target) {
             const idx = findRecord(a, target).idx;
@@ -2462,7 +2464,9 @@
           root.querySelector("[data-add-product-error]").hidden = !nameDuplicate;
           nameInput.classList.toggle("has-err", nameDuplicate);
           nameInput.setAttribute("aria-invalid", String(nameDuplicate));
-          const duplicate = cat && cat.type === "individual" && !!draft.assetNo.trim() && assets.some(a => a.id !== draft.editingId && a.assetNo === draft.assetNo.trim());
+          if (draft.assetNoDupValue !== draft.assetNo.trim()) draft.assetNoDupValue = null;
+          const duplicate = cat && cat.type === "individual" && !!draft.assetNo.trim() && (draft.editingId
+            ? assets.some(a => !a.deleted_at && a.id !== draft.editingId && a.assetNo === draft.assetNo.trim()) : !!draft.assetNoDupValue);
           const error = root.querySelector("[data-add-error]");
           if (error) error.hidden = !duplicate;
           const assetNoInput = field("assetNo");
@@ -2611,11 +2615,9 @@
             draw(); toast("저장되었습니다."); return;
           }
           const cat = addCategory(draft);
-          const numericIds = assets.map(a => Number(String(a.id).replace(/\D/g, ""))).filter(Number.isFinite);
-          const asset = {
-            id: `A${String((numericIds.length ? Math.max(...numericIds) : 0) + 1).padStart(3, "0")}`,
+          let asset = {
             type: cat.type, assetNo: cat.type === "individual" ? draft.assetNo.trim() : "", product: draft.product.trim(),
-            group: cat.group, sub: cat.sub, status: "stock", createdAt: "2026-09-04", labels: [...draft.labels],
+            group: cat.group, sub: cat.sub, status: "stock", labels: [...draft.labels],
             assignments: cat.type === "individual" ? [] : undefined, stocks: cat.type === "quantity" ? [] : undefined,
           };
           if (cat.type === "quantity") asset.totalQty = parseInt(draft.totalQty, 10);
@@ -2633,7 +2635,8 @@
             asset.photo = draft.photos[draft.primaryPhoto].color;
             asset.photoCount = draft.photos.length;
           }
-          assets.push(asset);
+          try { [asset] = window.AssetRegistration.registerBatch([asset], { who: ME }); }
+          catch (error) { if (error.code === "DUPLICATE_ASSET_NO") draft.assetNoDupValue = draft.assetNo.trim(); updateAddValidity(); toast(error.code === "CATEGORY_CHANGED" ? "설정이 변경되었습니다. 잠시 후 다시 시도해주세요." : "입력 내용을 확인해주세요."); return; }
           state.screen = "sub-detail";
           state.sub = cat.sub;
           state.addDraft = null;

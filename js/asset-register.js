@@ -1,4 +1,4 @@
-/* 자산 등록 팝업 — 현황/분류 화면 공용(아직 러프한 프로토타입: 저장은 토스트만, 실제 데이터 반영 없음).
+/* 자산 등록 팝업 — 현황/분류 화면 공용. 최종 신규 저장은 탭 메모리 등록과 자동 발급을 함께 처리한다.
    assets.js의 "자산 추가" 버튼과 category.js의 소분류별 빈 자산 목록 [자산 추가] 버튼이 이 하나를 같이 씀. */
 (function () {
   // 태그는 앞뒤 공백 제거·연속 공백 한 칸으로 정규화하되 대소문자는 유지한다.
@@ -448,7 +448,8 @@
               <label>사진</label>
               <div class="areg-photo-row" id="areg-photo-row"></div>
             </div>
-            <div class="field" id="areg-assetno"><label>고유관리번호 <span class="req">*</span></label><input type="text" id="areg-assetno-input" placeholder="입력" maxlength="30">
+            <div class="field" id="areg-assetno"><label>고유관리번호${opts.asset ? ' <span class="req">*</span>' : ""}</label><input type="text" id="areg-assetno-input" placeholder="입력" maxlength="30">
+              ${opts.asset ? "" : `<p class="hint">${window.ASSET_NUMBER_GUIDE}</p>`}
               <p class="field-err" data-assetno-err hidden>동일한 명칭이 존재합니다.</p>
             </div>
             <div class="field" id="areg-totalqty-field"><label>전체 수량 <span class="req">*</span></label><input type="text" inputmode="numeric" id="areg-totalqty-input" placeholder="입력" maxlength="6"></div>
@@ -513,6 +514,7 @@
     window.AssetMemo.mountTextarea(noteInput);
     const saveBtn = back.querySelector("#areg-save");
     let initialEditValues = null;
+    let savedNumberError = null, savedNameError = null;
 
     const getExpiry = wireDateField(expiryField);
     const getManufactured = wireMonthField(manufacturedField, todayStr());
@@ -588,16 +590,19 @@
     }
     function checkValid() {
       const name = nameInput.value.trim();
-      const nameDup = quantityNameDup(name);
+      const nameKey = `${catValue}|${name}`;
+      if (savedNameError !== nameKey) savedNameError = null;
+      const nameDup = opts.asset ? quantityNameDup(name) : savedNameError === nameKey;
       nameErr.hidden = !nameDup;
       nameInput.classList.toggle("has-err", nameDup);
       nameInput.setAttribute("aria-invalid", String(nameDup));
       const nameOk = name.length > 0 && !nameDup;
       const noVal = assetNoInput.value.trim();
-      const dup = type !== "quantity" && assetNoDup(noVal);
+      if (savedNumberError !== noVal) savedNumberError = null;
+      const dup = type !== "quantity" && !!noVal && (opts.asset ? assetNoDup(noVal) : savedNumberError === noVal);
       assetNoErr.hidden = !dup;
       assetNoInput.classList.toggle("has-err", dup);
-      const noOk = type === "quantity" ? true : (noVal.length > 0 && !dup);
+      const noOk = type === "quantity" ? true : ((!opts.asset || noVal.length > 0) && !dup);
       const totalQtyValue = totalQtyInput.value.trim();
       const heldQty = opts.asset && type === "quantity"
         ? (opts.asset.stocks || []).reduce((sum, stock) => sum + stock.qty, 0)
@@ -1153,8 +1158,8 @@
       });
     };
 
-    // 자산 수정(opts.asset)은 실제로 자산 객체를 갱신 + 활동 이력을 남김. 자산 추가는 아직 러프한 목업이라
-    // 기존과 동일하게 토스트만(실제 데이터 반영 없음) — 이번 스코프는 "수정"만, 신규 등록 저장은 별도 과제.
+    // 수정은 기존 객체를 갱신하고 신규 등록은 최종 저장 성공 시 메모리 등록·자동 발급을 함께 처리한다.
+    // 운영 서버의 원자적 저장·중복 방지 계약은 data.js AssetRegistration 주석을 따른다.
     // 바뀐 필드마다 "자산 정보 수정: OOO" 형식으로 각각 따로 기록(뭉뚱그린 한 건이 아니라 배정/보유 관리만큼
     // 촘촘하게 — 필드별로 실제 값이 바뀐 것만 기록되고, 아무것도 안 바꾸고 저장하면 아무 것도 안 남음)
     saveBtn.addEventListener("click", () => {
@@ -1223,7 +1228,31 @@
         toast("저장되었습니다.");
         if (opts.onSaved) opts.onSaved();
       } else {
+        const cat = findCat(catValue);
+        const draft = {
+          type, group: cat.group, sub: cat.sub, product: nameInput.value.trim(),
+          assetNo: type === "individual" ? assetNoInput.value.trim() : "",
+          totalQty: type === "quantity" ? Number(totalQtyInput.value) : undefined,
+          expiry: getExpiry() || undefined, manufactured: getManufactured() || undefined,
+          purchaseDate: getPurchaseDate() || undefined,
+          serial: type === "individual" ? serialInput.value.trim() || undefined : undefined,
+          imei: type === "individual" ? imeiInput.value.trim() || undefined : undefined,
+          price: window.normalizePurchasePrice(purchasePriceInput.value) || undefined,
+          note: noteInput.value.trim() || undefined, labels: [...tags],
+          _photos: photos.map(photo => ({ ...photo })), _primary: primaryIdx,
+          photo: photos[primaryIdx]?.color, photoCount: photos.length,
+        };
+        try { window.AssetRegistration.registerBatch([draft]); }
+        catch (error) {
+          if (error.code === "DUPLICATE_ASSET_NO") savedNumberError = assetNoInput.value.trim();
+          if (error.code === "DUPLICATE_PRODUCT") savedNameError = `${catValue}|${nameInput.value.trim()}`;
+          checkValid();
+          toast(error.code === "CATEGORY_CHANGED" ? "설정이 변경되었습니다. 잠시 후 다시 시도해주세요." : "입력 내용을 확인해주세요.");
+          return;
+        }
         back.remove();
+        window.dispatchEvent(new Event("asset-registered"));
+        if (opts.onSaved) opts.onSaved();
         toast("자산이 추가되었습니다.");
       }
     });

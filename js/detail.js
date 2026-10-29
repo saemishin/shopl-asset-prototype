@@ -141,7 +141,7 @@
     openStatusConfirmModal("분실 회수 처리하시겠습니까?", "분실 회수 시 배정 여부에 따라 배정 중 또는 재고 상태로 돌아갑니다.",
       () => applyStatusChange(a, "상태 변경: 분실 회수", deriveReturnStatus(a)));
   }
-  // 폐기 처리 — 되돌릴 수 없는 최종 상태라 자산 삭제와 동일한 DELETE 입력 확인 패턴 재사용.
+  // 폐기 시 배정 종료·편집 동결을 확인하는 DELETE 패턴. 관리자 복구 시에도 배정은 되살리지 않는다.
   // 활성 배정은 자동 종료(구조설계안 3.4)하되, 반납처럼 레코드별로 따로 로그를 남기지 않고 "폐기 처리"
   // 한 건으로 묶어서 기록 — 배정 종료가 이 액션의 부수효과일 뿐 별도로 시작된 사용자 행동이 아니기 때문
   // (자산 정보 수정처럼 사용자가 각각 입력한 필드들과는 성격이 다름 — 그쪽은 필드별로 각각 기록함)
@@ -153,7 +153,7 @@
       <div class="modal" style="width:380px">
         <h3>폐기 처리하시겠습니까?</h3>
         <div class="body">
-          <div class="danger-note">${WARN_ICON}<span>폐기 처리하면 되돌릴 수 없습니다. 기존 배정은 자동으로 종료되며, 이후 배정 추가·자산 수정이 제한됩니다.</span></div>
+          <div class="danger-note">${WARN_ICON}<span>기존 배정은 자동으로 종료되며, 이후 배정 추가·자산 수정이 제한됩니다. 관리자는 배정이 없는 재고 상태로 복구할 수 있습니다.</span></div>
           <div class="field" style="margin-top:14px;margin-bottom:0">
             <input type="text" data-del-input placeholder="입력">
           </div>
@@ -189,6 +189,7 @@
     "수리/점검 완료": handleRepairDone,
     "분실 회수": handleLostRecover,
     "폐기 처리": openDisposeModal,
+    "폐기 복구": a => window.openAssetRestoreConfirm(a, message => { render(); toast(message); }),
   };
   // 상태 변경(상태 뱃지) 전용 드롭다운 — "···" 메뉴의 moreDropdown()과 같은 이유로 공용 dropdown() 대신 분리
   function statusDropdown(anchor, items, a) {
@@ -1432,13 +1433,13 @@
            ${photos.length > 1 ? `<span class="tcount">+${photos.length - 1}</span>` : ""}</button>`
       : `<span class="dthumb empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 15 5-4 4 3 4-4 5 4"/></svg></span>`;
 
-    // 상태 변경으로 이동 가능한 전이만 노출. 재고⟷배정중은 배정/반납으로 자동 파생되므로 이 메뉴엔 없음. 폐기는 최종 상태라 뱃지가 클릭 불가.
+    // 상태 변경으로 이동 가능한 전이만 노출. 재고⟷배정중은 배정/반납으로 자동 파생되므로 이 메뉴엔 없음. 폐기 상태는 관리자에게만 복구 메뉴를 제공한다.
     const STATUS_TRANSITIONS = {
       stock: ["수리/점검 접수", "분실 신고", "폐기 처리"],
       assigned: ["수리/점검 접수", "분실 신고", "폐기 처리"],
       repair: ["수리/점검 완료", "분실 신고", "폐기 처리"],
       lost: ["분실 회수", "폐기 처리"],
-      disposed: [],
+      disposed: window.canRestoreDisposedAsset(a) ? ["폐기 복구"] : [],
     };
     // 수량형은 상태 변경 액션 자체가 없음(재고·보유중만, AssetStock 레코드 유무로 자동 파생) — 항상 읽기전용 뱃지
     const statusItems = isIndiv ? STATUS_TRANSITIONS[a.status] : [];

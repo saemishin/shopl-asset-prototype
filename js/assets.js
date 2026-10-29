@@ -2,6 +2,7 @@
 (function () {
   const TODAY = new Date("2026-09-04");
   const { assets } = window.DATA;
+  window.addEventListener("asset-registered", () => render());
   // 대시보드는 자산 관리 권한 보유 관리자 가정. 권한 QA 모드에서만 비관리 리더를 재현한다.
   // 실제 서비스에서는 현재 계정의 관리 권한·이름/그룹/직무 ID 응답으로 대체한다(인증 API 목업 아님).
   const DEMO_ASSUME_ASSET_MANAGE_PERMISSION = window.AssetPermissionQa?.managePermission ?? true;
@@ -566,7 +567,7 @@
       state.sort = { key: "name", dir: "asc" };
       state.pageSize = 20;
       state.page = 1;
-      // 구성원 공통 필터 실제 연동 시 초안·적용값도 리더 포함/퇴사자 제외 기본값으로 초기화한다.
+      // 구성원 공통 필터 실제 연동 시 초안·적용값도 리더 포함·퇴사자 포함을 모두 체크한 기본값으로 초기화한다.
       render();
     };
     confirm.focus();
@@ -1480,7 +1481,7 @@
     if (!product || product.length > 50) errors.product = true;
     if (bulkRegister.type === "individual") {
       const no = String(result.assetNo || "").trim();
-      if (!no || no.length > 30 || !/^[A-Za-z0-9_-]+$/.test(no)) errors.assetNo = true;
+      if (no && (no.length > 30 || !/^[A-Za-z0-9_-]+$/.test(no))) errors.assetNo = true;
       for (const field of ["serial", "imei"]) {
         if (bulkFieldEnabled(result, field) && String(result[field] || "").length > 40) errors[field] = true;
       }
@@ -1555,7 +1556,7 @@
     if (!bulkRegister.results.size) return "";
     // Shopl 일괄 추가 양식의 컬럼 순서와 동일하게 제공한다. No.만 확인 테이블의 행 번호다.
     const typeField = bulkRegister.type === "individual" ? "고유관리번호" : "총수량";
-    const columns = ["No.", "대분류 *", "소분류 *", "품목명 *", `${typeField} *`, "유효기한", "태그",
+    const columns = ["No.", "대분류 *", "소분류 *", "품목명 *", (bulkRegister.type === "individual" ? `${typeField} <span title="${window.ASSET_NUMBER_GUIDE}">ⓘ</span>` : `${typeField} *`), "유효기한", "태그",
       ...(bulkRegister.type === "individual" ? ["S/N", "IMEI"] : []), "제조연월", "구매연월", "구매가격", "메모"];
     const rows = bulkRegister.groups.map((group, index) => {
       const result = bulkRegister.results.get(group.id);
@@ -1687,6 +1688,28 @@
         renderBulkRegister();
         content.querySelector(".bulk-result-error")?.scrollIntoView({ block: "center", behavior: "smooth" });
         toast("입력 내용을 확인해 주세요.");
+        return;
+      }
+      const drafts = bulkRegister.groups.map(group => {
+        const result = bulkRegister.results.get(group.id);
+        const category = window.DATA.categories.find(cat => `${cat.group}/${cat.sub}` === result.category && cat.type === bulkRegister.type);
+        if (!category) return null;
+        const photos = group.photos.map(photo => ({ ...photo, color: photo.color || "#5b8def", at: new Date().toISOString(), by: "dana" }));
+        const month = value => value ? `${value.replaceAll(".", "-")}-01` : undefined;
+        return { type: bulkRegister.type, group: category.group, sub: category.sub, product: result.product,
+          assetNo: result.assetNo || "", totalQty: Number(result.totalQty), labels: bulkTags(result),
+          expiry: result.expiry ? result.expiry.replaceAll(".", "-") : undefined,
+          serial: result.serial || undefined, imei: result.imei || undefined,
+          manufactured: month(result.manufactured), purchaseDate: month(result.purchaseDate),
+          price: window.normalizePurchasePrice(result.price) || undefined, note: result.note || undefined,
+          _photos: photos, _primary: Math.max(0, group.photos.findIndex(photo => photo.id === group.primaryPhotoId)),
+          photo: "#5b8def", photoCount: photos.length };
+      });
+      try {
+        if (drafts.some(draft => !draft)) throw new Error("CATEGORY_CHANGED");
+        window.AssetRegistration.registerBatch(drafts);
+      } catch (error) {
+        toast(error.code === "CATEGORY_CHANGED" || error.message === "CATEGORY_CHANGED" ? "설정이 변경되었습니다. 잠시 후 다시 시도해주세요." : "오류가 있는 라인이 있습니다. 오류를 수정하거나, 해당 라인을 삭제해주세요.");
         return;
       }
       toast("자산이 추가되었습니다.");

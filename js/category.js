@@ -1256,7 +1256,7 @@
       refresh();
     }
     const addAssetBtn = c.querySelector("[data-add-asset]");
-    if (addAssetBtn) addAssetBtn.onclick = () => window.openAssetAddModal({ type: cat.type, group: cat.group, sub: cat.sub });
+    if (addAssetBtn) addAssetBtn.onclick = () => window.openAssetAddModal({ type: cat.type, group: cat.group, sub: cat.sub, onSaved: () => render({ group: cat.group, sub: cat.sub }) });
   }
 
   function render(sel) {

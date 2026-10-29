@@ -449,3 +449,109 @@ window.archiveDeletedAsset = function (asset, actor) {
   if (index > -1) window.DATA.assets.splice(index, 1);
   return record;
 };
+
+/* 2026-10-28: 승인된 신규 등록 자동 채번·폐기 복구의 메모리 데모.
+ * 운영에서는 인증된 회사/역할, 회사 시간대, DB 고유 제약과 원자적 카운터,
+ * 저장 요청 식별키를 서버에서 검증해야 한다. URL과 이 메모리는 권한/영속 저장 구현이 아니다.
+ * 신규 등록의 최종 성공 시에만 발급한다. 수정·AI 적용·업로드 적용에서는 호출하지 않는다. */
+(function () {
+  const counters = new Map();
+  const params = new URLSearchParams(location.search);
+  const mobile = /(?:leader|app)\.html$/.test(location.pathname);
+  window.AssetPrototypeActor = {
+    role: params.get("qa") === "restore" ? (params.get("role") === "admin" ? "admin" : "leader") : (mobile ? "leader" : "admin"),
+    companyId: "demo-company", timeZone: "Asia/Seoul",
+  };
+  window.ASSET_NUMBER_GUIDE = "입력하지 않으면 자산 등록 시 자동으로 발급됩니다. (형식: ASSET-YYYY-000001)";
+  function stamp(now, timeZone) {
+    const parts = new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(now);
+    const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
+    return `${values.year}-${values.month}-${values.day} ${values.hour}:${values.minute}`;
+  }
+  function fail(code) { const error = new Error(code); error.code = code; throw error; }
+  window.AssetRegistration = {
+    registerBatch(drafts, options = {}) {
+      if (!Array.isArray(drafts) || !drafts.length) fail("EMPTY_BATCH");
+      const actor = window.AssetPrototypeActor;
+      const companyId = options.companyId || actor.companyId;
+      const at = stamp(options.now || new Date(), options.timeZone || actor.timeZone);
+      const year = at.slice(0, 4), key = `${companyId}:${year}`;
+      // 같은 탭의 데모 회사별 채번을 분리한다. 기존 시드는 기본 회사 데이터다.
+      const existing = window.DATA.assets.filter(asset => !asset.deleted_at && (asset.companyId || actor.companyId) === companyId);
+      const used = new Set(existing.filter(asset => asset.type === "individual").map(asset => asset.assetNo).filter(Boolean));
+      const names = new Set(existing.filter(asset => asset.type === "quantity").map(asset => `${asset.group}\0${asset.sub}\0${asset.product.trim()}`));
+      const prepared = drafts.map(draft => {
+        const asset = { ...draft, companyId, product: String(draft.product || "").trim(), assetNo: String(draft.assetNo || "").trim() };
+        const category = window.DATA.categories.find(cat => cat.group === asset.group && cat.sub === asset.sub && cat.type === asset.type);
+        if (!category) fail("CATEGORY_CHANGED");
+        if (!asset.product || asset.product.length > 50) fail("INVALID_PRODUCT");
+        if (asset.type === "individual") {
+          if (asset.assetNo && !/^[A-Za-z0-9_-]{1,30}$/.test(asset.assetNo)) fail("INVALID_ASSET_NO");
+          // 같은 저장의 수기 번호를 모두 예약한 뒤 빈 값에 발급해 충돌을 피한다.
+          if (asset.assetNo) { if (used.has(asset.assetNo)) fail("DUPLICATE_ASSET_NO"); used.add(asset.assetNo); }
+        } else {
+          if (!Number.isInteger(asset.totalQty) || asset.totalQty < 0 || asset.totalQty > 999999999) fail("INVALID_QUANTITY");
+          const name = `${asset.group}\0${asset.sub}\0${asset.product}`;
+          if (names.has(name)) fail("DUPLICATE_PRODUCT");
+          names.add(name);
+        }
+        const hidden = category.hiddenFields || [];
+        for (const field of ["expiry", "serial", "imei", "manufactured", "purchaseDate", "price"]) {
+          if (hidden.includes(field === "price" ? "purchasePrice" : field)) delete asset[field];
+        }
+        return asset;
+      });
+      let sequence = counters.get(key) || 0;
+      let nextId = [...window.DATA.assets, ...(window.DATA.deletedAssets || [])].reduce((max, asset) => Math.max(max, /^A\d+$/.test(asset.id) ? Number(asset.id.slice(1)) : 0), 0);
+      const created = prepared.map(asset => {
+        if (asset.type === "individual" && !asset.assetNo) {
+          do { asset.assetNo = `ASSET-${year}-${String(++sequence).padStart(6, "0")}`; } while (used.has(asset.assetNo));
+          used.add(asset.assetNo);
+        }
+        return { ...asset, id: `A${String(++nextId).padStart(3, "0")}`, status: "stock", createdAt: at.slice(0, 10),
+          assignments: asset.type === "individual" ? [] : undefined, stocks: asset.type === "quantity" ? [] : undefined,
+          _activityLog: [{ d: at, who: options.who || "dana", script: "자산 등록" }] };
+      });
+      // 검증 중에는 DATA와 카운터를 바꾸지 않는다. 성공한 전체 작업만 반영한다.
+      window.DATA.assets.push(...created);
+      counters.set(key, sequence);
+      return created;
+    },
+  };
+  window.canRestoreDisposedAsset = asset => window.AssetPrototypeActor.role === "admin"
+    && window.DATA.assets.includes(asset) && !asset.deleted_at && asset.type === "individual" && asset.status === "disposed";
+  window.restoreDisposedAsset = (asset, who = "dana") => {
+    if (window.AssetPrototypeActor.role !== "admin") fail("PERMISSION_DENIED");
+    if (!window.canRestoreDisposedAsset(asset)) fail("ASSET_CHANGED");
+    if (!asset._activityLog) fail("HISTORY_NOT_INITIALIZED");
+    asset.status = "stock";
+    asset.assignments = [];
+    asset._activityLog.unshift({ d: stamp(new Date(), window.AssetPrototypeActor.timeZone), who,
+      script: "상태 변경: 폐기 복구", before: "폐기", after: "재고" });
+  };
+  window.openAssetRestoreConfirm = (asset, onDone, who) => {
+    if (!window.canRestoreDisposedAsset(asset)) return;
+    const back = document.createElement("div");
+    back.className = "modal-back"; back.style.zIndex = 340;
+    back.innerHTML = `<div class="modal sm" role="dialog" aria-modal="true" aria-label="폐기 자산 복구">
+      <h3>폐기 자산을 복구하시겠습니까?</h3><div class="body">배정이 없는 재고 상태로 복구됩니다. 기존 배정은 복원되지 않습니다.</div>
+      <div class="foot"><button type="button" class="btn" data-restore-cancel>취소</button><button type="button" class="btn primary" data-restore-confirm>확인</button></div></div>`;
+    back.querySelector("[data-restore-cancel]").onclick = () => back.remove();
+    back.querySelector("[data-restore-confirm]").onclick = () => {
+      let message;
+      try { window.restoreDisposedAsset(asset, who); message = "자산이 복구되었습니다."; }
+      catch (error) {
+        if (!["PERMISSION_DENIED", "ASSET_CHANGED"].includes(error.code)) {
+          const notice = document.createElement("div");
+          notice.textContent = "에러가 발생하였습니다. 잠시 후 다시 시도해보세요.";
+          notice.style.cssText = "position:fixed;left:50%;bottom:32px;transform:translateX(-50%);background:#1b1d1f;color:#fff;padding:10px 16px;border-radius:8px;z-index:400";
+          document.body.appendChild(notice); setTimeout(() => notice.remove(), 1800);
+          return;
+        }
+        message = error.code === "PERMISSION_DENIED" ? "관리자만 폐기 자산을 복구할 수 있습니다." : "설정이 변경되었습니다. 잠시 후 다시 시도해주세요.";
+      }
+      back.remove(); onDone(message);
+    };
+    document.body.appendChild(back);
+  };
+})();

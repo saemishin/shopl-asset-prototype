@@ -584,8 +584,8 @@
   function openStatusChangeConfirm(a, title, body, apply, onDone, danger, successMessage) {
     confirmModal(title, body, () => { apply(); toast(successMessage || "상태가 변경되었습니다."); onDone(); }, danger);
   }
-  // 폐기 처리 — 대시보드 detail.js의 openDisposeModal과 동일(되돌릴 수 없는 최종 상태라 자산 삭제와 같은
-  // DELETE 입력 확인 패턴). 문구·필드 구성 전부 대시보드와 통일(2026-09-28)
+  // 폐기 처리 — 배정 종료·편집 동결을 확인하는 DELETE 패턴. 관리자 복구도 이전 배정은 복원하지 않는다.
+  // 대시보드 detail.js의 openDisposeModal과 같은 패턴이다. 문구·필드 구성 전부 대시보드와 통일(2026-09-28)
   const WARN_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 9v4M12 16.5h.01M10.3 3.9 2.5 17.5a1.7 1.7 0 0 0 1.47 2.55h16.06a1.7 1.7 0 0 0 1.47-2.55L13.7 3.9a1.7 1.7 0 0 0-2.94 0z"/></svg>`;
   function openDisposeConfirmModal(a, onDone) {
     const cb = document.createElement("div");
@@ -595,7 +595,7 @@
       <div class="modal" style="width:380px">
         <h3>폐기 처리하시겠습니까?</h3>
         <div class="body">
-          <div class="danger-note">${WARN_ICON}<span>폐기 처리하면 되돌릴 수 없습니다. 기존 배정은 자동으로 종료되며, 이후 배정 추가·자산 수정이 제한됩니다.</span></div>
+          <div class="danger-note">${WARN_ICON}<span>기존 배정은 자동으로 종료되며, 이후 배정 추가·자산 수정이 제한됩니다. 관리자는 배정이 없는 재고 상태로 복구할 수 있습니다.</span></div>
           <div class="field" style="margin-top:14px;margin-bottom:0">
             <input type="text" data-del-input placeholder="입력">
           </div>
@@ -1336,6 +1336,7 @@
     disposed: [],
   };
   function statusActions(a) {
+    if (window.canRestoreDisposedAsset(a)) return [{ key: "dispose-restore", label: "폐기 복구" }];
     if (a.type !== "individual" || !canManage(a)) return [];
     return STATUS_TRANSITIONS[a.status].map(([key, label]) => ({ key, label, danger: key === "dispose" }));
   }
@@ -1854,6 +1855,7 @@
           else if (key === "lost-recover") openStatusChangeConfirm(a, "분실 회수 처리하시겠습니까?", "분실 회수 시 배정 여부에 따라 배정 중 또는 재고 상태로 돌아갑니다.", setStatus("상태 변경: 분실 회수", () => derivedActiveStatus(a)), afterMutate);
           else if (key === "repair-start") openStatusChangeConfirm(a, "수리/점검을 접수하시겠습니까?", "수리/점검을 접수하면 기존 배정은 유지되고 자산 상태가 수리/점검 중으로 변경됩니다.", setStatus("상태 변경: 수리/점검 접수", () => "repair"), afterMutate, false, "수리/점검이 접수되었습니다.");
           else if (key === "repair-done") openStatusChangeConfirm(a, "수리/점검을 완료하시겠습니까?", "수리/점검을 완료하면 현재 배정 여부에 따라 자산 상태가 배정 중 또는 재고로 변경됩니다.", setStatus("상태 변경: 수리/점검 완료", () => derivedActiveStatus(a)), afterMutate, false, "수리/점검이 완료되었습니다.");
+          else if (key === "dispose-restore") window.openAssetRestoreConfirm(a, message => { afterMutate(); toast(message); }, ME);
           else if (key === "dispose") openDisposeConfirmModal(a, afterMutate);
           else if (key === "qty-change") openQtyChangeModal(a, idx, afterMutate);
           else if (key === "qty-deduct") {
