@@ -109,7 +109,7 @@
           <button class="btn primary" data-cok>확인</button>
         </div>
       </div>`;
-    cb.addEventListener("click", e => { if (e.target === cb) cb.remove(); });
+    // Input/selection/confirmation modal: backdrop clicks do not dismiss.
     cb.querySelector("[data-cclose]").onclick = () => cb.remove();
     cb.querySelector("[data-cok]").onclick = () => { cb.remove(); onConfirm(); };
     document.body.appendChild(cb);
@@ -164,7 +164,7 @@
           <button class="btn danger" data-cok disabled>확인</button>
         </div>
       </div>`;
-    cb.addEventListener("click", e => { if (e.target === cb) cb.remove(); });
+    // Input/selection/confirmation modal: backdrop clicks do not dismiss.
     cb.querySelector("[data-cclose]").onclick = () => cb.remove();
     const input = cb.querySelector("[data-del-input]");
     const okBtn = cb.querySelector("[data-cok]");
@@ -236,7 +236,7 @@
     document.body.appendChild(cb);
     cb.querySelector("[data-exit-stay]").onclick = () => cb.remove();
     cb.querySelector("[data-exit-leave]").onclick = () => { cb.remove(); onLeave(); };
-    cb.onclick = event => { if (event.target === cb) cb.remove(); };
+    // Input/selection/confirmation modal: backdrop clicks do not dismiss.
   }
   function confirmModal(msg, onOk) {
     const cb = document.createElement("div");
@@ -250,7 +250,7 @@
           <button class="btn primary" data-cok>확인</button>
         </div>
       </div>`;
-    cb.addEventListener("click", e => { if (e.target === cb) cb.remove(); });
+    // Input/selection/confirmation modal: backdrop clicks do not dismiss.
     cb.querySelector("[data-cclose]").onclick = () => cb.remove();
     cb.querySelector("[data-cok]").onclick = () => { cb.remove(); onOk(); };
     document.body.appendChild(cb);
@@ -288,7 +288,7 @@
           <button class="btn danger" data-cok disabled>삭제</button>
         </div>
       </div>`;
-    cb.addEventListener("click", e => { if (e.target === cb) cb.remove(); });
+    // Input/selection/confirmation modal: backdrop clicks do not dismiss.
     cb.querySelector("[data-cclose]").onclick = () => cb.remove();
     const input = cb.querySelector("[data-del-input]");
     const okBtn = cb.querySelector("[data-cok]");
@@ -437,7 +437,7 @@
       d: `${x.since} 09:00`, script: "배정 관리: 신규 배정", target: x, before: "", after: window.fmtDate(x.since), who: "dana",
     }));
     (a.stocks || []).forEach(x => ev.push({
-      d: `${a.purchaseDate || "2025-01-01"} 09:00`, script: "보유 관리: 보유 대상 추가", target: x, before: "", after: `${x.qty}개`, who: "dana",
+      d: `${a.purchaseDate || "2025-01-01"} 09:00`, script: "보유 관리: 보유 대상 추가", target: x, before: "", after: `${window.AssetQuantity.format(x.qty)}개`, who: "dana",
     }));
     if (a.status === "repair") ev.push({ d: "2026-08-14 09:00", script: "상태 변경: 수리/점검 접수", before: "배정 중", after: "수리/점검 중", who: "dana" });
     if (a.status === "lost") ev.push({ d: "2026-07-21 09:00", script: "상태 변경: 분실 신고", before: "배정 중", after: "분실", who: "정우성" });
@@ -558,7 +558,7 @@
         ${typeBadge(x)}
         <div class="acard-id">${assignIdentity(x)}</div>
         <div class="acard-foot">
-          <span class="acard-date">보유 수량 <b class="qty">${x.qty}개</b></span>
+          <span class="acard-date">보유 수량 <b class="qty">${window.AssetQuantity.format(x.qty)}개</b></span>
           <div class="acard-actions">
             <button class="btn sm" data-qtyedit>수량 변경</button>
             <button class="btn sm" data-qtydeduct ${x.qty <= 0 ? "disabled" : ""}>수량 차감</button>
@@ -579,7 +579,7 @@
     const decreaseOnly = status === (kind === "employee" ? "retired" : "inactive");
     const otherSum = a.stocks.reduce((sum, stock, i) => i === idx ? sum : sum + stock.qty, 0);
     const available = a.totalQty - otherSum;
-    return { max: decreaseOnly ? Math.min(record.qty, available) : available, decreaseOnly };
+    return { max: decreaseOnly ? Math.min(record.qty, available, window.AssetQuantity.MAX) : Math.min(available, window.AssetQuantity.MAX), decreaseOnly };
   }
   function openQtyPopover(anchor, a, idx) {
     document.querySelectorAll(".qty-popover").forEach(m => m.remove());
@@ -594,7 +594,7 @@
         <input type="text" inputmode="numeric" data-qinput placeholder="입력" value="${cur}">
         <button type="button" class="qty-step" data-qplus aria-label="수량 증가">＋</button>
       </div>
-      <div class="qty-pop-remain">${decreaseOnly ? `변경 가능 수량: 0~${max}개` : `잔여 수량: ${max}개`}</div>
+      <div class="qty-pop-remain">${decreaseOnly ? `변경 가능 수량: 0~${window.AssetQuantity.format(max)}개` : `잔여 수량: ${window.AssetQuantity.format(max)}개`}</div>
       <div class="qty-pop-help">보유 수량을 변경하면 잔여 수량도 변경됩니다.</div>
       <div class="qty-pop-acts">
         <button class="btn sm" data-qcancel>취소</button>
@@ -608,7 +608,7 @@
     const minus = pop.querySelector("[data-qminus]");
     const plus = pop.querySelector("[data-qplus]");
     const save = pop.querySelector("[data-qsave]");
-    const val = () => { const n = parseInt(input.value, 10); return Number.isFinite(n) ? n : null; };
+    const val = () => { const n = window.AssetQuantity.parse(input.value); return Number.isFinite(n) ? n : null; };
     const sync = () => {
       const v = val();
       minus.disabled = v === null || v <= 0;
@@ -629,7 +629,7 @@
       confirmModal("수량을 변경하시겠습니까?", () => {
         a.stocks[idx].qty = v;
         deriveQtyStatus(a);
-        logActivity(a, { script: "보유 관리: 보유 수량 변경", target: x, before: `${cur}개`, after: `${v}개` });
+        logActivity(a, { script: "보유 관리: 보유 수량 변경", target: x, before: `${window.AssetQuantity.format(cur)}개`, after: `${window.AssetQuantity.format(v)}개` });
         toast("수량이 변경되었습니다.");
         render();
       });
@@ -669,7 +669,7 @@
     const error = pop.querySelector("[data-deduct-error]");
     let accepted = "";
     const currentQty = () => a.stocks[idx] ? a.stocks[idx].qty : 0;
-    const value = () => input.value ? Number(input.value) : null;
+    const value = () => input.value ? window.AssetQuantity.parse(input.value) : null;
     const clearStaleError = () => { input.classList.remove("is-error"); error.hidden = true; };
     const sync = () => {
       const v = value();
@@ -691,33 +691,32 @@
       if (!canManageAssets()) return;
       const amount = value();
       const latest = currentQty();
-      held.textContent = `보유 수량: ${latest}개`;
+      held.textContent = `보유 수량: ${window.AssetQuantity.format(latest)}개`;
       // 화면을 연 뒤 다른 변경으로 보유 수량이 줄었다면 값은 보존하고 최신 상한 오류만 이 시점에 표시한다.
       if (!(amount >= 1 && amount <= latest)) {
-        input.classList.add("is-error"); error.hidden = false; save.disabled = true; return;
+        error.hidden = true; sync(); toast("현재 보유 수량 이하로 입력해 주세요."); return;
       }
       const record = a.stocks[idx];
-      const beforeHeld = record.qty;
-      const beforeTotal = a.totalQty;
-      pop.remove();
       confirmModal("수량을 변경하시겠습니까?", () => {
+        if (!canManageAssets() || !a.stocks.includes(record) || amount > record.qty) {
+          held.textContent = `보유 수량: ${window.AssetQuantity.format(currentQty())}개`;
+          sync(); toast("현재 보유 수량 이하로 입력해 주세요."); return;
+        }
+        const beforeHeld = record.qty, beforeTotal = a.totalQty;
+        pop.remove();
         record.qty = beforeHeld - amount;
         a.totalQty = beforeTotal - amount;
         deriveQtyStatus(a);
         logActivity(a, {
           script: "보유 관리: 보유 수량 차감", target: record,
-          before: `보유 수량 ${beforeHeld}개 · 전체 수량 ${beforeTotal}개`,
-          after: `보유 수량 ${record.qty}개 · 전체 수량 ${a.totalQty}개`,
+          before: `보유 수량 ${window.AssetQuantity.format(beforeHeld)}개 · 전체 수량 ${window.AssetQuantity.format(beforeTotal)}개`,
+          after: `보유 수량 ${window.AssetQuantity.format(record.qty)}개 · 전체 수량 ${window.AssetQuantity.format(a.totalQty)}개`,
         });
         toast("수량이 변경되었습니다."); render();
       });
     };
     pop.querySelector("[data-qcancel]").onclick = () => pop.remove();
     input.focus();
-    setTimeout(() => {
-      const close = e => { if (!pop.contains(e.target) && e.target !== anchor) { pop.remove(); document.removeEventListener("click", close); } };
-      document.addEventListener("click", close);
-    });
   }
   function wireStockCards(scope, a) {
     scope.querySelectorAll("[data-release]").forEach(b => b.onclick = () => {
@@ -728,7 +727,7 @@
         const qty = x.qty;
         a.stocks.splice(idx, 1);
         deriveQtyStatus(a);
-        logActivity(a, { script: "보유 관리: 보유 대상 해제", target: x, before: `${qty}개`, after: "" });
+        logActivity(a, { script: "보유 관리: 보유 대상 해제", target: x, before: `${window.AssetQuantity.format(qty)}개`, after: "" });
         toast("보유 대상에서 해제되었습니다.");
         render();
       });
@@ -953,7 +952,7 @@
       if (picked || Object.values(draftTarget).some(Boolean) || dateText.trim()) confirmWriteExit(() => back.remove());
       else back.remove();
     };
-    back.addEventListener("click", e => { if (e.target === back) requestClose(); });
+    // Input/selection/confirmation modal: backdrop clicks do not dismiss.
     back.querySelector("[data-close]").onclick = requestClose;
     saveBtn.onclick = () => {
       if (saveBtn.disabled) return;
@@ -1057,7 +1056,7 @@
       if (picked || Object.values(draftTarget).some(Boolean) || dateText.trim()) confirmWriteExit(() => back.remove());
       else back.remove();
     };
-    back.addEventListener("click", e => { if (e.target === back) requestClose(); });
+    // Input/selection/confirmation modal: backdrop clicks do not dismiss.
     back.querySelector("[data-close]").onclick = requestClose;
     saveBtn.onclick = () => {
       if (saveBtn.disabled) return;
@@ -1118,7 +1117,7 @@
         </div>`;
     }
 
-    function qtyVal() { const n = parseInt(qtyText, 10); return Number.isFinite(n) ? n : null; }
+    function qtyVal() { const n = window.AssetQuantity.parse(qtyText); return Number.isFinite(n) ? n : null; }
     function updateSaveState() {
       const v = qtyVal();
       saveBtn.disabled = !(picked && draftTarget[picked] && v !== null && v >= 1 && v <= remaining);
@@ -1140,7 +1139,7 @@
             <input type="text" inputmode="numeric" data-qinput placeholder="입력" value="">
             <button type="button" class="qty-step" data-qplus aria-label="수량 증가">＋</button>
           </div>
-          <div class="acard-sub" style="margin-top:5px">잔여 수량 <b>${remaining}개</b></div>
+          <div class="acard-sub" style="margin-top:5px">잔여 수량 <b>${window.AssetQuantity.format(remaining)}개</b></div>
         </div>`;
       const qinput = body.querySelector("[data-qinput]");
       if (qtyText) qinput.value = qtyText;
@@ -1156,7 +1155,7 @@
 
       const minus = body.querySelector("[data-qminus]");
       const plus = body.querySelector("[data-qplus]");
-      const val = () => { const n = parseInt(qinput.value, 10); return Number.isFinite(n) ? n : null; };
+      const val = () => { const n = window.AssetQuantity.parse(qinput.value); return Number.isFinite(n) ? n : null; };
       const syncQty = () => {
         const v = val();
         minus.disabled = v === null || v <= 1;
@@ -1176,7 +1175,7 @@
       if (picked || Object.values(draftTarget).some(Boolean) || qtyText.trim()) confirmWriteExit(() => back.remove());
       else back.remove();
     };
-    back.addEventListener("click", e => { if (e.target === back) requestClose(); });
+    // Input/selection/confirmation modal: backdrop clicks do not dismiss.
     back.querySelector("[data-close]").onclick = requestClose;
     saveBtn.onclick = () => {
       if (saveBtn.disabled) return;
@@ -1188,7 +1187,7 @@
         back.remove();
         (a.stocks || (a.stocks = [])).push(record);
         deriveQtyStatus(a);
-        logActivity(a, { script: "보유 관리: 보유 대상 추가", target: record, before: "", after: `${v}개` });
+        logActivity(a, { script: "보유 관리: 보유 대상 추가", target: record, before: "", after: `${window.AssetQuantity.format(v)}개` });
         toast("추가되었습니다.");
         render();
       });
@@ -1450,7 +1449,7 @@
     const subMeta = `<div>${statusBadge}</div>${
       isIndiv && a.assetNo ? `<div style="margin-top:5px">고유관리번호 <b>${a.assetNo}</b></div>` : ""
     }${
-      !isIndiv ? `<div style="margin-top:5px">전체 <b>${a.totalQty}개</b> · 보유 <b>${heldQty}개</b> · 잔여 <b>${a.totalQty - heldQty}개</b></div>` : ""
+      !isIndiv ? `<div style="margin-top:5px">전체 <b>${window.AssetQuantity.format(a.totalQty)}개</b> · 보유 <b>${heldQty}개</b> · 잔여 <b>${a.totalQty - heldQty}개</b></div>` : ""
     }`;
 
     const QR_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM19 14h2v2h-2zM14 19h2v2h-2zM19 19h2v2h-2z"/></svg>`;

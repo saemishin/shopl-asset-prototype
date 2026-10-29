@@ -525,7 +525,7 @@
           <div class="modal-info-box">${headerHtml}</div>
           <div>${groupsHtml}</div>
         </div>
-      </div>`);
+      </div>`, { closeOnBackdrop: true });
     back.querySelectorAll(".assign-group-label").forEach(btn => btn.onclick = () => {
       const body = btn.nextElementSibling;
       const chevron = btn.querySelector(".assign-chevron");
@@ -2352,7 +2352,7 @@
   }
 
   /* ---------- other modals ---------- */
-  function modal(html, { closeOnBackdrop = true } = {}) {
+  function modal(html, { closeOnBackdrop = false } = {}) {
     const back = document.createElement("div");
     back.className = "modal-back";
     back.innerHTML = html;

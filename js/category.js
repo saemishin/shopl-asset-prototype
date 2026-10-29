@@ -35,7 +35,7 @@
           <button class="btn primary" data-cok>확인</button>
         </div>
       </div>`;
-    cb.addEventListener("click", e => { if (e.target === cb) cb.remove(); });
+    // Input/selection/confirmation modal: backdrop clicks do not dismiss.
     cb.querySelector("[data-cclose]").onclick = () => cb.remove();
     cb.querySelector("[data-cok]").onclick = () => { cb.remove(); onOk(); };
     document.body.appendChild(cb);
@@ -829,7 +829,7 @@
       siblingNames: categories.filter(c => c.group === cat.group && c.sub !== cat.sub).map(c => c.sub),
       onNameChange: valid => { saveBtn.disabled = !valid; },
     });
-    back.addEventListener("click", e => { if (e.target === back) back.remove(); });
+    // Input/selection/confirmation modal: backdrop clicks do not dismiss.
     back.querySelector("[data-cancel]").onclick = () => back.remove();
     saveBtn.onclick = () => {
       const name = state.name.trim();

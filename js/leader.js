@@ -99,7 +99,7 @@
       }
     }
     back.querySelectorAll("[data-plan-dialog-action]").forEach(button => button.onclick = () => { close(); const action = actions[Number(button.dataset.planDialogAction)]; if (action.run) action.run(); });
-    back.onclick = event => { if (event.target === back) close(); };
+    // Input/selection/confirmation modal: backdrop clicks do not dismiss.
     document.addEventListener("keydown", onKey);
     document.body.appendChild(back);
     back.querySelector("button").focus();
@@ -264,7 +264,7 @@
       ok.disabled = !selected;
     }
     drawMonths();
-    back.addEventListener("click", event => { if (event.target === back) back.remove(); });
+    // Input/selection/confirmation modal: backdrop clicks do not dismiss.
     back.querySelector("[data-add-month-cancel]").onclick = () => back.remove();
     const reset = back.querySelector("[data-add-date-reset]");
     if (reset) reset.onclick = () => { back.remove(); onApply(""); };
@@ -378,7 +378,7 @@
         <div class="mapp-card-body">
           <div class="mapp-card-title">${a.product}</div>
         </div>
-        <span class="badge stock">${x.qty}개</span>
+        <span class="badge stock">${window.AssetQuantity.format(x.qty)}개</span>
       </div>`;
   }
 
@@ -416,7 +416,7 @@
     document.body.appendChild(cb);
     cb.querySelector("[data-add-stay]").onclick = () => cb.remove();
     cb.querySelector("[data-add-leave]").onclick = () => { cb.remove(); onLeave(); };
-    cb.onclick = event => { if (event.target === cb) cb.remove(); };
+    // Input/selection/confirmation modal: backdrop clicks do not dismiss.
   }
   function addCategory(draft) {
     const [group, sub] = (draft.category || "").split("|");
@@ -460,9 +460,9 @@
     if (draft.editingId) {
       const asset = assets.find(a => a.id === draft.editingId);
       if (!asset || !hasAssetManagePermission() || asset.status === "disposed" || asset.type !== cat.type) return false;
-      if (cat.type === "quantity" && Number(draft.totalQty) < (asset.stocks || []).reduce((sum,x) => sum + x.qty,0)) return false;
+      if (cat.type === "quantity" && window.AssetQuantity.parse(draft.totalQty) < (asset.stocks || []).reduce((sum,x) => sum + x.qty,0)) return false;
     }
-    if (cat.type === "quantity") return /^(0|[1-9][0-9]*)$/.test(draft.totalQty);
+    if (cat.type === "quantity") return window.AssetQuantity.parse(draft.totalQty) !== null;
     const assetNo = draft.assetNo.trim();
     return (!draft.editingId || !!assetNo) && (draft.editingId ? !assets.some(a => !a.deleted_at && a.id !== draft.editingId && a.assetNo === assetNo) : !draft.assetNoDupValue);
   }
@@ -518,8 +518,8 @@
         </div>
         ${addProductFieldHtml(draft)}
         ${cat ? `
-          <div class="mapp-add-field"><label>사진</label><div class="mapp-add-photos">${photoTiles}${draft.photos.length < window.ASSET_PHOTO_MAX_COUNT ? '<button type="button" class="mapp-add-photo-plus" data-add-photo aria-label="사진 추가">+</button>' : ""}</div></div>
-          ${cat.type === "individual" ? addInputHtml("고유관리번호", "assetNo", draft, { required: !!draft.editingId, hint: draft.editingId ? "" : window.ASSET_NUMBER_GUIDE, maxlength: 30, error: "동일한 고유관리번호가 존재합니다." }) : addInputHtml("전체 수량", "totalQty", draft, { required: true, inputmode: "numeric", maxlength: 6 })}${draft.editingId && cat.type === "quantity" ? '<p class="field-err" data-edit-qty-error hidden>배분 수량보다 적게 입력할 수 없습니다.</p>' : ""}
+          <div class="mapp-add-field"><label>사진</label><div class="mapp-add-photos">${photoTiles}<button type="button" class="mapp-add-photo-plus" data-add-photo aria-label="사진 추가">+</button></div></div>
+          ${cat.type === "individual" ? addInputHtml("고유관리번호", "assetNo", draft, { required: !!draft.editingId, hint: draft.editingId ? "" : window.ASSET_NUMBER_GUIDE, maxlength: 30, error: "동일한 고유관리번호가 존재합니다." }) : addInputHtml("전체 수량", "totalQty", draft, { required: true, inputmode: "numeric", maxlength: 9 })}${draft.editingId && cat.type === "quantity" ? '<p class="field-err" data-edit-qty-error hidden>배분 수량보다 적게 입력할 수 없습니다.</p>' : ""}
           ${!hidden.includes("expiry") ? addExpiryFieldHtml(draft) : ""}
           <div class="mapp-add-field"><div class="mapp-add-field-label"><label>태그</label><button type="button" data-add-tag-manage>태그 관리</button></div><p class="hint mapp-add-tag-hint">최대 10개까지 선택할 수 있습니다.</p>
             <div class="mapp-add-tag-picker"><div class="tag-input-wrap"><div class="tag-chips" data-add-tag-chips>${addTagChipsHtml(draft.labels)}</div><input type="text" data-add-tag-search placeholder="${draft.labels.length ? "" : "검색"}" autocomplete="off"${draft.labels.length >= window.ASSET_TAG_MAX_COUNT ? " disabled" : ""}></div><div class="mapp-add-suggest" data-add-tag-menu hidden></div></div></div>
@@ -604,7 +604,7 @@
     document.body.appendChild(cb);
     cb.querySelector("[data-ai-stay]").onclick = () => cb.remove();
     cb.querySelector("[data-ai-leave]").onclick = () => { cb.remove(); onLeave(); };
-    cb.onclick = event => { if (event.target === cb) cb.remove(); };
+    // Input/selection/confirmation modal: backdrop clicks do not dismiss.
   }
   function openMobileAiInput(draft, onApplied, onChooseCategory) {
     const back = mappOverlay("mapp-ai-back", 130);
@@ -698,7 +698,7 @@
     renderPhotos();
     analyze.onclick = renderLoading;
     back.querySelector("[data-ai-close]").onclick = requestClose;
-    back.onclick = event => { if (event.target === back) requestClose(); };
+    // Input/selection/confirmation modal: backdrop clicks do not dismiss.
   }
 
   // 메뉴 화면 — 실 앱 스크린샷 참고(직원모드와 달리 "비용" 섹션 없음, 맨 위에 "승인" 섹션 추가, 관리
@@ -788,7 +788,7 @@
       <div class="mapp-directory-search"><input type="search" data-directory-search placeholder="${searchPlaceholder}" aria-label="자산 검색" value="${directoryEsc(state.directorySearch || "")}"><button type="button" data-directory-search-clear aria-label="검색어 지우기"${state.directorySearch ? "" : " hidden"}>×</button></div></div>
       <div class="mapp-directory-asset-list">${items.map(x => {
         const a = x.asset, status = STATUS_LABEL[a.status] || [a.status, ""];
-        return `<button type="button" class="mapp-directory-asset-row" data-directory-asset="${directoryEsc(a.id)}"><span><strong>${directoryEsc(a.product)}</strong>${a.type === "individual" ? `<small>${directoryEsc(a.assetNo || "—")}</small>` : ""}${kind === "member" ? `<small class="mapp-directory-asset-category">${directoryEsc(a.group)} › ${directoryEsc(a.sub)}</small>` : ""}</span><span class="badge ${a.type === "individual" ? status[1] : "stock"}">${a.type === "individual" ? status[0] : `${x.qty}개`}</span></button>`;
+        return `<button type="button" class="mapp-directory-asset-row" data-directory-asset="${directoryEsc(a.id)}"><span><strong>${directoryEsc(a.product)}</strong>${a.type === "individual" ? `<small>${directoryEsc(a.assetNo || "—")}</small>` : ""}${kind === "member" ? `<small class="mapp-directory-asset-category">${directoryEsc(a.group)} › ${directoryEsc(a.sub)}</small>` : ""}</span><span class="badge ${a.type === "individual" ? status[1] : "stock"}">${a.type === "individual" ? status[0] : `${window.AssetQuantity.format(x.qty)}개`}</span></button>`;
       }).join("")}</div>
       <p class="mapp-directory-empty" data-directory-search-empty hidden>결과가 없습니다.</p>`;
   }
@@ -1029,7 +1029,7 @@
   }
   function draftSnapshot(draft) {
     return JSON.stringify({ category: draft.category, product: draft.product.trim(), assetNo: draft.assetNo.trim(),
-      totalQty: Number(draft.totalQty), photos: draft.photos, primaryPhoto: draft.primaryPhoto, expiry: parseAddExpiry(draft.expiry) ?? draft.expiry.trim(),
+      totalQty: window.AssetQuantity.parse(draft.totalQty), photos: draft.photos, primaryPhoto: draft.primaryPhoto, expiry: parseAddExpiry(draft.expiry) ?? draft.expiry.trim(),
       labels: [...draft.labels].sort(), serial: draft.serial.trim(), imei: draft.imei.trim(), manufactured: draft.manufactured,
       purchaseDate: draft.purchaseDate, purchasePrice: window.normalizePurchasePrice(draft.purchasePrice), note: draft.note.trim() });
   }
@@ -1054,7 +1054,7 @@
     if (a.type === "individual") {
       set("assetNo", draft.assetNo.trim(), "고유관리번호 수정");
       set("serial", draft.serial.trim() || undefined, "S/N 수정"); set("imei", draft.imei.trim() || undefined, "IMEI 수정");
-    } else set("totalQty", Number(draft.totalQty), "전체 수량 변경", v => `${v}개`);
+    } else set("totalQty", window.AssetQuantity.parse(draft.totalQty), "전체 수량 변경", v => `${window.AssetQuantity.format(v)}개`);
     if (JSON.stringify(a.labels || []) !== JSON.stringify(draft.labels)) {
       pending.push({ script: "자산 정보 수정: 태그 수정", before: (a.labels || []).join(", "), after: draft.labels.join(", ") });
       a.labels = [...draft.labels];
@@ -1155,7 +1155,7 @@
           <button class="btn ${danger ? "danger" : "primary"}" data-cok>확인</button>
         </div>
       </div>`;
-    cb.addEventListener("click", e => { if (e.target === cb) cb.remove(); });
+    // Input/selection/confirmation modal: backdrop clicks do not dismiss.
     cb.querySelector("[data-cclose]").onclick = () => cb.remove();
     cb.querySelector("[data-cok]").onclick = () => { cb.remove(); onOk(); };
     document.body.appendChild(cb);
@@ -1185,7 +1185,7 @@
           <button class="btn danger" data-cok disabled>확인</button>
         </div>
       </div>`;
-    cb.addEventListener("click", e => { if (e.target === cb) cb.remove(); });
+    // Input/selection/confirmation modal: backdrop clicks do not dismiss.
     cb.querySelector("[data-cclose]").onclick = () => cb.remove();
     const input = cb.querySelector("[data-del-input]");
     const okBtn = cb.querySelector("[data-cok]");
@@ -1214,7 +1214,7 @@
       d: `${x.since} 09:00`, script: "배정 관리: 신규 배정", target: { ...x }, before: "", after: window.fmtDate(x.since), who: "dana",
     }));
     (a.stocks || []).forEach(x => ev.push({
-      d: `${a.purchaseDate || "2025-01-01"} 09:00`, script: "보유 관리: 보유 대상 추가", target: { ...x }, before: "", after: `${x.qty}개`, who: "dana",
+      d: `${a.purchaseDate || "2025-01-01"} 09:00`, script: "보유 관리: 보유 대상 추가", target: { ...x }, before: "", after: `${window.AssetQuantity.format(x.qty)}개`, who: "dana",
     }));
     if (a.status === "repair") ev.push({ d: "2026-08-14 09:00", script: "상태 변경: 수리/점검 접수", before: "배정 중", after: "수리/점검 중", who: "dana" });
     if (a.status === "lost") ev.push({ d: "2026-07-21 09:00", script: "상태 변경: 분실 신고", before: "배정 중", after: "분실", who: "정우성" });
@@ -1436,7 +1436,7 @@
       okBtn.disabled = !selected;
     }
     drawCal();
-    back.addEventListener("click", e => { if (e.target === back) back.remove(); });
+    // Input/selection/confirmation modal: backdrop clicks do not dismiss.
     back.querySelector("[data-cal-cancel]").onclick = () => back.remove();
     const calReset = back.querySelector("[data-cal-reset]");
     if (calReset) calReset.onclick = () => { back.remove(); onApply(""); };
@@ -1473,7 +1473,7 @@
       </div>`;
     const body = back.querySelector("[data-form-body]");
     const saveBtn = back.querySelector("[data-form-save]");
-    const qtyVal = () => { const n = parseInt(f.qtyText, 10); return Number.isFinite(n) ? n : null; };
+    const qtyVal = () => { const n = window.AssetQuantity.parse(f.qtyText); return Number.isFinite(n) ? n : null; };
     const targetSummaryHtml = k => {
       const val = f.draft[k];
       if (!val) return `<button type="button" class="perm-target-btn" data-target-open><span class="muted">선택</span><span class="chev">›</span></button>`;
@@ -1523,7 +1523,7 @@
               <input type="text" inputmode="numeric" data-qinput placeholder="입력" value="">
               <button type="button" class="qty-step" data-qplus aria-label="수량 증가">＋</button>
             </div>
-            <div class="acard-sub" style="margin-top:5px">잔여 수량 <b>${remaining}개</b></div>
+            <div class="acard-sub" style="margin-top:5px">잔여 수량 <b>${window.AssetQuantity.format(remaining)}개</b></div>
           </div>` : `
           <div class="field">
             <label>${kind === "reassign" ? "새 배정일" : "배정일"}</label>
@@ -1568,7 +1568,7 @@
       if (f.picked || Object.values(f.draft).some(Boolean) || f.dateIso || f.qtyText) confirmAddExit(() => back.remove());
       else back.remove();
     };
-    back.addEventListener("click", e => { if (e.target === back) requestClose(); });
+    // Input/selection/confirmation modal: backdrop clicks do not dismiss.
     back.querySelector("[data-form-back]").onclick = requestClose;
     saveBtn.onclick = () => {
       if (saveBtn.disabled) return;
@@ -1608,7 +1608,7 @@
           back.remove();
           (a.stocks || (a.stocks = [])).push(record);
           a.status = derivedHeldStatus(a);
-          logActivity(a, { script: "보유 관리: 보유 대상 추가", target: record, before: "", after: `${v}개` });
+          logActivity(a, { script: "보유 관리: 보유 대상 추가", target: record, before: "", after: `${window.AssetQuantity.format(v)}개` });
           toast("추가되었습니다.");
           afterMutate();
         });
@@ -1636,7 +1636,7 @@
     const decreaseOnly = status === (kind === "employee" ? "retired" : "inactive");
     const otherSum = a.stocks.reduce((sum, stock, i) => i === idx ? sum : sum + stock.qty, 0);
     const available = a.totalQty - otherSum;
-    return { max: decreaseOnly ? Math.min(record.qty, available) : available, decreaseOnly };
+    return { max: decreaseOnly ? Math.min(record.qty, available, window.AssetQuantity.MAX) : Math.min(available, window.AssetQuantity.MAX), decreaseOnly };
   }
   function openQtyChangeModal(a, idx, onDone) {
     const rec = a.stocks[idx];
@@ -1653,7 +1653,7 @@
             <input type="text" inputmode="numeric" data-qinput placeholder="입력" value="${cur}">
             <button type="button" class="qty-step" data-qplus aria-label="수량 증가">＋</button>
           </div>
-          <p class="hint" style="margin-top:6px">${decreaseOnly ? `변경 가능 수량: 0~${max}개` : `잔여 수량: ${max}개`}</p>
+          <p class="hint" style="margin-top:6px">${decreaseOnly ? `변경 가능 수량: 0~${window.AssetQuantity.format(max)}개` : `잔여 수량: ${window.AssetQuantity.format(max)}개`}</p>
           <p class="hint" style="margin-top:6px">보유 수량을 변경하면 잔여 수량도 변경됩니다.</p>
         </div>
         <div class="foot">
@@ -1666,7 +1666,7 @@
     const minus = back.querySelector("[data-qminus]");
     const plus = back.querySelector("[data-qplus]");
     const saveBtn = back.querySelector("[data-cok]");
-    const val = () => { const n = parseInt(input.value, 10); return Number.isFinite(n) ? n : null; };
+    const val = () => { const n = window.AssetQuantity.parse(input.value); return Number.isFinite(n) ? n : null; };
     const sync = () => {
       const v = val();
       minus.disabled = v === null || v <= 0;
@@ -1676,7 +1676,7 @@
     input.addEventListener("input", () => { input.value = input.value.replace(/[^0-9]/g, ""); sync(); });
     minus.onclick = () => { const v = val(); if (v !== null && v > 0) { input.value = v - 1; sync(); } };
     plus.onclick = () => { const v = val() ?? 0; if (v < max) { input.value = v + 1; sync(); } };
-    back.addEventListener("click", e => { if (e.target === back) back.remove(); });
+    // Input/selection/confirmation modal: backdrop clicks do not dismiss.
     back.querySelector("[data-cclose]").onclick = () => back.remove();
     saveBtn.onclick = () => {
       const qty = val();
@@ -1686,7 +1686,7 @@
       confirmModal("수량을 변경하시겠습니까?", "", () => {
         rec.qty = qty;
         a.status = derivedHeldStatus(a);
-        logActivity(a, { script: "보유 관리: 보유 수량 변경", target: rec, before: `${cur}개`, after: `${qty}개` });
+        logActivity(a, { script: "보유 관리: 보유 수량 변경", target: rec, before: `${window.AssetQuantity.format(cur)}개`, after: `${window.AssetQuantity.format(qty)}개` });
         toast("수량이 변경되었습니다.");
         onDone();
       });
@@ -1704,7 +1704,7 @@
         <div class="body" style="padding-top:20px">
           <p style="font-size:14px;font-weight:700;margin-bottom:14px">수량 차감</p>
           <div class="mapp-add-field"><label>차감 수량</label><input type="text" inputmode="numeric" data-deduct-input placeholder="입력"></div>
-          <p class="hint" data-held-qty style="margin-top:8px">보유 수량: ${rec.qty}개</p>
+          <p class="hint" data-held-qty style="margin-top:8px">보유 수량: ${window.AssetQuantity.format(rec.qty)}개</p>
           <p class="hint" style="margin-top:6px">차감한 수량만큼 전체 수량도 함께 줄어듭니다.</p>
           <p class="field-err" data-deduct-error hidden>현재 보유 수량 이하로 입력해 주세요.</p>
         </div>
@@ -1717,7 +1717,7 @@
     const save = back.querySelector("[data-cok]");
     let accepted = "";
     const currentQty = () => a.stocks[idx] ? a.stocks[idx].qty : 0;
-    const value = () => input.value ? Number(input.value) : null;
+    const value = () => input.value ? window.AssetQuantity.parse(input.value) : null;
     const sync = () => { const v = value(); save.disabled = v === null || v < 1 || v > currentQty(); };
     input.addEventListener("beforeinput", e => {
       if (e.inputType === "insertText" && e.data && !/^[0-9]+$/.test(e.data)) e.preventDefault();
@@ -1731,27 +1731,31 @@
       else input.value = accepted;
       input.classList.remove("is-error"); error.hidden = true; sync();
     });
-    back.addEventListener("click", e => { if (e.target === back) back.remove(); });
+    // Input/selection/confirmation modal: backdrop clicks do not dismiss.
     back.querySelector("[data-cclose]").onclick = () => back.remove();
     save.onclick = () => {
       if (!canManage(a)) return;
       const amount = value();
       const latest = currentQty();
-      held.textContent = `보유 수량: ${latest}개`;
+      held.textContent = `보유 수량: ${window.AssetQuantity.format(latest)}개`;
       if (!(amount >= 1 && amount <= latest)) {
-        input.classList.add("is-error"); error.hidden = false; save.disabled = true; return;
+        error.hidden = true; sync(); toast("현재 보유 수량 이하로 입력해 주세요."); return;
       }
-      const beforeHeld = rec.qty;
-      const beforeTotal = a.totalQty;
-      back.remove();
+      // Keep the quantity editor mounted until the final confirmation succeeds.
       confirmModal("수량을 변경하시겠습니까?", "", () => {
+        if (!canManage(a) || !a.stocks.includes(rec) || amount > rec.qty) {
+          back.style.display = ""; held.textContent = `보유 수량: ${window.AssetQuantity.format(currentQty())}개`;
+          sync(); toast("현재 보유 수량 이하로 입력해 주세요."); return;
+        }
+        const beforeHeld = rec.qty, beforeTotal = a.totalQty;
+        back.remove();
         rec.qty = beforeHeld - amount;
         a.totalQty = beforeTotal - amount;
         a.status = derivedHeldStatus(a);
         logActivity(a, {
           script: "보유 관리: 보유 수량 차감", target: rec,
-          before: `보유 수량 ${beforeHeld}개 · 전체 수량 ${beforeTotal}개`,
-          after: `보유 수량 ${rec.qty}개 · 전체 수량 ${a.totalQty}개`,
+          before: `보유 수량 ${window.AssetQuantity.format(beforeHeld)}개 · 전체 수량 ${window.AssetQuantity.format(beforeTotal)}개`,
+          after: `보유 수량 ${window.AssetQuantity.format(rec.qty)}개 · 전체 수량 ${window.AssetQuantity.format(a.totalQty)}개`,
         });
         toast("수량이 변경되었습니다."); onDone();
       });
@@ -1764,7 +1768,7 @@
       const qty = x.qty;
       a.stocks.splice(idx, 1);
       a.status = derivedHeldStatus(a);
-      logActivity(a, { script: "보유 관리: 보유 대상 해제", target: { ...x }, before: `${qty}개`, after: "" });
+      logActivity(a, { script: "보유 관리: 보유 대상 해제", target: { ...x }, before: `${window.AssetQuantity.format(qty)}개`, after: "" });
       toast("보유 대상에서 해제되었습니다.");
       onDone();
     });
@@ -1802,7 +1806,7 @@
           ${i === primaryIdx ? '<span class="areg-photo-star">★</span>' : ""}
           <span class="areg-photo-del" data-photo-del="${i}" aria-label="삭제">${CLOSE_ICON_SM}</span>
         </button>`).join("");
-      const addTile = photos.length < window.ASSET_PHOTO_MAX_COUNT ? `<button type="button" class="areg-photo-add" data-photo-add aria-label="사진 추가">+</button>` : "";
+      const addTile = `<button type="button" class="areg-photo-add" data-photo-add aria-label="사진 추가">+</button>`;
       row.innerHTML = tiles + addTile;
       row.querySelectorAll("[data-photo-i]").forEach(b => b.onclick = e => {
         if (e.target.closest("[data-photo-del]")) return;
@@ -1821,6 +1825,7 @@
       });
       const addBtn = row.querySelector("[data-photo-add]");
       if (addBtn) addBtn.onclick = () => {
+        if (photos.length >= window.ASSET_PHOTO_MAX_COUNT) { toast("자산 1개당 사진은 최대 10장까지 첨부할 수 있습니다."); return; }
         openDropdownMenu(addBtn, [
           { key: "camera", label: "카메라로 촬영하기" },
           { key: "gallery", label: "갤러리에서 불러오기" },
@@ -1832,7 +1837,7 @@
       };
     }
     renderPhotos();
-    back.addEventListener("click", e => { if (e.target === back) back.remove(); });
+    // Input/selection/confirmation modal: backdrop clicks do not dismiss.
     back.querySelector("[data-cclose]").onclick = () => back.remove();
     saveBtn.onclick = () => {
       if (saveBtn.disabled) return;
@@ -2014,7 +2019,7 @@
       : others.sort((p, q) => q.qty - p.qty || (p.employee || p.worksite).localeCompare(q.employee || q.worksite, "ko"));
   }
   function scopedPartyRowHtml(record, indiv) {
-    return `<div class="mapp-party-row"><div><div class="mapp-party-name">${esc(record.employee || record.worksite)}</div><div class="mapp-party-kind">${record.employee ? "구성원" : "근무지"}</div></div>${indiv ? `<span class="mapp-party-date">${window.fmtDate(record.since)}</span>` : `<span class="badge stock">${record.qty}개</span>`}</div>`;
+    return `<div class="mapp-party-row"><div><div class="mapp-party-name">${esc(record.employee || record.worksite)}</div><div class="mapp-party-kind">${record.employee ? "구성원" : "근무지"}</div></div>${indiv ? `<span class="mapp-party-date">${window.fmtDate(record.since)}</span>` : `<span class="badge stock">${window.AssetQuantity.format(record.qty)}개</span>`}</div>`;
   }
   function scopedPartiesScreenHtml(a, target) {
     const indiv = a.type === "individual", others = scopedParties(a, target);
@@ -2056,7 +2061,7 @@
         ${target ? `<div class="mapp-directory-context mapp-scoped-context">${esc(target.value)}</div>` : ""}
         <div class="dhead-id"><div class="mapp-hero-wrap"><button type="button" class="mapp-hero-img" data-hero-viewer aria-label="사진 보기"${photos.length ? "" : " disabled"}>${cardThumb(a)}</button>${photos.length > 1 ? `<span class="mapp-hero-count">+${photos.length-1}</span>` : ""}${editable ? `<button type="button" class="mapp-hero-edit" data-hero-edit aria-label="사진 관리">${IC_EDIT}</button>` : ""}</div>
           <div><h1>${esc(a.product)}</h1><div class="dhead-sub">${badge}${indiv ? `<div>고유관리번호 <b>${esc(a.assetNo)}</b></div>` : ""}${target && indiv && current ? `<div>배정일 ${window.fmtDate(current.since)}</div>` : ""}</div></div></div>
-        ${!target && !indiv ? `<div class="mapp-leader-qty-summary"><div>전체<strong>${a.totalQty}개</strong></div><div>보유<strong>${distributed}개</strong></div><div>잔여<strong>${a.totalQty-distributed}개</strong></div></div>` : ""}
+        ${!target && !indiv ? `<div class="mapp-leader-qty-summary"><div>전체<strong>${window.AssetQuantity.format(a.totalQty)}개</strong></div><div>보유<strong>${distributed}개</strong></div><div>잔여<strong>${a.totalQty-distributed}개</strong></div></div>` : ""}
         <div class="dsection"><div class="kv2">${kv}</div></div>
         ${target ? scopedPartySectionHtml(a, target) : `<div class="dsection"><div class="mapp-leader-holders-head"><h2>${indiv ? "배정 현황" : "보유 현황"}</h2>${editable ? `<button type="button" class="btn sm" data-holder-add>${indiv ? "배정 추가" : "보유 대상 추가"}</button>` : ""}</div>
           <div class="mapp-count">전체 <b>${(indiv ? a.assignments || [] : a.stocks || []).length}</b></div>
@@ -2073,7 +2078,7 @@
       return x.employee && (x.employee.toLowerCase().includes(q) || !!member && (member.empNo.includes(q) || member.phone.includes(q)));
     }).sort((p,r) => indiv ? r.x.since.localeCompare(p.x.since) : r.x.qty-p.x.qty || (p.x.employee || p.x.worksite).localeCompare(r.x.employee || r.x.worksite,"ko"));
     const pages = Math.max(1,Math.ceil(rows.length/20)), page = Math.min(requestedPage,pages);
-    return { page, html: rows.length ? `<div class="acard-list">${rows.slice((page-1)*20,page*20).map(({x,idx}) => `<div class="acard${canManage(a) ? " has-actions" : ""}">${typeBadge(x)}${canManage(a) ? `<button type="button" class="mapp-holder-more" data-holder-more data-index="${idx}" aria-label="${esc(x.employee || x.worksite)} ${indiv ? "배정" : "보유"} 관리" aria-haspopup="menu" aria-expanded="false">${MORE_ICON}</button>` : ""}<div class="acard-id">${assignIdentity(x)}</div><div class="acard-foot"><span class="acard-date">${indiv ? `배정일 <b>${window.fmtDate(x.since)}</b>` : `보유 수량 <b>${x.qty}개</b>`}</span></div></div>`).join("")}</div>${pages>1 ? `<div class="pager"><button data-holder-page="-1"${page===1 ? " disabled" : ""} aria-label="이전 페이지">‹</button><span>${page} / ${pages}</span><button data-holder-page="1"${page===pages ? " disabled" : ""} aria-label="다음 페이지">›</button></div>` : ""}` : `<p class="muted">${q ? "결과가 없습니다." : indiv ? "배정 대상이 없습니다." : "보유 대상이 없습니다."}</p>` };
+    return { page, html: rows.length ? `<div class="acard-list">${rows.slice((page-1)*20,page*20).map(({x,idx}) => `<div class="acard${canManage(a) ? " has-actions" : ""}">${typeBadge(x)}${canManage(a) ? `<button type="button" class="mapp-holder-more" data-holder-more data-index="${idx}" aria-label="${esc(x.employee || x.worksite)} ${indiv ? "배정" : "보유"} 관리" aria-haspopup="menu" aria-expanded="false">${MORE_ICON}</button>` : ""}<div class="acard-id">${assignIdentity(x)}</div><div class="acard-foot"><span class="acard-date">${indiv ? `배정일 <b>${window.fmtDate(x.since)}</b>` : `보유 수량 <b>${window.AssetQuantity.format(x.qty)}개</b>`}</span></div></div>`).join("")}</div>${pages>1 ? `<div class="pager"><button data-holder-page="-1"${page===1 ? " disabled" : ""} aria-label="이전 페이지">‹</button><span>${page} / ${pages}</span><button data-holder-page="1"${page===pages ? " disabled" : ""} aria-label="다음 페이지">›</button></div>` : ""}` : `<p class="muted">${q ? "결과가 없습니다." : indiv ? "배정 대상이 없습니다." : "보유 대상이 없습니다."}</p>` };
   }
   function openLeaderQr(a) {
     const back = mappOverlay("mapp-sheet-back", 90);
@@ -2107,7 +2112,7 @@
           <button class="btn danger" data-cok disabled>삭제</button>
         </div>
       </div>`;
-    cb.addEventListener("click", e => { if (e.target === cb) cb.remove(); });
+    // Input/selection/confirmation modal: backdrop clicks do not dismiss.
     cb.querySelector("[data-cclose]").onclick = () => cb.remove();
     const input = cb.querySelector("[data-del-input]");
     const okBtn = cb.querySelector("[data-cok]");
@@ -2481,7 +2486,7 @@
           const save = root.querySelector("[data-add-save]");
           if (save) save.disabled = !addDraftValid(draft) || !editDirty(draft);
           const qtyError = root.querySelector("[data-edit-qty-error]");
-          if (qtyError) qtyError.hidden = Number(draft.totalQty) >= (assets.find(a => a.id === draft.editingId).stocks || []).reduce((sum,x) => sum + x.qty,0);
+          if (qtyError) qtyError.hidden = window.AssetQuantity.parse(draft.totalQty) >= (assets.find(a => a.id === draft.editingId).stocks || []).reduce((sum,x) => sum + x.qty,0);
         }
         root.querySelector("[data-add-category]").onclick = () => { syncAddDraft(); state.screen = "asset-add-category"; draw(); };
         const aiInput = root.querySelector("[data-add-ai]");
@@ -2593,6 +2598,7 @@
         });
         const addPhoto = root.querySelector("[data-add-photo]");
         if (addPhoto) addPhoto.onclick = () => {
+          if (draft.photos.length >= window.ASSET_PHOTO_MAX_COUNT) { toast("자산 1개당 사진은 최대 10장까지 첨부할 수 있습니다."); return; }
           syncAddDraft();
           openAddDropdown(addPhoto, [
             { key: "camera", label: "카메라로 촬영하기" },
@@ -2620,7 +2626,7 @@
             group: cat.group, sub: cat.sub, status: "stock", labels: [...draft.labels],
             assignments: cat.type === "individual" ? [] : undefined, stocks: cat.type === "quantity" ? [] : undefined,
           };
-          if (cat.type === "quantity") asset.totalQty = parseInt(draft.totalQty, 10);
+          if (cat.type === "quantity") asset.totalQty = window.AssetQuantity.parse(draft.totalQty);
           const expiry = parseAddExpiry(draft.expiry);
           if (!(cat.hiddenFields || []).includes("expiry") && expiry) asset.expiry = expiry;
           if (cat.type === "individual" && draft.serial.trim()) asset.serial = draft.serial.trim();

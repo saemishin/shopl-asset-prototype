@@ -155,7 +155,7 @@
     });
 
     back.querySelector("[data-tm-cancel]").onclick = () => back.remove();
-    back.addEventListener("click", e => { if (e.target === back) back.remove(); });
+    // Input/selection/confirmation modal: backdrop clicks do not dismiss.
 
     saveBtn.onclick = () => {
       if (!isDirty() || dupNameSet().size > 0 || draft.some(t => !normalizeTagName(t.name))) return;
@@ -244,7 +244,7 @@
 
     searchInput.addEventListener("input", () => { query = searchInput.value; renderList(); });
     back.querySelector("[data-cp-cancel]").onclick = () => back.remove();
-    back.addEventListener("click", e => { if (e.target === back) back.remove(); });
+    // Input/selection/confirmation modal: backdrop clicks do not dismiss.
     back.querySelector("[data-cp-apply]").onclick = () => {
       if (back.querySelector("[data-cp-apply]").disabled) return;
       back.remove();
@@ -326,7 +326,7 @@
     draw();
 
     searchInput.addEventListener("input", () => { query = searchInput.value; draw(); });
-    back.addEventListener("click", e => { if (e.target === back) back.remove(); });
+    // Input/selection/confirmation modal: backdrop clicks do not dismiss.
     back.querySelector("[data-cancel]").onclick = () => back.remove();
     applyBtn.onclick = () => { if (!picked) return; back.remove(); onApply(picked); };
   }
@@ -452,7 +452,7 @@
               ${opts.asset ? "" : `<p class="hint">${window.ASSET_NUMBER_GUIDE}</p>`}
               <p class="field-err" data-assetno-err hidden>동일한 명칭이 존재합니다.</p>
             </div>
-            <div class="field" id="areg-totalqty-field"><label>전체 수량 <span class="req">*</span></label><input type="text" inputmode="numeric" id="areg-totalqty-input" placeholder="입력" maxlength="6"></div>
+            <div class="field" id="areg-totalqty-field"><label>전체 수량 <span class="req">*</span></label><input type="text" inputmode="numeric" id="areg-totalqty-input" placeholder="입력" maxlength="9"></div>
             <div class="field" id="areg-expiry-field"><label>유효기한</label>${dateFieldHtml()}
               <p class="field-err" data-date-err hidden>유효한 날짜가 아닙니다.</p>
             </div>
@@ -484,7 +484,7 @@
           <button type="button" class="btn primary" id="areg-save" disabled>저장</button>
         </div>
       </div>`;
-    back.addEventListener("click", e => { if (e.target === back) requestClose(); });
+    // Input/selection/confirmation modal: backdrop clicks do not dismiss.
     back.querySelectorAll("[data-close]").forEach(b => b.onclick = () => { if (!b.disabled) requestClose(); });
     document.body.appendChild(back);
 
@@ -553,7 +553,7 @@
       const price = window.normalizePurchasePrice(purchasePriceInput.value);
       return {
         category: catValue, name: nameInput.value.trim(), assetNo: assetNoInput.value.trim(),
-        totalQty: totalQtyInput.value ? Number(totalQtyInput.value) : "",
+        totalQty: totalQtyInput.value ? window.AssetQuantity.parse(totalQtyInput.value) : "",
         expiry: dateValue(expiryField, getExpiry), manufactured: dateValue(manufacturedField, getManufactured),
         purchaseDate: dateValue(purchaseDateField, getPurchaseDate), price,
         serial: serialInput.value.trim(), imei: imeiInput.value.trim(), note: noteInput.value.trim(),
@@ -586,7 +586,7 @@
       document.body.appendChild(cb);
       cb.querySelector("[data-register-stay]").onclick = () => cb.remove();
       cb.querySelector("[data-register-leave]").onclick = () => { cb.remove(); back.remove(); };
-      cb.onclick = event => { if (event.target === cb) cb.remove(); };
+      // Input/selection/confirmation modal: backdrop clicks do not dismiss.
     }
     function checkValid() {
       const name = nameInput.value.trim();
@@ -608,7 +608,7 @@
         ? (opts.asset.stocks || []).reduce((sum, stock) => sum + stock.qty, 0)
         : 0;
       const totalQtyOk = type === "quantity"
-        ? /^(0|[1-9][0-9]*)$/.test(totalQtyValue) && Number(totalQtyValue) >= heldQty
+        ? window.AssetQuantity.parse(totalQtyValue) !== null && window.AssetQuantity.parse(totalQtyValue) >= heldQty
         : true;
       const expiryOk = dateFieldValid(expiryField, getExpiry);
       const manufacturedOk = dateFieldValid(manufacturedField, getManufactured);
@@ -894,8 +894,7 @@
           ${i === primaryIdx ? '<span class="areg-photo-star">★</span>' : ""}
           <span class="areg-photo-del" data-photo-del="${i}" aria-label="삭제">${CLOSE_ICON_SM}</span>
         </button>`).join("");
-      const addTile = photos.length < window.ASSET_PHOTO_MAX_COUNT
-        ? `<button type="button" class="areg-photo-add" id="areg-photo-add-btn" aria-label="사진 추가">+</button>` : "";
+      const addTile = `<button type="button" class="areg-photo-add" id="areg-photo-add-btn" aria-label="사진 추가" ${photos.length >= window.ASSET_PHOTO_MAX_COUNT ? "disabled" : ""}>+</button>`;
       photoRow.innerHTML = tiles + addTile;
       photoRow.querySelectorAll("[data-photo-i]").forEach(b => b.onclick = e => {
         if (e.target.closest("[data-photo-del]")) return;
@@ -1051,7 +1050,7 @@
         document.body.appendChild(confirmBack);
         confirmBack.querySelector("[data-ai-stay]").onclick = () => confirmBack.remove();
         confirmBack.querySelector("[data-ai-leave]").onclick = () => { confirmBack.remove(); closeAi(); };
-        confirmBack.onclick = event => { if (event.target === confirmBack) confirmBack.remove(); };
+        // Input/selection/confirmation modal: backdrop clicks do not dismiss.
       }
       function renderAiPhotos() {
         const existingTiles = photos.map((photo, i) => `
@@ -1063,8 +1062,7 @@
             ${analyzing ? "" : `<button type="button" class="areg-ai-photo-del" data-ai-photo-del="${i}" aria-label="새 사진 삭제">${CLOSE_ICON_SM}</button>`}
           </span>`).join("");
         const total = photos.length + newPhotos.length;
-        const add = !analyzing && total < window.ASSET_PHOTO_MAX_COUNT
-          ? '<button type="button" class="areg-photo-add" data-ai-photo-add aria-label="사진 추가">+</button>' : "";
+        const add = `<button type="button" class="areg-photo-add" data-ai-photo-add aria-label="사진 추가" ${analyzing || total >= window.ASSET_PHOTO_MAX_COUNT ? "disabled" : ""}>+</button>`;
         photosEl.innerHTML = existingTiles + newTiles + add;
         analyzeBtn.disabled = total === 0 || analyzing;
         photosEl.querySelectorAll("[data-ai-photo-del]").forEach(button => button.onclick = () => {
@@ -1126,7 +1124,7 @@
       renderInitial();
       analyzeBtn.onclick = renderLoading;
       aiBack.querySelector("[data-ai-cancel]").onclick = requestAiClose;
-      aiBack.addEventListener("click", event => { if (event.target === aiBack) requestAiClose(); });
+      // Input/selection/confirmation modal: backdrop clicks do not dismiss.
     }
 
     const aiInputBtn = back.querySelector("[data-ai-input]");
@@ -1189,7 +1187,7 @@
         };
         setIf("품목명 수정", "product", nameInput.value.trim());
         if (type !== "quantity") setIf("고유관리번호 수정", "assetNo", assetNoInput.value.trim());
-        if (type !== "individual") setIf("전체 수량 변경", "totalQty", parseInt(totalQtyInput.value, 10) || 0, v => `${v}개`);
+        if (type !== "individual") setIf("전체 수량 변경", "totalQty", window.AssetQuantity.parse(totalQtyInput.value) || 0, v => `${window.AssetQuantity.format(v)}개`);
         const newTags = [...tags];
         if (JSON.stringify(newTags) !== JSON.stringify(asset.labels || [])) {
           logChange("태그 수정", (asset.labels || []).join(", "), newTags.join(", "));
@@ -1232,7 +1230,7 @@
         const draft = {
           type, group: cat.group, sub: cat.sub, product: nameInput.value.trim(),
           assetNo: type === "individual" ? assetNoInput.value.trim() : "",
-          totalQty: type === "quantity" ? Number(totalQtyInput.value) : undefined,
+          totalQty: type === "quantity" ? window.AssetQuantity.parse(totalQtyInput.value) : undefined,
           expiry: getExpiry() || undefined, manufactured: getManufactured() || undefined,
           purchaseDate: getPurchaseDate() || undefined,
           serial: type === "individual" ? serialInput.value.trim() || undefined : undefined,

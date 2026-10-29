@@ -555,3 +555,69 @@ window.archiveDeletedAsset = function (asset, actor) {
     document.body.appendChild(back);
   };
 })();
+
+
+// D-20261023-03/04, D-20261026-19: integer quantities use nine digits;
+// commas are presentation only. Imported invalid values stay intact until edited.
+window.AssetQuantity = (() => {
+  const MAX = 999999999;
+  const parse = value => {
+    const s = String(value ?? "").replace(/,/g, "");
+    return /^(0|[1-9][0-9]{0,8})$/.test(s) ? Number(s) : null;
+  };
+  const format = value => {
+    const n = parse(value);
+    return n === null ? String(value ?? "") : n.toLocaleString("en-US");
+  };
+  const selector = '#areg-totalqty-input,[data-add-field="totalQty"],[data-qinput],[data-deduct-input],[data-result-field="totalQty"]';
+  const matches = el => el instanceof HTMLInputElement && el.matches(selector) && !el.disabled;
+  const deduct = el => el.hasAttribute("data-deduct-input");
+  function show(el) {
+    el.removeAttribute("maxlength");
+    const digitsBefore = el.value.slice(0, el.selectionStart ?? el.value.length).replace(/,/g, "").length;
+    const old = el.value, value = format(old);
+    if (value === old) return;
+    el.value = value;
+    if (el === document.activeElement) {
+      let pos=0, count=0;
+      while (pos < value.length && count < digitsBefore) { if (/\d/.test(value[pos])) count++; pos++; }
+      el.setSelectionRange(pos,pos);
+    }
+  }
+  function replacement(el, text) {
+    if (!/^[\d,]*$/.test(text)) return null;
+    const a = el.selectionStart ?? el.value.length, b = el.selectionEnd ?? a;
+    const left = el.value.slice(0,a).replace(/,/g,""), right = el.value.slice(b).replace(/,/g,"");
+    const insert = text.replace(/,/g,"").slice(0, Math.max(0,9-left.length-right.length));
+    const next = left+insert+right;
+    if (next && !(deduct(el) ? /^[1-9]\d{0,8}$/ : /^(0|[1-9]\d{0,8})$/).test(next)) return null;
+    return {value:next, caret:left.length+insert.length};
+  }
+  if (typeof document !== "undefined") {
+    document.addEventListener("beforeinput", e => {
+      if (!matches(e.target) || !e.inputType.startsWith("insert") || e.data == null) return;
+      const next = replacement(e.target,e.data);
+      if (!next || next.value === e.target.value.replace(/,/g,"")) e.preventDefault();
+    },true);
+    document.addEventListener("paste", e => {
+      if (!matches(e.target)) return;
+      e.preventDefault(); e.stopImmediatePropagation();
+      const next = replacement(e.target,e.clipboardData.getData("text").trim());
+      if (!next) return;
+      e.target.value=next.value; e.target.setSelectionRange(next.caret,next.caret);
+      e.target.dispatchEvent(new Event("input",{bubbles:true}));
+    },true);
+    // Existing screen handlers store plain integer text, then this final bubble
+    // listener formats its presentation. Save readers always call parse().
+    document.addEventListener("input", e => {
+      if (!matches(e.target)) return;
+      const el=e.target, raw=el.value.replace(/,/g,"");
+      if (/^\d*$/.test(raw)) el.value=raw.slice(0,9);
+    },true);
+    window.addEventListener("input", e => { if(matches(e.target)) show(e.target); });
+    document.addEventListener("focusin", e => { if(matches(e.target)) show(e.target); });
+    document.addEventListener("click", () => queueMicrotask(() => document.querySelectorAll(selector).forEach(show)));
+    new MutationObserver(() => document.querySelectorAll(selector).forEach(show)).observe(document.documentElement,{childList:true,subtree:true});
+  }
+  return {MAX,parse,format};
+})();
