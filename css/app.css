@@ -2209,3 +2209,30 @@ fieldset.asset-fixed-inputs{border:0;padding:0;margin:0;min-width:0;}
 /* 배정 없음 빈 상태 안의 [배정] 버튼(D-20261030-15) */
 .assign-empty { display:flex; flex-direction:column; align-items:flex-start; gap:8px; padding:6px 0; }
 .assign-empty .muted { margin:0; }
+/* 자산 연결(Web_dc_23 4번) */
+.link-sec { margin-top:16px; padding-top:14px; border-top:1px solid var(--line); }
+.link-head { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px; }
+.link-head h3 { margin:0; font-size:14px; font-weight:600; }
+.link-list { display:flex; flex-direction:column; gap:6px; }
+.link-row, .link-cand { display:flex; align-items:center; gap:8px; padding:8px 10px; border:1px solid var(--line); border-radius:8px; cursor:pointer; }
+.link-row.static { cursor:default; }
+.link-row:hover:not(.static) { background:var(--bg-soft, #f7f8fa); }
+.link-row-main { flex:1; min-width:0; display:flex; flex-direction:column; }
+.link-row-name { font-size:13px; font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.link-row-no { font-size:12px; color:var(--muted, #8a8f98); }
+.link-cand .link-row-name { flex:1; }
+.link-empty { margin:4px 0; }
+.link-all { margin-top:8px; background:none; border:0; color:var(--primary, #3b6cf6); cursor:pointer; padding:0; font-size:13px; }
+.link-hidden { margin:8px 0 0; font-size:12px; color:var(--muted, #8a8f98); }
+.tg-sec { margin-top:12px; }
+.tg-sec-head { font-size:13px; margin-bottom:6px; }
+/* 템플릿 관리·템플릿으로 배정(Web_dc_28·29) */
+.tpl-row { display:flex; gap:8px; align-items:center; margin-bottom:6px; }
+.tpl-row select { flex:1; min-width:0; }
+.tpl-count { width:72px; flex:none; text-align:center; }
+.tpl-del-ph { width:52px; flex:none; }
+.tpl-slot { border:1px solid var(--line); border-radius:8px; padding:10px; margin-bottom:8px; display:flex; flex-direction:column; gap:6px; }
+.tpl-slot-head { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.tpl-row select { flex:1 1 0; width:auto !important; }
+.tpl-row input.tpl-count, .tpl-slot-head input.tpl-count { flex:0 0 72px; width:72px !important; }
+.tpl-row .btn { flex:none; }

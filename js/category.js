@@ -768,10 +768,11 @@
 function openManagementMenu(button,sel) {
   document.querySelectorAll('[data-category-manage-menu]').forEach(el=>el.remove());
   const menu=document.createElement('div');menu.className='dropdown-menu';menu.dataset.categoryManageMenu='';
-  menu.innerHTML='<button type="button" data-manage-classification>분류</button><button type="button" data-manage-extra>추가 정보</button>';
+  menu.innerHTML='<button type="button" data-manage-classification>분류</button><button type="button" data-manage-extra>추가 정보</button><button type="button" data-manage-template>템플릿</button>';
   const rect=button.getBoundingClientRect();menu.style.cssText=`position:fixed;left:${rect.left}px;top:${rect.bottom+4}px;min-width:160px`;document.body.appendChild(menu);
   menu.querySelector('[data-manage-classification]').onclick=()=>{menu.remove();openManageModal(sel);};
   menu.querySelector('[data-manage-extra]').onclick=()=>{menu.remove();openExtraInfoManager();};
+  menu.querySelector('[data-manage-template]').onclick=()=>{menu.remove();window.AssetTemplates.openTemplateManager();};
   const close=e=>{if(!menu.contains(e.target)&&!button.contains(e.target)){menu.remove();document.removeEventListener('click',close);}};document.addEventListener('click',close);
 }
 

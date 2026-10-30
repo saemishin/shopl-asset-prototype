@@ -185,7 +185,7 @@
       <div class="modal" style="width:380px">
         <h3>폐기 처리하시겠습니까?</h3>
         <div class="body">
-          <div class="danger-note">${WARN_ICON}<span>기존 배정은 자동으로 종료되며, 이후 배정·자산 수정이 제한됩니다. 자산 관리 권한자는 배정이 없는 배정 가능 상태로 복구할 수 있습니다.</span></div>
+          <div class="danger-note">${WARN_ICON}<span>기존 배정은 자동으로 종료되며, 이후 배정·자산 수정이 제한됩니다. 자산 관리 권한자는 배정이 없는 배정 가능 상태로 복구할 수 있습니다.${window.AssetLinks.count(a.id) ? ` 연결된 자산 ${window.AssetLinks.count(a.id)}건과의 연결이 해제됩니다.` : ""}</span></div>
           <div class="field" style="margin-top:14px;margin-bottom:0">
             <input type="text" data-del-input placeholder="입력">
           </div>
@@ -209,7 +209,7 @@
         script: "상태 변경: 폐기 처리",
         before,
         after: STATUS_LABEL[a.status][0]
-      }), cb.remove(), toast("폐기 처리되었습니다."), render();
+      }), pruneLinks("폐기"), cb.remove(), toast("폐기 처리되었습니다."), render();
     }, document.body.appendChild(cb), input.focus();
   }
   const STATUS_ACTION_HANDLERS = {
@@ -281,7 +281,7 @@
       <div class="modal" style="width:380px">
         <h3>삭제하시겠습니까?</h3>
         <div class="body">
-          <div class="danger-note">${WARN_ICON}<span>삭제하면 복구할 수 없으니 신중하게 결정해주세요.</span></div>
+          <div class="danger-note">${WARN_ICON}<span>삭제하면 복구할 수 없으니 신중하게 결정해주세요.${window.AssetLinks.count(a.id) ? ` 연결된 자산 ${window.AssetLinks.count(a.id)}건과의 연결이 해제됩니다.` : ""}</span></div>
           <div class="field" style="margin-top:14px;margin-bottom:0">
             <input type="text" data-del-input placeholder="입력">
           </div>
@@ -495,7 +495,7 @@
             <button class="btn sm" data-act="반납">반납</button>
           </div>
         </div>
-      </div>`).join("")}</div>` : `<div class="assign-empty"><p class="muted">배정 대상이 없습니다.</p>${a.status === "disposed" ? "" : '<button class="btn sm" data-assign-new>배정</button>'}</div>`;
+      </div>`).join("")}</div>${linksHtml(a)}` : `<div class="assign-empty"><p class="muted">배정 대상이 없습니다.</p>${a.status === "disposed" ? "" : '<button class="btn sm" data-assign-new>배정</button>'}</div>`;
   }
   function applyTargetContext(scope,a){
     if(!window.AssetAccess.canState(a)){scope.querySelectorAll('[data-dateedit],.acard-actions,#assign-actions,[data-assign-new]').forEach(el=>el.remove());}
@@ -583,6 +583,7 @@
   }
   function wireAssignCards(scope, a) {
     scope.querySelector("[data-assign-new]")?.addEventListener("click", () => openAssignAddModal(a));
+    wireLinks(scope, a);
     scope.querySelectorAll("[data-dateedit]").forEach(b => b.onclick = () => {
       const row = b.closest(".acard");
       openDatePopover(b, a, +row.dataset.idx);
@@ -594,8 +595,180 @@
       returnAssignment(a, +row.dataset.idx);
     });
   }
+  // ── 자산 연결(Web_dc_23 4번, Policy_15) ──
+  const linkLabel = b => `${b.product} · ${b.assetNo}`;
+  function linkRowHtml(a, b) {
+    const canCut = window.AssetAccess.canState(a) && window.AssetAccess.canState(b);
+    return `<div class="link-row" data-link-open="${b.id}">
+      <div class="link-row-main"><span class="link-row-name">${b.product}</span><span class="link-row-no">${b.assetNo}</span></div>
+      <span class="badge ${STATUS_LABEL[b.status][1]}">${STATUS_LABEL[b.status][0]}</span>
+      ${canCut ? `<button class="btn sm" data-link-cut="${b.id}">연결 해제</button>` : ""}
+    </div>`;
+  }
+  function linksHtml(a) {
+    const v = window.AssetLinks.view(a),
+      full = window.AssetLinks.count(a.id) >= window.AssetLinks.MAX,
+      addBtn = window.AssetAccess.canState(a) ? `<button class="btn sm" data-link-add${full ? " disabled" : ""}>자산 연결</button>` : "";
+    return `<div class="link-sec">
+      <div class="link-head"><h3>연결된 자산 <span class="muted">${v.visible.length}</span></h3>${addBtn}</div>
+      ${v.visible.length ? `<div class="link-list">${v.visible.slice(0, 5).map(b => linkRowHtml(a, b)).join("")}</div>` : '<p class="muted link-empty">연결된 자산이 없습니다.</p>'}
+      ${v.visible.length > 5 ? '<button class="link-all" data-link-all>전체 보기</button>' : ""}
+      ${v.hidden ? `<p class="link-hidden">조회할 수 없는 연결 자산 ${v.hidden}건</p>` : ""}
+    </div>`;
+  }
+  // 대상이 달라지거나 배정이 없어진 연결을 해제하고 양쪽 이력에 원인과 함께 남긴다.
+  function pruneLinks(cause) {
+    window.AssetLinks.prune().forEach(([x, y]) => {
+      logActivity(x, { script: `자산 연결: 연결 해제(${cause})`, before: linkLabel(y), after: "" });
+      logActivity(y, { script: `자산 연결: 연결 해제(${cause})`, before: linkLabel(x), after: "" });
+    });
+  }
+  function wireLinks(scope, a) {
+    scope.querySelector("[data-link-add]")?.addEventListener("click", () => openLinkAddModal(a));
+    scope.querySelector("[data-link-all]")?.addEventListener("click", () => openLinksAllModal(a));
+    wireLinkRows(scope, a, () => render());
+  }
+  function wireLinkRows(scope, a, after) {
+    scope.querySelectorAll("[data-link-open]").forEach(row => row.onclick = e => {
+      e.target.closest("[data-link-cut]") || (location.href = `asset-detail.html?id=${row.dataset.linkOpen}`);
+    });
+    scope.querySelectorAll("[data-link-cut]").forEach(b => b.onclick = e => {
+      e.stopPropagation();
+      openLinkCutConfirm(a, window.DATA.assets.find(x => x.id === b.dataset.linkCut), after);
+    });
+  }
+  function openLinkCutConfirm(a, b, after) {
+    const cb = document.createElement("div");
+    cb.className = "modal-back", cb.style.zIndex = 360, cb.innerHTML = `
+      <div class="modal" style="width:380px">
+        <h3>연결을 해제하시겠습니까?</h3>
+        <div class="body" style="font-size:13px"><b>${linkLabel(b)}</b><p class="muted" style="margin-top:6px">배정은 바뀌지 않습니다.</p></div>
+        <div class="foot"><button class="btn" data-cclose>취소</button><button class="btn primary" data-cok>확인</button></div>
+      </div>`, document.body.appendChild(cb);
+    cb.querySelector("[data-cclose]").onclick = () => cb.remove();
+    cb.querySelector("[data-cok]").onclick = () => {
+      cb.remove();
+      if (!window.AssetLinks.remove(a, b)) return toast("설정이 변경되었습니다. 잠시 후 다시 시도해주세요."), after();
+      logActivity(a, { script: "자산 연결: 연결 해제", before: linkLabel(b), after: "" });
+      logActivity(b, { script: "자산 연결: 연결 해제", before: linkLabel(a), after: "" });
+      toast("연결이 해제되었습니다."), after();
+    };
+  }
+  function openLinksAllModal(a) {
+    const back = document.createElement("div");
+    back.className = "modal-back", back.innerHTML = `
+      <div class="modal" style="width:460px">
+        <h3 data-links-title></h3>
+        <div class="body" style="max-height:60vh;overflow-y:auto"><div class="link-list" data-links-list></div></div>
+        <div class="foot"><button class="btn" data-close>닫기</button></div>
+      </div>`, document.body.appendChild(back);
+    const draw = () => {
+      const v = window.AssetLinks.view(a);
+      back.querySelector("[data-links-title]").textContent = `연결된 자산 ${v.visible.length}`;
+      const list = back.querySelector("[data-links-list]");
+      list.innerHTML = v.visible.map(b => linkRowHtml(a, b)).join("") || '<p class="muted">연결된 자산이 없습니다.</p>';
+      wireLinkRows(list, a, () => { draw(), render(); });
+    };
+    draw();
+    back.querySelector("[data-close]").onclick = () => back.remove();
+    back.onclick = e => { e.target === back && back.remove(); };
+  }
+  function openLinkAddModal(a) {
+    const room = window.AssetLinks.MAX - window.AssetLinks.count(a.id),
+      picked = new Set(),
+      r = a.assignments[0];
+    let q = "";
+    const back = document.createElement("div");
+    back.className = "modal-back", back.innerHTML = `
+      <div class="modal" style="width:460px">
+        <h3>자산 연결</h3>
+        <div class="body" style="display:flex;flex-direction:column;max-height:62vh">
+          <p class="muted" style="margin:0 0 8px">배정 대상 <b>${r.employee || r.worksite}</b></p>
+          <input type="text" class="picker-search" placeholder="품목명/고유관리번호" data-link-q>
+          <div data-link-cands style="flex:1;min-height:0;overflow-y:auto;margin-top:8px"></div>
+          <p class="muted" style="margin:8px 0 0" data-link-count></p>
+        </div>
+        <div class="foot"><button class="btn" data-close>취소</button><button class="btn primary" data-save disabled>연결</button></div>
+      </div>`, document.body.appendChild(back);
+    const list = back.querySelector("[data-link-cands]"), save = back.querySelector("[data-save]");
+    const draw = () => {
+      const all = window.AssetLinks.candidates(a),
+        rows = all.filter(b => !q || (b.product + " " + b.assetNo).toLowerCase().includes(q));
+      list.innerHTML = !all.length ? '<p class="muted">연결할 수 있는 자산이 없습니다.</p>' : !rows.length ? '<p class="muted">결과가 없습니다.</p>' : rows.map(b => {
+        const on = picked.has(b.id), lock = !on && picked.size >= room;
+        return `<label class="link-cand"><input type="checkbox" data-pick="${b.id}"${on ? " checked" : ""}${lock ? " disabled" : ""}><span class="link-row-name">${b.product}</span><span class="link-row-no">${b.assetNo}</span><span class="badge ${STATUS_LABEL[b.status][1]}">${STATUS_LABEL[b.status][0]}</span></label>`;
+      }).join("");
+      list.querySelectorAll("[data-pick]").forEach(c => c.onchange = () => {
+        c.checked ? picked.add(c.dataset.pick) : picked.delete(c.dataset.pick), draw();
+      });
+      back.querySelector("[data-link-count]").textContent = `선택 ${picked.size}건`;
+      save.disabled = !picked.size;
+    };
+    back.querySelector("[data-link-q]").oninput = e => { q = e.target.value.trim().toLowerCase(), draw(); };
+    back.querySelector("[data-close]").onclick = () => back.remove();
+    save.onclick = () => {
+      const targets = [...picked].map(id => window.DATA.assets.find(x => x.id === id));
+      if (targets.some(b => !window.AssetLinks.candidates(a).includes(b))) {
+        targets.forEach(b => window.AssetLinks.candidates(a).includes(b) || picked.delete(b.id));
+        return toast("설정이 변경되었습니다. 잠시 후 다시 시도해주세요."), draw();
+      }
+      targets.forEach(b => {
+        window.AssetLinks.add(a, b);
+        logActivity(a, { script: "자산 연결: 연결", before: "", after: linkLabel(b) });
+        logActivity(b, { script: "자산 연결: 연결", before: "", after: linkLabel(a) });
+      });
+      back.remove(), toast("연결되었습니다."), render();
+    };
+    draw();
+  }
+  // 연결 자산 재배정·반납 확인(Web_dc_23 3-3-3·3-4-2). onRun(mode, plan)을 확인 시 호출한다.
+  function openTogetherModal(a, kind, onRun) {
+    const verb = kind === "reassign" ? "재배정" : "반납";
+    let mode = "all";
+    const plan = window.AssetLinks.togetherPlan(a),
+      back = document.createElement("div");
+    back.className = "modal-back", back.style.zIndex = 340, back.innerHTML = `
+      <div class="modal" style="width:460px">
+        <h3>${verb}하시겠습니까?</h3>
+        <div class="body" style="max-height:64vh;overflow-y:auto">
+          <label class="radio-row"><input type="radio" name="tg-mode" value="all" checked><span>연결된 자산과 함께</span></label>
+          <label class="radio-row"><input type="radio" name="tg-mode" value="one"><span>이 자산만</span></label>
+          <div data-tg-body style="margin-top:10px"></div>
+        </div>
+        <div class="foot"><button class="btn" data-cclose>취소</button><button class="btn primary" data-cok>확인</button></div>
+      </div>`, document.body.appendChild(back);
+    const rows = list => list.map(b => `<div class="link-row static"><div class="link-row-main"><span class="link-row-name">${b.product}</span><span class="link-row-no">${b.assetNo}</span></div><span class="badge ${STATUS_LABEL[b.status][1]}">${STATUS_LABEL[b.status][0]}</span></div>`).join("");
+    const draw = () => {
+      const cutCount = plan.cutVisible.length + plan.cutHidden;
+      back.querySelector("[data-tg-body]").innerHTML = mode === "all" ? `
+        <div class="tg-sec"><div class="tg-sec-head">함께 ${verb}될 자산 <b>${plan.move.length}</b>건</div><div class="link-list">${rows(plan.move)}</div>${kind === "return" ? '<p class="muted" style="margin-top:6px">반납한 자산의 연결은 모두 해제됩니다.</p>' : ""}</div>
+        ${cutCount ? `<div class="tg-sec"><div class="tg-sec-head">상태 관리 권한이 없어 함께 ${verb}되지 않고 연결이 끊어질 자산 <b>${cutCount}</b>건</div><div class="link-list">${rows(plan.cutVisible)}</div>${plan.cutHidden ? `<p class="link-hidden">조회할 수 없는 자산 ${plan.cutHidden}건</p>` : ""}</div>` : ""}` : `<p class="muted">이 자산의 연결 ${window.AssetLinks.count(a.id)}건이 해제됩니다.</p>`;
+    };
+    back.querySelectorAll('[name="tg-mode"]').forEach(r => r.onchange = () => { mode = r.value, draw(); });
+    back.querySelector("[data-cclose]").onclick = () => back.remove();
+    back.querySelector("[data-cok]").onclick = () => {
+      back.remove();
+      // 저장 시점에 목록을 다시 계산해 확인 때와 다르면 반영하지 않는다(D-20261030-19 A).
+      if (mode === "all" && window.AssetLinks.togetherPlan(a).signature !== plan.signature) return toast("설정이 변경되었습니다. 잠시 후 다시 시도해주세요."), render();
+      onRun(mode, plan);
+    };
+    draw();
+  }
   function returnAssignment(a, idx) {
-    const old = a.assignments[idx];
+    const old = a.assignments[idx],
+      returnOne = (x, note) => {
+        const rec = x.assignments[0];
+        x.assignments = [], x.status === "assigned" && (x.status = "stock"), logActivity(x, {
+          script: "배정 관리: 반납" + (note || ""),
+          target: rec,
+          before: window.fmtDate(rec.since),
+          after: ""
+        });
+      };
+    if (window.AssetLinks.count(a.id)) return openTogetherModal(a, "return", (mode, plan) => {
+      mode === "all" ? plan.move.forEach(x => returnOne(x, x === a ? "" : ` (${a.product} · ${a.assetNo}과 함께)`)) : returnOne(a);
+      pruneLinks("반납"), toast("반납되었습니다."), render();
+    });
     confirmModal("반납 처리하시겠습니까?", () => {
       a.assignments.splice(idx, 1), a.assignments.length === 0 && a.status === "assigned" && (a.status = "stock"), logActivity(a, {
         script: "배정 관리: 반납",
@@ -782,15 +955,21 @@
           worksite: draftTarget.worksite,
           since: d
         };
-      confirmModal("재배정하시겠습니까?", () => {
+      const reassignOne = (x, note) => {
+        const prev = x.assignments[0];
+        x.assignments[0] = { ...record }, logActivity(x, {
+          script: "배정 관리: 재배정" + (note || ""),
+          before: `${prev.employee || prev.worksite} · ${window.fmtDate(prev.since)}`,
+          after: `${record.employee || record.worksite} · ${window.fmtDate(d)}`
+        });
+      };
+      if (window.AssetLinks.count(a.id)) return openTogetherModal(a, "reassign", (mode, plan) => {
         back.remove();
-        const beforeLabel = `${old.employee || old.worksite} · ${window.fmtDate(old.since)}`,
-          afterLabel = `${record.employee || record.worksite} · ${window.fmtDate(d)}`;
-        a.assignments[idx] = record, logActivity(a, {
-          script: "배정 관리: 재배정",
-          before: beforeLabel,
-          after: afterLabel
-        }), toast("재배정되었습니다."), render();
+        mode === "all" ? (plan.cutPairs.forEach(([x, y]) => window.AssetLinks.remove({ id: x }, { id: y })), plan.move.forEach(x => reassignOne(x, x === a ? "" : ` (${a.product} · ${a.assetNo}과 함께)`))) : reassignOne(a);
+        pruneLinks("재배정"), toast("재배정되었습니다."), render();
+      });
+      confirmModal("재배정하시겠습니까?", () => {
+        back.remove(), reassignOne(a), toast("재배정되었습니다."), render();
       });
     };
   }

@@ -1216,5 +1216,82 @@ window.AssetExtra.exportValues=(asset,manage=window.hasPrototypeAssetManagePermi
       if(mobile&&el)el.closest('.mapp-add-field').hidden=!window.AssetExtra.visible(category(a),id);
     }
   }
-  window.AssetAccess={scope,canInfo,canState,canField,protectForm,managed};
+  function canView(a,name){return !!a && !a.deleted_at && (managed() || scope(category(a),'view',name));}
+  window.AssetAccess={scope,canView,canInfo,canState,canField,protectForm,managed};
+})();
+
+// 자산 간 연결(설계기록 D-20261030-16~19, Policy_15). 두 자산 ID 쌍으로 저장하고 양방향으로 본다.
+// 같은 대상에게 배정된 자산끼리만 연결하며 대상이 달라지거나 배정이 없어지면 prune()이 자동 해제한다.
+(() => {
+  const MAX = 50;
+  const pairs = window.DATA.links || (window.DATA.links = [
+    ["A023", "A024"], ["A024", "A021"], ["A021", "A022"],
+    ["A027", "A028"], ["A027", "A102"],
+    ["A013", "A006"]
+  ]);
+  const byId = id => window.DATA.assets.find(a => a.id === id);
+  const alive = a => !!a && !a.deleted_at;
+  const targetKey = a => {
+    const r = alive(a) && a.status !== "disposed" ? (a.assignments || [])[0] : null;
+    return r ? (r.employee ? "e:" + r.employee : "w:" + r.worksite) : null;
+  };
+  const linked = (x, y) => pairs.some(([p, q]) => p === x && q === y || p === y && q === x);
+  function partners(id) {
+    return pairs.filter(p => p.includes(id)).map(([p, q]) => byId(p === id ? q : p)).filter(alive);
+  }
+  function sort(list) {
+    return list.slice().sort((p, q) => p.product.localeCompare(q.product, "ko") || String(p.assetNo).localeCompare(String(q.assetNo)));
+  }
+  // 현재 계정이 조회할 수 있는 연결 자산과 조회할 수 없는 연결 수(Policy_15 7절)
+  function view(a) {
+    const all = partners(a.id), visible = all.filter(b => window.AssetAccess.canView(b));
+    return { visible: sort(visible), hidden: all.length - visible.length, total: all.length };
+  }
+  function candidates(a) {
+    const key = targetKey(a);
+    if (!key) return [];
+    return sort(window.DATA.assets.filter(b => b.id !== a.id && alive(b) && targetKey(b) === key && !linked(a.id, b.id) && window.AssetAccess.canView(b) && window.AssetAccess.canState(b)));
+  }
+  function add(a, b) {
+    if (linked(a.id, b.id) || targetKey(a) !== targetKey(b) || !targetKey(a)) return false;
+    if (partners(a.id).length >= MAX || partners(b.id).length >= MAX) return false;
+    pairs.push([a.id, b.id]);
+    return true;
+  }
+  function remove(a, b) {
+    const i = pairs.findIndex(([p, q]) => p === a.id && q === b.id || p === b.id && q === a.id);
+    i >= 0 && pairs.splice(i, 1);
+    return i >= 0;
+  }
+  // 함께 재배정·반납 범위: 이어진 자산 전체. 상태 관리 권한이 없는 자산은 처리하지 않고 경계 연결을 끊는다(D-20261030-18).
+  function togetherPlan(a) {
+    const move = [a], cut = [], cutPairs = [], seen = new Set([a.id]);
+    for (let i = 0; i < move.length; i++) {
+      for (const b of partners(move[i].id)) {
+        if (window.AssetAccess.canState(b)) {
+          seen.has(b.id) || (seen.add(b.id), move.push(b));
+        } else {
+          cutPairs.push([move[i].id, b.id]);
+          cut.includes(b) || cut.push(b);
+        }
+      }
+    }
+    return {
+      move: [a].concat(sort(move.slice(1))),
+      cutVisible: sort(cut.filter(b => window.AssetAccess.canView(b))),
+      cutHidden: cut.filter(b => !window.AssetAccess.canView(b)).length,
+      cutPairs,
+      signature: move.map(x => x.id).sort().join() + "|" + cut.map(x => x.id).sort().join()
+    };
+  }
+  // 같은 대상 조건이 깨진 연결을 해제하고 해제된 쌍을 돌려준다.
+  function prune() {
+    const removed = [];
+    for (let i = pairs.length - 1; i >= 0; i--) {
+      const [x, y] = pairs[i].map(byId), kx = targetKey(x);
+      if (!kx || kx !== targetKey(y)) removed.push([x, y]), pairs.splice(i, 1);
+    }
+    return removed.filter(([x, y]) => x && y);
+  }
+  window.AssetLinks = { MAX, partners, view, candidates, add, remove, togetherPlan, prune, linked, count: id => partners(id).length };
 })();

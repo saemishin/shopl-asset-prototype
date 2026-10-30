@@ -297,7 +297,7 @@
   }
   function bulkActions() {
     const actions = [];
-    return canManageAssets() && actions.push("일괄 추가"), (canManageAssets() || window.DATA.categories.some(canAssignCategory)) && actions.push("일괄 배정"), actions;
+    return canManageAssets() && actions.push("일괄 추가"), (canManageAssets() || window.DATA.categories.some(canAssignCategory)) && actions.push("일괄 배정"), window.AssetTemplates && window.AssetTemplates.usableTemplates().length && actions.push("템플릿으로 배정"), actions;
   }
   function viewableCategories() {
     return window.DATA.categories.filter(canViewCategory);
@@ -1690,9 +1690,11 @@
         if (event.stopPropagation(), b.dataset.bulkAction === "일괄 추가") {
           if (!canManageAssets()) return;
           menu.remove(), resetBulkRegister(), activeScreen = "bulk-register", render();
+        } else if (b.dataset.bulkAction === "템플릿으로 배정") {
+          menu.remove(), window.AssetTemplates.openTemplateAssign(() => render());
         } else toast("일괄 배정 화면은 기획서에서 확인해 주세요.");
       }, b.addEventListener("mouseenter", () => {
-        if (b.dataset.bulkAction === "일괄 추가") return;
+        if (b.dataset.bulkAction === "일괄 추가" || b.dataset.bulkAction === "템플릿으로 배정") return;
         tip = document.createElement("div"), tip.className = "hover-tip", tip.textContent = "PM: 기획서에서 명세 확인", document.body.appendChild(tip);
         const br = b.getBoundingClientRect();
         tip.style.cssText = `position:fixed;top:${br.top + br.height / 2}px;right:${window.innerWidth - br.left + 8}px;transform:translateY(-50%);`;
