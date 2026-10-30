@@ -2352,3 +2352,22 @@ fieldset.asset-fixed-inputs{border:0;padding:0;margin:0;min-width:0;}
 .cat-manage-modal .btn[data-tip]:hover::after { width:auto; white-space:nowrap; }
 .tpl-manage-desc { margin:0 0 12px; font-size:12.5px; line-height:1.5; color:var(--text-mut); }
 .cat-manage-desc { margin:0; padding:14px 20px 0; }
+/* 현황 구성원별·근무지별 요약/전체 보기(D-20261030-35) */
+.target-view-row { display:flex; align-items:center; gap:12px; margin:4px 0 14px; }
+.target-view-row .overview-scope { margin:0; }
+.seg-toggle { display:inline-flex; padding:4px; border-radius:10px; background:#f1f3f5; gap:2px; }
+.seg-toggle button { min-width:72px; height:30px; padding:0 14px; border:0; border-radius:7px; background:transparent; color:var(--text-mut); font-size:13px; font-weight:500; cursor:pointer; }
+.seg-toggle button.active { background:#fff; color:var(--text); font-weight:600; box-shadow:0 1px 2px rgba(0,0,0,.08); }
+table.tbl-target-full { table-layout:auto; width:max-content; min-width:100%; }
+table.tbl-target-full th, table.tbl-target-full td { width:auto !important; white-space:nowrap; }
+table.tbl-target-full .num { text-align:center; min-width:72px; }
+table.tbl-target-full .tf-sticky { position:sticky; z-index:2; background:var(--panel); }
+table.tbl-target-full thead .tf-sticky { z-index:3; background:#fafbfc; }
+table.tbl-target-full .tf-sticky-last { box-shadow:inset -1px 0 0 var(--line); }
+table.tbl-target-full tbody tr:hover .tf-sticky { background:#f7f8fa; }
+table.tbl-target-full .tf-group { text-align:center; border-bottom:1px solid var(--line); border-left:1px solid var(--line); }
+table.tbl-target-full .tf-sub { font-weight:500; }
+table.tbl-target-full .tf-zero { color:#c4c8cd; }
+table.tbl-target-full td.tf-sticky { white-space:normal; }
+table.tbl-target-full .tf-sub span { display:block; }
+table.tbl-target-full .tf-sub .tf-group-name { font-size:11px; font-weight:400; color:var(--text-mut); }
