@@ -237,7 +237,7 @@
     return `<div class="prodcell">${thumb(a)}<span class="pname">${a.product}</span></div>`;
   }
   function memoCell(a) {
-    return window.AssetMemo.has(a.note) ? '<span class="memo-flag"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M9 13h5M9 17h4"/></svg></span>' : "";
+    return displayField(a,"memo") && window.AssetMemo.has(a.note) ? '<span class="memo-flag"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M9 13h5M9 17h4"/></svg></span>' : "";
   }
   function labelsCell(labels) {
     return !labels || !labels.length ? '<span class="muted">—</span>' : `<span class="asset-fit-chips">${labels.map(l => `<span class="tag">${l}</span>`).join("")}<span class="muted" data-chip-rest hidden></span></span>`;
@@ -412,7 +412,7 @@
  return viewableAssets().filter(a=>{
   if(scope.length&&!scope.includes(`${a.group}/${a.sub}`))return false;
   if(!forStats&&state.statFilter){const p=state.statFilter;if(p.status&&!p.status.includes(a.status)||p.expiry&&(!displayField(a,'expiry')||!p.expiry.includes(expiryKey(a.expiry))))return false;}
-  return !(f.status.length&&!f.status.includes(a.status)||f.expiry.length&&(!displayField(a,'expiry')||!f.expiry.includes(expiryKey(a.expiry)))||f.note.length&&!f.note.includes(window.AssetMemo.has(a.note)?'has':'none')||f.labels.length&&f.labels.some(l=>!(a.labels||[]).includes(l))||q&&state.view==='all'&&!`${a.product} ${a.assetNo||''}`.toLowerCase().includes(q)||q&&state.view==='product'&&!a.product.toLowerCase().includes(q));
+  return !(f.status.length&&!f.status.includes(a.status)||f.expiry.length&&(!displayField(a,'expiry')||!f.expiry.includes(expiryKey(a.expiry)))||f.note.length&&(!displayField(a,'memo')||!f.note.includes(window.AssetMemo.has(a.note)?'has':'none'))||f.labels.length&&(!displayField(a,'tags')||f.labels.some(l=>!(a.labels||[]).includes(l)))||q&&state.view==='all'&&!`${a.product} ${a.assetNo||''}`.toLowerCase().includes(q)||q&&state.view==='product'&&!a.product.toLowerCase().includes(q));
  });
 }
   function activeFilterCount() {
@@ -442,7 +442,7 @@
         <td>${st}</td>
         <td>${holderText(a)}</td>
         <td>${expiryCell(displayField(a, "expiry") ? a.expiry : "")}</td>
-        <td>${labelsCell(a.labels)}</td>
+        <td>${displayField(a,"tags")?labelsCell(a.labels):"—"}</td>
         <td class="c">${memoCell(a)}</td>
         <td>${window.fmtDate(a.createdAt)}</td>
       </tr>`;
@@ -1228,7 +1228,7 @@
   }
   function bulkFieldEnabled(result, field) {
     const category = (window.DATA.categories || []).find(item => `${item.group}/${item.sub}` === result.category && item.type === bulkRegister.type);
-    return !category || !(category.hiddenFields || []).includes(field);
+    return !category || window.AssetExtra.enabled(category,field);
   }
   function bulkValidMonth(value) {
     if (!value) return !0;

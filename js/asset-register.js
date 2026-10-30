@@ -279,9 +279,9 @@
   }
   window.openAssetAddModal = function (opts) {
     opts = opts || {};
-    const hasAssetManagePermission = () => !0;
-    if (!hasAssetManagePermission()) return null;
-    const categories = (window.DATA && window.DATA.categories || []).filter(() => hasAssetManagePermission()),
+    const hasAssetManagePermission = () => window.hasPrototypeAssetManagePermission();
+    if (opts.asset ? !window.AssetAccess.canInfo(opts.asset) : !hasAssetManagePermission()) return null;
+    const categories = (window.DATA && window.DATA.categories || []).filter(c => hasAssetManagePermission() || opts.asset && c.group===opts.asset.group && c.sub===opts.asset.sub),
       preselectValue = opts.group && opts.sub ? `${opts.group}|${opts.sub}` : null,
       findCat = v => {
         const [g, s] = (v || "").split("|");
@@ -362,7 +362,7 @@
     let photos = [],
       primaryIdx = 0;
     const back = document.createElement("div");
-    back.className = "modal-back", back.innerHTML = `
+    back.className = "modal-back" + (/app\.html$/.test(location.pathname) ? " mapp-register-edit" : ""), back.innerHTML = `
       <div class="modal scroll-body areg">
         <div class="areg-head">
           <h3>${opts.asset ? "자산 수정" : "자산 추가"}</h3>
@@ -535,6 +535,7 @@
       return q ? names.filter(n => n.toLowerCase().includes(q)) : names;
     }
     function openProdMenu() {
+      if(nameInput.readOnly)return;
       const opts2 = productOptions();
       if (closeProdMenu(), !opts2.length) return;
       prodMenu = document.createElement("div"), prodMenu.className = "dropdown-menu", prodHi = 0, prodMenu.innerHTML = opts2.map((n, i) => `<button type="button" data-v="${n}" class="${i === 0 ? "active" : ""}">${n}</button>`).join("");
@@ -589,11 +590,14 @@
  serialField.style.display='none';imeiField.style.display='none';
  const rows=[['expiry',expiryField],['manufactured',manufacturedField],['purchaseDate',purchaseDateField],['purchasePrice',purchasePriceField]];
  let section=back.querySelector('[data-extra-section]');
- if(!section){section=document.createElement('section');section.className='extra-info-section';section.dataset.extraSection='';section.innerHTML='<h4>추가 정보</h4><div data-custom-inputs></div>';const noteField=rightCol.querySelector('#areg-note-field');noteField?rightCol.insertBefore(section,noteField):rightCol.appendChild(section);}
- for(const [id,field] of rows){field.style.display=!cat||window.AssetExtra.visible(cat,id,manage)?'':'none';field.querySelectorAll('input,button').forEach(el=>el.disabled=!cat);section.insertBefore(field,section.querySelector('[data-custom-inputs]'));}
+ if(!section){section=document.createElement('section');section.className='extra-info-section';section.dataset.extraSection='';section.innerHTML='<h4>추가 정보</h4><div data-custom-inputs></div>';rightCol.appendChild(section);}
+ // 기본 정보의 마지막은 메모. 날짜·가격은 기본 정보로 유지한다.
+ for(const [id,field] of rows){field.style.display=!cat||window.AssetExtra.visible(cat,id,manage)?'':'none';field.querySelectorAll('input,button').forEach(el=>el.disabled=!cat);rightCol.insertBefore(field,noteField);}
+ rightCol.insertBefore(tagFieldEl,expiryField);
  const custom=section.querySelector('[data-custom-inputs]'), current=window.AssetExtra.readInputs(custom);
- custom.innerHTML=window.AssetExtra.customInputs(cat,{...(opts.asset?.extraValues||{}),...current});
- section.hidden=!!cat && !window.AssetExtra.values({group:cat.group,sub:cat.sub},manage).length;
+ custom.innerHTML=window.AssetExtra.customInputs(cat,{...(opts.asset?.extraValues||{}),...current},'data-extra-input',manage);
+ tagFieldEl.hidden=false;noteField.hidden=false;
+ section.hidden=!custom.children.length;
 }
     function renderCatDisplay() {
       catValue ? (catDisplay.textContent = catLabel(catValue), catDisplay.style.color = "var(--text)") : (catDisplay.textContent = "선택", catDisplay.style.color = "var(--text-mut)");
@@ -651,6 +655,7 @@
       })), primaryIdx = asset._primary || 0, renderPhotos(), setDateInputs(expiryField, asset.expiry), serialInput.value = asset.serial || "", imeiInput.value = asset.imei || "", setDateInputs(manufacturedField, asset.manufactured), setDateInputs(purchaseDateField, asset.purchaseDate), purchasePriceInput.value = window.formatPurchasePriceInput(asset.price), noteInput.value = asset.note || "", window.AssetMemo.syncTextarea(noteInput), checkValid();
     }
     catWrap.addEventListener("click", () => {
+      if(opts.asset&&!hasAssetManagePermission())return;
       opts.asset ? openCategoryMoveModal(categories, opts.asset.group, opts.asset.sub, opts.asset.type, v => selectCat(`${v.group}|${v.sub}`)) : openCategoryPickModal(categories, catValue, v => selectCat(v));
     }), renderCatDisplay(), applyFieldVisibility();
     const tagWrap = back.querySelector("#areg-tagwrap"),
@@ -881,7 +886,8 @@
       renderInitial(), analyzeBtn.onclick = renderLoading, aiBack.querySelector("[data-ai-cancel]").onclick = requestAiClose;
     }
     const aiInputBtn = back.querySelector("[data-ai-input]");
-    return aiInputBtn && (aiInputBtn.onclick = openAiInputModal), renderChips(), checkValid(), opts.asset ? prefillFromAsset(opts.asset) : preselectValue && selectCat(preselectValue), opts.asset && (initialEditValues = editValues()), checkValid(), back.addEventListener("input", checkValid), back.addEventListener("change", checkValid), back.querySelector("#areg-tag-manage").onclick = () => {
+    return aiInputBtn && (aiInputBtn.onclick = openAiInputModal), renderChips(), checkValid(), opts.asset ? prefillFromAsset(opts.asset) : preselectValue && selectCat(preselectValue), opts.asset && (initialEditValues = editValues()), checkValid(), opts.asset && window.AssetAccess.protectForm(back,opts.asset), back.addEventListener("input", checkValid), back.addEventListener("change", checkValid), back.querySelector("#areg-tag-manage").onclick = () => {
+      if(!hasAssetManagePermission())return;
       closeMenu(), openTagManageModal(({
         renamed,
         deletedOrigs
@@ -899,8 +905,10 @@
       });
     }, saveBtn.addEventListener("click", () => {
       if (checkValid(), !saveBtn.disabled) if (closeMenu(), opts.asset) {
-        const asset = opts.asset,
-          pending = [],
+        const asset = opts.asset;
+        if(!window.AssetAccess.canInfo(asset)){toast('자산 관리 권한이 없습니다.');return;}
+        if(!hasAssetManagePermission() && (catValue!==`${asset.group}|${asset.sub}` || nameInput.value.trim()!==asset.product || assetNoInput.value.trim()!==asset.assetNo)){toast('자산 관리 권한이 없습니다.');return;}
+        const pending = [],
           logChange = (script, before, after) => {
             pending.push({
               script: `자산 정보 수정: ${script}`,
@@ -918,13 +926,13 @@
           setIf = (script, key, val, format) => {
             if (key === "price" ? window.normalizePurchasePrice(asset[key]) === window.normalizePurchasePrice(val) : asset[key] === val) return;
             const setting=key==="price"?"purchasePrice":key;
-            if(window.AssetExtra.fixed.some(f=>f.id===setting)&&!window.AssetExtra.visible(findCat(catValue),setting,window.hasPrototypeAssetManagePermission()))return;
+            if(!window.AssetAccess.canField(asset,setting))return;
             const fmt = format || (v => v || "");
             logChange(script, fmt(asset[key]), fmt(val)), asset[key] = val;
           };
         setIf("품목명 수정", "product", nameInput.value.trim()), setIf("고유관리번호 수정", "assetNo", assetNoInput.value.trim());
         const newTags = [...tags];
-        JSON.stringify(newTags) !== JSON.stringify(asset.labels || []) && (logChange("태그 수정", (asset.labels || []).join(", "), newTags.join(", ")), asset.labels = newTags);
+        window.AssetAccess.canField(asset,"tags") && JSON.stringify(newTags) !== JSON.stringify(asset.labels || []) && (logChange("태그 수정", (asset.labels || []).join(", "), newTags.join(", ")), asset.labels = newTags);
         const expiry = getExpiry();
         expiry !== null && setIf("유효기한 변경", "expiry", expiry || void 0, dateFmt);
         const monthFmt = d => d ? window.fmtMonth(d) : "",

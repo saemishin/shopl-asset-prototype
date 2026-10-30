@@ -64,7 +64,7 @@
           <li>자산을 분류하는 대분류·소분류 구조를 관리할 수 있습니다. 분류는 [분류] 화면에서 설정할 수 있습니다. <a href="category.html" target="_blank" rel="noopener">바로가기</a></li>
           <li>자산을 등록, 수정, 폐기, 삭제할 수 있습니다.</li>
           <li>모든 자산을 조회하고 배정·상태를 변경할 수 있습니다.</li>
-          <li>자산 관리 권한이 없는 구성원은 소분류별로 설정되는 조회·배정 변경 권한과 기존 정보 수정 기준에 따라 자산을 관리할 수 있게 됩니다.</li>
+          <li>자산 관리 권한이 없는 구성원은 소분류별로 설정되는 조회·정보 수정·상태 관리 권한에 따라 자산을 관리할 수 있게 됩니다.</li>
         </ul>
         <label class="opt is-disabled"><input type="checkbox" checked disabled><span>관리자</span></label>
         <label class="opt"><input type="checkbox" data-toggle-leader${leaderOn ? " checked" : ""}><span>리더</span></label>

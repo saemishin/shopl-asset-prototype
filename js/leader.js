@@ -368,23 +368,7 @@
     윤재현: "해외영업",
     임하늘: "개발팀"
   };
-  function catViewPermission(cat) {
-    if (!cat) return !1;
-    if (hasAssetManagePermission()) return !0;
-    switch (cat.view) {
-      case "회사의 모든 구성원":
-        return !0;
-      case "모든 관리자 및 리더":
-        return !0;
-      // 현재 페르소나는 리더 김민수
-      case "특정 관리자/리더":
-        return (cat.viewTarget && cat.viewTarget.members || []).includes(ME);
-      case "특정 그룹 및 직무/직급":
-        return window.matchesAssetGroupPositionTarget(cat.viewTarget, MEMBER_TEAM[ME], window.ASSET_MEMBER_JOB_TITLES[ME]);
-      default:
-        return !1;
-    }
-  }
+  function catViewPermission(cat) { return window.AssetAccess.scope(cat,'view',ME); }
   function hasViewPermission(a) {
     return catViewPermission(window.DATA.categories.find(c => c.group === a.group && c.sub === a.sub));
   }
@@ -505,10 +489,10 @@
   }
   function addDraftValid(draft) {
     const cat = addCategory(draft);
-    if (!cat || !catViewPermission(cat) || !draft.product.trim() || draft.nameDupKey || !(cat.hiddenFields || []).includes("expiry") && parseAddExpiry(draft.expiry) === null) return !1;
+    if (!cat || !catViewPermission(cat) || !draft.product.trim() || draft.nameDupKey || window.AssetExtra.visible(cat,"expiry") && parseAddExpiry(draft.expiry) === null) return !1;
     if (draft.editingId) {
       const asset = assets.find(a => a.id === draft.editingId);
-      if (!asset || !hasAssetManagePermission() || asset.status === "disposed" || asset.type !== cat.type) return !1;
+      if (!asset || !canEditInfo(asset) || asset.type !== cat.type) return !1;
     }
     const assetNo = draft.assetNo.trim();
     return (!draft.editingId || !!assetNo) && (draft.editingId ? !assets.some(a => !a.deleted_at && a.id !== draft.editingId && a.assetNo === assetNo) : !draft.assetNoDupValue);
@@ -573,19 +557,20 @@
 
           <div class="mapp-add-field"><div class="mapp-add-field-label"><label>태그</label><button type="button" data-add-tag-manage>태그 관리</button></div><p class="hint mapp-add-tag-hint">최대 10개까지 선택할 수 있습니다.</p>
             <div class="mapp-add-tag-picker"><div class="tag-input-wrap"><div class="tag-chips" data-add-tag-chips>${addTagChipsHtml(draft.labels)}</div><input type="text" data-add-tag-search placeholder="${draft.labels.length ? "" : "검색"}" autocomplete="off"${draft.labels.length >= window.ASSET_TAG_MAX_COUNT ? " disabled" : ""}></div><div class="mapp-add-suggest" data-add-tag-menu hidden></div></div></div>
-          <fieldset class="extra-info-section"${cat?"":" disabled"}><h4>추가 정보</h4>
+          <fieldset class="asset-fixed-inputs"${cat?"":" disabled"}>
           ${cat && !window.AssetExtra.visible(cat,"expiry",hasAssetManagePermission()) ? "" : addExpiryFieldHtml(draft)}
-          ${hidden.includes("manufactured") ? "" : addDateSelectHtml("제조연월", "manufactured", draft, "month")}
-          ${hidden.includes("purchaseDate") ? "" : addDateSelectHtml("구매연월", "purchaseDate", draft, "month")}
-          ${hidden.includes("purchasePrice") ? "" : addInputHtml("구매가격", "purchasePrice", draft, {
+          ${cat && !window.AssetExtra.visible(cat,"manufactured") ? "" : addDateSelectHtml("제조연월", "manufactured", draft, "month")}
+          ${cat && !window.AssetExtra.visible(cat,"purchaseDate") ? "" : addDateSelectHtml("구매연월", "purchaseDate", draft, "month")}
+          ${cat && !window.AssetExtra.visible(cat,"purchasePrice") ? "" : addInputHtml("구매가격", "purchasePrice", draft, {
       inputmode: "decimal",
       maxlength: 21
     })}
-          ${window.AssetExtra.customInputs(cat,draft.extraValues||{},'data-mobile-extra',hasAssetManagePermission())}</fieldset>
+          </fieldset>
           ${addInputHtml("메모", "note", draft, {
       textarea: !0,
       maxlength: 500
-    })}`}
+    })}
+          ${window.AssetExtra.customInputs(cat,draft.extraValues||{},'data-mobile-extra',hasAssetManagePermission()) ? `<section class="extra-info-section"><h4>추가 정보</h4>${window.AssetExtra.customInputs(cat,draft.extraValues||{},'data-mobile-extra',hasAssetManagePermission())}</section>` : ""}`}
       </div>
       <div class="mapp-add-foot"><button type="button" class="btn primary" data-add-save${addDraftValid(draft) && editDirty(draft) ? "" : " disabled"}>저장</button></div>`;
   }
@@ -993,22 +978,9 @@
       </div>
       ${addFabHtml()}`;
   }
-  function canManage(a) {
-    if (!a || a.status === "disposed" || !hasViewPermission(a)) return !1;
-    if (hasAssetManagePermission()) return !0;
-    const cat = window.DATA.categories.find(c => c.group === a.group && c.sub === a.sub);
-    switch (cat && cat.assign) {
-      case "회사의 모든 구성원":
-      case "모든 관리자 및 리더":
-        return !0;
-      case "특정 관리자/리더":
-        return (cat.assignTarget && cat.assignTarget.members || []).includes(ME);
-      case "특정 그룹 및 직무/직급":
-        return window.matchesAssetGroupPositionTarget(cat.assignTarget, MEMBER_TEAM[ME], window.ASSET_MEMBER_JOB_TITLES[ME]);
-      default:
-        return !1;
-    }
-  }
+  function canManage(a) { return window.AssetAccess.canState(a,ME); }
+  function canEditInfo(a) { return window.AssetAccess.canInfo(a,ME); }
+
   function derivedActiveStatus(a) {
     return (a.assignments || []).length ? "assigned" : "stock";
   }
@@ -1061,6 +1033,12 @@
     return !draft.editingId || draftSnapshot(draft) !== draftSnapshot(editDraftFor(assets.find(a => a.id === draft.editingId)));
   }
   function applyAssetEdit(a, draft) {
+    if(!canEditInfo(a))return;
+    if(!hasAssetManagePermission()){
+      draft.category=`${a.group}|${a.sub}`;draft.product=a.product;draft.assetNo=a.assetNo;
+    }
+    if(!window.AssetAccess.canField(a,'tags',ME))draft.labels=[...(a.labels||[])];
+    if(!window.AssetAccess.canField(a,'memo',ME))draft.note=a.note||'';
     activityLog(a);
     const cat = addCategory(draft),
       pending = [],
@@ -1230,7 +1208,7 @@
       <div class="modal" style="width:380px">
         <h3>폐기 처리하시겠습니까?</h3>
         <div class="body">
-          <div class="danger-note">${WARN_ICON}<span>기존 배정은 자동으로 종료되며, 이후 배정 추가·자산 수정이 제한됩니다. 자산 관리 권한자는 배정이 없는 배정 가능 상태로 복구할 수 있습니다.</span></div>
+          <div class="danger-note">${WARN_ICON}<span>기존 배정은 자동으로 종료되며, 이후 배정·자산 수정이 제한됩니다. 자산 관리 권한자는 배정이 없는 배정 가능 상태로 복구할 수 있습니다.</span></div>
           <div class="field" style="margin-top:14px;margin-bottom:0">
             <input type="text" data-del-input placeholder="입력">
           </div>
@@ -1505,9 +1483,9 @@
   }
   const FORM_CFG = {
     "assign-add": {
-      title: "배정 추가",
+      title: "배정",
       targetLabel: "배정 대상",
-      confirm: "배정을 추가하시겠습니까?"
+      confirm: "배정하시겠습니까?"
     },
     reassign: {
       title: "재배정",
@@ -1628,7 +1606,7 @@
             target: record,
             before: "",
             after: window.fmtDate(d)
-          }), toast("추가되었습니다."), afterMutate();
+          }), toast("배정되었습니다."), afterMutate();
         });
       } else if (kind === "reassign") {
         const d = f.dateIso,
@@ -1776,7 +1754,7 @@
     }, back.querySelector("[data-vclose]").onclick = () => back.remove(), back.querySelector("[data-vdownload]").onclick = () => toast("사진을 저장하였습니다."), draw();
   }
   const STATUS_TRANSITIONS = {
-    // 배정 가능 상태에서는 배정 추가와 같은 동작을 '배정'으로 바로 제공한다(2026-10-29 사용자 결정).
+    // 배정 가능 상태에서는 상태 메뉴에서 '배정'을 바로 제공한다(D-20261029-52·D-20261030-15).
     stock: [["assign-add", "배정"], ["repair-start", "수리/점검 접수"], ["lost-report", "분실 신고"], ["dispose", "폐기 처리"]],
     assigned: [["repair-start", "수리/점검 접수"], ["lost-report", "분실 신고"], ["dispose", "폐기 처리"]],
     repair: [["repair-done", "수리/점검 완료"], ["lost-report", "분실 신고"], ["dispose", "폐기 처리"]],
@@ -1846,19 +1824,13 @@
       idx
     };
   }
-  function scopedParties(a, target) {
-    return (a.assignments || []).filter(record => record[target.type] !== target.value).sort((p, q) => q.since.localeCompare(p.since));
-  }
   function scopedPartyRowHtml(record, indiv) {
     return `<div class="mapp-party-row"><div><div class="mapp-party-name">${esc(record.employee || record.worksite)}</div><div class="mapp-party-kind">${record.employee ? "구성원" : "근무지"}</div></div>${`<span class="mapp-party-date">${window.fmtDate(record.since)}</span>`}</div>`;
   }
-  function scopedPartiesScreenHtml(a, target) {
-    const others = scopedParties(a, target);
-    return `<div class="mapp-topbar"><button type="button" class="mapp-back" data-mapp-back aria-label="뒤로">←</button><span class="mapp-topbar-title">공동 배정 대상</span></div><div class="mapp-body"><div class="mapp-count">전체 <b>${others.length}</b></div><div class="mapp-party-list">${others.map(record => scopedPartyRowHtml(record, !0)).join("")}</div></div>`;
-  }
+  // 자산 한 건은 한 대상에게만 배정하므로 대상 기준 상세의 배정 탭에는 이 대상의 기록 하나만 보여준다(D-20261030-14·15).
   function scopedPartySectionHtml(a, target) {
-    const others = scopedParties(a, target);
-    return `<div class="dsection"><div class="mapp-party-header"><h2 class="mapp-party-head">공동 배정 대상</h2>${canManage(a) ? '<button type="button" class="btn sm" data-holder-add>배정 추가</button>' : ""}</div><div class="mapp-count">전체 <b>${others.length}</b></div>${others.length ? `<div class="mapp-party-list">${others.slice(0, 5).map(record => scopedPartyRowHtml(record, !0)).join("")}</div>` : '<p class="mapp-party-empty">공동 배정 대상이 없습니다.</p>'}${others.length > 5 ? '<button type="button" class="mapp-party-viewall" data-parties-viewall>전체보기</button>' : ""}</div>`;
+    const record = findRecord(a, target), current = record.idx >= 0 ? record.list[record.idx] : null;
+    return `<div class="dsection"><h2 class="mapp-party-head">배정 대상</h2>${current ? `<div class="mapp-party-list">${scopedPartyRowHtml(current, !0)}</div>` : '<p class="mapp-party-empty">배정 대상이 없습니다.</p>'}</div>`;
   }
   function scopedManageActions(a, target) {
     return !target || !canManage(a) || findRecord(a, target).idx < 0 ? [] : [{
@@ -1876,11 +1848,11 @@
   }
   function leaderAssetDetailHtml(a,target=null) {
  activityLog(a);
- const editable=canManage(a), manage=hasAssetManagePermission(), photos=window.assetPhotos(a), record=target?findRecord(a,target):null, current=record&&record.idx>=0?record.list[record.idx]:null;
+ const editable=canEditInfo(a), stateEditable=canManage(a), manage=hasAssetManagePermission(), photos=window.assetPhotos(a), record=target?findRecord(a,target):null, current=record&&record.idx>=0?record.list[record.idx]:null;
  const badge=statusActions(a).length?`<button class="badge ${STATUS_LABEL[a.status][1]} clickable" data-status-open>${STATUS_LABEL[a.status][0]} ▾</button>`:`<span class="badge ${STATUS_LABEL[a.status][1]}">${STATUS_LABEL[a.status][0]}</span>`;
- const info=[['분류',categoryPath(a)],['태그',(a.labels||[]).map(l=>`<span class="tag">${esc(l)}</span>`).join('')||'—'],['자산 등록일',window.fmtDate(a.createdAt)],['QR 라벨',`<button type="button" class="btn sm icon-only" data-qr-open aria-label="QR 라벨">${QR_ICON}</button>`],['메모',`${window.AssetMemo.render(a.note)}${editable?`<button class="icon-edit" data-memoedit aria-label="메모 수정">${IC_EDIT}</button>`:''}`]].map(([k,v])=>`<div><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
- const assignments=target?scopedPartySectionHtml(a,target):`<div class="dsection"><div class="mapp-leader-holders-head"><h2>배정 현황</h2>${editable?'<button class="btn sm" data-holder-add>배정 추가</button>':''}</div><div class="mapp-count">전체 <b>${(a.assignments||[]).length}</b></div><div data-holder-list></div></div>`;
- return `<div class="mapp-topbar"><button class="mapp-back" data-mapp-back aria-label="뒤로">←</button>${manage&&!target?`<button class="mapp-more" data-more-open aria-label="더보기">${MORE_ICON}</button>`:''}</div><div class="mapp-body mapp-leader-detail-body">${target?`<div class="mapp-directory-context">${esc(target.value)}</div>`:''}<div class="dhead-id"><div class="mapp-hero-wrap"><button class="mapp-hero-img" data-hero-viewer aria-label="사진 보기"${photos.length?'':' disabled'}>${cardThumb(a)}</button>${photos.length>1?`<span class="mapp-hero-count">+${photos.length-1}</span>`:''}${editable?`<button class="mapp-hero-edit" data-hero-edit aria-label="사진 관리">${IC_EDIT}</button>`:''}</div><div><h1>${esc(a.product)}</h1><div class="dhead-sub">${badge}<div>고유관리번호 <b>${esc(a.assetNo)}</b></div>${current?`<div>배정일 ${window.fmtDate(current.since)}</div>`:''}</div></div></div>${window.AssetExtra.tabs()}<div data-detail-panel="assignment">${assignments}</div><div data-detail-panel="info" hidden><div class="kv2">${info}${window.AssetExtra.detailRows(a,manage,expiryBadge)}</div></div><div data-detail-panel="history" hidden>${timelineHtml(a,'')}</div></div>`;
+ const info=[['분류',categoryPath(a)],['태그',(a.labels||[]).map(l=>`<span class="tag">${esc(l)}</span>`).join('')||'—']].map(([k,v])=>`<div><div class="k">${k}</div><div class="v">${v}</div></div>`).join('')+window.AssetExtra.detailRows(a,manage,expiryBadge)+[['자산 등록일',window.fmtDate(a.createdAt)],['QR 라벨',`<button type="button" class="btn sm icon-only" data-qr-open aria-label="QR 라벨">${QR_ICON}</button>`],['메모',`${window.AssetMemo.render(a.note)}${editable?`<button class="icon-edit" data-memoedit aria-label="메모 수정">${IC_EDIT}</button>`:''}`]].map(([k,v])=>`<div><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
+ const assignments=target?scopedPartySectionHtml(a,target):`<div class="dsection"><div class="mapp-leader-holders-head"><h2>배정 현황</h2></div><div data-holder-list></div></div>`;
+ return `<div class="mapp-topbar"><button class="mapp-back" data-mapp-back aria-label="뒤로">←</button>${editable||manage&&!target?`<button class="mapp-more" data-more-open aria-label="더보기">${MORE_ICON}</button>`:''}</div><div class="mapp-body mapp-leader-detail-body">${target?`<div class="mapp-directory-context">${esc(target.value)}</div>`:''}<div class="dhead-id"><div class="mapp-hero-wrap"><button class="mapp-hero-img" data-hero-viewer aria-label="사진 보기"${photos.length?'':' disabled'}>${cardThumb(a)}</button>${photos.length>1?`<span class="mapp-hero-count">+${photos.length-1}</span>`:''}${editable?`<button class="mapp-hero-edit" data-hero-edit aria-label="사진 관리">${IC_EDIT}</button>`:''}</div><div><h1>${esc(a.product)}</h1><div class="dhead-sub">${badge}<div>고유관리번호 <b>${esc(a.assetNo)}</b></div>${current?`<div>배정일 ${window.fmtDate(current.since)}</div>`:''}</div></div></div>${window.AssetExtra.tabs()}<div data-detail-panel="assignment">${assignments}</div><div data-detail-panel="info" hidden><div class="kv2">${info}</div>${window.AssetExtra.detailHtml(a,manage,expiryBadge)}</div><div data-detail-panel="history" hidden>${timelineHtml(a,'')}</div></div>`;
 }
   function leaderHolderList(a, query, kind, requestedPage) {
     const q = (query || "").trim().toLowerCase(),
@@ -1902,7 +1874,7 @@
       html: rows.length ? `<div class="acard-list">${rows.slice(0, page * 20).map(({
         x,
         idx
-      }) => `<div class="acard${canManage(a) ? " has-actions" : ""}">${typeBadge(x)}${canManage(a) ? `<button type="button" class="mapp-holder-more" data-holder-more data-index="${idx}" aria-label="${esc(x.employee || x.worksite)} 배정 관리" aria-haspopup="menu" aria-expanded="false">${MORE_ICON}</button>` : ""}<div class="acard-id">${assignIdentity(x)}</div><div class="acard-foot"><span class="acard-date">${`배정일 <b>${window.fmtDate(x.since)}</b>`}</span></div></div>`).join("")}</div>${page < pages ? '<div data-holder-sentinel style="height:1px"></div>' : ""}` : `<p class="muted">${q ? "결과가 없습니다." : "배정 대상이 없습니다."}</p>`
+      }) => `<div class="acard${canManage(a) ? " has-actions" : ""}">${typeBadge(x)}${canManage(a) ? `<button type="button" class="mapp-holder-more" data-holder-more data-index="${idx}" aria-label="${esc(x.employee || x.worksite)} 배정 관리" aria-haspopup="menu" aria-expanded="false">${MORE_ICON}</button>` : ""}<div class="acard-id">${assignIdentity(x)}</div><div class="acard-foot"><span class="acard-date">${`배정일 <b>${window.fmtDate(x.since)}</b>`}</span></div></div>`).join("")}</div>${page < pages ? '<div data-holder-sentinel style="height:1px"></div>' : ""}` : `<div class="assign-empty"><p class="muted">배정 대상이 없습니다.</p>${canManage(a) && a.status !== "disposed" ? '<button type="button" class="btn sm" data-holder-add>배정</button>' : ""}</div>`
     };
   }
   function openLeaderQr(a) {
@@ -1966,10 +1938,14 @@
         holderPage: 1,
         collapsedGroups: /* @__PURE__ */new Set()
       };
+    if(new URLSearchParams(location.search).get('qa')==='access'){
+      const sample=assets.find(a=>a.id===(new URLSearchParams(location.search).get('id')||'A001'))||assets[0];
+      Object.assign(state,{screen:'asset-detail',detailAssetId:sample.id,detailTarget:null,detailFrom:{screen:'menu'}});
+    }
     function draw() {
       ["plan-features", "asset-feature"].includes(state.screen) && !canConfigureFeatures() && (state.screen = "menu");
       const showTabBar = state.screen === "menu",
-        screenHtml = state.screen === "menu" ? menuScreenHtml(state.menuExpanded) : state.screen === "member-profile" ? directoryProfileScreenHtml("member", state) : state.screen === "worksite-profile" ? directoryProfileScreenHtml("worksite", state) : state.screen === "directory-member-assets" ? directoryMemberAssetsScreenHtml(state) : state.screen === "directory-worksite-assets" ? directoryWorksiteAssetsScreenHtml(state) : state.screen === "plan-features" ? planFeaturesScreenHtml() : state.screen === "asset-feature" ? assetFeatureScreenHtml() : state.screen === "sub-detail" ? subDetailScreenHtml(state.sub, state.statusFilter, state.popupFilters) : state.screen === "asset-detail" ? leaderAssetDetailHtml(assets.find(a => a.id === state.detailAssetId), state.detailTarget) : state.screen === "asset-parties" ? scopedPartiesScreenHtml(assets.find(a => a.id === state.detailAssetId), state.detailTarget) : state.screen === "asset-history" ? historyScreenHtml(assets.find(a => a.id === state.detailAssetId)) : state.screen === "asset-add" ? assetAddScreenHtml(state.addDraft) : state.screen === "asset-add-category" ? assetAddCategoryScreenHtml(state.addDraft) : state.screen === "asset-add-tags" ? assetAddTagManageScreenHtml(state.tagManageDraft) : assetsScreenHtml(state);
+        screenHtml = state.screen === "menu" ? menuScreenHtml(state.menuExpanded) : state.screen === "member-profile" ? directoryProfileScreenHtml("member", state) : state.screen === "worksite-profile" ? directoryProfileScreenHtml("worksite", state) : state.screen === "directory-member-assets" ? directoryMemberAssetsScreenHtml(state) : state.screen === "directory-worksite-assets" ? directoryWorksiteAssetsScreenHtml(state) : state.screen === "plan-features" ? planFeaturesScreenHtml() : state.screen === "asset-feature" ? assetFeatureScreenHtml() : state.screen === "sub-detail" ? subDetailScreenHtml(state.sub, state.statusFilter, state.popupFilters) : state.screen === "asset-detail" ? leaderAssetDetailHtml(assets.find(a => a.id === state.detailAssetId), state.detailTarget) : state.screen === "asset-history" ? historyScreenHtml(assets.find(a => a.id === state.detailAssetId)) : state.screen === "asset-add" ? assetAddScreenHtml(state.addDraft) : state.screen === "asset-add-category" ? assetAddCategoryScreenHtml(state.addDraft) : state.screen === "asset-add-tags" ? assetAddTagManageScreenHtml(state.tagManageDraft) : assetsScreenHtml(state);
       root.innerHTML = `
         <div class="mapp-stage">
           <div class="mapp-phone">
@@ -1999,7 +1975,7 @@
           };
           (state.addDraft.editingId ? editDirty(state.addDraft) : hasAddInput(state.addDraft)) ? confirmAddExit(leave, !!state.addDraft.editingId) : leave();
           return;
-        } else if (["asset-history", "asset-parties"].includes(state.screen)) state.screen = "asset-detail";else if (state.screen === "asset-detail") {
+        } else if (state.screen === "asset-history") state.screen = "asset-detail";else if (state.screen === "asset-detail") {
           state.screen = state.directoryDetailFrom || "sub-detail", delete state.directoryDetailFrom, state.detailTarget = null, draw(), root.querySelector(".mapp-screen").scrollTop = state.listScroll;
           return;
         } else state.screen === "sub-detail" ? (state.screen = "assets", state.sub = null, state.statusFilter = "all", state.popupFilters = MappAssetFilter.empty(), state.subSearch = "") : state.screen = "menu";
@@ -2086,7 +2062,7 @@
               return;
             }
             if (key === "edit") {
-              if (target || !hasAssetManagePermission() || a.status === "disposed") return;
+              if (!canEditInfo(a)) return;
               state.addOrigin = "asset-detail", state.addDraft = editDraftFor(a), state.screen = "asset-add", draw();
               return;
             }
@@ -2134,7 +2110,7 @@
               }
             }
             if (key === "assign-add") {
-              (a.assignments || []).length >= 5 ? toast("활성 배정은 최대 5건까지 가능합니다.") : openFormPage(a, null, "assign-add", afterMutate);
+              (a.assignments || []).length || openFormPage(a, null, "assign-add", afterMutate);
               return;
             }
             if (!statusActions(a).some(action => action.key === key)) return;
@@ -2163,6 +2139,7 @@
             if (!list) return;
             const rendered = leaderHolderList(a, state.holderQuery, state.holderCategory, state.holderPage);
             state.holderPage = rendered.page, list.innerHTML = rendered.html, holderObserver?.disconnect();
+            list.querySelector("[data-holder-add]")?.addEventListener("click", () => dispatchAction2("assign-add"));
             const sentinel = list.querySelector("[data-holder-sentinel]");
             sentinel && (holderObserver = new IntersectionObserver(entries => {
               entries.some(e => e.isIntersecting) && (state.holderPage++, drawHolders2());
@@ -2218,11 +2195,11 @@
         const more = root.querySelector("[data-more-open]");
         more && (more.onclick = () => {
           const items = [];
-          hasAssetManagePermission() && a.status !== "disposed" && items.push({
+          canEditInfo(a) && items.push({
             key: "edit",
             label: "자산 수정",
             sep: !0
-          }), hasAssetManagePermission() && items.push({
+          }), !target && hasAssetManagePermission() && items.push({
             key: "delete",
             label: "자산 삭제",
             danger: !0
@@ -2230,18 +2207,12 @@
         }), root.querySelector("[data-hero-viewer]").onclick = () => openPhotoViewer(a);
         const photoEdit = root.querySelector("[data-hero-edit]");
         photoEdit && (photoEdit.onclick = () => {
-          canManage(a) && openPhotoManageModal(a, afterMutate);
+          canEditInfo(a) && openPhotoManageModal(a, afterMutate);
         });
         const memoEdit = root.querySelector("[data-memoedit]");
         memoEdit && (memoEdit.onclick = () => {
-          canManage(a) && openMemoEditModal(a, afterMutate);
+          window.AssetAccess.canField(a,'memo',ME) && openMemoEditModal(a, afterMutate);
         }), root.querySelector("[data-qr-open]").onclick = () => openLeaderQr(a);
-        const add = root.querySelector("[data-holder-add]");
-        add && (add.onclick = () => dispatchAction2("assign-add"));
-        const partiesViewAll = root.querySelector("[data-parties-viewall]");
-        partiesViewAll && (partiesViewAll.onclick = () => {
-          state.screen = "asset-parties", draw();
-        });
         let holderObserver = null;
         const holderQuery = root.querySelector("[data-holder-query]"),
           holderCategory = root.querySelector("[data-holder-category]");
@@ -2283,6 +2254,7 @@
             save2 && (save2.disabled = !addDraftValid(draft) || !editDirty(draft));
           },
           renderProductMenu2 = function () {
+            if(productInput.readOnly)return;
             const query = productInput.value.trim().toLowerCase(),
               options = query ? productNames.filter(name => name.toLowerCase().includes(query)) : productNames;
             productMenu.innerHTML = options.map(name => `<button type="button" data-add-product-pick="${esc(name)}">${esc(name)}</button>`).join(""), productMenu.hidden = !options.length, productMenu.querySelectorAll("[data-add-product-pick]").forEach(button => button.onclick = () => {
@@ -2393,6 +2365,7 @@
             }), draw();
           });
         });
+        if(draft.editingId)window.AssetAccess.protectForm(root,assets.find(a=>a.id===draft.editingId),true);
         const save = root.querySelector("[data-add-save]");
         save && (save.onclick = () => {
           if (updateAddValidity2(), !addDraftValid(draft) || !editDirty(draft)) return;

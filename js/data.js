@@ -3,14 +3,14 @@ window.DATA = function () {
       group: "가구류",
       sub: "책상",
       type: "individual",
-      hiddenFields: ["expiry"],
+      hiddenFields: [],
       view: "회사의 모든 구성원",
       assign: "모든 관리자 및 리더"
     }, {
       group: "가구류",
       sub: "의자",
       type: "individual",
-      hiddenFields: ["expiry"],
+      hiddenFields: [],
       view: "회사의 모든 구성원",
       assign: "모든 관리자 및 리더"
     },
@@ -19,7 +19,7 @@ window.DATA = function () {
       group: "가구류",
       sub: "서랍장",
       type: "individual",
-      hiddenFields: ["expiry"],
+      hiddenFields: [],
       view: "회사의 모든 구성원",
       assign: "모든 관리자 및 리더"
     }, {
@@ -83,20 +83,13 @@ window.DATA = function () {
       note: "키보드 자판 일부 마모 확인 — 2025-06 교체 요청 이력 있음. 배정 반납 시 상태 재확인 필요. 트랙패드 클릭감 저하 민원 1건 접수돼 다음 정기 점검 때 같이 확인 요망.",
       photo: "#4b7bec",
       photoCount: 6,
-      // 공동 배정 샘플(구조설계안 2.3) — 앱 자산 상세의 "공동 배정 대상" 정보 섹션 확인용으로 이서연을 공동 배정자로 추가(2026-09-27)
       labels: ["본사", "개발팀"],
       assignments: [{
         employee: "김민수",
         worksite: null,
         since: "2024-03-15"
-      }, {
-        employee: "이서연",
-        worksite: null,
-        since: "2024-05-01"
       }]
     },
-    // 배정 추가 상한 테스트용 — 자산 하나당 활성 배정 최대 5건(구조설계안 2.1·6)을 꽉 채운 샘플(2026-09-30,
-    // 원래 status:"stock"/assignments:[] 배정 가능 샘플이었으나 A015/A016도 같은 역할이라 이걸로 대체)
     {
       id: "A002",
       type: "individual",
@@ -111,23 +104,8 @@ window.DATA = function () {
       price: 189e4,
       expiry: "2027-03-10",
       labels: ["본사"],
+      // 자산 한 건은 한 대상에게만 배정한다(설계기록 D-20261030-14, 공동 배정 제거).
       assignments: [{
-        employee: "김민수",
-        worksite: null,
-        since: "2024-04-01"
-      }, {
-        employee: "이서연",
-        worksite: null,
-        since: "2024-05-01"
-      }, {
-        employee: "박지훈",
-        worksite: null,
-        since: "2024-06-01"
-      }, {
-        employee: "정우성",
-        worksite: null,
-        since: "2024-07-01"
-      }, {
         employee: null,
         worksite: "강남점",
         since: "2024-08-01"
@@ -371,14 +349,6 @@ window.DATA = function () {
         employee: "박지훈",
         worksite: null,
         since: "2023-01-04"
-      }, {
-        employee: null,
-        worksite: "강남점",
-        since: "2023-06-01"
-      }, {
-        employee: null,
-        worksite: "판교점",
-        since: "2024-02-11"
       }]
     }, {
       id: "A006",
@@ -946,7 +916,7 @@ window.assetPhotoActivities = function (beforePhotos, beforePrimary, afterPhotos
 window.assetPhotoThumbsHtml = function (list) {
   return !list || !list.length ? "없음" : `<span class="hval-photos">${list.map(p => `<span class="hval-photo" style="background:${p.color}"></span>`).join("")}</span>`;
 };
-window.ASSET_ACTIVITY_ORDER = ["자산 정보 수정: 소분류 이동", "자산 정보 수정: 품목명 수정", "자산 사진 관리: 사진 변경", "자산 사진 관리: 대표 사진 변경", "자산 정보 수정: 고유관리번호 수정", "자산 정보 수정: 유효기한 변경", "자산 정보 수정: 태그 수정", "자산 정보 수정: S/N 수정", "자산 정보 수정: IMEI 수정", "자산 정보 수정: 제조연월 변경", "자산 정보 수정: 구매연월 변경", "자산 정보 수정: 구매가격 변경", "자산 정보 수정: 메모 수정"];
+window.ASSET_ACTIVITY_ORDER = ["자산 정보 수정: 소분류 이동", "자산 정보 수정: 품목명 수정", "자산 사진 관리: 사진 변경", "자산 사진 관리: 대표 사진 변경", "자산 정보 수정: 고유관리번호 수정", "자산 정보 수정: 태그 수정", "자산 정보 수정: 유효기한 변경", "자산 정보 수정: S/N 수정", "자산 정보 수정: IMEI 수정", "자산 정보 수정: 제조연월 변경", "자산 정보 수정: 구매연월 변경", "자산 정보 수정: 구매가격 변경", "자산 정보 수정: 메모 수정"];
 window.logAssetActivities = function (entries, log) {
   const rank = e => {
     const i = window.ASSET_ACTIVITY_ORDER.indexOf(e.script);
@@ -1029,7 +999,7 @@ window.archiveDeletedAsset = function (asset, actor) {
           category || fail("CATEGORY_CHANGED"), (!asset.product || asset.product.length > 50) && fail("INVALID_PRODUCT"), asset.assetNo && !/^[A-Za-z0-9_-]{1,30}$/.test(asset.assetNo) && fail("INVALID_ASSET_NO"), asset.assetNo && (used.has(asset.assetNo) && fail("DUPLICATE_ASSET_NO"), used.add(asset.assetNo));
           delete asset.totalQty;
           delete asset.stocks; // 회사 양식의 수량을 등록 개수로 해석하지 않는다.
-          const hidden = category.hiddenFields || [];
+          const hidden = []; // Basic information is always enabled; only custom fields have use toggles.
           asset.extraValues = Object.fromEntries((window.DATA.extraFields || []).filter(f => !f.deleted && (category.extraEnabled || []).includes(f.id)).map(f => [f.id,String((draft.extraValues||{})[f.id]||"").trim().slice(0,100)]));
           delete asset.serial; delete asset.imei;
           for (const field of ["expiry", "serial", "imei", "manufactured", "purchaseDate", "price"]) hidden.includes(field === "price" ? "purchasePrice" : field) && delete asset[field];
@@ -1124,15 +1094,16 @@ window.formatAssetCount = value => Number(value || 0).toLocaleString("en-US");
     return !/(?:^|\/)app\.html$/.test(location.pathname);
   };
   const category = a => a && window.DATA.categories.find(c => c.group === a.group && c.sub === a.sub);
-  const enabled = (cat,id) => !!cat && (fixed.some(f=>f.id===id) ? !(cat.hiddenFields||[]).includes(id) : (cat.extraEnabled||[]).includes(id));
-  const visible = (cat,id,manage=window.hasPrototypeAssetManagePermission()) => enabled(cat,id) && (manage || !(cat.privateFields||[]).includes(id));
+  const normalizeField = id => ({labels:'tags',note:'memo',price:'purchasePrice'}[id] || id);
+  const enabled = (cat,id) => !!cat && (['tags','memo',...fixed.map(f=>f.id)].includes(normalizeField(id)) || (cat.extraEnabled||[]).includes(id));
+  const visible = (cat,id,manage=window.hasPrototypeAssetManagePermission()) => enabled(cat,id) && (['tags','memo'].includes(normalizeField(id)) || manage || !(cat.privateFields||[]).includes(normalizeField(id)));
   const fields = () => [...fixed,...window.DATA.extraFields.filter(f=>!f.deleted)];
   function values(a,manage) {
     const cat=category(a);
     return fields().filter(f=>visible(cat,f.id,manage)).map(f=>({ ...f,value: f.id==='purchasePrice' ? a.price : fixed.some(x=>x.id===f.id) ? a[f.id] : (a.extraValues||{})[f.id] }));
   }
-  function detailRows(a,manage,expiryFormat) {
-    return values(a,manage).map(f=>{
+  function detailRows(a,manage,expiryFormat,group='basic') {
+    return values(a,manage).filter(f=>fixed.some(x=>x.id===f.id)===(group==='basic')).map(f=>{
       let value=f.value == null || f.value==='' ? '—' : esc(f.value);
       if(f.value && f.id==='expiry') value=expiryFormat ? expiryFormat(f.value) : window.fmtDate(f.value);
       if(f.value && ['manufactured','purchaseDate'].includes(f.id)) value=window.fmtMonth(f.value);
@@ -1140,15 +1111,15 @@ window.formatAssetCount = value => Number(value || 0).toLocaleString("en-US");
       return `<div><div class="k">${esc(f.name)}</div><div class="v">${value}</div></div>`;
     }).join('');
   }
-  // D-20261029-43: 상세 정보는 기본 항목·QR·메모 다음에 추가 정보를 소제목 없이 같은 목록으로 이어 나열한다.
+  // 기본 정보는 기존 목록에서, 회사 커스텀 항목만 별도 추가 정보 섹션에서 표시한다.
   function detailHtml(a,manage,expiryFormat) {
-    const rows=detailRows(a,manage,expiryFormat);
-    return rows ? `<div class="kv2">${rows}</div>` : '';
+    const rows=detailRows(a,manage,expiryFormat,'custom');
+    return rows ? `<section class="extra-info-section asset-custom-info"><h4>추가 정보</h4><div class="kv2">${rows}</div></section>` : '';
   }
   function historyVisible(asset,entry,manage=window.hasPrototypeAssetManagePermission()) {
     if(manage) return true;
-    const id=entry.fieldId || fixed.find(f=>(entry.script||'').startsWith(`자산 정보 수정: ${f.name} `))?.id;
-    return !id || !(category(asset)?.privateFields||[]).includes(id);
+    const id=entry.fieldId || ((entry.script||'').includes('메모 수정')?'memo':(entry.script||'').includes('태그 수정')?'tags':fixed.find(f=>(entry.script||'').startsWith(`자산 정보 수정: ${f.name} `))?.id);
+    return !id || ['tags','memo'].includes(normalizeField(id)) || !(category(asset)?.privateFields||[]).includes(id);
   }
   function customInputs(cat,values={},attr='data-extra-input',manage=true) {
     return window.DATA.extraFields.filter(f=>!f.deleted && visible(cat,f.id,manage)).map(f=>`<div class="field mapp-add-field"><label>${esc(f.name)}</label><input type="text" ${attr}="${esc(f.id)}" maxlength="100" placeholder="입력" value="${esc(values[f.id]||'')}"></div>`).join('');
@@ -1173,7 +1144,7 @@ window.formatAssetCount = value => Number(value || 0).toLocaleString("en-US");
     });
   }
   const tabs = () => '<div class="asset-detail-tabs"><button type="button" class="active" data-detail-tab="assignment">배정</button><button type="button" data-detail-tab="info">정보</button><button type="button" data-detail-tab="history">이력</button></div>';
-  window.AssetExtra={fixed,fields,category,enabled,visible,values,detailRows,detailHtml,historyVisible,customInputs,readInputs,applyCustom,bindDetailTabs,tabs,esc};
+  window.AssetExtra={fixed,fields,settingsFields:fields,category,enabled,visible,values,detailRows,detailHtml,historyVisible,customInputs,readInputs,applyCustom,bindDetailTabs,tabs,esc};
 })();
 
 (function(){if(new URLSearchParams(location.search).get('qa')!=='extra-info')return;window.DATA.extraFields.push({id:'qa-serial',name:'S/N'},{id:'qa-owner',name:'구매 담당자'});for(const c of window.DATA.categories){c.extraEnabled=['qa-serial','qa-owner'];c.privateFields=['purchasePrice','qa-owner'];}for(const a of window.DATA.assets)a.extraValues={'qa-serial':a.serial||'DEMO-SN-'+a.id,'qa-owner':'구매팀'};})();
@@ -1182,3 +1153,68 @@ window.formatAssetCount = value => Number(value || 0).toLocaleString("en-US");
 // company definitions and authorization, never send hidden values to the client.
 window.AssetExtra.exportColumns=()=>window.AssetExtra.fields().map(f=>({id:f.id,name:f.name}));
 window.AssetExtra.exportValues=(asset,manage=window.hasPrototypeAssetManagePermission())=>Object.fromEntries(window.AssetExtra.fields().map(f=>[f.id,window.AssetExtra.visible(window.AssetExtra.category(asset),f.id,manage)?(f.id==='purchasePrice'?asset.price:window.AssetExtra.fixed.some(x=>x.id===f.id)?asset[f.id]:asset.extraValues?.[f.id])??'':'']));
+
+
+// D-20261030: independent subcategory view / information edit / state management.
+// This is an in-memory prototype. Production APIs must enforce both category and field permissions.
+(function () {
+  const params = new URLSearchParams(location.search);
+  const roles = {admin:'admin',manager:'leader',leader:'leader',employee:'employee',viewer:'employee'};
+  const teams = {'김민수':'개발팀','이서연':'디자인팀','박지훈':'영업팀','정우성':'CS팀','김철수':'운영팀','최유진':'개발팀','한소희':'디자인팀','장민호':'국내영업','오세훈':'운영팀','배수지':'CS팀','윤재현':'해외영업','임하늘':'개발팀'};
+  const managed = () => window.hasPrototypeAssetManagePermission();
+  const qa = params.get('qa') === 'access';
+  const scenario = params.get('scenario') || 'info';
+  for (const cat of window.DATA.categories) {
+    cat.hiddenFields = []; // Fixed fields have no OFF state.
+    cat.privateFields=(cat.privateFields||[]).filter(id=>!['tags','labels','memo','note'].includes(id));
+    cat.edit ||= cat.assign || '모든 관리자 및 리더';
+    cat.editTarget ||= cat.assignTarget ? JSON.parse(JSON.stringify(cat.assignTarget)) : {groups:[],jobTitles:[],members:[]};
+    if (qa) {
+      cat.view='회사의 모든 구성원';
+      cat.edit=['info','both','private'].includes(scenario)?'회사의 모든 구성원':'관리자만';
+      cat.assign=['state','both'].includes(scenario)?'회사의 모든 구성원':'관리자만';
+      if(scenario==='private') cat.privateFields=[...new Set([...(cat.privateFields||[]),'purchasePrice'])];
+    }
+  }
+  // In QA, do not inherit the normal dashboard/leader manager persona.
+  if(qa) window.hasPrototypeAssetManagePermission=()=>scenario==='manage';
+  function actor(name) {
+    return {name:name||params.get('me')||'김민수',role:roles[params.get('role')] || (/app\.html$/.test(location.pathname)?'employee':'leader')};
+  }
+  function scope(cat,key,name) {
+    if(!cat)return false;
+    if(managed())return true;
+    const a=actor(name),target=cat[key+'Target'];
+    switch(cat[key]) {
+      case '회사의 모든 구성원':return true;
+      case '모든 관리자 및 리더':return a.role==='admin'||a.role==='leader';
+      case '관리자만':return a.role==='admin';
+      case '특정 관리자/리더':return ['admin','leader'].includes(a.role)&&(target?.members||[]).includes(a.name);
+      case '특정 그룹 및 직무/직급':return window.matchesAssetGroupPositionTarget(target,teams[a.name],window.ASSET_MEMBER_JOB_TITLES[a.name]);
+      default:return false;
+    }
+  }
+  const category=window.AssetExtra.category;
+  function canInfo(a,name){return !!a && !a.deleted_at && a.status!=='disposed' && (managed() || (scope(category(a),'view',name)&&scope(category(a),'edit',name)));}
+  function canState(a,name){return !!a && !a.deleted_at && a.status!=='disposed' && (managed() || (scope(category(a),'view',name)&&scope(category(a),'assign',name)));}
+  function canField(a,id,name){return canInfo(a,name) && (managed() || (!['group','sub','category','product','assetNo'].includes(id)&&window.AssetExtra.visible(category(a),id,false)));}
+  function protectForm(root,a,mobile=false){
+    if(!a)return;
+    const restricted=!managed();
+    const name=root.querySelector(mobile?'[data-add-field="product"]':'#areg-name');
+    const number=root.querySelector(mobile?'[data-add-field="assetNo"]':'#areg-assetno-input');
+    [name,number].filter(Boolean).forEach(el=>{el.readOnly=restricted;el.setAttribute('aria-readonly',String(restricted));});
+    const cat=root.querySelector(mobile?'[data-add-category]':'#areg-catwrap');
+    if(cat){if(cat.tagName==='BUTTON')cat.disabled=restricted;cat.setAttribute('aria-disabled',String(restricted));cat.classList.toggle('asset-readonly',restricted);}
+    root.querySelector(mobile?'[data-add-tag-manage]':'#areg-tag-manage')?.toggleAttribute('hidden',restricted);
+    for(const [id,selector] of mobile?[['tags','[data-add-tag-search]'],['memo','[data-add-field="note"]']]:[['tags','#areg-tag-field'],['memo','#areg-note-field']]){
+      const el=root.querySelector(selector),row=mobile?el?.closest('.mapp-add-field'):el;
+      if(row)row.hidden=!window.AssetExtra.visible(category(a),id);
+    }
+    for(const id of ['expiry','manufactured','purchaseDate','purchasePrice']){
+      const el=root.querySelector(`[data-add-date="${id}"], [data-add-field="${id}"]`);
+      if(mobile&&el)el.closest('.mapp-add-field').hidden=!window.AssetExtra.visible(category(a),id);
+    }
+  }
+  window.AssetAccess={scope,canInfo,canState,canField,protectForm,managed};
+})();

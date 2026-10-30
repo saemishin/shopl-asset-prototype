@@ -323,26 +323,14 @@
       phone: "010-5578-9901"
     }],
     MEMBER_TEAM = Object.fromEntries(MEMBERS.map(m => [m.name, m.team]));
-  function catViewPermission(cat) {
-    if (!cat) return !1;
-    switch (cat.view) {
-      case "회사의 모든 구성원":
-        return !0;
-      case "특정 관리자/리더":
-        return (cat.viewTarget && cat.viewTarget.members || []).includes(ME);
-      case "특정 그룹 및 직무/직급":
-        return window.matchesAssetGroupPositionTarget(cat.viewTarget, MEMBER_TEAM[ME], window.ASSET_MEMBER_JOB_TITLES[ME]);
-      default:
-        return !1;
-    }
-  }
+  function catViewPermission(cat) { return window.AssetAccess.scope(cat,'view',ME); }
   function hasViewPermission(a) {
     return catViewPermission(window.DATA.categories.find(c => c.group === a.group && c.sub === a.sub));
   }
   const DEMO_ASSUME_PERMISSION = !0;
-  function canManage(a) {
-    return !0;
-  }
+  function canManage(a) { return window.AssetAccess.canState(a,ME); }
+  function canEditInfo(a) { return window.AssetAccess.canInfo(a,ME); }
+
   const IC_EDIT = '<svg viewBox="0 0 24 24"><path d="M4 20l1-4L16 5l3 3L8 19l-4 1z"/><path d="M13.5 6.5l4 4"/></svg>',
     IC_EMP = '<svg class="hi" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5.5 20c0-4 3-6.5 6.5-6.5s6.5 2.5 6.5 6.5"/></svg>',
     IC_WS = '<svg class="hi" viewBox="0 0 24 24"><path d="M4 20V9.5L12 4l8 5.5V20"/><path d="M9.5 20v-5h5v5"/></svg>',
@@ -611,7 +599,7 @@
       <div class="modal" style="width:380px">
         <h3>폐기 처리하시겠습니까?</h3>
         <div class="body">
-          <div class="danger-note">${WARN_ICON}<span>기존 배정은 자동으로 종료되며, 이후 배정 추가·자산 수정이 제한됩니다. 자산 관리 권한자는 배정이 없는 배정 가능 상태로 복구할 수 있습니다.</span></div>
+          <div class="danger-note">${WARN_ICON}<span>기존 배정은 자동으로 종료되며, 이후 배정·자산 수정이 제한됩니다. 자산 관리 권한자는 배정이 없는 배정 가능 상태로 복구할 수 있습니다.</span></div>
           <div class="field" style="margin-top:14px;margin-bottom:0">
             <input type="text" data-del-input placeholder="입력">
           </div>
@@ -863,9 +851,9 @@
   }
   const FORM_CFG = {
     "assign-add": {
-      title: "배정 추가",
+      title: "배정",
       targetLabel: "배정 대상",
-      confirm: "배정을 추가하시겠습니까?"
+      confirm: "배정하시겠습니까?"
     },
     reassign: {
       title: "재배정",
@@ -994,7 +982,7 @@
             target: record,
             before: "",
             after: window.fmtDate(d)
-          }), toast("추가되었습니다."), afterMutate();
+          }), toast("배정되었습니다."), afterMutate();
         });
       } else if (kind === "reassign") {
         const d = f.dateIso,
@@ -1144,7 +1132,7 @@
     }, back.querySelector("[data-vclose]").onclick = () => back.remove(), back.querySelector("[data-vdownload]").onclick = () => toast("사진을 저장하였습니다."), draw();
   }
   const STATUS_TRANSITIONS = {
-    // 배정 가능 상태에서는 배정 추가와 같은 동작을 '배정'으로 바로 제공한다(2026-10-29 사용자 결정).
+    // 배정 가능 상태에서는 상태 메뉴에서 '배정'을 바로 제공한다(D-20261029-52·D-20261030-15).
     stock: [["assign-add", "배정"], ["repair-start", "수리/점검 접수"], ["lost-report", "분실 신고"], ["dispose", "폐기 처리"]],
     assigned: [["repair-start", "수리/점검 접수"], ["lost-report", "분실 신고"], ["dispose", "폐기 처리"]],
     repair: [["repair-done", "수리/점검 완료"], ["lost-report", "분실 신고"], ["dispose", "폐기 처리"]],
@@ -1183,11 +1171,12 @@
     return acts;
   }
   function menuActions(a,target) {
- // 대상 기준 상세(내 자산·근무지 자산)는 이 대상의 배정 관리(배정일 수정·재배정·반납)를 기존처럼 상단 더보기에 둔다.
- if(target)return manageActions(a,target);
- if(!window.hasPrototypeAssetManagePermission())return [];
- return [...(a.status!=='disposed'?[{key:'edit',label:'자산 수정'}]:[]),{key:'delete',label:'자산 삭제',danger:true}];
-}
+    const actions=target?manageActions(a,target):[];
+    if(canEditInfo(a))actions.push({key:'edit',label:'자산 수정'});
+    if(!target&&window.hasPrototypeAssetManagePermission())actions.push({key:'delete',label:'자산 삭제',danger:true});
+    return actions;
+  }
+
   function openDropdownMenu(anchor, items, onPick) {
     document.querySelectorAll(".dropdown-menu").forEach(m => m.remove());
     const menu = document.createElement("div");
@@ -1229,23 +1218,11 @@ function openLeaderQr(a) {
   function assetDetailScreenHtml(a,target) {
  activityLog(a);
  const actions=statusActions(a), idx=findRecord(a,target).idx, rec=idx>=0?a.assignments[idx]:null, photos=window.assetPhotos(a), manage=window.hasPrototypeAssetManagePermission();
- const info=[['분류',categoryPath(a)],['태그',chips(a.labels)],['자산 등록일',window.fmtDate(a.createdAt)],['QR 라벨','<button class="btn sm" data-qr-open aria-label="QR 라벨">QR 라벨</button>'],['메모',`${memoHtml(a.note)}${canManage(a)&&a.status!=='disposed'?`<button class="icon-edit" data-memoedit aria-label="메모 수정">${IC_EDIT}</button>`:''}`]].map(([k,v])=>`<div><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
- const others=otherParties(a,target);
- const party=`<div class="dsection"><div class="mapp-party-header"><h2 class="mapp-party-head">공동 배정 대상</h2>${canManage(a)&&a.status!=='disposed'?'<button class="btn sm" data-party-add>배정 추가</button>':''}</div><div class="mapp-count">전체 <b>${others.length}</b></div>${others.length?`<div class="mapp-party-list">${others.map(x=>partyRowHtml(x,true)).join('')}</div>`:'<p class="mapp-party-empty">공동 배정 대상이 없습니다.</p>'}</div>`;
- return `<div class="mapp-topbar"><button class="mapp-back" data-mapp-back aria-label="뒤로">←</button>${menuActions(a,target).length?`<button class="mapp-more" data-more-open aria-label="더보기">${MORE_ICON}</button>`:''}</div><div class="mapp-body"><div class="dhead-id"><div class="mapp-hero-wrap"><button class="mapp-hero-img" data-hero-viewer aria-label="사진 보기"${photos.length?'':' disabled'}>${cardThumb(a)}</button>${photos.length>1?`<span class="mapp-hero-count">+${photos.length-1}</span>`:''}${canManage(a)&&a.status!=='disposed'?`<button class="mapp-hero-edit" data-hero-edit aria-label="사진 관리">${IC_EDIT}</button>`:''}</div><div><h1>${a.product}</h1><div class="dhead-sub">${actions.length?`<button class="badge ${STATUS_LABEL[a.status][1]} clickable" data-status-open>${STATUS_LABEL[a.status][0]} ▾</button>`:`<span class="badge ${STATUS_LABEL[a.status][1]}">${STATUS_LABEL[a.status][0]}</span>`}<div>고유관리번호 <b>${a.assetNo}</b></div>${rec?`<div>배정일 ${window.fmtDate(rec.since)}</div>`:''}</div></div></div>${window.AssetExtra.tabs()}<div data-detail-panel="assignment">${party}</div><div data-detail-panel="info" hidden><div class="kv2">${info}${window.AssetExtra.detailRows(a,manage,expiryBadge)}</div></div><div data-detail-panel="history" hidden>${timelineHtml(a,'')}</div></div>`;
+ const info=[['분류',categoryPath(a)],['태그',chips(a.labels)]].map(([k,v])=>`<div><div class="k">${k}</div><div class="v">${v}</div></div>`).join('')+window.AssetExtra.detailRows(a,manage,expiryBadge)+[['자산 등록일',window.fmtDate(a.createdAt)],['QR 라벨','<button class="btn sm" data-qr-open aria-label="QR 라벨">QR 라벨</button>'],['메모',`${memoHtml(a.note)}${window.AssetAccess.canField(a,'memo',ME)?`<button class="icon-edit" data-memoedit aria-label="메모 수정">${IC_EDIT}</button>`:''}`]].map(([k,v])=>`<div><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
+ // 자산 한 건은 한 대상에게만 배정하므로 배정 탭에는 이 대상의 배정 기록 하나만 보여준다(D-20261030-14·15).
+ const party=`<div class="dsection"><h2 class="mapp-party-head">배정 대상</h2>${rec?`<div class="mapp-party-list">${partyRowHtml(rec,true)}</div>`:'<p class="mapp-party-empty">배정 대상이 없습니다.</p>'}</div>`;
+ return `<div class="mapp-topbar"><button class="mapp-back" data-mapp-back aria-label="뒤로">←</button>${menuActions(a,target).length?`<button class="mapp-more" data-more-open aria-label="더보기">${MORE_ICON}</button>`:''}</div><div class="mapp-body"><div class="dhead-id"><div class="mapp-hero-wrap"><button class="mapp-hero-img" data-hero-viewer aria-label="사진 보기"${photos.length?'':' disabled'}>${cardThumb(a)}</button>${photos.length>1?`<span class="mapp-hero-count">+${photos.length-1}</span>`:''}${canEditInfo(a)?`<button class="mapp-hero-edit" data-hero-edit aria-label="사진 관리">${IC_EDIT}</button>`:''}</div><div><h1>${a.product}</h1><div class="dhead-sub">${actions.length?`<button class="badge ${STATUS_LABEL[a.status][1]} clickable" data-status-open>${STATUS_LABEL[a.status][0]} ▾</button>`:`<span class="badge ${STATUS_LABEL[a.status][1]}">${STATUS_LABEL[a.status][0]}</span>`}<div>고유관리번호 <b>${a.assetNo}</b></div>${rec?`<div>배정일 ${window.fmtDate(rec.since)}</div>`:''}</div></div></div>${window.AssetExtra.tabs()}<div data-detail-panel="assignment">${party}</div><div data-detail-panel="info" hidden><div class="kv2">${info}</div>${window.AssetExtra.detailHtml(a,manage,expiryBadge)}</div><div data-detail-panel="history" hidden>${timelineHtml(a,'')}</div></div>`;
 }
-  function partiesScreenHtml(a, target) {
-    const others = otherParties(a, target);
-    return `
-      <div class="mapp-topbar">
-        <button type="button" class="mapp-back" data-mapp-back aria-label="뒤로">←</button>
-        <span class="mapp-topbar-title">공동 배정 대상</span>
-      </div>
-      <div class="mapp-body">
-        <div class="mapp-count">전체 <b>${others.length}</b></div>
-        <div class="mapp-party-list">${others.map(x => partyRowHtml(x, !0)).join("")}</div>
-      </div>`;
-  }
   const MENU_ICON_ASSET = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10" r="1.6"/><path d="m21 16-5-5-9 8"/></svg>',
     DEMO_DIRECTORY_MEMBER = "김민수",
     DEMO_DIRECTORY_WORKSITE = "강남점";
@@ -1459,6 +1436,12 @@ function openLeaderQr(a) {
         wsFilters: MappAssetFilter.empty(),
         wsSearch: ""
       };
+    if(new URLSearchParams(location.search).get('qa')==='access'){
+      const sample=assets.find(a=>a.id===(new URLSearchParams(location.search).get('id')||'A001'))||assets[0];
+      const record=(sample.assignments||[]).find(r=>r.employee===ME)||(sample.assignments||[])[0];
+      const target=record?{type:record.employee?'employee':'worksite',value:record.employee||record.worksite}:null;
+      Object.assign(state,{screen:'asset-detail',detailAssetId:sample.id,detailTarget:target,detailFrom:{screen:'menu'}});
+    }
     function draw() {
       ["plan-features", "asset-feature"].includes(state.screen) && !canConfigureFeatures() && (state.screen = "menu");
       const items = sortItems(collectMyItems(ME)),
@@ -1538,7 +1521,7 @@ function openLeaderQr(a) {
           const {
             idx
           } = findRecord(a, target);
-          if(key === "edit"){window.openAssetAddModal({asset:a,logActivity:e=>logActivity(a,e),onSaved:draw});return;}
+          if(key === "edit"){if(!canEditInfo(a))return;window.openAssetAddModal({asset:a,logActivity:e=>logActivity(a,e),onSaved:draw});return;}
           if(key === "delete"){confirmModal("삭제하시겠습니까?","삭제하면 복구할 수 없습니다.",()=>{window.archiveDeletedAsset(a,ME);Object.assign(state,state.detailFrom);draw();toast("삭제되었습니다.");});return;}
           if (key === "history") state.screen = "asset-history", draw();else if (key === "date") {
             if (a.status === "disposed" || !canManage(a) || idx < 0) return;
@@ -1554,7 +1537,7 @@ function openLeaderQr(a) {
                 }), afterMutate(), toast("배정일이 수정되었습니다.");
               });
             });
-          } else key === "assign-add" ? (a.assignments || []).length >= 5 ? toast("활성 배정은 최대 5건까지 가능합니다.") : openFormPage(a, target, "assign-add", afterMutate) : key === "reassign" ? openFormPage(a, target, "reassign", afterMutate) : key === "return" ? openReturnConfirm(a, idx, afterMutate) : key === "lost-report" ? openStatusChangeConfirm(a, "분실 신고하시겠습니까?", "분실 신고 시 기존 배정은 유지된 채 상태만 분실로 변경됩니다.", setStatus("상태 변경: 분실 신고", () => "lost"), afterMutate) : key === "lost-recover" ? openStatusChangeConfirm(a, "분실 회수 처리하시겠습니까?", "분실 회수 시 배정 여부에 따라 배정 중 또는 배정 가능 상태로 돌아갑니다.", setStatus("상태 변경: 분실 회수", () => derivedActiveStatus(a)), afterMutate) : key === "repair-start" ? openStatusChangeConfirm(a, "수리/점검을 접수하시겠습니까?", "수리/점검을 접수하면 기존 배정은 유지되고 자산 상태가 수리/점검 중으로 변경됩니다.", setStatus("상태 변경: 수리/점검 접수", () => "repair"), afterMutate, !1, "수리/점검이 접수되었습니다.") : key === "repair-done" ? openStatusChangeConfirm(a, "수리/점검을 완료하시겠습니까?", "수리/점검을 완료하면 현재 배정 여부에 따라 자산 상태가 배정 중 또는 배정 가능 상태로 변경됩니다.", setStatus("상태 변경: 수리/점검 완료", () => derivedActiveStatus(a)), afterMutate, !1, "수리/점검이 완료되었습니다.") : key === "dispose-restore" ? window.openAssetRestoreConfirm(a, message => {
+          } else key === "assign-add" ? (a.assignments || []).length || openFormPage(a, target, "assign-add", afterMutate) : key === "reassign" ? openFormPage(a, target, "reassign", afterMutate) : key === "return" ? openReturnConfirm(a, idx, afterMutate) : key === "lost-report" ? openStatusChangeConfirm(a, "분실 신고하시겠습니까?", "분실 신고 시 기존 배정은 유지된 채 상태만 분실로 변경됩니다.", setStatus("상태 변경: 분실 신고", () => "lost"), afterMutate) : key === "lost-recover" ? openStatusChangeConfirm(a, "분실 회수 처리하시겠습니까?", "분실 회수 시 배정 여부에 따라 배정 중 또는 배정 가능 상태로 돌아갑니다.", setStatus("상태 변경: 분실 회수", () => derivedActiveStatus(a)), afterMutate) : key === "repair-start" ? openStatusChangeConfirm(a, "수리/점검을 접수하시겠습니까?", "수리/점검을 접수하면 기존 배정은 유지되고 자산 상태가 수리/점검 중으로 변경됩니다.", setStatus("상태 변경: 수리/점검 접수", () => "repair"), afterMutate, !1, "수리/점검이 접수되었습니다.") : key === "repair-done" ? openStatusChangeConfirm(a, "수리/점검을 완료하시겠습니까?", "수리/점검을 완료하면 현재 배정 여부에 따라 자산 상태가 배정 중 또는 배정 가능 상태로 변경됩니다.", setStatus("상태 변경: 수리/점검 완료", () => derivedActiveStatus(a)), afterMutate, !1, "수리/점검이 완료되었습니다.") : key === "dispose-restore" ? window.openAssetRestoreConfirm(a, message => {
             afterMutate(), toast(message);
           }, ME) : key === "dispose" && openDisposeConfirmModal(a, afterMutate);
         };
@@ -1574,10 +1557,6 @@ function openLeaderQr(a) {
         statusOpen && (statusOpen.onclick = () => openDropdownMenu(statusOpen, statusActions(a), dispatchAction2));
         const moreOpen = root.querySelector("[data-more-open]");
         moreOpen && (moreOpen.onclick = () => openDropdownMenu(moreOpen, menuActions(a, target), dispatchAction2));
-        const partyAdd = root.querySelector("[data-party-add]");
-        partyAdd && (partyAdd.onclick = () => {
-          !canManage(a) || a.status === "disposed" || dispatchAction2("assign-add");
-        });
         const qr=root.querySelector("[data-qr-open]");if(qr)qr.onclick=()=>openLeaderQr(a);
         const heroBtn = root.querySelector("[data-hero-viewer]");
         heroBtn && (heroBtn.onclick = () => openPhotoViewer(a));

@@ -185,7 +185,7 @@
       <div class="modal" style="width:380px">
         <h3>폐기 처리하시겠습니까?</h3>
         <div class="body">
-          <div class="danger-note">${WARN_ICON}<span>기존 배정은 자동으로 종료되며, 이후 배정 추가·자산 수정이 제한됩니다. 자산 관리 권한자는 배정이 없는 배정 가능 상태로 복구할 수 있습니다.</span></div>
+          <div class="danger-note">${WARN_ICON}<span>기존 배정은 자동으로 종료되며, 이후 배정·자산 수정이 제한됩니다. 자산 관리 권한자는 배정이 없는 배정 가능 상태로 복구할 수 있습니다.</span></div>
           <div class="field" style="margin-top:14px;margin-bottom:0">
             <input type="text" data-del-input placeholder="입력">
           </div>
@@ -213,7 +213,7 @@
     }, document.body.appendChild(cb), input.focus();
   }
   const STATUS_ACTION_HANDLERS = {
-    // 배정 가능 상태의 상태 변경 메뉴에서 배정 추가와 같은 Modal을 바로 연다.
+    // 배정 가능 상태의 상태 변경 메뉴에서 배정 현황의 [배정]과 같은 Modal을 바로 연다.
     "배정": a => openAssignAddModal(a),
     "수리/점검 접수": handleRepairStart,
     "분실 신고": handleLostReport,
@@ -477,7 +477,8 @@
   let stockPage = 1;
   function assignCurrentHtml(a) {
     const asg = a.assignments || [];
-    return asg.length ? `<div class="acard-list">${asg.map((x, idx) => ({
+    // 자산 한 건은 한 대상에게만 배정한다(D-20261030-14·15). 배정이 없으면 빈 상태 안에 [배정]을 둔다.
+    return asg.length ? `<div class="acard-list">${asg.slice(0, 1).map((x, idx) => ({
       x,
       idx
     })).sort((p, q) => p.x.since === q.x.since ? 0 : p.x.since < q.x.since ? 1 : -1).map(({
@@ -494,9 +495,10 @@
             <button class="btn sm" data-act="반납">반납</button>
           </div>
         </div>
-      </div>`).join("")}</div>` : '<p class="muted" style="padding:6px 0">배정 대상이 없습니다.</p>';
+      </div>`).join("")}</div>` : `<div class="assign-empty"><p class="muted">배정 대상이 없습니다.</p>${a.status === "disposed" ? "" : '<button class="btn sm" data-assign-new>배정</button>'}</div>`;
   }
   function applyTargetContext(scope,a){
+    if(!window.AssetAccess.canState(a)){scope.querySelectorAll('[data-dateedit],.acard-actions,#assign-actions,[data-assign-new]').forEach(el=>el.remove());}
     if(!targetContext)return;
     const idx=(a.assignments||[]).findIndex(x=>x[targetContext.type]===targetContext.value);
     if(idx<0){scope.querySelector('.dgrid').innerHTML='<p class="muted">설정이 변경되었습니다. 잠시 후 다시 시도해주세요.</p>';return;}
@@ -580,6 +582,7 @@
     });
   }
   function wireAssignCards(scope, a) {
+    scope.querySelector("[data-assign-new]")?.addEventListener("click", () => openAssignAddModal(a));
     scope.querySelectorAll("[data-dateedit]").forEach(b => b.onclick = () => {
       const row = b.closest(".acard");
       openDatePopover(b, a, +row.dataset.idx);
@@ -612,7 +615,7 @@
     const back = document.createElement("div");
     back.className = "modal-back", back.innerHTML = `
       <div class="modal" style="width:400px">
-        <h3>배정 추가</h3>
+        <h3>배정</h3>
         <div class="body" data-body></div>
         <div class="foot">
           <button class="btn" data-close>취소</button>
@@ -681,13 +684,13 @@
           worksite: draftTarget.worksite,
           since: d
         };
-      confirmModal("배정을 추가하시겠습니까?", () => {
+      confirmModal("배정하시겠습니까?", () => {
         back.remove(), (a.assignments || (a.assignments = [])).push(record), a.status === "stock" && (a.status = "assigned"), logActivity(a, {
           script: "배정 관리: 신규 배정",
           target: record,
           before: "",
           after: window.fmtDate(d)
-        }), toast("추가되었습니다."), render();
+        }), toast("배정되었습니다."), render();
       });
     };
   }
@@ -938,6 +941,7 @@
         fn: () => toast(`${zipName(a)} 다운로드 (프로토타입)`),
         sep: !0
       });
+      if(!window.AssetAccess.canInfo(a))for(let i=list.length-1;i>=0;i--)if(['대표 사진으로 지정','삭제'].includes(list[i].t))list.splice(i,1);
       const menu = document.createElement("div");
       menu.className = "dropdown-menu", menu.innerHTML = list.map((x, i) => (x.sep ? '<div class="dropdown-sep"></div>' : "") + `<button data-i="${i}" class="${x.danger ? "danger" : ""}">${x.t}</button>`).join("");
       const r = anchor.getBoundingClientRect();
@@ -992,23 +996,24 @@
         repair: ["수리/점검 완료", "분실 신고", "폐기 처리"],
         lost: ["분실 회수", "폐기 처리"],
         disposed: window.canRestoreDisposedAsset(a) ? ["폐기 복구"] : []
-      }[a.status].filter(label => label !== "폐기 처리" || canManageAssets()),
+      }[a.status].filter(label => label === "폐기 복구" ? window.canRestoreDisposedAsset(a) : label === "폐기 처리" ? canManageAssets() : window.AssetAccess.canState(a)),
       statusBadge = statusItems.length ? `<button class="badge ${STATUS_LABEL[a.status][1]} clickable" data-statuschange>${STATUS_LABEL[a.status][0]} <span class="bchev">▾</span></button>` : `<span class="badge ${STATUS_LABEL[a.status][1]}">${STATUS_LABEL[a.status][0]}</span>`,
       heldQty = 0,
       subMeta = `<div>${statusBadge}</div>${a.assetNo ? `<div style="margin-top:5px">고유관리번호 <b>${a.assetNo}</b></div>` : ""}`,
       qrBtn = '<button class="btn sm icon-only" data-qr aria-label="QR 라벨" title="QR 라벨"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM19 14h2v2h-2zM14 19h2v2h-2zM19 19h2v2h-2z"/></svg></button>',
       mgrBtn = '<button class="btn sm icon-only corner" data-more aria-label="자산관리" title="자산관리"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button>',
-      moreItems = !targetContext&&canManageAssets()?[...(a.status!=="disposed"?["자산 수정"]:[]),"자산 삭제"]:[],
+      moreItems = [...(window.AssetAccess.canInfo(a)?["자산 수정"]:[]),...(!targetContext&&canManageAssets()?["자산 삭제"]:[])],
       hidden = ((window.DATA.categories || []).find(x => x.group === a.group && x.sub === a.sub) || {}).hiddenFields || [],
       kv = [
  {k:'분류',v:`${a.group} › ${a.sub}`},
- {k:'태그',v:chips(a.labels)}, {k:'자산 등록일',v:window.fmtDate(a.createdAt)},
- {k:'QR 라벨',v:qrBtn}, {k:'메모',v:`${memoHtml(a.note)}${a.status!=='disposed'?`<button class="icon-edit" data-memoedit aria-label="메모 수정">${IC_EDIT}</button>`:''}`}
-].map(({k,v})=>`<div><div class="k">${k}</div><div class="v">${v}</div></div>`).join('')+window.AssetExtra.detailRows(a,canManageAssets(),expiryBadge);
+ {k:'태그',v:chips(a.labels)}
+].map(({k,v})=>`<div><div class="k">${k}</div><div class="v">${v}</div></div>`).join('')+window.AssetExtra.detailRows(a,canManageAssets(),expiryBadge)+[
+ {k:'자산 등록일',v:window.fmtDate(a.createdAt)}, {k:'QR 라벨',v:qrBtn},
+ {k:'메모',v:`${memoHtml(a.note)}${window.AssetAccess.canField(a,'memo')?`<button class="icon-edit" data-memoedit aria-label="메모 수정">${IC_EDIT}</button>`:''}`}
+].map(({k,v})=>`<div><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
     activityLog(a);
     let holdCard;
     {
-      const asg = a.assignments || [];
       holdCard = `
         <section class="dcard" id="assign-card">
           <div class="dsection-head">
@@ -1016,9 +1021,7 @@
               <button data-atab="current" class="active">배정 현황</button>
               <button data-atab="history">이력</button>
             </div>
-            <div class="hactions" id="assign-actions">${a.status === "disposed" ? "" :
-      // 자산 하나당 활성 배정 최대 5건(구조설계안 2.1·6, 근무지·구성원 합산) — 도달 시 배정 추가 비활성
-      asg.length >= 5 ? '<button class="btn sm" disabled data-tip="자산 하나당 활성 배정은 최대 5건까지 가능합니다.">배정 추가</button>' : btn("배정 추가")}</div>
+            <div class="hactions" id="assign-actions"></div>
           </div>
           <div id="assign-body">${assignCurrentHtml(a)}</div>
         </section>`;
@@ -1046,7 +1049,7 @@
           </div>
 
           <div class="dsection">
-            <div class="kv2">${kv}</div>
+            <div class="kv2">${kv}</div>${window.AssetExtra.detailHtml(a,canManageAssets(),expiryBadge)}
           </div>
         </section>
 
@@ -1064,8 +1067,7 @@
       const body = card.querySelector("#assign-body"),
         actions = card.querySelector("#assign-actions");
       wireAssignCards(body, a);applyTargetContext(c,a);
-      const addBtn = actions.querySelector("[data-act]");
-      addBtn && (addBtn.onclick = () => openAssignAddModal(a)), card.querySelectorAll("[data-atab]").forEach(t => t.onclick = () => {
+      card.querySelectorAll("[data-atab]").forEach(t => t.onclick = () => {
         card.querySelectorAll("[data-atab]").forEach(x => x.classList.toggle("active", x === t));
         const isCurrent = t.dataset.atab === "current";
         body.innerHTML = isCurrent ? assignCurrentHtml(a) : timelineHtml(a), actions.hidden = !isCurrent, bindActs(body), isCurrent && wireAssignCards(body, a);applyTargetContext(c,a);

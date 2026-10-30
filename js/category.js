@@ -133,7 +133,8 @@
     DEFAULT_HIDDEN_FIELDS = {
       individual: ["imei"]
     },
-    assignLabel = type => "배정 변경 권한",
+    assignLabel = type => "상태 관리 권한",
+    permLabel = kind => kind === "view" ? "자산 조회 권한" : kind === "edit" ? "정보 수정 권한" : "상태 관리 권한",
     RESTRICT_TIP = "변경 권한을 부여하려면 먼저 조회 권한이 부여되어야 합니다.",
     assetsOf = (group, sub) => assets.filter(a => !a.deleted_at && a.group === group && a.sub === sub),
     categoryName = value => String(value || "").trim().replace(/\s+/g, " ");
@@ -241,7 +242,7 @@
   const fieldsForType = type => window.AssetExtra.fields().map(f=>f.id);
   function usageInfoHtml(cat) {
  const manage=window.hasPrototypeAssetManagePermission();
- return window.AssetExtra.fields().filter(f=>manage || !(cat.privateFields||[]).includes(f.id)).map(f=>`<span class="usebullet ${window.AssetExtra.enabled(cat,f.id)?'on':'off'}">${window.AssetExtra.esc(f.name)} ${window.AssetExtra.enabled(cat,f.id)?'ON':'OFF'}${window.AssetExtra.enabled(cat,f.id)&&(cat.privateFields||[]).includes(f.id)?' · 비공개':''}</span>`).join('');
+ return window.DATA.extraFields.filter(f=>!f.deleted).filter(f=>manage || !(cat.privateFields||[]).includes(f.id)).map(f=>`<span class="usebullet ${window.AssetExtra.enabled(cat,f.id)?'on':'off'}">${window.AssetExtra.esc(f.name)} ${window.AssetExtra.enabled(cat,f.id)?'ON':'OFF'}${window.AssetExtra.enabled(cat,f.id)&&(cat.privateFields||[]).includes(f.id)?' · 비공개':''}</span>`).join('');
 }
   const ASSET_SEARCH_HTML = `
     <div class="cat-asset-search">
@@ -313,7 +314,7 @@
     m.className = "modal-back", m.innerHTML = `
       <div class="modal help-modal perm-target-modal">
         <div class="help-modal-head">
-          <h3>${kind === "view" ? "자산 조회 권한" : assignLabel(cat.type)}</h3>
+          <h3>${permLabel(kind)}</h3>
           <button type="button" class="btn icon-only sm" data-close aria-label="닫기">${CLOSE_ICON}</button>
         </div>
         <div class="body">${bodyHtml}</div>
@@ -329,9 +330,10 @@
       </div>
       <div class="kv2 cat-detail-kv">
         <div><div class="k">자산 조회 권한</div><div class="v">${permValueHtml(cat, "view")}</div></div>
+        <div><div class="k">정보 수정 권한</div><div class="v">${permValueHtml(cat, "edit")}</div></div>
         <div><div class="k">${assignLabel(cat.type)}</div><div class="v">${permValueHtml(cat, "assign")}</div></div>
       </div>
-      <div class="cat-usage">
+      <div class="cat-usage"${usageInfoHtml(cat)?"":" hidden"}>
         <div class="k">추가 정보</div>
         <div class="cat-usage-bullets">${usageInfoHtml(cat)}</div>
       </div>
@@ -356,18 +358,23 @@
         <button type="button" class="cat-manage-select-btn" data-f-view-btn><span>${state.view}</span><span class="chev">▾</span></button>
       </div>
       <div class="field">
+        <label>정보 수정 권한<span class="req">*</span></label>
+        <p class="hint" style="margin-top:0;margin-bottom:8px">이 소분류의 자산 정보·사진·태그·메모를 수정할 수 있는 구성원을 설정합니다.</p>
+        <button type="button" class="cat-manage-select-btn" data-f-edit-btn><span>${state.edit}</span><span class="chev">▾</span></button>
+      </div>
+      <div class="field">
         <label>${assignLabel(state.type)}<span class="req">*</span></label>
         <p class="hint" style="margin-top:0;margin-bottom:8px">이 소분류의 자산을 배정·반납하거나 상태를 변경할 수 있는 구성원을 설정합니다.</p>
         <button type="button" class="cat-manage-select-btn" data-f-assign-btn><span>${state.assign}</span><span class="chev">▾</span></button>
       </div>
       <div class="field">
-        <label>추가 정보</label>
+        <label>정보 설정</label>
         <p class="hint" style="margin-top:0;margin-bottom:10px">비공개로 설정한 항목은 자산 관리 권한을 보유한 구성원만 보고 입력할 수 있습니다.</p>
         <div class="cat-manage-fieldlist" data-f-fields>
-          ${window.AssetExtra.fields().map(f => {
-            const enabled=window.AssetExtra.fixed.some(x=>x.id===f.id)?!state.hiddenFields.includes(f.id):(state.extraEnabled||[]).includes(f.id);
-            return `<div class="extra-field-settings"><div class="cat-manage-fieldrow"><span>${window.AssetExtra.esc(f.name)}</span><button type="button" class="toggle-switch${enabled?' on':''}" data-field="${f.id}" role="switch" aria-checked="${enabled}" aria-label="${window.AssetExtra.esc(f.name)} 노출"><span class="toggle-knob"></span></button></div>${f.description?`<small>${f.description}</small>`:''}${enabled?`<label class="extra-private"><input type="checkbox" data-private-field="${f.id}"${(state.privateFields||[]).includes(f.id)?' checked':''}>비공개</label>`:''}</div>`;
-          }).join("")}
+          ${[{name:'기본 정보',fields:window.AssetExtra.fixed},{name:'추가 정보',fields:window.DATA.extraFields.filter(f=>!f.deleted)}].filter(group=>group.fields.length).map(group=>`<section class="cat-info-settings-group"><h4>${group.name}</h4>${group.fields.map(f => {
+            const locked=window.AssetExtra.fixed.some(x=>x.id===f.id), enabled=locked||(state.extraEnabled||[]).includes(f.id);
+            return `<div class="extra-field-settings"><div class="cat-manage-fieldrow"><span>${window.AssetExtra.esc(f.name)}</span><button type="button" class="toggle-switch${enabled?' on':''}" data-field="${f.id}"${locked?' disabled aria-disabled="true"':''} role="switch" aria-checked="${enabled}" aria-label="${window.AssetExtra.esc(f.name)} 노출"><span class="toggle-knob"></span></button></div>${f.description?`<small>${window.AssetExtra.esc(f.description)}</small>`:''}${enabled?`<label class="extra-private"><input type="checkbox" data-private-field="${f.id}"${(state.privateFields||[]).includes(f.id)?' checked':''}>비공개</label>`:''}</div>`;
+          }).join('')}</section>`).join('')}
         </div>
       </div>`;
     const nameInputEl = container.querySelector("[data-f-name]"),
@@ -376,13 +383,17 @@
     function checkName() {
       const val = categoryName(state.name),
         dup = !!val && (opts.siblingNames || []).map(categoryName).includes(val);
-      nameInputEl.classList.toggle("has-err", dup), nameErrEl.hidden = !dup, opts.onNameChange(val.length > 0 && !dup);
+      nameInputEl.classList.toggle("has-err", dup), nameErrEl.hidden = !dup, opts.onNameChange(val.length > 0 && !dup && ['view','edit','assign'].every(key=>{
+        if(!TARGET_NEEDED.has(state[key]))return !!state[key];
+        const target=state[key+'Target'];
+        return state[key]==='특정 관리자/리더'?!!target?.members?.length:!!(target?.groups?.length||target?.jobTitles?.length);
+      }));
     }
     nameInputEl.addEventListener("input", e => {
       state.name = e.target.value, checkName();
-    }), checkName(), container.querySelector("[data-f-view-btn]").onclick = () => openPermPicker("view", state, () => renderSubForm(container, state, opts)), container.querySelector("[data-f-assign-btn]").onclick = () => openPermPicker("assign", state, () => renderSubForm(container, state, opts)), container.querySelector("[data-f-fields]").addEventListener("click", e => {
+    }), checkName(), container.querySelector("[data-f-edit-btn]").onclick = () => openPermPicker("edit", state, () => renderSubForm(container, state, opts)), container.querySelector("[data-f-view-btn]").onclick = () => openPermPicker("view", state, () => renderSubForm(container, state, opts)), container.querySelector("[data-f-assign-btn]").onclick = () => openPermPicker("assign", state, () => renderSubForm(container, state, opts)), container.querySelector("[data-f-fields]").addEventListener("click", e => {
       const b = e.target.closest("[data-field]");
-      if (!b) return;
+      if (!b || b.disabled) return;
       const f=b.dataset.field;
       state.extraEnabled ||= [];state.privateFields ||= [];
       const list=window.AssetExtra.fixed.some(x=>x.id===f)?state.hiddenFields:state.extraEnabled,index=list.indexOf(f);
@@ -401,7 +412,7 @@
     const p = document.createElement("div");
     p.className = "modal-back", p.innerHTML = `
       <div class="modal">
-        <h3>${isView ? "자산 조회 권한" : assignLabel(state.type)}</h3>
+        <h3>${permLabel(kind)}</h3>
         <div class="body" data-picker-body></div>
         <div class="foot">
           <button class="btn" data-close>취소</button>
@@ -477,11 +488,11 @@
         jobTitles: [],
         members: []
       };
-      isView ? (state.view = picked, state.assign = ASSIGN_BY_VIEW[picked].default, state.viewTarget = appliedTarget, state.assignTarget = {
-        groups: [],
-        jobTitles: [],
-        members: []
-      }) : (state.assign = picked, state.assignTarget = appliedTarget), p.remove(), onApply();
+      if(isView){
+        state.view=picked;state.viewTarget=appliedTarget;
+        for(const key of ['edit','assign']){state[key]=ASSIGN_BY_VIEW[picked].default;state[key+'Target']={groups:[],jobTitles:[],members:[]};}
+      }else{state[kind]=picked;state[kind+'Target']=appliedTarget;}
+      p.remove();onApply();
     };
   }
   function openGroupJobPicker(initial, onApply, restrict) {
@@ -771,6 +782,8 @@ function openManagementMenu(button,sel) {
         type: cat.type,
         view: cat.view,
         assign: cat.assign,
+        edit: cat.edit,
+        editTarget: structuredClone(cat.editTarget || {groups:[],jobTitles:[],members:[]}),
         viewTarget: cat.viewTarget ? {
           ...cat.viewTarget
         } : {
@@ -822,7 +835,7 @@ function openManagementMenu(button,sel) {
         }
         cat.sub !== name && assets.forEach(a => {
           a.group === cat.group && a.sub === cat.sub && (a.sub = name);
-        }), cat.sub = name, cat.type = state.type, cat.hiddenFields = [...state.hiddenFields], cat.extraEnabled=[...(state.extraEnabled||[])], cat.privateFields=[...(state.privateFields||[])], cat.view = state.view, cat.assign = state.assign, cat.viewTarget = TARGET_NEEDED.has(state.view) ? {
+        }), cat.sub = name, cat.type = state.type, cat.hiddenFields = [...state.hiddenFields], cat.extraEnabled=[...(state.extraEnabled||[])], cat.privateFields=[...(state.privateFields||[])], cat.view = state.view, cat.assign = state.assign, cat.edit = state.edit, cat.editTarget = TARGET_NEEDED.has(state.edit) ? structuredClone(state.editTarget) : null, cat.viewTarget = TARGET_NEEDED.has(state.view) ? {
           ...state.viewTarget
         } : null, cat.assignTarget = TARGET_NEEDED.has(state.assign) ? {
           ...state.assignTarget
@@ -1091,6 +1104,8 @@ function openManagementMenu(button,sel) {
         type: "individual",
         view: VIEW_OPTIONS[0],
         assign: ASSIGN_BY_VIEW[VIEW_OPTIONS[0]].default,
+        edit: ASSIGN_BY_VIEW[VIEW_OPTIONS[0]].default,
+        editTarget: {groups:[],jobTitles:[],members:[]},
         viewTarget: {
           groups: [],
           jobTitles: [],
@@ -1124,6 +1139,8 @@ function openManagementMenu(button,sel) {
         hiddenFields: [...createState.hiddenFields], extraEnabled:[...(createState.extraEnabled||[])], privateFields:[...(createState.privateFields||[])],
         view: createState.view,
         assign: createState.assign,
+        edit: createState.edit,
+        editTarget: TARGET_NEEDED.has(createState.edit) ? structuredClone(createState.editTarget) : null,
         viewTarget: TARGET_NEEDED.has(createState.view) ? {
           ...createState.viewTarget
         } : null,

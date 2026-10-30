@@ -2187,3 +2187,25 @@ fieldset.extra-info-section{border:0;border-top:1px solid var(--line);margin:16p
 .directory-detail .mdetail-info-tab{display:inline-flex;align-items:center;flex-shrink:0;min-height:64px;font-size:14px;font-weight:600;color:var(--text-sub);border-bottom:2px solid transparent;cursor:default;}
 .directory-detail .mdetail-info-tab.active{color:var(--text);border-bottom-color:var(--text);}
 .directory-detail .mdetail-panel>.mdetail-body{padding:20px 24px;}
+
+/* Fixed basic fields remain visible in subcategory settings, with an ON disabled switch. */
+.extra-field-settings .toggle-switch:disabled{cursor:default;opacity:.55;}
+.extra-field-settings .toggle-switch.on:disabled{background:var(--blue,#318bff);}
+.asset-readonly{cursor:default!important;background:var(--bg-soft,#f5f6f7);}
+.areg input[readonly],.mapp-add-field input[readonly]{background:#f5f6f7;color:var(--text-mut,#777);}
+
+/* The shared button display rule must not reveal manager-only tag controls. */
+.areg #areg-tag-manage[hidden]{display:none!important;}
+
+/* Reuse the shared field editor within the employee prototype phone width. */
+.mapp-register-edit .modal.areg{width:390px;max-width:calc(100vw - 24px);height:calc(100dvh - 70px);max-height:820px;}
+
+/* 공통 정보 구분: 기본 정보 다음 회사 커스텀 추가 정보, 빈 섹션 숨김. */
+.cat-info-settings-group h4{margin:14px 0 4px;font-size:13px;}
+.cat-info-settings-group+.cat-info-settings-group{border-top:1px solid var(--line);margin-top:12px;}
+.cat-usage[hidden]{display:none!important;}
+fieldset.asset-fixed-inputs{border:0;padding:0;margin:0;min-width:0;}
+.asset-custom-info .kv2{margin-top:0;}
+/* 배정 없음 빈 상태 안의 [배정] 버튼(D-20261030-15) */
+.assign-empty { display:flex; flex-direction:column; align-items:flex-start; gap:8px; padding:6px 0; }
+.assign-empty .muted { margin:0; }

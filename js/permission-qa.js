@@ -67,3 +67,13 @@
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", mountPanel, { once: true });
   else mountPanel();
 })();
+
+// Review the new independent information/state permissions without duplicate QA pages.
+(function(){
+  const p=new URLSearchParams(location.search);if(p.get('qa')!=='access')return;
+  const options=[['manage','자산 관리'],['info','정보 수정만'],['state','상태 관리만'],['both','수정·상태 관리'],['view','조회만'],['private','비공개 확인']];
+  const panel=document.createElement('aside');panel.className='permission-qa-panel';
+  panel.innerHTML='<div class="permission-qa-head"><strong>소분류 권한 QA</strong></div><div class="permission-qa-actions">'+options.map(([key,label])=>`<button type="button" data-access-case="${key}" aria-pressed="${(p.get('scenario')||'info')===key}">${label}</button>`).join('')+'</div>';
+  panel.querySelectorAll('[data-access-case]').forEach(button=>button.onclick=()=>{const u=new URL(location.href);u.searchParams.set('scenario',button.dataset.accessCase);location.href=u.href;});
+  document.body.appendChild(panel);
+})();

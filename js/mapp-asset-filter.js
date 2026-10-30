@@ -59,14 +59,14 @@
         value,
         label
       }))
-    }), groups.push({
+    }), window.AssetExtra.visible(category,"tags") && groups.push({
       key: "labels",
       label: "태그",
       options: [...(window.DATA.tags || [])].sort((a, b) => a.localeCompare(b, "ko")).map(value => ({
         value,
         label: value
       }))
-    }), groups.push({
+    }), window.AssetExtra.visible(category,"memo") && groups.push({
       key: "note",
       label: "메모",
       options: [{
@@ -90,7 +90,7 @@
     return days < 0 ? "over" : days <= 7 ? "soon" : "valid";
   }
   function matches(asset, filters) {
-    return (!filters.status.length || filters.status.includes(asset.status)) && (!filters.expiry.length || filters.expiry.includes(expiryKey(asset.expiry))) && (!filters.note.length || filters.note.includes(window.AssetMemo.has(asset.note) ? "has" : "none")) && filters.labels.every(label => (asset.labels || []).includes(label));
+    return (!filters.status.length || filters.status.includes(asset.status)) && (!filters.expiry.length || filters.expiry.includes(expiryKey(asset.expiry))) && (!filters.note.length || window.AssetExtra.visible(window.AssetExtra.category(asset),"memo") && filters.note.includes(window.AssetMemo.has(asset.note) ? "has" : "none")) && (!filters.labels.length || window.AssetExtra.visible(window.AssetExtra.category(asset),"tags") && filters.labels.every(label => (asset.labels || []).includes(label)));
   }
   function buttonHtml(filters) {
     const n = count(filters);
