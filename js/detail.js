@@ -597,10 +597,14 @@
   }
   // ── 자산 연결(Web_dc_23 4번, Policy_15) ──
   const linkLabel = b => `${b.product} · ${b.assetNo}`;
+  const linkThumb = b => {
+    const ph = window.assetPhotos(b);
+    return ph.length ? `<span class="thumb" style="background:${ph[b._primary || 0].color}"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10" r="1.6"/><path d="m21 16-5-5-9 8"/></svg></span>` : '<span class="thumb empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 15 5-4 4 3 4-4 5 4"/></svg></span>';
+  };
   function linkRowHtml(a, b) {
     const canCut = window.AssetAccess.canState(a) && window.AssetAccess.canState(b);
     return `<div class="link-row" data-link-open="${b.id}">
-      <div class="link-row-main"><span class="link-row-name">${b.product}</span><span class="link-row-no">${b.assetNo}</span></div>
+      ${linkThumb(b)}<div class="link-row-main"><span class="link-row-name">${b.product}</span><span class="link-row-no">${b.assetNo}</span></div>
       <span class="badge ${STATUS_LABEL[b.status][1]}">${STATUS_LABEL[b.status][0]}</span>
       ${canCut ? `<button class="btn sm" data-link-cut="${b.id}">연결 해제</button>` : ""}
     </div>`;
@@ -683,9 +687,9 @@
       <div class="modal" style="width:460px">
         <h3>자산 연결</h3>
         <div class="body" style="display:flex;flex-direction:column;max-height:62vh">
-          <p class="muted" style="margin:0 0 8px">배정 대상 <b>${r.employee || r.worksite}</b></p>
+          <p class="link-target">배정 대상 <b>${r.employee || r.worksite}</b></p>
           <input type="text" class="picker-search" placeholder="품목명/고유관리번호" data-link-q>
-          <div data-link-cands style="flex:1;min-height:0;overflow-y:auto;margin-top:8px"></div>
+          <div class="link-list" data-link-cands style="flex:1;min-height:0;overflow-y:auto;margin-top:8px"></div>
           <p class="muted" style="margin:8px 0 0" data-link-count></p>
         </div>
         <div class="foot"><button class="btn" data-close>취소</button><button class="btn primary" data-save disabled>연결</button></div>
@@ -696,7 +700,7 @@
         rows = all.filter(b => !q || (b.product + " " + b.assetNo).toLowerCase().includes(q));
       list.innerHTML = !all.length ? '<p class="muted">연결할 수 있는 자산이 없습니다.</p>' : !rows.length ? '<p class="muted">결과가 없습니다.</p>' : rows.map(b => {
         const on = picked.has(b.id), lock = !on && picked.size >= room;
-        return `<label class="link-cand"><input type="checkbox" data-pick="${b.id}"${on ? " checked" : ""}${lock ? " disabled" : ""}><span class="link-row-name">${b.product}</span><span class="link-row-no">${b.assetNo}</span><span class="badge ${STATUS_LABEL[b.status][1]}">${STATUS_LABEL[b.status][0]}</span></label>`;
+        return `<label class="link-cand"><input type="checkbox" data-pick="${b.id}"${on ? " checked" : ""}${lock ? " disabled" : ""}>${linkThumb(b)}<span class="link-row-name">${b.product}</span><span class="link-row-no">${b.assetNo}</span><span class="badge ${STATUS_LABEL[b.status][1]}">${STATUS_LABEL[b.status][0]}</span></label>`;
       }).join("");
       list.querySelectorAll("[data-pick]").forEach(c => c.onchange = () => {
         c.checked ? picked.add(c.dataset.pick) : picked.delete(c.dataset.pick), draw();

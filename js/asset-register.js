@@ -158,6 +158,7 @@
     }, back;
   }
   window.openAssetTagManageModal = openTagManageModal;
+  window.openAssetCategoryPickModal = openCategoryPickModal;
   function openCategoryPickModal(categories, currentValue, onApply) {
     let selected = currentValue,
       query = "";

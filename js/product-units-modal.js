@@ -2,10 +2,10 @@ window.openProductUnitsModal = function (product, items) {
   const CLOSE_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
     STATUS_LABEL = {
       assigned: "배정 중",
-      stock: "배정 가능",
       repair: "수리/점검 중",
       lost: "분실",
-      disposed: "폐기"
+      disposed: "폐기",
+      stock: "배정 가능"
     };
   function thumb(a) {
     const ph = window.assetPhotos(a);

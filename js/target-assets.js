@@ -129,14 +129,14 @@
           <td>${a.assetNo ? esc(a.assetNo) : '<span class="muted">—</span>'}</td>
           <td><span class="badge ${STATUS_LABEL[a.status][1]}">${STATUS_LABEL[a.status][0]}</span></td>
           <td>${x.since ? window.fmtDate(x.since) : '<span class="muted">—</span>'}</td>
-          <td class="c">${(n => n ? n : '<span class="muted">—</span>')(window.AssetLinks ? window.AssetLinks.view(a).visible.length : 0)}</td>
           <td>${expiryCell(expiryOf(a))}</td>
           <td>${labelsCell(a.labels)}</td>
           <td class="c">${window.AssetMemo.has(a.note) ? `<button type="button" class="memo-flag memo-view-btn" data-note="${a.id}" aria-label="메모 보기">${MEMO_ICON}</button>` : '<span class="muted">—</span>'}</td>
+          <td class="c">${(n => n ? n : '<span class="muted">—</span>')(window.AssetLinks ? window.AssetLinks.view(a).visible.length : 0)}</td>
         </tr>`;
       }).join("");
       const emptyMsg = items.length ? "결과가 없습니다." : "배정 중인 자산이 없습니다.";
-      table.innerHTML = `<div class="table-wrap"><table class="target-asset-table"><thead><tr><th>분류</th><th>품목명</th><th>고유관리번호</th><th>상태</th><th>배정일</th><th class="c">연결</th><th>유효기한</th><th>태그</th><th class="c">메모</th></tr></thead><tbody>${rows || `<tr><td colspan="9" style="text-align:center;color:var(--text-mut);padding:32px">${emptyMsg}</td></tr>`}</tbody></table></div>`;
+      table.innerHTML = `<div class="table-wrap"><table class="target-asset-table"><thead><tr><th>분류</th><th>품목명</th><th>고유관리번호</th><th>상태</th><th>배정일</th><th>유효기한</th><th>태그</th><th class="c">메모</th><th class="c">연결된 자산</th></tr></thead><tbody>${rows || `<tr><td colspan="9" style="text-align:center;color:var(--text-mut);padding:32px">${emptyMsg}</td></tr>`}</tbody></table></div>`;
       table.querySelectorAll("[data-target-asset]").forEach(row => row.onclick = e => {
         // 메모 아이콘은 행 클릭과 분리해 조회 Modal만 연다(바깥 클릭·[X]로 닫음).
         const note = e.target.closest("[data-note]");

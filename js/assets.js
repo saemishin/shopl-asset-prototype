@@ -431,7 +431,7 @@
       head = `<tr>
       ${canDelete ? '<th class="td-check"><input type="checkbox" data-check-all aria-label="전체 선택"></th>' : ""}
       <th>분류</th><th>품목명</th><th>고유관리번호</th><th>상태</th>
-      <th>배정 현황</th><th>유효기한</th><th>태그</th><th class="c">메모</th><th>등록일</th></tr>`,
+      <th>배정 대상</th><th>유효기한</th><th>태그</th><th class="c">메모</th><th>등록일</th></tr>`,
       rows = pageSlice(sortList(list)).map(a => {
         const st = `<span class="badge ${STATUS_LABEL[a.status][1]}">${STATUS_LABEL[a.status][0]}</span>`;
         return `<tr class="clickable" data-id="${a.id}">
@@ -475,7 +475,7 @@
   }
   function view_product_individual(list) {
     const head = `<tr><th>분류</th><th>품목명</th><th class="num">자산 수</th>
-      <th class="num">배정 중</th><th class="num">배정 가능</th><th class="num">수리/점검 중</th><th class="num">분실</th><th class="num">폐기</th></tr>`,
+      <th class="num">배정 중</th><th class="num">수리/점검 중</th><th class="num">분실</th><th class="num">폐기</th><th class="num">배정 가능</th></tr>`,
       groups = groupByProduct(list.filter(a => !0)),
       sorted = sortList(groups),
       paged = pageSlice(sorted);
@@ -495,10 +495,10 @@
         <td><div class="prodcell">${thumb([...g.list].sort((a, b) => String(a.assetNo || "").localeCompare(String(b.assetNo || ""))).find(a => window.assetPhotos(a).length) || g.list[0])}<span class="pname">${g.product}</span></div></td>
         <td class="num">${g.list.length}</td>
         <td class="num">${counts.assigned}</td>
-        <td class="num">${counts.stock}</td>
         <td class="num">${counts.repair}</td>
         <td class="num">${counts.lost}</td>
         <td class="num">${counts.disposed}</td>
+        <td class="num">${counts.stock}</td>
       </tr>`;
     }).join("");
     return {
