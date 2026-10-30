@@ -1243,14 +1243,19 @@ window.AssetExtra.exportValues=(asset,manage=window.hasPrototypeAssetManagePermi
     return list.slice().sort((p, q) => p.product.localeCompare(q.product, "ko") || String(p.assetNo).localeCompare(String(q.assetNo)));
   }
   // 현재 계정이 조회할 수 있는 연결 자산과 조회할 수 없는 연결 수(Policy_15 7절)
-  function view(a) {
-    const all = partners(a.id), visible = all.filter(b => window.AssetAccess.canView(b));
+  function view(a, name) {
+    const all = partners(a.id), visible = all.filter(b => window.AssetAccess.canView(b, name));
     return { visible: sort(visible), hidden: all.length - visible.length, total: all.length };
   }
-  function candidates(a) {
+  function candidates(a, name) {
     const key = targetKey(a);
     if (!key) return [];
-    return sort(window.DATA.assets.filter(b => b.id !== a.id && alive(b) && targetKey(b) === key && !linked(a.id, b.id) && window.AssetAccess.canView(b) && window.AssetAccess.canState(b)));
+    return sort(window.DATA.assets.filter(b => b.id !== a.id && alive(b) && targetKey(b) === key && !linked(a.id, b.id) && window.AssetAccess.canView(b, name) && window.AssetAccess.canState(b, name)));
+  }
+  // 고유관리번호 검색 시 같은 대상 후보와 함께 배정 가능 자산도 찾는다(배정 가능 자산은 검색 때만, Policy_15 3절).
+  function stockMatches(a, name, q) {
+    if (!q) return [];
+    return sort(window.DATA.assets.filter(b => b.id !== a.id && alive(b) && b.status === "stock" && !(b.assignments || []).length && String(b.assetNo || "").toLowerCase().includes(q) && window.AssetAccess.canView(b, name) && window.AssetAccess.canState(b, name)));
   }
   function add(a, b) {
     if (linked(a.id, b.id) || targetKey(a) !== targetKey(b) || !targetKey(a)) return false;
@@ -1264,11 +1269,11 @@ window.AssetExtra.exportValues=(asset,manage=window.hasPrototypeAssetManagePermi
     return i >= 0;
   }
   // 함께 재배정·반납 범위: 이어진 자산 전체. 상태 관리 권한이 없는 자산은 처리하지 않고 경계 연결을 끊는다(D-20261030-18).
-  function togetherPlan(a) {
+  function togetherPlan(a, name) {
     const move = [a], cut = [], cutPairs = [], seen = new Set([a.id]);
     for (let i = 0; i < move.length; i++) {
       for (const b of partners(move[i].id)) {
-        if (window.AssetAccess.canState(b)) {
+        if (window.AssetAccess.canState(b, name)) {
           seen.has(b.id) || (seen.add(b.id), move.push(b));
         } else {
           cutPairs.push([move[i].id, b.id]);
@@ -1278,8 +1283,8 @@ window.AssetExtra.exportValues=(asset,manage=window.hasPrototypeAssetManagePermi
     }
     return {
       move: [a].concat(sort(move.slice(1))),
-      cutVisible: sort(cut.filter(b => window.AssetAccess.canView(b))),
-      cutHidden: cut.filter(b => !window.AssetAccess.canView(b)).length,
+      cutVisible: sort(cut.filter(b => window.AssetAccess.canView(b, name))),
+      cutHidden: cut.filter(b => !window.AssetAccess.canView(b, name)).length,
       cutPairs,
       signature: move.map(x => x.id).sort().join() + "|" + cut.map(x => x.id).sort().join()
     };
@@ -1293,5 +1298,5 @@ window.AssetExtra.exportValues=(asset,manage=window.hasPrototypeAssetManagePermi
     }
     return removed.filter(([x, y]) => x && y);
   }
-  window.AssetLinks = { MAX, partners, view, candidates, add, remove, togetherPlan, prune, linked, count: id => partners(id).length };
+  window.AssetLinks = { MAX, partners, view, candidates, stockMatches, targetKey, add, remove, togetherPlan, prune, linked, count: id => partners(id).length };
 })();

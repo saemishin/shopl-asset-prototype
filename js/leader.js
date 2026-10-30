@@ -1208,7 +1208,7 @@
       <div class="modal" style="width:380px">
         <h3>폐기 처리하시겠습니까?</h3>
         <div class="body">
-          <div class="danger-note">${WARN_ICON}<span>기존 배정은 자동으로 종료되며, 이후 배정·자산 수정이 제한됩니다. 자산 관리 권한자는 배정이 없는 배정 가능 상태로 복구할 수 있습니다.</span></div>
+          <div class="danger-note">${WARN_ICON}<span>기존 배정은 자동으로 종료되며, 이후 배정·자산 수정이 제한됩니다. 자산 관리 권한자는 배정이 없는 배정 가능 상태로 복구할 수 있습니다.${window.MappLinks.unlinkNote(a)}</span></div>
           <div class="field" style="margin-top:14px;margin-bottom:0">
             <input type="text" data-del-input placeholder="입력">
           </div>
@@ -1232,7 +1232,7 @@
         script: "상태 변경: 폐기 처리",
         before,
         after: STATUS_LABEL[a.status][0]
-      }), cb.remove(), toast("폐기 처리되었습니다."), onDone();
+      }), window.MappLinks.prune(logActivity, "폐기"), cb.remove(), toast("폐기 처리되었습니다."), onDone();
     }, document.body.appendChild(cb), input.focus();
   }
   function activityOf(a) {
@@ -1613,6 +1613,9 @@
           record = mk({
             since: d
           });
+        if (window.MappLinks.together(a, "reassign", ME, (mode, plan) => {
+          back.remove(), window.MappLinks.runReassign(a, mode, plan, record, logActivity), toast("재배정되었습니다."), afterMutate();
+        })) return;
         confirmModal(cfg.confirm, "", () => {
           back.remove();
           const idx = target.index,
@@ -1628,6 +1631,9 @@
     };
   }
   function openReturnConfirm(a, idx, onDone) {
+    if (window.MappLinks.together(a, "return", ME, (mode, plan) => {
+      window.MappLinks.runReturn(a, mode, plan, logActivity, x => derivedActiveStatus(x)), toast("반납되었습니다."), onDone();
+    })) return;
     confirmModal("반납 처리하시겠습니까?", "반납하면 배정에서 제거됩니다.", () => {
       const old = a.assignments[idx];
       a.assignments.splice(idx, 1), (a.status === "assigned" || a.status === "stock") && (a.status = derivedActiveStatus(a)), logActivity(a, {
@@ -1824,13 +1830,10 @@
       idx
     };
   }
-  function scopedPartyRowHtml(record, indiv) {
-    return `<div class="mapp-party-row"><div><div class="mapp-party-name">${esc(record.employee || record.worksite)}</div><div class="mapp-party-kind">${record.employee ? "구성원" : "근무지"}</div></div>${`<span class="mapp-party-date">${window.fmtDate(record.since)}</span>`}</div>`;
-  }
   // 자산 한 건은 한 대상에게만 배정하므로 대상 기준 상세의 배정 탭에는 이 대상의 기록 하나만 보여준다(D-20261030-14·15).
   function scopedPartySectionHtml(a, target) {
     const record = findRecord(a, target), current = record.idx >= 0 ? record.list[record.idx] : null;
-    return `<div class="dsection"><h2 class="mapp-party-head">배정 대상</h2>${current ? `<div class="mapp-party-list">${scopedPartyRowHtml(current, !0)}</div>` : '<p class="mapp-party-empty">배정 대상이 없습니다.</p>'}</div>`;
+    return `<div class="dsection"><h2 class="mapp-party-head">배정 대상</h2>${current ? `<div class="acard">${typeBadge(current)}<div class="acard-id">${assignIdentity(current)}</div><div class="acard-foot"><span class="acard-date">배정일 <b>${window.fmtDate(current.since)}</b></span></div></div>` : '<p class="mapp-party-empty">배정 대상이 없습니다.</p>'}</div>`;
   }
   function scopedManageActions(a, target) {
     return !target || !canManage(a) || findRecord(a, target).idx < 0 ? [] : [{
@@ -1852,7 +1855,7 @@
  const badge=statusActions(a).length?`<button class="badge ${STATUS_LABEL[a.status][1]} clickable" data-status-open>${STATUS_LABEL[a.status][0]} ▾</button>`:`<span class="badge ${STATUS_LABEL[a.status][1]}">${STATUS_LABEL[a.status][0]}</span>`;
  const info=[['분류',categoryPath(a)],['태그',(a.labels||[]).map(l=>`<span class="tag">${esc(l)}</span>`).join('')||'—']].map(([k,v])=>`<div><div class="k">${k}</div><div class="v">${v}</div></div>`).join('')+window.AssetExtra.detailRows(a,manage,expiryBadge)+[['자산 등록일',window.fmtDate(a.createdAt)],['QR 라벨',`<button type="button" class="btn sm icon-only" data-qr-open aria-label="QR 라벨">${QR_ICON}</button>`],['메모',`${window.AssetMemo.render(a.note)}${editable?`<button class="icon-edit" data-memoedit aria-label="메모 수정">${IC_EDIT}</button>`:''}`]].map(([k,v])=>`<div><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
  const assignments=target?scopedPartySectionHtml(a,target):`<div class="dsection"><div class="mapp-leader-holders-head"><h2>배정 현황</h2></div><div data-holder-list></div></div>`;
- return `<div class="mapp-topbar"><button class="mapp-back" data-mapp-back aria-label="뒤로">←</button>${editable||manage&&!target?`<button class="mapp-more" data-more-open aria-label="더보기">${MORE_ICON}</button>`:''}</div><div class="mapp-body mapp-leader-detail-body">${target?`<div class="mapp-directory-context">${esc(target.value)}</div>`:''}<div class="dhead-id"><div class="mapp-hero-wrap"><button class="mapp-hero-img" data-hero-viewer aria-label="사진 보기"${photos.length?'':' disabled'}>${cardThumb(a)}</button>${photos.length>1?`<span class="mapp-hero-count">+${photos.length-1}</span>`:''}${editable?`<button class="mapp-hero-edit" data-hero-edit aria-label="사진 관리">${IC_EDIT}</button>`:''}</div><div><h1>${esc(a.product)}</h1><div class="dhead-sub">${badge}<div>고유관리번호 <b>${esc(a.assetNo)}</b></div>${current?`<div>배정일 ${window.fmtDate(current.since)}</div>`:''}</div></div></div>${window.AssetExtra.tabs()}<div data-detail-panel="assignment">${assignments}</div><div data-detail-panel="info" hidden><div class="kv2">${info}</div>${window.AssetExtra.detailHtml(a,manage,expiryBadge)}</div><div data-detail-panel="history" hidden>${timelineHtml(a,'')}</div></div>`;
+ return `<div class="mapp-topbar"><button class="mapp-back" data-mapp-back aria-label="뒤로">←</button>${editable||manage&&!target?`<button class="mapp-more" data-more-open aria-label="더보기">${MORE_ICON}</button>`:''}</div><div class="mapp-body mapp-leader-detail-body">${target?`<div class="mapp-directory-context">${esc(target.value)}</div>`:''}<div class="dhead-id"><div class="mapp-hero-wrap"><button class="mapp-hero-img" data-hero-viewer aria-label="사진 보기"${photos.length?'':' disabled'}>${cardThumb(a)}</button>${photos.length>1?`<span class="mapp-hero-count">+${photos.length-1}</span>`:''}${editable?`<button class="mapp-hero-edit" data-hero-edit aria-label="사진 관리">${IC_EDIT}</button>`:''}</div><div><h1>${esc(a.product)}</h1><div class="dhead-sub">${badge}<div>고유관리번호 <b>${esc(a.assetNo)}</b></div>${current?`<div>배정일 ${window.fmtDate(current.since)}</div>`:''}</div></div></div>${window.AssetExtra.tabs()}<div data-detail-panel="assignment">${assignments}${window.MappLinks.sectionHtml(a, ME)}</div><div data-detail-panel="info" hidden><div class="kv2">${info}</div>${window.AssetExtra.detailHtml(a,manage,expiryBadge)}</div><div data-detail-panel="history" hidden>${timelineHtml(a,'')}</div></div>`;
 }
   function leaderHolderList(a, query, kind, requestedPage) {
     const q = (query || "").trim().toLowerCase(),
@@ -1895,7 +1898,7 @@
       <div class="modal" style="width:380px">
         <h3>삭제하시겠습니까?</h3>
         <div class="body">
-          <div class="danger-note">${WARN_ICON}<span>삭제하면 복구할 수 없으니 신중하게 결정해주세요.</span></div>
+          <div class="danger-note">${WARN_ICON}<span>삭제하면 복구할 수 없으니 신중하게 결정해주세요.${window.MappLinks.unlinkNote(a)}</span></div>
           <div class="field" style="margin-top:14px;margin-bottom:0">
             <input type="text" data-del-input placeholder="입력">
           </div>
@@ -1912,7 +1915,7 @@
     input.addEventListener("input", () => {
       okBtn.disabled = !confirmed();
     }), okBtn.onclick = () => {
-      confirmed() && (window.archiveDeletedAsset(a, ME), cb.remove(), onDone(), toast("삭제되었습니다."));
+      confirmed() && (window.archiveDeletedAsset(a, ME), window.MappLinks.prune(logActivity, "삭제"), cb.remove(), onDone(), toast("삭제되었습니다."));
     }, document.body.appendChild(cb), input.focus();
   }
   function render() {
@@ -2217,6 +2220,7 @@
         const holderQuery = root.querySelector("[data-holder-query]"),
           holderCategory = root.querySelector("[data-holder-category]");
         drawHolders2();
+        window.MappLinks.wire(root, a, { me: ME, log: logActivity, after: afterMutate, identity: rec => `<div class="acard">${typeBadge(rec)}<div class="acard-id">${assignIdentity(rec)}</div></div>`, open: id => { state.detailAssetId = id, state.holderPage = 1, draw(); } });
       }
       if (state.screen === "asset-history") {
         const a = assets.find(x => x.id === state.detailAssetId),

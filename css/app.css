@@ -2280,3 +2280,75 @@ fieldset.asset-fixed-inputs{border:0;padding:0;margin:0;min-width:0;}
 .tpl-picked-chip button svg { width:12px; height:12px; }
 .field-help { margin:4px 0 0; font-size:12px; color:var(--text-mut); }
 .tpl-cat > span:first-child:not(.muted) { color:var(--text); font-size:13px; }
+/* 앱 연결된 자산(Policy_15, 대시보드 Web_dc_23 4번 기준) */
+.mlink-sec { margin-top:12px; }
+.mlink-head { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px; }
+.mlink-head h2 { margin:0; font-size:15px; font-weight:700; }
+.mlink-head h2 span { color:var(--primary, #3b6cf6); margin-left:2px; }
+.mlink-list { display:flex; flex-direction:column; gap:8px; }
+.mlink-row { display:flex; align-items:center; gap:10px; padding:10px 12px; border:1px solid var(--line); border-radius:12px; background:#fff; cursor:pointer; }
+.mlink-row .thumb { flex:none; }
+.mlink-row-main { flex:1; min-width:0; display:flex; flex-direction:column; gap:1px; }
+.mlink-row-main b { font-size:13.5px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.mlink-row-main span { font-size:12px; color:var(--text-mut); }
+.mlink-row .badge { flex:none; }
+.mlink-cut { flex:none; width:28px; height:28px; border:0; background:#f3f4f6; border-radius:50%; color:var(--text-mut); display:inline-flex; align-items:center; justify-content:center; cursor:pointer; }
+.mlink-cut svg { width:12px; height:12px; }
+.mlink-empty { margin:4px 0; font-size:13px; color:var(--text-mut); }
+.mlink-all { width:100%; margin-top:8px; padding:9px; border:1px solid var(--line); border-radius:10px; background:#fff; font-size:13px; color:var(--text); cursor:pointer; }
+.mlink-hidden { margin:8px 0 0; font-size:12px; color:var(--text-mut); }
+.mlink-sheet { max-height:82%; display:flex; flex-direction:column; }
+.mlink-sheet-body { overflow-y:auto; flex:1; min-height:0; }
+.mlink-target { margin:0 0 8px; font-size:13px; color:var(--text-mut); }
+.mlink-target b { color:var(--text); }
+.mlink-cands { margin-top:10px; }
+.mlink-cand { cursor:pointer; }
+.mlink-cand.on { border-color:var(--primary, #3b6cf6); background:#f5f8ff; }
+.mlink-cand input { flex:none; width:18px; height:18px; margin:0; accent-color:var(--primary, #3b6cf6); }
+.mlink-modes { display:flex; flex-direction:column; margin-bottom:6px; }
+.mlink-group { margin-top:12px; }
+.mlink-group-head { font-size:13px; margin-bottom:8px; }
+.mlink-group.warn .mlink-group-head { color:#c2554e; }
+.mlink-note { margin:8px 0 0; font-size:12.5px; color:var(--text-mut); }
+.link-search-help { margin:6px 0 0; font-size:12px; color:var(--text-mut); }
+.link-cand.on { border-color:var(--primary, #3b6cf6); background:#f5f8ff; }
+.link-cand .link-row-main { flex:1; }
+.link-date { margin:12px 0 0; }
+.mlink-help { margin:6px 0 0; font-size:12px; color:var(--text-mut); }
+.mlink-date { margin-top:14px; }
+.mlink-date label { display:block; font-size:13px; font-weight:600; margin-bottom:6px; }
+.mlink-date input[type=date] { width:100%; height:40px; border:1px solid var(--line-strong); border-radius:10px; padding:0 12px; background:#fff; }
+/* 자산 연결 Modal 구성(배정 대상 → 연결되지 않은 자산 → 배정 가능 자산 검색) */
+.modal.link-add-modal { width:480px; }
+.link-add-modal .body { max-height:68vh; overflow-y:auto; }
+.link-add-sec + .link-add-sec { margin-top:18px; }
+.link-add-sec h4 { margin:0 0 8px; font-size:13px; font-weight:600; }
+.link-add-target { padding:10px 12px; }
+.link-add-sec .picker-search { width:100%; margin-bottom:8px; }
+.link-add-count { margin:12px 0 0; }
+.link-add-count:empty { display:none; }
+.mlink-add-sec + .mlink-add-sec { margin-top:18px; }
+.mlink-add-sec h3 { margin:0 0 8px; font-size:13.5px; font-weight:700; }
+.mlink-add-sec .picker-search { width:100%; }
+.mlink-found { margin-top:8px; }
+.mlink-found:empty { display:none; }
+.mlink-count { margin:12px 0 0; font-size:12.5px; color:var(--text-mut); }
+.mlink-count:empty { display:none; }
+/* 기본 정보 고정 ON 토글 안내 툴팁(D-20261030-31) */
+.toggle-switch[data-tip] { position: relative; }
+.toggle-switch[data-tip]:hover::after {
+  content: attr(data-tip);
+  position: absolute; top: calc(100% + 6px); right: 0;
+  background: #1b1d1f; color: #fff; font-size: 11px; padding: 6px 10px;
+  border-radius: 6px; white-space: nowrap; line-height: 1.4; z-index: 20; pointer-events: none;
+}
+/* 툴팁이 함께 흐려지지 않도록 고정 ON 토글은 opacity 대신 옅은 색으로 비활성 표현 */
+.extra-field-settings .toggle-switch.on:disabled[data-tip] { opacity:1; background:#9cc3ff; }
+/* 분류 상한 툴팁(D-20261030-32): 오른쪽 끝 버튼은 Modal 밖으로 잘리지 않게 오른쪽 기준 */
+.cat-manage-modal [data-add-group][data-tip]:hover::after { left:auto; right:0; }
+/* 비활성 사유 툴팁이 있는 버튼은 호버를 받도록 하고, 툴팁이 흐려지지 않게 opacity 대신 색으로 비활성 표현 */
+.btn:disabled[data-tip] { pointer-events:auto; cursor:not-allowed; opacity:1; color:#a9b0b8; background:#f4f5f6; border-color:var(--line); }
+.btn.primary:disabled[data-tip] { background:#c9d8fb; border-color:#c9d8fb; color:#fff; }
+.cat-manage-modal .btn[data-tip]:hover::after { width:auto; white-space:nowrap; }
+.tpl-manage-desc { margin:0 0 12px; font-size:12.5px; line-height:1.5; color:var(--text-mut); }
+.cat-manage-desc { margin:0; padding:14px 20px 0; }

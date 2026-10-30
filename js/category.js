@@ -373,7 +373,7 @@
         <div class="cat-manage-fieldlist" data-f-fields>
           ${[{name:'기본 정보',fields:window.AssetExtra.fixed},{name:'추가 정보',fields:window.DATA.extraFields.filter(f=>!f.deleted)}].filter(group=>group.fields.length).map(group=>`<section class="cat-info-settings-group"><h4>${group.name}</h4>${group.fields.map(f => {
             const locked=window.AssetExtra.fixed.some(x=>x.id===f.id), enabled=locked||(state.extraEnabled||[]).includes(f.id);
-            return `<div class="extra-field-settings"><div class="cat-manage-fieldrow"><span>${window.AssetExtra.esc(f.name)}</span><button type="button" class="toggle-switch${enabled?' on':''}" data-field="${f.id}"${locked?' disabled aria-disabled="true"':''} role="switch" aria-checked="${enabled}" aria-label="${window.AssetExtra.esc(f.name)} 노출"><span class="toggle-knob"></span></button></div>${f.description?`<small>${window.AssetExtra.esc(f.description)}</small>`:''}${enabled?`<label class="extra-private"><input type="checkbox" data-private-field="${f.id}"${(state.privateFields||[]).includes(f.id)?' checked':''}>비공개</label>`:''}</div>`;
+            return `<div class="extra-field-settings"><div class="cat-manage-fieldrow"><span>${window.AssetExtra.esc(f.name)}</span><button type="button" class="toggle-switch${enabled?' on':''}" data-field="${f.id}"${locked?' disabled aria-disabled="true" data-tip="기본 항목이므로 체크를 해제할 수 없습니다."':''} role="switch" aria-checked="${enabled}" aria-label="${window.AssetExtra.esc(f.name)} 노출"><span class="toggle-knob"></span></button></div>${f.description?`<small>${window.AssetExtra.esc(f.description)}</small>`:''}${enabled?`<label class="extra-private"><input type="checkbox" data-private-field="${f.id}"${(state.privateFields||[]).includes(f.id)?' checked':''}>비공개</label>`:''}</div>`;
           }).join('')}</section>`).join('')}
         </div>
       </div>`;
@@ -725,7 +725,7 @@
   const master=window.DATA.extraFields, draft=master.filter(f=>!f.deleted).map(f=>({...f}));
   const initial=JSON.stringify(draft), back=document.createElement('div');
   back.className='modal-back';
-  back.innerHTML='<div class="modal scroll-body"><h3>추가 정보 관리</h3><div class="body"><div class="extra-manager-row"><div class="field"><input type="text" data-extra-name maxlength="20" placeholder="입력"><p class="field-err" data-extra-create-error hidden>동일한 명칭이 존재합니다.</p></div><button class="btn primary" data-extra-add disabled>+ 추가</button></div><div data-extra-list></div></div><div class="foot"><button class="btn" data-extra-cancel>취소</button><button class="btn primary" data-extra-save disabled>저장</button></div></div>';
+  back.innerHTML='<div class="modal scroll-body"><h3>추가 정보 관리</h3><div class="body"><p class="tpl-manage-desc">회사에서 관리할 항목을 만들어 두면, 소분류마다 사용 여부와 비공개를 설정해 자산 정보에 추가로 입력할 수 있습니다.</p><div class="extra-manager-row"><div class="field"><input type="text" data-extra-name maxlength="20" placeholder="입력"><p class="field-err" data-extra-create-error hidden>동일한 명칭이 존재합니다.</p></div><button class="btn primary" data-extra-add disabled>+ 추가</button></div><div data-extra-list></div></div><div class="foot"><button class="btn" data-extra-cancel>취소</button><button class="btn primary" data-extra-save disabled>저장</button></div></div>';
   document.body.appendChild(back);
   let dragging=null;
   const input=back.querySelector('[data-extra-name]'), add=back.querySelector('[data-extra-add]'), save=back.querySelector('[data-extra-save]');
@@ -847,6 +847,12 @@ function openManagementMenu(button,sel) {
       }
     };
   }
+  // 분류 개수 상한(D-20261030-32): 회사 전체 대분류 30·소분류 300, 삭제된 분류 제외. ?qa=category-limit은 현재 개수를 상한으로 보아 도달 상태를 확인한다.
+  const CATEGORY_LIMIT_TIP = { group: "대분류는 최대 30개까지 추가할 수 있습니다.", sub: "소분류는 최대 300개까지 추가할 수 있습니다." };
+  function categoryLimit() {
+    const qa = new URLSearchParams(location.search).get("qa") === "category-limit";
+    return { group: qa ? groupsOf().length : 30, sub: qa ? window.DATA.categories.length : 300 };
+  }
   function openManageModal(sel) {
     let draft = groupsOf().map(({
         group,
@@ -873,6 +879,7 @@ function openManagementMenu(button,sel) {
           <button class="btn icon-only sm" data-back hidden aria-label="뒤로">${BACK_ICON}</button>
           <h3 data-modal-title>분류 관리</h3>
         </div>
+        <p class="tpl-manage-desc cat-manage-desc" data-manage-desc>자산을 대분류·소분류로 나눠 관리합니다. 소분류마다 조회·정보 수정·상태 관리 권한과 정보 설정을 지정할 수 있습니다.</p>
         <div class="cat-manage-add-group">
           <div class="cat-manage-name-field">
             <input type="text" class="cat-manage-input" placeholder="입력" maxlength="30">
@@ -935,7 +942,10 @@ function openManagementMenu(button,sel) {
       });
       const addName = normalizedName(addInput.value),
         addDup = !!addName && draft.some(g => normalizedName(g.name) === addName);
-      addInput.classList.toggle("has-err", addDup), addGroupErr.hidden = !addDup, back.querySelector("[data-add-group]").disabled = !addName || addDup, currentMode === "list" && (confirmBtn.disabled = !dirty || anyDup || anyEmpty);
+      addInput.classList.toggle("has-err", addDup), addGroupErr.hidden = !addDup, (() => {
+        const addBtn = back.querySelector("[data-add-group]"), full = draft.length >= categoryLimit().group;
+        addBtn.disabled = full || !addName || addDup, full ? addBtn.dataset.tip = CATEGORY_LIMIT_TIP.group : delete addBtn.dataset.tip;
+      })(), currentMode === "list" && (confirmBtn.disabled = !dirty || anyDup || anyEmpty);
     }
     const markDirty = () => {
         dirty = !0, updateValidity();
@@ -947,7 +957,7 @@ function openManagementMenu(button,sel) {
     function setMode(mode) {
       currentMode = mode;
       const isList = mode === "list";
-      titleEl.textContent = isList ? "분류 관리" : "소분류 추가", backBtn.hidden = isList, addGroupRow.hidden = !isList, body.hidden = !isList, createEl.hidden = isList, cancelBtn.hidden = !isList, confirmBtn.textContent = "저장", isList ? updateValidity() : confirmBtn.disabled = !0, cancelBtn.onclick = () => {
+      titleEl.textContent = isList ? "분류 관리" : "소분류 추가", backBtn.hidden = isList, addGroupRow.hidden = !isList, back.querySelector("[data-manage-desc]").hidden = !isList, body.hidden = !isList, createEl.hidden = isList, cancelBtn.hidden = !isList, confirmBtn.textContent = "저장", isList ? updateValidity() : confirmBtn.disabled = !0, cancelBtn.onclick = () => {
         back.remove(), render(sel);
       }, confirmBtn.onclick = isList ? saveAll : commitCreate;
     }
@@ -987,13 +997,14 @@ function openManagementMenu(button,sel) {
               </div>`;
         }).join("")}
             ${g.subs.length ? "" : '<p class="cat-tree-empty" style="padding-left:8px">소분류 없음</p>'}
-            <button class="btn sm cat-manage-add-sub" data-add-sub="${gi}">+ 소분류 추가</button>
+            ${window.DATA.categories.length >= categoryLimit().sub ? `<button class="btn sm cat-manage-add-sub" data-add-sub="${gi}" disabled data-tip="${CATEGORY_LIMIT_TIP.sub}">+ 소분류 추가</button>` : `<button class="btn sm cat-manage-add-sub" data-add-sub="${gi}">+ 소분류 추가</button>`}
           </div>
         </div>`;
       }).join("") : '<p class="cat-manage-empty">등록된 분류가 없습니다.</p>', updateValidity();
     }
     renderBody();
     function addGroup() {
+      if (draft.length >= categoryLimit().group) return;
       const name = normalizedName(addInput.value);
       if (!name || draft.some(g => normalizedName(g.name) === name)) {
         addInput.focus();

@@ -677,51 +677,73 @@
     back.querySelector("[data-close]").onclick = () => back.remove();
     back.onclick = e => { e.target === back && back.remove(); };
   }
+  // 자산 연결 Modal(Web_dc_23 4-6): 배정 대상 → 이 대상의 연결되지 않은 자산 → 고유관리번호 검색(배정 가능 자산 새 배정)
   function openLinkAddModal(a) {
     const room = window.AssetLinks.MAX - window.AssetLinks.count(a.id),
-      picked = new Set(),
+      picked = new Map(),
       r = a.assignments[0];
     let q = "";
     const back = document.createElement("div");
     back.className = "modal-back", back.innerHTML = `
-      <div class="modal" style="width:460px">
+      <div class="modal link-add-modal">
         <h3>자산 연결</h3>
-        <div class="body" style="display:flex;flex-direction:column;max-height:62vh">
-          <p class="link-target">배정 대상 <b>${r.employee || r.worksite}</b></p>
-          <input type="text" class="picker-search" placeholder="품목명/고유관리번호" data-link-q>
-          <div class="link-list" data-link-cands style="flex:1;min-height:0;overflow-y:auto;margin-top:8px"></div>
-          <p class="muted" style="margin:8px 0 0" data-link-count></p>
+        <div class="body">
+          <section class="link-add-sec">
+            <h4>배정 대상</h4>
+            <div class="acard link-add-target">${typeBadge(r)}<div class="acard-id">${assignIdentity(r)}</div></div>
+          </section>
+          <section class="link-add-sec">
+            <h4>연결되지 않은 자산</h4>
+            <div class="link-list" data-link-same></div>
+          </section>
+          <section class="link-add-sec">
+            <h4>배정 가능 자산 검색</h4>
+            <input type="text" class="picker-search" placeholder="고유관리번호" data-link-q>
+            <div class="link-list" data-link-found></div>
+            <div class="field link-date" data-link-date hidden><label>배정일</label>${dateFieldHtml(todayStr())}<p class="link-search-help">검색해서 선택한 자산을 이 대상에게 새로 배정하면서 연결합니다.</p></div>
+          </section>
         </div>
-        <div class="foot"><button class="btn" data-close>취소</button><button class="btn primary" data-save disabled>연결</button></div>
+        <div class="foot"><button class="btn" data-close>취소</button><button class="btn primary" data-save disabled>저장</button></div>
       </div>`, document.body.appendChild(back);
-    const list = back.querySelector("[data-link-cands]"), save = back.querySelector("[data-save]");
+    const save = back.querySelector("[data-save]"), dateBox = back.querySelector("[data-link-date]");
+    const isNew = b => !(b.assignments || []).length;
+    const getDate = wireDateField(dateBox, todayStr(), () => refresh());
+    const rowHtml = b => {
+      const on = picked.has(b.id), lock = !on && picked.size >= room;
+      return `<label class="link-cand${on ? " on" : ""}"><input type="checkbox" data-pick="${b.id}"${on ? " checked" : ""}${lock ? " disabled" : ""}>${linkThumb(b)}<span class="link-row-main"><span class="link-row-name">${b.product}</span><span class="link-row-no">${b.assetNo}</span></span>${isNew(b) ? '<span class="badge stock">새로 배정</span>' : `<span class="badge ${STATUS_LABEL[b.status][1]}">${STATUS_LABEL[b.status][0]}</span>`}</label>`;
+    };
+    const refresh = () => {
+      const newCount = [...picked.values()].filter(isNew).length;
+      dateBox.hidden = !newCount;
+      save.disabled = !picked.size || newCount && !getDate();
+    };
     const draw = () => {
-      const all = window.AssetLinks.candidates(a),
-        rows = all.filter(b => !q || (b.product + " " + b.assetNo).toLowerCase().includes(q));
-      list.innerHTML = !all.length ? '<p class="muted">연결할 수 있는 자산이 없습니다.</p>' : !rows.length ? '<p class="muted">결과가 없습니다.</p>' : rows.map(b => {
-        const on = picked.has(b.id), lock = !on && picked.size >= room;
-        return `<label class="link-cand"><input type="checkbox" data-pick="${b.id}"${on ? " checked" : ""}${lock ? " disabled" : ""}>${linkThumb(b)}<span class="link-row-name">${b.product}</span><span class="link-row-no">${b.assetNo}</span><span class="badge ${STATUS_LABEL[b.status][1]}">${STATUS_LABEL[b.status][0]}</span></label>`;
-      }).join("");
-      list.querySelectorAll("[data-pick]").forEach(c => c.onchange = () => {
-        c.checked ? picked.add(c.dataset.pick) : picked.delete(c.dataset.pick), draw();
+      const same = window.AssetLinks.candidates(a),
+        pickedNew = [...picked.values()].filter(isNew),
+        found = q ? window.AssetLinks.stockMatches(a, undefined, q).filter(b => !picked.has(b.id)) : [];
+      back.querySelector("[data-link-same]").innerHTML = same.length ? same.map(rowHtml).join("") : '<p class="muted link-empty">연결할 수 있는 자산이 없습니다.</p>';
+      back.querySelector("[data-link-found]").innerHTML = pickedNew.concat(found).map(rowHtml).join("") || (q ? '<p class="muted link-empty">결과가 없습니다.</p>' : "");
+      back.querySelectorAll("[data-pick]").forEach(c => c.onchange = () => {
+        const b = window.DATA.assets.find(x => x.id === c.dataset.pick);
+        c.checked ? picked.set(b.id, b) : picked.delete(b.id), draw();
       });
-      back.querySelector("[data-link-count]").textContent = `선택 ${picked.size}건`;
-      save.disabled = !picked.size;
+      refresh();
     };
     back.querySelector("[data-link-q]").oninput = e => { q = e.target.value.trim().toLowerCase(), draw(); };
     back.querySelector("[data-close]").onclick = () => back.remove();
     save.onclick = () => {
-      const targets = [...picked].map(id => window.DATA.assets.find(x => x.id === id));
-      if (targets.some(b => !window.AssetLinks.candidates(a).includes(b))) {
-        targets.forEach(b => window.AssetLinks.candidates(a).includes(b) || picked.delete(b.id));
-        return toast("설정이 변경되었습니다. 잠시 후 다시 시도해주세요."), draw();
-      }
+      const targets = [...picked.values()], key = window.AssetLinks.targetKey(a), d = getDate();
+      // 저장 시점 재검증: 같은 대상 후보이거나 여전히 배정 가능한 자산인지(Case 4-6-1)
+      const stale = targets.filter(b => isNew(b) ? b.status !== "stock" || b.deleted_at : window.AssetLinks.targetKey(b) !== key || window.AssetLinks.linked(a.id, b.id));
+      if (stale.length) return stale.forEach(b => picked.delete(b.id)), toast("설정이 변경되었습니다. 잠시 후 다시 시도해주세요."), draw();
+      const record = r.employee ? { employee: r.employee, worksite: null, since: d } : { employee: null, worksite: r.worksite, since: d };
       targets.forEach(b => {
+        isNew(b) && (b.assignments = [{ ...record }], b.status = "assigned", logActivity(b, { script: "배정 관리: 신규 배정", target: record, before: "", after: window.fmtDate(d) }));
         window.AssetLinks.add(a, b);
         logActivity(a, { script: "자산 연결: 연결", before: "", after: linkLabel(b) });
         logActivity(b, { script: "자산 연결: 연결", before: "", after: linkLabel(a) });
       });
-      back.remove(), toast("연결되었습니다."), render();
+      back.remove(), toast("저장되었습니다."), render();
     };
     draw();
   }
