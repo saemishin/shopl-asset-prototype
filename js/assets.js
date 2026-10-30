@@ -377,7 +377,7 @@
   const targetModes={employee:'summary',worksite:'summary'};
   for(const view of ['employee','worksite']){try{const v=localStorage.getItem(targetModeKey(view));if(v==='full'||v==='summary')targetModes[view]=v;}catch{}}
   const isTargetFull=()=>['employee','worksite'].includes(state.view)&&targetModes[state.view]==='full';
-  function targetModeToggleHtml(){return `<div class="target-view-row"><div class="seg-toggle" role="tablist">${[['summary','요약'],['full','전체']].map(([k,t])=>`<button type="button" role="tab" data-target-mode="${k}" class="${targetModes[state.view]===k?'active':''}" aria-selected="${targetModes[state.view]===k}">${t}</button>`).join('')}</div>${isTargetFull()?classificationScopeHtml():''}</div>`;}
+  function targetModeToggleHtml(){return `<div class="target-view-row"><div class="seg-toggle" role="tablist">${[['summary','요약'],['full','종합']].map(([k,t])=>`<button type="button" role="tab" data-target-mode="${k}" class="${targetModes[state.view]===k?'active':''}" aria-selected="${targetModes[state.view]===k}">${t}</button>`).join('')}</div>${isTargetFull()?classificationScopeHtml():''}</div>`;}
   function scopedCategories(){const chosen=classificationScopes[state.view]||[];return viewableCategories().filter(c=>c.type==='individual'&&(!chosen.length||chosen.includes(`${c.group}/${c.sub}`)));}
   function classificationScopeHtml(){const chosen=classificationScopes[state.view]||[],first=viewableCategories().find(c=>chosen.includes(`${c.group}/${c.sub}`));return `<div class="overview-scope"><span>분류</span><button type="button" class="btn sm" id="classification-scope">${first?`${first.sub}${chosen.length>1?' +'+(chosen.length-1):''}`:'전체'} ▾</button></div>`;}
   const rememberOverview = () => sessionStorage.setItem("asset-overview-return", JSON.stringify(state));
@@ -582,7 +582,7 @@
       url.searchParams.delete("qa"), url.searchParams.delete("scenario"), location.href = url.toString();
     }, document.body.appendChild(panel);
   }
-  // 전체 보기: 고정 컬럼(구성원 이름·사번·휴대폰번호 / 근무지명·코드) 뒤에 분류 범위의 소분류를 컬럼으로 두고 배정 수를 표시한다.
+  // 종합 보기: 고정 컬럼(구성원 이름·사번·휴대폰번호 / 근무지명·코드) 뒤에 분류 범위의 소분류를 컬럼으로 두고 배정 수를 표시한다.
   function targetFullTable(fixedHeads, fixedCells, rows, keyAttr) {
     const cats = scopedCategories();
     let left = 0;
