@@ -646,7 +646,7 @@
     cb.className = "modal-back", cb.style.zIndex = 360, cb.innerHTML = `
       <div class="modal" style="width:380px">
         <h3>연결을 해제하시겠습니까?</h3>
-        <div class="body" style="font-size:13px"><b>${linkLabel(b)}</b><p class="muted" style="margin-top:6px">배정은 바뀌지 않습니다.</p></div>
+        <div class="body" style="font-size:13px"><b>${linkLabel(a)}</b><br><span aria-hidden="true">↕</span><br><b>${linkLabel(b)}</b><p class="muted" style="margin-top:6px">배정은 바뀌지 않습니다.</p></div>
         <div class="foot"><button class="btn" data-cclose>취소</button><button class="btn primary" data-cok>확인</button></div>
       </div>`, document.body.appendChild(cb);
     cb.querySelector("[data-cclose]").onclick = () => cb.remove();
@@ -767,8 +767,8 @@
     const draw = () => {
       const cutCount = plan.cutVisible.length + plan.cutHidden;
       back.querySelector("[data-tg-body]").innerHTML = mode === "all" ? `
-        <div class="tg-sec"><div class="tg-sec-head">함께 ${verb}될 자산 <b>${plan.move.length}</b>건</div><div class="link-list">${rows(plan.move)}</div>${kind === "return" ? '<p class="muted" style="margin-top:6px">반납한 자산의 연결은 모두 해제됩니다.</p>' : ""}</div>
-        ${cutCount ? `<div class="tg-sec"><div class="tg-sec-head">상태 관리 권한이 없어 함께 ${verb}되지 않고 연결이 끊어질 자산 <b>${cutCount}</b>건</div><div class="link-list">${rows(plan.cutVisible)}</div>${plan.cutHidden ? `<p class="link-hidden">조회할 수 없는 자산 ${plan.cutHidden}건</p>` : ""}</div>` : ""}` : `<p class="muted">이 자산의 연결 ${window.AssetLinks.count(a.id)}건이 해제됩니다.</p>`;
+        <div class="tg-sec"><div class="tg-sec-head">함께 ${verb}될 자산 <b>${plan.move.length}</b>건</div><div class="link-list">${rows(plan.move)}</div>${kind === "return" ? '<p class="muted" style="margin-top:6px">반납 시 연결은 모두 해제됩니다.</p>' : ""}</div>
+        ${cutCount ? `<div class="tg-sec"><div class="tg-sec-head">상태 관리 권한이 없어 함께 ${verb}되지 않고 연결이 끊어질 자산 <b>${cutCount}</b>건</div><div class="link-list">${rows(plan.cutVisible)}</div>${plan.cutHidden ? `<p class="link-hidden">조회할 수 없는 자산 ${plan.cutHidden}건</p>` : ""}</div>` : ""}` : `<p class="muted">${kind === "return" ? "반납 시 연결은 모두 해제됩니다." : "이 자산에 연결된 자산들은 해제됩니다."}</p>`;
     };
     back.querySelectorAll('[name="tg-mode"]').forEach(r => r.onchange = () => { mode = r.value, draw(); });
     back.querySelector("[data-cclose]").onclick = () => back.remove();

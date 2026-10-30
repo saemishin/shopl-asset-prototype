@@ -289,7 +289,7 @@
           <label class="radio-row"><input type="radio" name="ta-kind" value="worksite"${st.kind === "worksite" ? " checked" : ""}><span>근무지</span></label>
           ${st.kind === "worksite" ? `<div class="perm-target-wrap">${targetField("worksite")}</div>` : ""}</div>
         <div class="field"><label>템플릿</label><select data-tpl><option value="">템플릿 선택</option>${tpls.map(t => `<option value="${t.id}"${t.id === st.tplId ? " selected" : ""}>${esc(t.name)}</option>`).join("")}</select></div>
-        <div class="field"><label>배정일</label><input type="date" data-date value="${st.date}" max="${today}"${anyNew() ? "" : " disabled"}><p class="field-help">새로 배정하는 자산에만 적용됩니다.</p></div>
+        <div class="field"><label>배정일</label><input type="date" data-date value="${st.date}" max="${today}"><p class="field-help">새로 배정하는 자산에만 적용됩니다.</p></div>
         ${st.rows.length ? `<div class="tpl-section"><div class="tpl-section-head"><b>항목별 자산 선택</b><span class="muted">항목마다 필요한 개수만큼 자산을 선택해주세요.</span></div>${st.rows.map(slotHtml).join("")}<button type="button" class="tpl-add-row" data-row-add>+ 항목 추가</button></div>` : ""}`;
       body.querySelectorAll('[name="ta-kind"]').forEach(r => r.onchange = () => { st.kind = r.value, clearPicked(), draw(); });
       body.querySelectorAll("[data-target-open]").forEach(el => el.onclick = e => {

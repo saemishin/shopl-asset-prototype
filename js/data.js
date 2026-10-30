@@ -1224,10 +1224,21 @@ window.AssetExtra.exportValues=(asset,manage=window.hasPrototypeAssetManagePermi
 // 같은 대상에게 배정된 자산끼리만 연결하며 대상이 달라지거나 배정이 없어지면 prune()이 자동 해제한다.
 (() => {
   const MAX = 50;
+  // 기본 데이터의 연결 권한 혼합 샘플. 회사 자산 관리 권한자는 모두 조회·처리할 수 있다.
+  const base = window.DATA.assets.find(a => a.id === "A001");
+  for (const sample of [
+    { id:"A107", product:"보안 인증 단말", assetNo:"IT-2026-0107", view:"관리자만" },
+    { id:"A108", product:"회의용 디스플레이", assetNo:"IT-2026-0108", view:"회사의 모든 구성원" }
+  ]) {
+    const sub = sample.id === "A107" ? "보안 장비" : "공용 디스플레이";
+    window.DATA.categories.push({group:"전자기기류",sub,type:"individual",hiddenFields:[],privateFields:[],extraEnabled:[],view:sample.view,edit:"관리자만",assign:"관리자만"});
+    window.DATA.assets.push({...JSON.parse(JSON.stringify(base)),id:sample.id,group:"전자기기류",sub,product:sample.product,assetNo:sample.assetNo,serial:"",labels:[],extraValues:{},_activityLog:[]});
+  }
   const pairs = window.DATA.links || (window.DATA.links = [
     ["A023", "A024"], ["A024", "A021"], ["A021", "A022"],
     ["A027", "A028"], ["A027", "A102"],
-    ["A013", "A006"]
+    ["A013", "A006"],
+    ["A001", "A106"], ["A001", "A107"], ["A001", "A108"]
   ]);
   const byId = id => window.DATA.assets.find(a => a.id === id);
   const alive = a => !!a && !a.deleted_at;

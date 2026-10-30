@@ -56,7 +56,7 @@
     });
   }
   function cutConfirm(a, b, log, after) {
-    confirm("연결을 해제하시겠습니까?", `${esc(label(b))}<br>배정은 바뀌지 않습니다.`, () => {
+    confirm("연결을 해제하시겠습니까?", `<strong>${esc(label(a))}</strong><br><span aria-hidden="true">↕</span><br><strong>${esc(label(b))}</strong><br><br>배정은 바뀌지 않습니다.`, () => {
       if (!L().remove(a, b)) return toast("설정이 변경되었습니다. 잠시 후 다시 시도해주세요."), after();
       log(a, { script: "자산 연결: 연결 해제", before: label(b), after: "" });
       log(b, { script: "자산 연결: 연결 해제", before: label(a), after: "" });
@@ -151,9 +151,9 @@
     const draw = () => {
       const cutCount = plan.cutVisible.length + plan.cutHidden;
       s.querySelector("[data-body]").innerHTML = mode === "all" ? `
-        <div class="mlink-group"><div class="mlink-group-head">함께 ${verb}될 자산 <b>${plan.move.length}</b>건</div><div class="mlink-list">${rows(plan.move)}</div>${kind === "return" ? '<p class="mlink-note">반납한 자산의 연결은 모두 해제됩니다.</p>' : ""}</div>
+        <div class="mlink-group"><div class="mlink-group-head">함께 ${verb}될 자산 <b>${plan.move.length}</b>건</div><div class="mlink-list">${rows(plan.move)}</div>${kind === "return" ? '<p class="mlink-note">반납 시 연결은 모두 해제됩니다.</p>' : ""}</div>
         ${cutCount ? `<div class="mlink-group warn"><div class="mlink-group-head">상태 관리 권한이 없어 함께 ${verb}되지 않고 연결이 끊어질 자산 <b>${cutCount}</b>건</div><div class="mlink-list">${rows(plan.cutVisible)}</div>${plan.cutHidden ? `<p class="mlink-hidden">조회할 수 없는 자산 ${plan.cutHidden}건</p>` : ""}</div>` : ""}`
-        : `<p class="mlink-note">이 자산의 연결 ${L().count(a.id)}건이 해제됩니다.</p>`;
+        : `<p class="mlink-note">${kind === "return" ? "반납 시 연결은 모두 해제됩니다." : "이 자산에 연결된 자산들은 해제됩니다."}</p>`;
     };
     s.querySelectorAll('[name="mlink-mode"]').forEach(r => r.onchange = () => { mode = r.value, draw(); });
     s.querySelector("[data-close]").onclick = () => s.remove();
