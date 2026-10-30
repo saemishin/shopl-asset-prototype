@@ -52,6 +52,7 @@
   }
 
   function mountPanel() {
+    if(window.PrototypeQa)return;
     const panel = document.createElement("aside");
     panel.className = "permission-qa-panel";
     panel.setAttribute("aria-label", "권한 QA 시나리오");
@@ -70,7 +71,7 @@
 
 // Review the new independent information/state permissions without duplicate QA pages.
 (function(){
-  const p=new URLSearchParams(location.search);if(p.get('qa')!=='access')return;
+  const p=new URLSearchParams(location.search);if(window.PrototypeQa||p.get('qa')!=='access')return;
   const options=[['manage','자산 관리'],['info','정보 수정만'],['state','상태 관리만'],['both','수정·상태 관리'],['view','조회만'],['private','비공개 확인']];
   const panel=document.createElement('aside');panel.className='permission-qa-panel';
   panel.innerHTML='<div class="permission-qa-head"><strong>소분류 권한 QA</strong></div><div class="permission-qa-actions">'+options.map(([key,label])=>`<button type="button" data-access-case="${key}" aria-pressed="${(p.get('scenario')||'info')===key}">${label}</button>`).join('')+'</div>';

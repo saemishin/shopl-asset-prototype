@@ -2371,3 +2371,18 @@ table.tbl-target-full .tf-zero { color:#c4c8cd; }
 table.tbl-target-full td.tf-sticky { white-space:normal; }
 table.tbl-target-full .tf-sub span { display:block; }
 table.tbl-target-full .tf-sub .tf-group-name { font-size:11px; font-weight:400; color:var(--text-mut); }
+
+/* 파라미터를 직접 수정하지 않고 디자인 검토를 하는 공통 QA 패널. */
+.prototype-qa{position:fixed;right:16px;bottom:16px;width:260px;max-width:calc(100vw - 24px);z-index:10000;background:#fff;border:1px solid #dce1e6;border-radius:12px;box-shadow:0 6px 24px #0002;color:#222;font:12px/1.45 -apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo",sans-serif;}
+.prototype-qa header{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid #edf0f2;}
+.prototype-qa header strong{font-size:13px;}.prototype-qa button,.prototype-qa select{font:inherit;}
+.prototype-qa header button{border:0;background:#f3f5f7;border-radius:6px;width:26px;height:26px;cursor:pointer;}
+.prototype-qa-body{padding:10px 12px;max-height:58vh;overflow:auto;}.prototype-qa-body[hidden]{display:none!important;}
+.prototype-qa-label{display:flex;flex-direction:column;gap:5px;font-size:11px;color:#666;}.prototype-qa select{width:100%;padding:7px;border:1px solid #dce1e6;border-radius:6px;color:#222;background:#fff;}
+.prototype-qa [data-cases]{display:flex;flex-direction:column;gap:5px;margin-top:9px;}
+.prototype-qa [data-cases] button,.prototype-qa-reset{background:#f8f9fb;border:1px solid #e3e7eb;border-radius:6px;padding:7px 9px;text-align:left;cursor:pointer;color:#222;}
+.prototype-qa [data-cases] button:hover,.prototype-qa-reset:hover{border-color:#3194ff;background:#edf6ff;}
+.prototype-qa-note{font-size:11px;color:#777;margin:10px 0;}.prototype-qa-reset{width:100%;text-align:center;background:#fff;}
+@media(max-width:700px){.prototype-qa{right:8px;bottom:8px;width:224px;}.prototype-qa-body{max-height:48vh;}}
+
+.prototype-qa-current{font-size:11px;color:#345b82;margin:8px 0 0;}

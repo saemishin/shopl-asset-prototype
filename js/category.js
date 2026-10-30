@@ -725,7 +725,7 @@
   const master=window.DATA.extraFields, draft=master.filter(f=>!f.deleted).map(f=>({...f}));
   const initial=JSON.stringify(draft), back=document.createElement('div');
   back.className='modal-back';
-  back.innerHTML='<div class="modal scroll-body"><h3>추가 정보 관리</h3><div class="body"><p class="tpl-manage-desc">회사에서 관리할 항목을 만들어 두면, 소분류마다 사용 여부와 비공개를 설정해 자산 정보에 추가로 입력할 수 있습니다.</p><div class="extra-manager-row"><div class="field"><input type="text" data-extra-name maxlength="20" placeholder="입력"><p class="field-err" data-extra-create-error hidden>동일한 명칭이 존재합니다.</p></div><button class="btn primary" data-extra-add disabled>+ 추가</button></div><div data-extra-list></div></div><div class="foot"><button class="btn" data-extra-cancel>취소</button><button class="btn primary" data-extra-save disabled>저장</button></div></div>';
+  back.innerHTML='<div class="modal scroll-body"><h3>추가 정보 관리</h3><div class="body"><p class="tpl-manage-desc">회사에 필요한 자산 정보 항목을 추가하고 관리합니다.</p><div class="extra-manager-row"><div class="field"><input type="text" data-extra-name maxlength="20" placeholder="입력"><p class="field-err" data-extra-create-error hidden>동일한 명칭이 존재합니다.</p></div><button class="btn primary" data-extra-add disabled>+ 추가</button></div><div data-extra-list></div></div><div class="foot"><button class="btn" data-extra-cancel>취소</button><button class="btn primary" data-extra-save disabled>저장</button></div></div>';
   document.body.appendChild(back);
   let dragging=null;
   const input=back.querySelector('[data-extra-name]'), add=back.querySelector('[data-extra-add]'), save=back.querySelector('[data-extra-save]');
@@ -847,12 +847,9 @@ function openManagementMenu(button,sel) {
       }
     };
   }
-  // 분류 개수 상한(D-20261030-32): 회사 전체 대분류 30·소분류 300, 삭제된 분류 제외. ?qa=category-limit은 현재 개수를 상한으로 보아 도달 상태를 확인한다.
+  // 분류 상한: 실제 상한을 QA 패널의 샘플 분류로 검증한다.
   const CATEGORY_LIMIT_TIP = { group: "대분류는 최대 30개까지 추가할 수 있습니다.", sub: "소분류는 최대 300개까지 추가할 수 있습니다." };
-  function categoryLimit() {
-    const qa = new URLSearchParams(location.search).get("qa") === "category-limit";
-    return { group: qa ? groupsOf().length : 30, sub: qa ? window.DATA.categories.length : 300 };
-  }
+  function categoryLimit() { return {group:30,sub:300}; }
   function openManageModal(sel) {
     let draft = groupsOf().map(({
         group,
@@ -879,7 +876,7 @@ function openManagementMenu(button,sel) {
           <button class="btn icon-only sm" data-back hidden aria-label="뒤로">${BACK_ICON}</button>
           <h3 data-modal-title>분류 관리</h3>
         </div>
-        <p class="tpl-manage-desc cat-manage-desc" data-manage-desc>자산을 대분류·소분류로 나눠 관리합니다. 소분류마다 조회·정보 수정·상태 관리 권한과 정보 설정을 지정할 수 있습니다.</p>
+        <p class="tpl-manage-desc cat-manage-desc" data-manage-desc>자산을 대분류·소분류로 나누고, 소분류별 권한과 정보 설정을 관리합니다.</p>
         <div class="cat-manage-add-group">
           <div class="cat-manage-name-field">
             <input type="text" class="cat-manage-input" placeholder="입력" maxlength="30">

@@ -987,6 +987,7 @@
     asset.labels = [];
   }));
   function mount() {
+    if(!window.PrototypeQa){
     const panel = document.createElement("aside");
     panel.className = "permission-qa-panel", panel.setAttribute("aria-label", "자산 추가 QA 시나리오"), panel.innerHTML = `<div class="permission-qa-head"><strong>자산 추가 QA</strong><button type="button" data-register-qa-close aria-label="QA 종료">×</button></div>
       <div class="permission-qa-actions">${scenarios.map(([key, label]) => `<button type="button" data-register-scenario="${key}" aria-pressed="${key === scenario}">${label}</button>`).join("")}</div>`, document.body.appendChild(panel), panel.querySelectorAll("[data-register-scenario]").forEach(button => {
@@ -998,6 +999,7 @@
       const next = new URL(location.href);
       next.searchParams.delete("qa"), next.searchParams.delete("scenario"), location.href = next.toString();
     };
+    }
     const cat = window.DATA.categories[0],
       parent = window.openAssetAddModal(cat ? {
         group: cat.group,

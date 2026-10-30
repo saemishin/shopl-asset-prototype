@@ -25,7 +25,7 @@
   }
 
   function mount() {
-    if (params.get("capture") !== "1") {
+    if (!window.PrototypeQa && params.get("capture") !== "1") {
       const panel = document.createElement("aside");
       panel.className = "permission-qa-panel";
       panel.setAttribute("aria-label", "필터 빈 옵션 QA 시나리오");

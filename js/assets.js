@@ -372,11 +372,10 @@
   const classificationScopes={all:[],product:[],employee:[],worksite:[]};
   const scopeStorageKey=view=>`asset-classification:${window.AssetPrototypeActor.companyId}:${DEMO_VIEWER_NAME}:${view}`;
   for(const view of ['all','product','employee','worksite']){try{const stored=JSON.parse(localStorage.getItem(scopeStorageKey(view))||'[]');classificationScopes[view]=Array.isArray(stored)?stored.filter(key=>viewableCategories().some(c=>`${c.group}/${c.sub}`===key)):[];}catch{classificationScopes[view]=[];}}
-  // 구성원별·근무지별 요약/전체 보기(D-20261030-35). 마지막 선택을 탭별로 브라우저에 기억한다.
-  const targetModeKey=view=>`asset-target-mode:${window.AssetPrototypeActor.companyId}:${DEMO_VIEWER_NAME}:${view}`;
+  // 분류 선택만 브라우저에 기억한다. 보기 방식은 진입할 때마다 요약으로 시작한다.
   const targetModes={employee:'summary',worksite:'summary'};
-  for(const view of ['employee','worksite']){try{const v=localStorage.getItem(targetModeKey(view));if(v==='full'||v==='summary')targetModes[view]=v;}catch{}}
   const isTargetFull=()=>['employee','worksite'].includes(state.view)&&targetModes[state.view]==='full';
+  window.addEventListener('pageshow',e=>{if(e.persisted&&isTargetFull()){targetModes.employee='summary';targetModes.worksite='summary';render();}});
   function targetModeToggleHtml(){return `<div class="target-view-row"><div class="seg-toggle" role="tablist">${[['summary','요약'],['full','종합']].map(([k,t])=>`<button type="button" role="tab" data-target-mode="${k}" class="${targetModes[state.view]===k?'active':''}" aria-selected="${targetModes[state.view]===k}">${t}</button>`).join('')}</div>${isTargetFull()?classificationScopeHtml():''}</div>`;}
   function scopedCategories(){const chosen=classificationScopes[state.view]||[];return viewableCategories().filter(c=>c.type==='individual'&&(!chosen.length||chosen.includes(`${c.group}/${c.sub}`)));}
   function classificationScopeHtml(){const chosen=classificationScopes[state.view]||[],first=viewableCategories().find(c=>chosen.includes(`${c.group}/${c.sub}`));return `<div class="overview-scope"><span>분류</span><button type="button" class="btn sm" id="classification-scope">${first?`${first.sub}${chosen.length>1?' +'+(chosen.length-1):''}`:'전체'} ▾</button></div>`;}
@@ -568,7 +567,7 @@
     });
   }
   function mountMemberQaPanel() {
-    if (!memberQaEnabled || document.getElementById("member-unavailable-qa")) return;
+    if (window.PrototypeQa || !memberQaEnabled || document.getElementById("member-unavailable-qa")) return;
     const panel = document.createElement("aside");
     panel.id = "member-unavailable-qa", panel.className = "permission-qa-panel", panel.setAttribute("aria-label", "구성원별 7-3 QA");
     const scenarios = [["relation", "배정 관계 종료"], ["scope", "조회 범위 변경"], ["partial", "일부 관계 유지"]];
@@ -856,8 +855,8 @@
       <div class="table-wrap">${tableInner(v)}</div>
 
       ${pagerHtml(v.count, state.view === "all" && canManageAssets() ? '<button class="btn sm" id="btn-bulk-delete" disabled>삭제</button>' : "")}
-    `, c.querySelector('#classification-scope') && (c.querySelector('#classification-scope').onclick=openCategoryFilterModal), c.querySelectorAll('[data-target-mode]').forEach(b=>b.onclick=()=>{targetModes[state.view]=b.dataset.targetMode;try{localStorage.setItem(targetModeKey(state.view),b.dataset.targetMode);}catch{}state.page=1;render();}), c.querySelectorAll(".subtabs button").forEach(b => b.onclick = () => {
-      state.view = b.dataset.view, state.page = 1, state.filters = emptyFilters(), state.statFilter = null, state.search = "", state.productType = "individual";
+    `, c.querySelector('#classification-scope') && (c.querySelector('#classification-scope').onclick=openCategoryFilterModal), c.querySelectorAll('[data-target-mode]').forEach(b=>b.onclick=()=>{targetModes[state.view]=b.dataset.targetMode;state.page=1;render();}), c.querySelectorAll(".subtabs button").forEach(b => b.onclick = () => {
+      state.view = b.dataset.view, ["employee","worksite"].includes(state.view) && (targetModes[state.view]="summary"), state.page = 1, state.filters = emptyFilters(), state.statFilter = null, state.search = "", state.productType = "individual";
       const fields = sortFieldsFor(state.view);
       fields.some(f => f.k === state.sort.key) || (state.sort = {
         key: fields[0].k,
