@@ -593,7 +593,7 @@
  let section=back.querySelector('[data-extra-section]');
  if(!section){section=document.createElement('section');section.className='extra-info-section';section.dataset.extraSection='';section.innerHTML='<h4>추가 정보</h4><div data-custom-inputs></div>';rightCol.appendChild(section);}
  // 기본 정보의 마지막은 메모. 날짜·가격은 기본 정보로 유지한다.
- for(const [id,field] of rows){field.style.display=!cat||window.AssetExtra.visible(cat,id,manage)?'':'none';field.querySelectorAll('input,button').forEach(el=>el.disabled=!cat);rightCol.insertBefore(field,noteField);}
+ for(const [id,field] of rows){field.style.display=!cat||window.AssetExtra.visible(cat,id,manage)?'':'none';field.querySelectorAll('input,button').forEach(el=>el.disabled=false);rightCol.insertBefore(field,noteField);}
  rightCol.insertBefore(tagFieldEl,expiryField);
  const custom=section.querySelector('[data-custom-inputs]'), current=window.AssetExtra.readInputs(custom);
  custom.innerHTML=window.AssetExtra.customInputs(cat,{...(opts.asset?.extraValues||{}),...current},'data-extra-input',manage);
@@ -630,17 +630,28 @@
       })), primaryIdx = saved.primaryIdx, window.AssetMemo.syncTextarea(noteInput), renderChips(), renderPhotos();
     }
     function selectCat(v) {
-      const changed = v !== catValue,
-        uncategorizedPhotos = catValue ? null : photos.map(p => ({
-          ...p
-        }));
-      changed && !opts.asset && catValue && categoryDrafts.set(catValue, captureCategoryDraft()), catValue = v;
+      const previousValue = catValue,
+        changed = v !== previousValue;
+      if (changed && !opts.asset && previousValue) {
+        categoryDrafts.set(previousValue, captureCategoryDraft());
+      }
+      catValue = v;
       const cat = findCat(v);
-      if (type = cat && cat.type || "individual", renderCatDisplay(), applyFieldVisibility(), changed && !opts.asset && (resetOtherFields(), categoryDrafts.has(v) ? restoreCategoryDraft(categoryDrafts.get(v)) : uncategorizedPhotos?.length && (photos = uncategorizedPhotos, renderPhotos()), activeAiDraft)) {
-        const pending = activeAiDraft;
-        activeAiDraft = null, applyAiValues(pending, {
-          replace: !0
-        });
+      type = cat && cat.type || "individual";
+      renderCatDisplay();
+      applyFieldVisibility();
+      if (changed && !opts.asset) {
+        // The first category attaches the existing uncategorized draft as-is.
+        // Only a change from an already chosen category resets/restores its draft.
+        if (previousValue) {
+          resetOtherFields();
+          if (categoryDrafts.has(v)) restoreCategoryDraft(categoryDrafts.get(v));
+        }
+        if (activeAiDraft) {
+          const pending = activeAiDraft;
+          activeAiDraft = null;
+          applyAiValues(pending, { replace: true });
+        }
       }
       checkValid();
     }

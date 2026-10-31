@@ -557,7 +557,7 @@
 
           <div class="mapp-add-field"><div class="mapp-add-field-label"><label>태그</label><button type="button" data-add-tag-manage>태그 관리</button></div><p class="hint mapp-add-tag-hint">최대 10개까지 선택할 수 있습니다.</p>
             <div class="mapp-add-tag-picker"><div class="tag-input-wrap"><div class="tag-chips" data-add-tag-chips>${addTagChipsHtml(draft.labels)}</div><input type="text" data-add-tag-search placeholder="${draft.labels.length ? "" : "검색"}" autocomplete="off"${draft.labels.length >= window.ASSET_TAG_MAX_COUNT ? " disabled" : ""}></div><div class="mapp-add-suggest" data-add-tag-menu hidden></div></div></div>
-          <fieldset class="asset-fixed-inputs"${cat?"":" disabled"}>
+          <fieldset class="asset-fixed-inputs">
           ${cat && !window.AssetExtra.visible(cat,"expiry",hasAssetManagePermission()) ? "" : addExpiryFieldHtml(draft)}
           ${cat && !window.AssetExtra.visible(cat,"manufactured") ? "" : addDateSelectHtml("제조연월", "manufactured", draft, "month")}
           ${cat && !window.AssetExtra.visible(cat,"purchaseDate") ? "" : addDateSelectHtml("구매연월", "purchaseDate", draft, "month")}
@@ -2435,13 +2435,25 @@
               category: row.dataset.addCategoryPick
             });
           if (catViewPermission(category)) {
-            if (previous.editingId) previous.category = row.dataset.addCategoryPick;else if (row.dataset.addCategoryPick !== previous.category) {
-              const cache = previous._categoryDrafts || /* @__PURE__ */new Map();
-              previous.category && cache.set(previous.category, copyCategoryDraft(previous)), state.addDraft = cache.has(row.dataset.addCategoryPick) ? copyCategoryDraft(cache.get(row.dataset.addCategoryPick)) : emptyAddDraft(category), state.addDraft.product = product, state.addDraft._categoryDrafts = cache, !previous.category && previous.photos.length && (state.addDraft.photos = previous.photos.map(p => ({
-                ...p
-              })), state.addDraft.primaryPhoto = previous.primaryPhoto), previous._pendingAiOnce && applyMobileAiDraft(state.addDraft, previous._pendingAiOnce, {
-                replace: !0
-              });
+            if (previous.editingId) previous.category = row.dataset.addCategoryPick;
+            else if (row.dataset.addCategoryPick !== previous.category) {
+              if (!previous.category) {
+                // Preserve all basic inputs when choosing the first category.
+                previous.category = row.dataset.addCategoryPick;
+                if (previous._pendingAiOnce) {
+                  const pending = previous._pendingAiOnce;
+                  delete previous._pendingAiOnce;
+                  applyMobileAiDraft(previous, pending, { replace: true });
+                }
+              } else {
+                const cache = previous._categoryDrafts || new Map();
+                cache.set(previous.category, copyCategoryDraft(previous));
+                state.addDraft = cache.has(row.dataset.addCategoryPick)
+                  ? copyCategoryDraft(cache.get(row.dataset.addCategoryPick))
+                  : emptyAddDraft(category);
+                state.addDraft.product = product;
+                state.addDraft._categoryDrafts = cache;
+              }
             }
             state.screen = "asset-add", draw();
           }
