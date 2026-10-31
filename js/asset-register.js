@@ -487,7 +487,9 @@
     }
     function hasAddInput() {
       const inputs = [nameInput, assetNoInput, serialInput, imeiInput, purchasePriceInput, noteInput, ...[expiryField, manufacturedField, purchaseDateField].map(field => field.querySelector("[data-dtext]"))];
-      return !!catValue || inputs.some(input => input.value.trim()) || tags.length > 0 || photos.length > 0;
+      // 진입 시 사전 선택된 소분류를 그대로 둔 상태는 작성 내용으로 보지 않는다(새06 Case 13-1-1).
+      const categoryTouched = !!catValue && catValue !== preselectValue || categoryDrafts.size > 0;
+      return categoryTouched || inputs.some(input => input.value.trim()) || tags.length > 0 || photos.length > 0 || !!window.AssetMemo?.has?.(noteInput.value) || Object.values(window.AssetExtra.readInputs(back.querySelector('[data-custom-inputs]') || back)).some(v => String(v || "").trim());
     }
     function requestClose() {
       if (closeMenu(), closeProdMenu(), opts.asset ? !editDirty() : !hasAddInput()) {

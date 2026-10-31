@@ -825,7 +825,7 @@
         ${[["all", "전체"], ["product", "품목별"], ["employee", "구성원별"], ["worksite", "근무지별"]].map(([k, t]) => `<button data-view="${k}" class="${state.view === k ? "active" : ""}">${t}</button>`).join("")}
         ${state.view === "all" ? `
         <div class="sub-actions">
-          ${canManageAssets() ? '<button class="btn primary sm" id="btn-add">＋ 자산 추가 <span class="chev">▾</span></button>' : ""}
+          ${canManageAssets() ? '<button class="btn primary sm" id="btn-add">＋ 자산 추가</button>' : ""}
           ${bulkActions().length ? '<button class="btn sm" id="btn-bulk">일괄 작업 <span class="chev">▾</span></button>' : ""}
         </div>` : ""}
       </div>
