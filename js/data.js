@@ -710,7 +710,28 @@ window.DATA = function () {
       labels: [],
       assignments: []
     },
-    // 신규 구성원 6명 추가. 다만 이번엔 데모 전용이라 MEMBERS/MEMBER_INFO/EMP_GROUP엔 등록 안 함(그 목록들에
+    // 구성원별 배정 자산 목록에서 한 소분류 안의 서로 다른 품목을 확인할 수 있는 기본 샘플.
+    // 김민수의 전자기기류 > 노트북: 그램 16 (2024)(A001) + 맥북 에어 13(A109).
+    {
+      id: "A109",
+      type: "individual",
+      assetNo: "IT-2026-0109",
+      product: "맥북 에어 13",
+      group: "전자기기류",
+      sub: "노트북",
+      status: "assigned",
+      serial: "DEMO-MBA13-0109",
+      createdAt: "2026-08-03",
+      purchaseDate: "2026-08-01",
+      price: 159e4,
+      expiry: "2029-08-01",
+      labels: ["개발팀"],
+      assignments: [{
+        employee: "김민수",
+        worksite: null,
+        since: "2026-08-04"
+      }]
+    },
     {
       id: "A106",
       type: "individual",
