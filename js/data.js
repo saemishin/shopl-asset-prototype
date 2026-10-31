@@ -711,7 +711,7 @@ window.DATA = function () {
       assignments: []
     },
     // 구성원별 배정 자산 목록에서 한 소분류 안의 서로 다른 품목을 확인할 수 있는 기본 샘플.
-    // 김민수의 전자기기류 > 노트북: 그램 16 (2024)(A001) + 맥북 에어 13(A109).
+    // 김민수의 전자기기류 > 노트북: 그램 16 (2024) 1대 + 맥북 에어 13 2대(A109/A110).
     {
       id: "A109",
       type: "individual",
@@ -721,6 +721,26 @@ window.DATA = function () {
       sub: "노트북",
       status: "assigned",
       serial: "DEMO-MBA13-0109",
+      createdAt: "2026-08-03",
+      purchaseDate: "2026-08-01",
+      price: 159e4,
+      expiry: "2029-08-01",
+      labels: ["개발팀"],
+      assignments: [{
+        employee: "김민수",
+        worksite: null,
+        since: "2026-08-04"
+      }]
+    },
+    {
+      id: "A110",
+      type: "individual",
+      assetNo: "IT-2026-0110",
+      product: "맥북 에어 13",
+      group: "전자기기류",
+      sub: "노트북",
+      status: "assigned",
+      serial: "DEMO-MBA13-0110",
       createdAt: "2026-08-03",
       purchaseDate: "2026-08-01",
       price: 159e4,
