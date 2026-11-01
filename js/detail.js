@@ -248,11 +248,11 @@
       cb.remove(), onLeave();
     };
   }
-  function confirmModal(msg, onOk) {
+  function confirmModal(msg, onOk, asset) {
     const cb = document.createElement("div");
     cb.className = "modal-back", cb.style.zIndex = 340, cb.innerHTML = `
       <div class="modal" style="width:380px">
-        <div class="body" style="padding-top:20px;font-size:13px">${msg}</div>
+        <div class="body" style="padding-top:20px;font-size:13px">${msg}${asset ? assetSummaryHtml(asset) : ""}</div>
         <div class="foot">
           <button class="btn" data-cclose>취소</button>
           <button class="btn primary" data-cok>확인</button>
@@ -598,6 +598,9 @@
     const ph = window.assetPhotos(b);
     return ph.length ? `<span class="thumb" style="background:${ph[b._primary || 0].color}"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10" r="1.6"/><path d="m21 16-5-5-9 8"/></svg></span>` : '<span class="thumb empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 15 5-4 4 3 4-4 5 4"/></svg></span>';
   };
+  function assetSummaryHtml(a) {
+    return `<div class="aa-asset-summary" data-current-asset>${linkThumb(a)}<div class="aa-asset-summary-main"><strong>${window.AssetExtra.esc(a.product)}</strong><span>${window.AssetExtra.esc(a.assetNo)}</span></div></div>`;
+  }
   function linkRowHtml(a, b) {
     const canCut = window.AssetAccess.canState(a) && window.AssetAccess.canState(b);
     return `<div class="link-row" data-link-open="${b.id}">
@@ -754,6 +757,7 @@
       <div class="modal" style="width:460px">
         <h3>${verb}하시겠습니까?</h3>
         <div class="body" style="max-height:64vh;overflow-y:auto">
+          ${assetSummaryHtml(a)}
           <label class="radio-row"><input type="radio" name="tg-mode" value="all" checked><span>연결된 자산과 함께</span></label>
           <label class="radio-row"><input type="radio" name="tg-mode" value="one"><span>이 자산만</span></label>
           <div data-tg-body style="margin-top:10px"></div>
@@ -762,9 +766,9 @@
       </div>`, document.body.appendChild(back);
     const rows = list => list.map(b => `<div class="link-row static"><div class="link-row-main"><span class="link-row-name">${b.product}</span><span class="link-row-no">${b.assetNo}</span></div><span class="badge ${STATUS_LABEL[b.status][1]}">${STATUS_LABEL[b.status][0]}</span></div>`).join("");
     const draw = () => {
-      const cutCount = plan.cutVisible.length + plan.cutHidden;
+      const cutCount = plan.cutVisible.length + plan.cutHidden, others = plan.move.filter(b => b.id !== a.id);
       back.querySelector("[data-tg-body]").innerHTML = mode === "all" ? `
-        <div class="tg-sec"><div class="tg-sec-head">함께 ${verb}될 자산 <b>${plan.move.length}</b>건</div><div class="link-list">${rows(plan.move)}</div>${kind === "return" ? '<p class="muted" style="margin-top:6px">반납 시 연결은 모두 해제됩니다.</p>' : ""}</div>
+        ${others.length ? `<div class="tg-sec"><div class="tg-sec-head">함께 ${verb}될 자산 <b>${others.length}</b>건</div><div class="link-list">${rows(others)}</div></div>` : ""}${kind === "return" ? '<p class="muted" style="margin-top:6px">반납 시 연결은 모두 해제됩니다.</p>' : ""}
         ${cutCount ? `<div class="tg-sec"><div class="tg-sec-head">연결이 끊어질 자산 <b>${cutCount}</b>건</div><p class="tg-permission-note">상태 관리 권한이 없습니다.</p><div class="link-list">${rows(plan.cutVisible)}${maskedLinkRows(plan.cutHidden)}</div></div>` : ""}` : `<p class="muted">${kind === "return" ? "반납 시 연결은 모두 해제됩니다." : "이 자산에 연결된 자산들은 해제됩니다."}</p>`;
     };
     back.querySelectorAll('[name="tg-mode"]').forEach(r => r.onchange = () => { mode = r.value, draw(); });
@@ -799,7 +803,7 @@
         before: window.fmtDate(old.since),
         after: ""
       }), toast("반납되었습니다."), render();
-    });
+    }, a);
   }
   function openAssignAddModal(a) {
     let picked = null;
@@ -831,6 +835,7 @@
     let getDate = () => null;
     function draw() {
       body.innerHTML = `
+        ${assetSummaryHtml(a)}
         <div class="field">
           <label>배정 대상</label>
           <label class="radio-row"><input type="radio" name="aa-kind" value="employee"${picked === "employee" ? " checked" : ""}><span>구성원</span></label>
@@ -887,7 +892,7 @@
           before: "",
           after: window.fmtDate(d)
         }), toast("배정되었습니다."), render();
-      });
+      }, a);
     };
   }
   function openReassignModal(a, idx) {
@@ -921,6 +926,7 @@
     let getDate = () => null;
     function draw() {
       body.innerHTML = `
+        ${assetSummaryHtml(a)}
         <div class="ra-current">
           <div class="perm-info-note">${INFO_ICON}<span>기존 배정을 반납하고 새 대상에게 배정합니다.</span></div>
           <div class="acard">
@@ -989,7 +995,7 @@
       if (window.AssetLinks.count(a.id)) return openTogetherModal(a, "reassign", (mode, plan) => {
         move(mode === "all" ? plan.move : [a],mode === "all" ? plan : null);
       });
-      confirmModal("이동하시겠습니까?", () => move([a]));
+      confirmModal("이동하시겠습니까?", () => move([a]), a);
     };
   }
   function openAssignMemberPicker(initial, onApply, exclude) {

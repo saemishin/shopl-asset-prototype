@@ -13,6 +13,9 @@
     const ph = window.assetPhotos(b);
     return ph.length ? `<span class="thumb" style="background:${ph[b._primary || 0].color}"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10" r="1.6"/><path d="m21 16-5-5-9 8"/></svg></span>` : '<span class="thumb empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 15 5-4 4 3 4-4 5 4"/></svg></span>';
   };
+  function assetSummaryHtml(a) {
+    return `<div class="aa-asset-summary" data-current-asset>${thumb(a)}<div class="aa-asset-summary-main"><strong>${esc(a.product)}</strong><span>${esc(a.assetNo)}</span></div></div>`;
+  }
   function toast(msg) {
     const t = document.createElement("div"), screen = document.querySelector(".mapp-screen"), r = screen ? screen.getBoundingClientRect() : null;
     t.textContent = msg, t.style.cssText = `position:fixed;${r ? `left:${r.left + r.width / 2}px;bottom:${window.innerHeight - r.bottom + 32}px;` : "left:50%;bottom:32px;"}transform:translateX(-50%);background:#1b1d1f;color:#fff;padding:10px 16px;border-radius:8px;font-size:12.5px;z-index:400;max-width:280px;text-align:center`;
@@ -148,12 +151,12 @@
     if (!L().count(a.id)) return false;
     const verb = kind === "reassign" ? "이동" : "반납", plan = L().togetherPlan(a, me);
     let mode = "all";
-    const s = sheet(`${verb}하시겠습니까?`, `<div class="mlink-modes"><label class="radio-row"><input type="radio" name="mlink-mode" value="all" checked><span>연결된 자산과 함께</span></label><label class="radio-row"><input type="radio" name="mlink-mode" value="one"><span>이 자산만</span></label></div><div data-body></div>`, '<button type="button" class="btn" data-close>취소</button><button type="button" class="btn primary" data-ok>확인</button>', 340);
+    const s = sheet(`${verb}하시겠습니까?`, `${assetSummaryHtml(a)}<div class="mlink-modes"><label class="radio-row"><input type="radio" name="mlink-mode" value="all" checked><span>연결된 자산과 함께</span></label><label class="radio-row"><input type="radio" name="mlink-mode" value="one"><span>이 자산만</span></label></div><div data-body></div>`, '<button type="button" class="btn" data-close>취소</button><button type="button" class="btn primary" data-ok>확인</button>', 340);
     const rows = list => list.map(b => rowHtml(a, b, me, false)).join("");
     const draw = () => {
-      const cutCount = plan.cutVisible.length + plan.cutHidden;
+      const cutCount = plan.cutVisible.length + plan.cutHidden, others = plan.move.filter(b => b.id !== a.id);
       s.querySelector("[data-body]").innerHTML = mode === "all" ? `
-        <div class="mlink-group"><div class="mlink-group-head">함께 ${verb}될 자산 <b>${plan.move.length}</b>건</div><div class="mlink-list">${rows(plan.move)}</div>${kind === "return" ? '<p class="mlink-note">반납 시 연결은 모두 해제됩니다.</p>' : ""}</div>
+        ${others.length ? `<div class="mlink-group"><div class="mlink-group-head">함께 ${verb}될 자산 <b>${others.length}</b>건</div><div class="mlink-list">${rows(others)}</div></div>` : ""}${kind === "return" ? '<p class="mlink-note">반납 시 연결은 모두 해제됩니다.</p>' : ""}
         ${cutCount ? `<div class="mlink-group warn"><div class="mlink-group-head">연결이 끊어질 자산 <b>${cutCount}</b>건</div><p class="tg-permission-note">상태 관리 권한이 없습니다.</p><div class="mlink-list">${rows(plan.cutVisible)}${maskedRows(plan.cutHidden)}</div></div>` : ""}`
         : `<p class="mlink-note">${kind === "return" ? "반납 시 연결은 모두 해제됩니다." : "이 자산에 연결된 자산들은 해제됩니다."}</p>`;
     };
@@ -184,5 +187,5 @@
     prune(log, "반납");
   }
   const unlinkNote = a => L().count(a.id) ? ` 연결된 자산 ${L().count(a.id)}건과의 연결이 해제됩니다.` : "";
-  window.MappLinks = { sectionHtml, wire, together, runReassign, runReturn, prune, unlinkNote };
+  window.MappLinks = { assetSummaryHtml, sectionHtml, wire, together, runReassign, runReturn, prune, unlinkNote };
 })();

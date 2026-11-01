@@ -109,8 +109,8 @@
   };
 
   // ── 공통 입력: 분류 선택 Modal(Web_dc_13 15번) · 품목명 제안 Input · 대상 선택 Modal(Web_dc_23 5번) ──
-  function categoryFieldHtml(x, attr) {
-    return x.sub ? `<button type="button" class="perm-target-btn tpl-cat" ${attr}><span>${esc(x.group)} › ${esc(x.sub)}</span><span class="chev">›</span></button>` : `<button type="button" class="perm-target-btn tpl-cat" ${attr}><span class="muted">소분류 선택</span><span class="chev">›</span></button>`;
+  function categoryFieldHtml(x, attr, placeholder = "소분류 선택") {
+    return x.sub ? `<button type="button" class="perm-target-btn tpl-cat" ${attr}><span>${esc(x.group)} › ${esc(x.sub)}</span><span class="chev">›</span></button>` : `<button type="button" class="perm-target-btn tpl-cat" ${attr}><span class="muted">${esc(placeholder)}</span><span class="chev">›</span></button>`;
   }
   function pickCategory(x, onDone) {
     window.openAssetCategoryPickModal(D.categories, x.sub ? `${x.group}|${x.sub}` : null, v => {
@@ -120,8 +120,8 @@
     const backs = document.querySelectorAll(".modal-back");
     backs.length && (backs[backs.length - 1].style.zIndex = 390);
   }
-  function productFieldHtml(x, attr) {
-    return `<div class="tpl-prod"><input type="text" maxlength="50" placeholder="${x.sub ? "품목명 입력" : "소분류를 먼저 선택"}" value="${esc(x._text ?? x.product)}" ${attr}${x.sub ? "" : " disabled"}></div>`;
+  function productFieldHtml(x, attr, placeholder) {
+    return `<div class="tpl-prod"><input type="text" maxlength="50" placeholder="${esc(placeholder ?? (x.sub ? "품목명 입력" : "소분류를 먼저 선택"))}" value="${esc(x._text ?? x.product)}" ${attr}${x.sub ? "" : " disabled"}></div>`;
   }
   function wireProductInput(input, x, onPick, onType) {
     let menu = null;
@@ -161,7 +161,7 @@
 
   // ── Web_dc_28 템플릿 관리 ──
   function openTemplateManager() {
-    const back = modal(`<h3>배정 템플릿 관리</h3><div class="body tpl-manage-body"><p class="tpl-manage-desc">함께 배정하고 연결할 자산 구성을 미리 만들어 관리합니다.</p><div class="tpl-manage-head"><button class="btn sm primary" data-tpl-add>+ 템플릿 추가</button></div><div class="link-list" data-tpl-list></div></div><div class="foot"><button class="btn" data-close>닫기</button></div>`, "tpl-modal");
+    const back = modal(`<div class="tpl-manager-header"><h3>배정 템플릿 관리</h3><button type="button" class="btn icon-only sm" data-close aria-label="닫기">${CLOSE_ICON}</button></div><div class="body tpl-manage-body"><p class="tpl-manage-desc">함께 배정하고 연결할 자산 구성을 미리 만들어 관리합니다.</p><div class="tpl-manage-head"><button class="btn sm primary" data-tpl-add>+ 템플릿 추가</button></div><div class="link-list" data-tpl-list></div></div>`, "tpl-modal");
     const draw = () => {
       const list = D.templates.slice().sort((p, q) => p.name.localeCompare(q.name, "ko"));
       back.querySelector("[data-tpl-list]").innerHTML = list.length ? list.map(t => `<div class="tpl-card"><div class="tpl-card-main"><b>${esc(t.name)}</b><span class="muted">전체 ${totalOf(t)}개</span><div class="tpl-card-items">${[t.base, ...t.items].map((x, i) => `<span class="tpl-chip${i ? "" : " base"}">${i ? "" : "기준 "}${esc(x.product)}${i ? ` ×${x.count}` : ""}</span>`).join("")}</div></div><div class="tpl-card-actions"><button class="btn sm" data-tpl-edit="${t.id}">수정</button><button class="btn sm" data-tpl-del="${t.id}">삭제</button></div></div>`).join("") : '<p class="muted tpl-empty">등록된 템플릿이 없습니다.</p>';
@@ -178,9 +178,10 @@
   function openTemplateEditor(tpl, onSaved) {
     const pick = x => ({ group: x.group, sub: x.sub, product: x.product, ...(x.count ? { count: x.count } : {}) });
     const original = tpl ? JSON.stringify({ name: tpl.name, base: pick(tpl.base), items: tpl.items.map(pick) }) : "";
-    const draft = tpl ? JSON.parse(original) : { name: "", base: { group: "", sub: "", product: "" }, items: [] };
+    const draft = tpl ? JSON.parse(original) : { name: "", base: { group: "", sub: "", product: "" }, items: [{ group: "", sub: "", product: "", count: 1 }] };
     const back = modal(`<h3>${tpl ? "템플릿 수정" : "템플릿 추가"}</h3><div class="body tpl-edit-body" data-ed></div><div class="foot"><button class="btn" data-cancel>취소</button><button class="btn primary" data-save disabled>저장</button></div>`, "tpl-modal wide", 340);
     const body = back.querySelector("[data-ed]"), save = back.querySelector("[data-save]");
+    const itemCount = () => draft.items.reduce((n, x) => n + (+x.count || 0), 0);
     const errors = () => {
       const name = draft.name.trim(),
         rows = [draft.base, ...draft.items].filter(x => x.product),
@@ -188,35 +189,38 @@
       return { dup: !!name && D.templates.some(t => t !== tpl && t.name.trim() === name), dupKeys: new Set(keys.filter((k, i) => keys.indexOf(k) !== i)), over: draft.items.reduce((n, x) => n + (+x.count || 0), 0) > MAX_ITEMS };
     };
     const valid = () => { const e = errors(); return draft.name.trim() && !e.dup && !e.over && !e.dupKeys.size && draft.base.product && draft.items.length && draft.items.every(x => x.product && +x.count >= 1); };
-    const changed = () => tpl ? JSON.stringify({ name: draft.name, base: pick(draft.base), items: draft.items.map(pick) }) !== original : !!(draft.name.trim() || draft.base.sub || draft.items.length);
+    const changed = () => tpl ? JSON.stringify({ name: draft.name, base: pick(draft.base), items: draft.items.map(pick) }) !== original : !!(draft.name.trim() || draft.base.sub || draft.items.length > 1 || draft.items.some(x => x.sub || x.product || x._text?.trim() || +x.count !== 1));
     const rowErr = x => {
       const e = errors();
       if (x._text && !x.product) return "등록된 품목에서 선택해주세요.";
       if (x.product && e.dupKeys.has(itemKey(x))) return "같은 품목이 이미 있습니다.";
       return "";
     };
-    const rowHtml = (x, i) => `<div class="tpl-item${i < 0 ? " base" : ""}">
-        <div class="tpl-item-fields">${categoryFieldHtml(x, `data-cat="${i}"`)}${productFieldHtml(x, `data-prod="${i}"`)}</div>
-        ${i < 0 ? '<span class="tpl-fixed">1개</span>' : `<div class="tpl-stepper"><button type="button" data-dec="${i}"${x.count <= 1 ? " disabled" : ""}>−</button><span>${x.count}</span><button type="button" data-inc="${i}">＋</button></div><button type="button" class="tpl-x" data-del="${i}" aria-label="항목 삭제">${CLOSE_ICON}</button>`}
-        <p class="field-err" data-row-err="${i}"${rowErr(x) ? "" : " hidden"}>${rowErr(x)}</p>
+    const rowHtml = (x, i) => `<div class="tpl-item tpl-editor-asset${i < 0 ? " base" : ""}">
+        <div class="tpl-item-fields tpl-editor-fields">
+          <div class="tpl-editor-field"><label>소분류</label>${categoryFieldHtml(x, `data-cat="${i}" aria-label="소분류 선택"`, "선택")}</div>
+          <div class="tpl-editor-field"><label>품목명</label>${productFieldHtml(x, `data-prod="${i}" aria-label="품목명"`, "입력")}<p class="field-err" data-row-err="${i}"${rowErr(x) ? "" : " hidden"}>${rowErr(x)}</p></div>
+          ${i < 0 ? "" : `<div class="tpl-editor-field"><label>개수</label><div class="tpl-stepper"><button type="button" data-dec="${i}" aria-label="개수 줄이기"${x.count <= 1 ? " disabled" : ""}>−</button><span>${x.count}</span><button type="button" data-inc="${i}" aria-label="개수 늘리기"${itemCount() >= MAX_ITEMS ? " disabled" : ""}>＋</button></div></div>`}
+        </div>
+        ${i < 0 ? "" : `<button type="button" class="tpl-x" data-del="${i}" aria-label="자산 삭제"${draft.items.length === 1 ? " disabled" : ""}>${CLOSE_ICON}</button>`}
       </div>`;
     const draw = () => {
       const e = errors();
       body.innerHTML = `
         <div class="field"><label>템플릿 이름</label><input type="text" maxlength="30" data-name value="${esc(draft.name)}" placeholder="입력"><p class="field-err" data-name-err${e.dup ? "" : " hidden"}>동일한 명칭이 존재합니다.</p></div>
-        <div class="tpl-section"><div class="tpl-section-head"><b>기준 자산</b><span class="muted">나머지 항목의 자산이 모두 이 자산에 연결됩니다.</span></div>${rowHtml(draft.base, -1)}</div>
-        <div class="tpl-section"><div class="tpl-section-head"><b>연결할 항목</b><span class="muted">기준 자산 제외 최대 ${MAX_ITEMS}개</span></div>
-          ${draft.items.length ? draft.items.map(rowHtml).join("") : '<p class="muted tpl-empty">항목을 추가해주세요.</p>'}
+        <div class="tpl-section"><div class="tpl-section-head"><b>기준 자산</b><span class="muted">다른 자산이 모두 이 자산에 연결됩니다.</span></div>${rowHtml(draft.base, -1)}</div>
+        <div class="tpl-section"><div class="tpl-section-head"><b>연결할 자산</b></div>
+          ${draft.items.map(rowHtml).join("")}
           <p class="field-err" data-over-err${e.over ? "" : " hidden"}>기준 자산을 제외한 필요 개수는 최대 ${MAX_ITEMS}개입니다.</p>
-          <button type="button" class="tpl-add-row" data-add>+ 항목 추가</button></div>`;
+          <button type="button" class="tpl-add-row" data-add${itemCount() >= MAX_ITEMS ? " disabled" : ""}>추가</button></div>`;
       const at = i => i < 0 ? draft.base : draft.items[i];
       body.querySelector("[data-name]").oninput = ev => { draft.name = ev.target.value, refresh(); };
       body.querySelectorAll("[data-cat]").forEach(b => b.onclick = () => pickCategory(at(+b.dataset.cat), draw));
       body.querySelectorAll("[data-prod]").forEach(inp => wireProductInput(inp, at(+inp.dataset.prod), draw, refresh));
-      body.querySelectorAll("[data-dec]").forEach(b => b.onclick = () => { draft.items[+b.dataset.dec].count--, draw(); });
-      body.querySelectorAll("[data-inc]").forEach(b => b.onclick = () => { draft.items[+b.dataset.inc].count++, draw(); });
-      body.querySelectorAll("[data-del]").forEach(b => b.onclick = () => { draft.items.splice(+b.dataset.del, 1), draw(); });
-      body.querySelector("[data-add]").onclick = () => { draft.items.push({ group: "", sub: "", product: "", count: 1 }), draw(); };
+      body.querySelectorAll("[data-dec]").forEach(b => b.onclick = () => { if (draft.items[+b.dataset.dec].count > 1) { draft.items[+b.dataset.dec].count--; draw(); } });
+      body.querySelectorAll("[data-inc]").forEach(b => b.onclick = () => { if (itemCount() < MAX_ITEMS) { draft.items[+b.dataset.inc].count++; draw(); } });
+      body.querySelectorAll("[data-del]").forEach(b => b.onclick = () => { if (draft.items.length > 1) { draft.items.splice(+b.dataset.del, 1); draw(); } });
+      body.querySelector("[data-add]").onclick = () => { if (itemCount() < MAX_ITEMS) { draft.items.push({ group: "", sub: "", product: "", count: 1 }); draw(); } };
       refresh();
     };
     const refresh = () => {
@@ -224,6 +228,8 @@
       const e = errors();
       body.querySelector("[data-name-err]").hidden = !e.dup;
       body.querySelector("[data-over-err]").hidden = !e.over;
+      body.querySelector("[data-add]").disabled = itemCount() >= MAX_ITEMS;
+      body.querySelectorAll("[data-inc]").forEach(b => b.disabled = itemCount() >= MAX_ITEMS);
       body.querySelectorAll("[data-row-err]").forEach(p => { const i = +p.dataset.rowErr, msg = rowErr(i < 0 ? draft.base : draft.items[i]); p.textContent = msg, p.hidden = !msg; });
     };
     back.querySelector("[data-cancel]").onclick = () => changed() ? confirmBox("작성을 중단하시겠습니까?", "지금까지 작성한 내용은 저장되지 않습니다.", () => back.remove()) : back.remove();

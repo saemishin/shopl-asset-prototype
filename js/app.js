@@ -559,12 +559,13 @@
         ` : `<p class="mapp-empty" data-mapp-empty>${items.length ? "결과가 없습니다." : "배정 중인 자산이 없습니다."}</p>`}
       </div>`;
   }
-  function confirmModal(title, body, onOk, danger) {
+  function confirmModal(title, body, onOk, danger, asset) {
     const cb = document.createElement("div");
     cb.className = "modal-back", cb.style.zIndex = 340, cb.innerHTML = `
       <div class="modal" style="width:360px">
         <div class="body" style="padding-top:20px">
           <p style="font-size:14px;font-weight:700;margin-bottom:6px">${title}</p>
+          ${asset ? window.MappLinks.assetSummaryHtml(asset) : ""}
           ${body ? `<p class="hint" style="margin-top:0">${body}</p>` : ""}
         </div>
         <div class="foot">
@@ -900,6 +901,7 @@
       };
     function drawBody() {
       body.innerHTML = `
+        ${window.MappLinks.assetSummaryHtml(a)}
         ${old ? `
           <div class="ra-current">
             <div class="perm-info-note">${INFO_ICON}<span>기존 배정을 반납하고 새 대상에게 배정합니다.</span></div>
@@ -971,7 +973,7 @@
             before: "",
             after: window.fmtDate(d)
           }), toast("배정되었습니다."), afterMutate();
-        });
+        }, false, a);
       } else if (kind === "reassign") {
         const d = f.dateIso,
           record = mk({
@@ -989,7 +991,7 @@
           try { window.AssetMoves.moveBatch([a],record,todayStr(),ME,logActivity,a); }
           catch (_) { toast("설정이 변경되었습니다. 잠시 후 다시 시도해주세요."); afterMutate(); return; }
           toast("이동되었습니다."); afterMutate();
-        });
+        }, false, a);
       }
     };
   }
@@ -1005,7 +1007,7 @@
         before: window.fmtDate(old.since),
         after: ""
       }), toast("반납되었습니다."), onDone();
-    });
+    }, false, a);
   }
   const PHOTO_COLORS = ["#5b8def", "#8f6ef0", "#eb7f8b", "#3fb37f", "#e0a63c", "#4dabf7", "#c2554e", "#3f9ba0", "#9a6bd6", "#5aa06a"],
     CLOSE_ICON_SM = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
