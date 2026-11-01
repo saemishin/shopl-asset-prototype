@@ -559,13 +559,12 @@
         ` : `<p class="mapp-empty" data-mapp-empty>${items.length ? "결과가 없습니다." : "배정 중인 자산이 없습니다."}</p>`}
       </div>`;
   }
-  function confirmModal(title, body, onOk, danger, asset) {
+  function confirmModal(title, body, onOk, danger) {
     const cb = document.createElement("div");
     cb.className = "modal-back", cb.style.zIndex = 340, cb.innerHTML = `
       <div class="modal" style="width:360px">
         <div class="body" style="padding-top:20px">
           <p style="font-size:14px;font-weight:700;margin-bottom:6px">${title}</p>
-          ${asset ? window.MappLinks.assetSummaryHtml(asset) : ""}
           ${body ? `<p class="hint" style="margin-top:0">${body}</p>` : ""}
         </div>
         <div class="foot">
@@ -846,7 +845,7 @@
     },
     reassign: {
       title: "이동",
-      targetLabel: "이동할 대상",
+      targetLabel: "이동시킬 대상",
       confirm: "이동하시겠습니까?"
     }
   };
@@ -880,6 +879,7 @@
       <div class="mapp-fullpage-foot">
         <button type="button" class="btn primary" data-form-save disabled>저장</button>
       </div>`;
+    const choice = kind === "reassign" ? window.MappLinks.createChoice(a, "reassign", ME) : null;
     const body = back.querySelector("[data-form-body]"),
       saveBtn = back.querySelector("[data-form-save]"),
       targetSummaryHtml = k => {
@@ -922,7 +922,7 @@
           <div class="field">
             <label>${kind === "reassign" ? "새 배정일" : "배정일"}</label>
             <div class="mapp-date-wrap">${dateSummaryHtml()}</div>
-          </div>`}`, body.querySelectorAll('input[name="form-kind"]').forEach(r => r.onchange = () => {
+          </div>`}${choice ? choice.html() : ""}`, choice?.wire(body), body.querySelectorAll('input[name="form-kind"]').forEach(r => r.onchange = () => {
         f.picked = r.value, drawBody();
       });
       const openBtn = body.querySelector("[data-target-open]");
@@ -947,7 +947,7 @@
     }
     drawBody();
     const requestClose = () => {
-      f.picked || Object.values(f.draft).some(Boolean) || f.dateIso || f.qtyText ? confirmWriteExit(() => back.remove()) : back.remove();
+      f.picked || Object.values(f.draft).some(Boolean) || f.dateIso || f.qtyText || choice?.mode === "one" ? confirmWriteExit(() => back.remove()) : back.remove();
     };
     back.querySelector("[data-form-back]").onclick = requestClose, saveBtn.onclick = () => {
       if (saveBtn.disabled) return;
@@ -973,41 +973,29 @@
             before: "",
             after: window.fmtDate(d)
           }), toast("배정되었습니다."), afterMutate();
-        }, false, a);
+        });
       } else if (kind === "reassign") {
         const d = f.dateIso,
           record = mk({
             since: d
           });
-        if (window.MappLinks.together(a, "reassign", ME, (mode, plan) => {
-          (mode === "all" ? plan.move : [a]).forEach(activityLog);
-          try { window.MappLinks.runReassign(a, mode, plan, record, logActivity, ME); }
-          catch (_) { toast("설정이 변경되었습니다. 잠시 후 다시 시도해주세요."); afterMutate(); return; }
-          back.remove(); toast("이동되었습니다."); afterMutate();
-        })) return;
         confirmModal(cfg.confirm, "", () => {
-          back.remove();
-          activityLog(a);
-          try { window.AssetMoves.moveBatch([a],record,todayStr(),ME,logActivity,a); }
-          catch (_) { toast("설정이 변경되었습니다. 잠시 후 다시 시도해주세요."); afterMutate(); return; }
-          toast("이동되었습니다."); afterMutate();
-        }, false, a);
+          if (!choice.valid()) { back.remove(); toast("설정이 변경되었습니다. 잠시 후 다시 시도해주세요."); afterMutate(); return; }
+          (choice.mode === "all" ? choice.plan.move : [a]).forEach(activityLog);
+          try { window.MappLinks.runReassign(a, choice.mode, choice.plan, record, logActivity, ME); }
+          catch (_) { back.remove(); toast("설정이 변경되었습니다. 잠시 후 다시 시도해주세요."); afterMutate(); return; }
+          back.remove(); toast("이동되었습니다."); afterMutate();
+        });
       }
     };
   }
   function openReturnConfirm(a, idx, onDone) {
-    if (window.MappLinks.together(a, "return", ME, (mode, plan) => {
-      window.MappLinks.runReturn(a, mode, plan, logActivity, x => derivedActiveStatus(x)), toast("반납되었습니다."), onDone();
-    })) return;
-    confirmModal("반납 처리하시겠습니까?", "반납하면 배정에서 제거됩니다.", () => {
-      const old = a.assignments[idx];
-      a.assignments.splice(idx, 1), a.status = derivedActiveStatus(a), logActivity(a, {
-        script: "배정 관리: 반납",
-        target: old,
-        before: window.fmtDate(old.since),
-        after: ""
-      }), toast("반납되었습니다."), onDone();
-    }, false, a);
+    const old = a.assignments[idx];
+    const currentHtml = `<div class="acard">${typeBadge(old)}<div class="acard-id">${assignIdentity(old)}</div><div class="acard-foot"><span class="acard-date">배정일 <b>${window.fmtDate(old.since)}</b></span></div></div>`;
+    window.MappLinks.returnReview(a, ME, currentHtml, (mode, plan) => {
+      window.MappLinks.runReturn(a, mode, plan, logActivity, x => derivedActiveStatus(x));
+      toast("반납되었습니다."); onDone();
+    }, onDone);
   }
   const PHOTO_COLORS = ["#5b8def", "#8f6ef0", "#eb7f8b", "#3fb37f", "#e0a63c", "#4dabf7", "#c2554e", "#3f9ba0", "#9a6bd6", "#5aa06a"],
     CLOSE_ICON_SM = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';

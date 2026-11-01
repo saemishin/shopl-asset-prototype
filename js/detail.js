@@ -248,11 +248,11 @@
       cb.remove(), onLeave();
     };
   }
-  function confirmModal(msg, onOk, asset) {
+  function confirmModal(msg, onOk) {
     const cb = document.createElement("div");
     cb.className = "modal-back", cb.style.zIndex = 340, cb.innerHTML = `
       <div class="modal" style="width:380px">
-        <div class="body" style="padding-top:20px;font-size:13px">${msg}${asset ? assetSummaryHtml(asset) : ""}</div>
+        <div class="body" style="padding-top:20px;font-size:13px">${msg}</div>
         <div class="foot">
           <button class="btn" data-cclose>취소</button>
           <button class="btn primary" data-cok>확인</button>
@@ -747,63 +747,43 @@
     };
     draw();
   }
-  // 연결 자산 이동·반납 확인(Web_dc_23 3-3-3·3-4-2). onRun(mode, plan)을 확인 시 호출한다.
-  function openTogetherModal(a, kind, onRun) {
+  // The first step owns selection; the final confirmation never repeats asset details.
+  function linkedAssetChoice(a, kind) {
+    const hasLinks = !!window.AssetLinks.count(a.id), plan = window.AssetLinks.togetherPlan(a);
     const verb = kind === "reassign" ? "이동" : "반납";
     let mode = "all";
-    const plan = window.AssetLinks.togetherPlan(a),
-      back = document.createElement("div");
-    back.className = "modal-back", back.style.zIndex = 340, back.innerHTML = `
-      <div class="modal" style="width:460px">
-        <h3>${verb}하시겠습니까?</h3>
-        <div class="body" style="max-height:64vh;overflow-y:auto">
-          ${assetSummaryHtml(a)}
-          <label class="radio-row"><input type="radio" name="tg-mode" value="all" checked><span>연결된 자산과 함께</span></label>
-          <label class="radio-row"><input type="radio" name="tg-mode" value="one"><span>이 자산만</span></label>
-          <div data-tg-body style="margin-top:10px"></div>
-        </div>
-        <div class="foot"><button class="btn" data-cclose>취소</button><button class="btn primary" data-cok>확인</button></div>
-      </div>`, document.body.appendChild(back);
-    const rows = list => list.map(b => `<div class="link-row static"><div class="link-row-main"><span class="link-row-name">${b.product}</span><span class="link-row-no">${b.assetNo}</span></div><span class="badge ${STATUS_LABEL[b.status][1]}">${STATUS_LABEL[b.status][0]}</span></div>`).join("");
-    const draw = () => {
-      const cutCount = plan.cutVisible.length + plan.cutHidden, others = plan.move.filter(b => b.id !== a.id);
-      back.querySelector("[data-tg-body]").innerHTML = mode === "all" ? `
-        ${others.length ? `<div class="tg-sec"><div class="tg-sec-head">함께 ${verb}될 자산 <b>${others.length}</b>건</div><div class="link-list">${rows(others)}</div></div>` : ""}${kind === "return" ? '<p class="muted" style="margin-top:6px">반납 시 연결은 모두 해제됩니다.</p>' : ""}
-        ${cutCount ? `<div class="tg-sec"><div class="tg-sec-head">연결이 끊어질 자산 <b>${cutCount}</b>건</div><p class="tg-permission-note">상태 관리 권한이 없습니다.</p><div class="link-list">${rows(plan.cutVisible)}${maskedLinkRows(plan.cutHidden)}</div></div>` : ""}` : `<p class="muted">${kind === "return" ? "반납 시 연결은 모두 해제됩니다." : "이 자산에 연결된 자산들은 해제됩니다."}</p>`;
+    const rows = list => list.map(b => `<div class="link-row static"><div class="link-row-main"><span class="link-row-name">${window.AssetExtra.esc(b.product)}</span><span class="link-row-no">${window.AssetExtra.esc(b.assetNo)}</span></div><span class="badge ${STATUS_LABEL[b.status][1]}">${STATUS_LABEL[b.status][0]}</span></div>`).join("");
+    const html = () => hasLinks ? `<div class="field" data-linked-choice><label>연결 자산 처리</label><label class="radio-row"><input type="radio" name="tg-mode" value="all"${mode === "all" ? " checked" : ""}><span>연결된 자산과 함께</span></label><label class="radio-row"><input type="radio" name="tg-mode" value="one"${mode === "one" ? " checked" : ""}><span>이 자산만</span></label><div data-tg-body style="margin-top:10px"></div></div>` : "";
+    const wire = root => {
+      const area = root.querySelector("[data-linked-choice]");
+      if (!area) return;
+      const draw = () => {
+        const cutCount = plan.cutVisible.length + plan.cutHidden, others = plan.move.filter(b => b.id !== a.id);
+        area.querySelector("[data-tg-body]").innerHTML = mode === "all" ? `
+          ${others.length ? `<div class="tg-sec"><div class="tg-sec-head">함께 ${verb}될 자산 <b>${others.length}</b>건</div><div class="link-list">${rows(others)}</div></div>` : ""}${kind === "return" ? '<p class="muted" style="margin-top:6px">반납 시 연결은 모두 해제됩니다.</p>' : ""}
+          ${cutCount ? `<div class="tg-sec"><div class="tg-sec-head">연결이 끊어질 자산 <b>${cutCount}</b>건</div><p class="tg-permission-note">상태 관리 권한이 없습니다.</p><div class="link-list">${rows(plan.cutVisible)}${maskedLinkRows(plan.cutHidden)}</div></div>` : ""}` : `<p class="muted">${kind === "return" ? "반납 시 연결은 모두 해제됩니다." : "이 자산에 연결된 자산들은 해제됩니다."}</p>`;
+      };
+      area.querySelectorAll('[name="tg-mode"]').forEach(r => r.onchange = () => { mode = r.value; draw(); });
+      draw();
     };
-    back.querySelectorAll('[name="tg-mode"]').forEach(r => r.onchange = () => { mode = r.value, draw(); });
-    back.querySelector("[data-cclose]").onclick = () => back.remove();
-    back.querySelector("[data-cok]").onclick = () => {
-      back.remove();
-      // 저장 시점에 목록을 다시 계산해 확인 때와 다르면 반영하지 않는다(D-20261030-19 A).
-      if (mode === "all" && window.AssetLinks.togetherPlan(a).signature !== plan.signature) return toast("설정이 변경되었습니다. 잠시 후 다시 시도해주세요."), render();
-      onRun(mode, plan);
-    };
-    draw();
+    return { html, wire, plan, get mode() { return mode; }, valid: () => !hasLinks || mode !== "all" || window.AssetLinks.togetherPlan(a).signature === plan.signature };
   }
   function returnAssignment(a, idx) {
-    const old = a.assignments[idx],
-      returnOne = (x, note) => {
+    const old = a.assignments[idx], choice = linkedAssetChoice(a, "return"), back = document.createElement("div");
+    back.className = "modal-back";
+    back.innerHTML = `<div class="modal scroll-body" style="width:460px"><h3>반납</h3><div class="body">${assetSummaryHtml(a)}<div class="field"><label>현재 배정</label><div class="acard">${typeBadge(old)}<div class="acard-id">${assignIdentity(old)}</div><div class="acard-foot"><span class="acard-date">배정일 <b>${window.fmtDate(old.since)}</b></span></div></div></div>${choice.html()}</div><div class="foot"><button class="btn" data-close>취소</button><button class="btn primary" data-save>저장</button></div></div>`;
+    document.body.appendChild(back); choice.wire(back);
+    back.querySelector("[data-close]").onclick = () => back.remove();
+    back.querySelector("[data-save]").onclick = () => confirmModal("반납하시겠습니까?", () => {
+      if (!choice.valid()) { back.remove(); toast("설정이 변경되었습니다. 잠시 후 다시 시도해주세요."); render(); return; }
+      const returnOne = (x, note) => {
         const rec = x.assignments[0];
-        x.assignments = [], x.status === "assigned" && (x.status = "stock"), logActivity(x, {
-          script: "배정 관리: 반납" + (note || ""),
-          target: rec,
-          before: window.fmtDate(rec.since),
-          after: ""
-        });
+        x.assignments = []; x.status === "assigned" && (x.status = "stock");
+        logActivity(x, { script: "배정 관리: 반납" + (note || ""), target: rec, before: window.fmtDate(rec.since), after: "" });
       };
-    if (window.AssetLinks.count(a.id)) return openTogetherModal(a, "return", (mode, plan) => {
-      mode === "all" ? plan.move.forEach(x => returnOne(x, x === a ? "" : ` (${a.product} · ${a.assetNo}과 함께)`)) : returnOne(a);
-      pruneLinks("반납"), toast("반납되었습니다."), render();
+      (choice.mode === "all" ? choice.plan.move : [a]).forEach(x => returnOne(x, x === a ? "" : ` (${a.product} · ${a.assetNo}과 함께)`));
+      back.remove(); pruneLinks("반납"); toast("반납되었습니다."); render();
     });
-    confirmModal("반납 처리하시겠습니까?", () => {
-      a.assignments.splice(idx, 1), a.assignments.length === 0 && a.status === "assigned" && (a.status = "stock"), logActivity(a, {
-        script: "배정 관리: 반납",
-        target: old,
-        before: window.fmtDate(old.since),
-        after: ""
-      }), toast("반납되었습니다."), render();
-    }, a);
   }
   function openAssignAddModal(a) {
     let picked = null;
@@ -892,11 +872,11 @@
           before: "",
           after: window.fmtDate(d)
         }), toast("배정되었습니다."), render();
-      }, a);
+      });
     };
   }
   function openReassignModal(a, idx) {
-    const old = a.assignments[idx];
+    const old = a.assignments[idx], choice = linkedAssetChoice(a, "reassign");
     let picked = null;
     const draftTarget = {
       employee: null,
@@ -905,7 +885,7 @@
     let dateText = "";
     const back = document.createElement("div");
     back.className = "modal-back", back.innerHTML = `
-      <div class="modal" style="width:400px">
+      <div class="modal scroll-body" style="width:460px">
         <h3>이동</h3>
         <div class="body" data-body></div>
         <div class="foot">
@@ -936,7 +916,7 @@
           </div>
         </div>
         <div class="field">
-          <label>이동할 대상</label>
+          <label>이동시킬 대상</label>
           <label class="radio-row"><input type="radio" name="ra-kind" value="employee"${picked === "employee" ? " checked" : ""}><span>구성원</span></label>
           ${picked === "employee" ? `<div class="perm-target-wrap">${targetSummaryHtml("employee")}</div>` : ""}
           <label class="radio-row"><input type="radio" name="ra-kind" value="worksite"${picked === "worksite" ? " checked" : ""}><span>근무지</span></label>
@@ -945,7 +925,8 @@
         <div class="field">
           <label>새 배정일</label>
           ${dateFieldHtml("")}
-        </div>`;
+        </div>${choice.html()}`;
+      choice.wire(body);
       const dtext = body.querySelector("[data-dtext]");
       dateText && (dtext.value = dateText), body.querySelectorAll('input[name="ra-kind"]').forEach(r => r.onchange = () => {
         picked = r.value, draw();
@@ -970,7 +951,7 @@
     }
     draw();
     const requestClose = () => {
-      picked || Object.values(draftTarget).some(Boolean) || dateText.trim() ? confirmWriteExit(() => back.remove()) : back.remove();
+      picked || Object.values(draftTarget).some(Boolean) || dateText.trim() || choice.mode !== "all" ? confirmWriteExit(() => back.remove()) : back.remove();
     };
     back.querySelector("[data-close]").onclick = requestClose, saveBtn.onclick = () => {
       if (saveBtn.disabled) return;
@@ -992,10 +973,10 @@
         plan && plan.cutPairs.forEach(([x,y]) => window.AssetLinks.remove({id:x},{id:y}));
         back.remove(); pruneLinks("이동"); toast("이동되었습니다."); render();
       };
-      if (window.AssetLinks.count(a.id)) return openTogetherModal(a, "reassign", (mode, plan) => {
-        move(mode === "all" ? plan.move : [a],mode === "all" ? plan : null);
+      confirmModal("이동하시겠습니까?", () => {
+        if (!choice.valid()) { back.remove(); toast("설정이 변경되었습니다. 잠시 후 다시 시도해주세요."); render(); return; }
+        move(choice.mode === "all" ? choice.plan.move : [a], choice.mode === "all" ? choice.plan : null);
       });
-      confirmModal("이동하시겠습니까?", () => move([a]), a);
     };
   }
   function openAssignMemberPicker(initial, onApply, exclude) {

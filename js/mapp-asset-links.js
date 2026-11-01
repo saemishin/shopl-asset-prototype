@@ -146,29 +146,35 @@
     sec.querySelector("[data-mlink-all]")?.addEventListener("click", () => openAll(a, ctx));
     wireRows(sec, a, ctx, ctx.after);
   }
-  // 연결 자산 이동·반납 확인 시트. 연결이 없으면 false를 돌려 기존 확인을 쓰게 한다.
-  function together(a, kind, me, onRun) {
-    if (!L().count(a.id)) return false;
-    const verb = kind === "reassign" ? "이동" : "반납", plan = L().togetherPlan(a, me);
+  // Selection stays in the first step, including across target/date redraws.
+  function createChoice(a, kind, me) {
+    const hasLinks = !!L().count(a.id), verb = kind === "reassign" ? "이동" : "반납", plan = L().togetherPlan(a, me);
     let mode = "all";
-    const s = sheet(`${verb}하시겠습니까?`, `${assetSummaryHtml(a)}<div class="mlink-modes"><label class="radio-row"><input type="radio" name="mlink-mode" value="all" checked><span>연결된 자산과 함께</span></label><label class="radio-row"><input type="radio" name="mlink-mode" value="one"><span>이 자산만</span></label></div><div data-body></div>`, '<button type="button" class="btn" data-close>취소</button><button type="button" class="btn primary" data-ok>확인</button>', 340);
-    const rows = list => list.map(b => rowHtml(a, b, me, false)).join("");
-    const draw = () => {
-      const cutCount = plan.cutVisible.length + plan.cutHidden, others = plan.move.filter(b => b.id !== a.id);
-      s.querySelector("[data-body]").innerHTML = mode === "all" ? `
-        ${others.length ? `<div class="mlink-group"><div class="mlink-group-head">함께 ${verb}될 자산 <b>${others.length}</b>건</div><div class="mlink-list">${rows(others)}</div></div>` : ""}${kind === "return" ? '<p class="mlink-note">반납 시 연결은 모두 해제됩니다.</p>' : ""}
-        ${cutCount ? `<div class="mlink-group warn"><div class="mlink-group-head">연결이 끊어질 자산 <b>${cutCount}</b>건</div><p class="tg-permission-note">상태 관리 권한이 없습니다.</p><div class="mlink-list">${rows(plan.cutVisible)}${maskedRows(plan.cutHidden)}</div></div>` : ""}`
-        : `<p class="mlink-note">${kind === "return" ? "반납 시 연결은 모두 해제됩니다." : "이 자산에 연결된 자산들은 해제됩니다."}</p>`;
+    const html = () => hasLinks ? `<div class="field" data-mlink-choice><label>연결 자산 처리</label><div class="mlink-modes"><label class="radio-row"><input type="radio" name="mlink-mode" value="all"${mode === "all" ? " checked" : ""}><span>연결된 자산과 함께</span></label><label class="radio-row"><input type="radio" name="mlink-mode" value="one"${mode === "one" ? " checked" : ""}><span>이 자산만</span></label></div><div data-linked-body></div></div>` : "";
+    const wire = root => {
+      const area = root.querySelector("[data-mlink-choice]");
+      if (!area) return;
+      const rows = list => list.map(b => rowHtml(a, b, me, false)).join("");
+      const draw = () => {
+        const cutCount = plan.cutVisible.length + plan.cutHidden, others = plan.move.filter(b => b.id !== a.id);
+        area.querySelector("[data-linked-body]").innerHTML = mode === "all" ? `
+          ${others.length ? `<div class="mlink-group"><div class="mlink-group-head">함께 ${verb}될 자산 <b>${others.length}</b>건</div><div class="mlink-list">${rows(others)}</div></div>` : ""}${kind === "return" ? '<p class="mlink-note">반납 시 연결은 모두 해제됩니다.</p>' : ""}
+          ${cutCount ? `<div class="mlink-group warn"><div class="mlink-group-head">연결이 끊어질 자산 <b>${cutCount}</b>건</div><p class="tg-permission-note">상태 관리 권한이 없습니다.</p><div class="mlink-list">${rows(plan.cutVisible)}${maskedRows(plan.cutHidden)}</div></div>` : ""}` : `<p class="mlink-note">${kind === "return" ? "반납 시 연결은 모두 해제됩니다." : "이 자산에 연결된 자산들은 해제됩니다."}</p>`;
+      };
+      area.querySelectorAll('[name="mlink-mode"]').forEach(r => r.onchange = () => { mode = r.value; draw(); });
+      draw();
     };
-    s.querySelectorAll('[name="mlink-mode"]').forEach(r => r.onchange = () => { mode = r.value, draw(); });
+    return { html, wire, plan, get mode() { return mode; }, valid: () => !hasLinks || mode !== "all" || L().togetherPlan(a, me).signature === plan.signature };
+  }
+  function returnReview(a, me, currentHtml, onRun, onStale) {
+    const choice = createChoice(a, "return", me);
+    const s = sheet("반납", `${assetSummaryHtml(a)}<div class="field"><label>현재 배정</label>${currentHtml}</div>${choice.html()}`, '<button type="button" class="btn" data-close>취소</button><button type="button" class="btn primary" data-save>저장</button>', 120);
+    choice.wire(s);
     s.querySelector("[data-close]").onclick = () => s.remove();
-    s.querySelector("[data-ok]").onclick = () => {
-      s.remove();
-      if (mode === "all" && L().togetherPlan(a, me).signature !== plan.signature) return toast("설정이 변경되었습니다. 잠시 후 다시 시도해주세요.");
-      onRun(mode, plan);
-    };
-    draw();
-    return true;
+    s.querySelector("[data-save]").onclick = () => confirm("반납하시겠습니까?", "", () => {
+      if (!choice.valid()) { s.remove(); toast("설정이 변경되었습니다. 잠시 후 다시 시도해주세요."); onStale?.(); return; }
+      s.remove(); onRun(choice.mode, choice.plan);
+    });
   }
   // 함께 처리 실행: 이동은 같은 기록을 모두에 적용하고 경계 연결을 끊는다.
   function runReassign(a, mode, plan, record, log, name) {
@@ -187,5 +193,5 @@
     prune(log, "반납");
   }
   const unlinkNote = a => L().count(a.id) ? ` 연결된 자산 ${L().count(a.id)}건과의 연결이 해제됩니다.` : "";
-  window.MappLinks = { assetSummaryHtml, sectionHtml, wire, together, runReassign, runReturn, prune, unlinkNote };
+  window.MappLinks = { assetSummaryHtml, sectionHtml, wire, createChoice, returnReview, runReassign, runReturn, prune, unlinkNote };
 })();
