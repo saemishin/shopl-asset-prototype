@@ -771,7 +771,7 @@
   function returnAssignment(a, idx) {
     const old = a.assignments[idx], choice = linkedAssetChoice(a, "return"), back = document.createElement("div");
     back.className = "modal-back";
-    back.innerHTML = `<div class="modal scroll-body" style="width:460px"><h3>반납</h3><div class="body">${assetSummaryHtml(a)}<div class="field"><label>현재 배정</label><div class="acard">${typeBadge(old)}<div class="acard-id">${assignIdentity(old)}</div><div class="acard-foot"><span class="acard-date">배정일 <b>${window.fmtDate(old.since)}</b></span></div></div></div>${choice.html()}</div><div class="foot"><button class="btn" data-close>취소</button><button class="btn primary" data-save>저장</button></div></div>`;
+    back.innerHTML = `<div class="modal scroll-body" style="width:460px"><h3>반납</h3><div class="body">${assetSummaryHtml(a)}<div class="ra-current"><div class="perm-info-note">${INFO_ICON}<span>현재 배정을 종료합니다.</span></div><div class="field"><label>현재 배정</label><div class="acard">${typeBadge(old)}<div class="acard-id">${assignIdentity(old)}</div><div class="acard-foot"><span class="acard-date">배정일 <b>${window.fmtDate(old.since)}</b></span></div></div></div></div>${choice.html()}</div><div class="foot"><button class="btn" data-close>취소</button><button class="btn primary" data-save>저장</button></div></div>`;
     document.body.appendChild(back); choice.wire(back);
     back.querySelector("[data-close]").onclick = () => back.remove();
     back.querySelector("[data-save]").onclick = () => confirmModal("반납하시겠습니까?", () => {

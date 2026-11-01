@@ -5,6 +5,7 @@
   const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
   const STATUS = { assigned: ["배정 중", "assigned"], stock: ["배정 가능", "stock"], repair: ["수리/점검 중", "repair"], lost: ["분실", "lost"], disposed: ["폐기", "disposed"] };
   const CLOSE_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+  const INFO_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 8v.01"/></svg>';
   const label = b => `${b.product} · ${b.assetNo}`;
   // A non-interactive placeholder per hidden asset, generated from the permitted count only.
   const maskedRows = count => Array.from({length: count}, () => `<div class="mlink-row link-unavailable-card"><span class="link-unavailable-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></span><div class="mlink-row-main"><b>조회 불가 자산</b><span class="link-unavailable-mask" aria-hidden="true">••••••••</span></div></div>`).join("");
@@ -168,7 +169,7 @@
   }
   function returnReview(a, me, currentHtml, onRun, onStale) {
     const choice = createChoice(a, "return", me);
-    const s = sheet("반납", `${assetSummaryHtml(a)}<div class="field"><label>현재 배정</label>${currentHtml}</div>${choice.html()}`, '<button type="button" class="btn" data-close>취소</button><button type="button" class="btn primary" data-save>저장</button>', 120);
+    const s = sheet("반납", `${assetSummaryHtml(a)}<div class="ra-current"><div class="perm-info-note">${INFO_ICON}<span>현재 배정을 종료합니다.</span></div><div class="field"><label>현재 배정</label>${currentHtml}</div></div>${choice.html()}`, '<button type="button" class="btn" data-close>취소</button><button type="button" class="btn primary" data-save>저장</button>', 120);
     choice.wire(s);
     s.querySelector("[data-close]").onclick = () => s.remove();
     s.querySelector("[data-save]").onclick = () => confirm("반납하시겠습니까?", "", () => {
