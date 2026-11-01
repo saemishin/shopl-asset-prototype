@@ -451,7 +451,7 @@
       getManufactured = wireMonthField(manufacturedField, todayStr()),
       getPurchaseDate = wireMonthField(purchaseDateField, todayStr());
     function assetNoDup(v) {
-      return v ? (window.DATA.assets || []).some(a => a !== opts.asset && a.assetNo && a.assetNo === v) : !1;
+      return v ? (window.DATA.assets || []).some(a => a !== opts.asset && !a.deleted_at && a.assetNo && a.assetNo === v) : !1;
     }
     function dateFieldValid(fieldEl, getValue) {
       if (fieldEl.style.display === "none") return !0;
@@ -516,7 +516,8 @@
       const nameOk = name.length > 0 && !nameDup,
         noVal = assetNoInput.value.trim();
       savedNumberError !== noVal && (savedNumberError = null);
-      const dup = !!noVal && (opts.asset ? assetNoDup(noVal) : savedNumberError === noVal);
+      // Existing-asset duplicates are checked only when saving, including edit mode.
+      const dup = !!noVal && savedNumberError === noVal;
       assetNoErr.hidden = !dup, assetNoInput.classList.toggle("has-err", dup);
       const noOk = (!opts.asset || noVal.length > 0) && !dup,
         expiryOk = dateFieldValid(expiryField, getExpiry),
@@ -929,6 +930,11 @@
         const asset = opts.asset;
         if(!window.AssetAccess.canInfo(asset)){toast('자산 관리 권한이 없습니다.');return;}
         if(!hasAssetManagePermission() && (catValue!==`${asset.group}|${asset.sub}` || nameInput.value.trim()!==asset.product || assetNoInput.value.trim()!==asset.assetNo)){toast('자산 관리 권한이 없습니다.');return;}
+        if(assetNoDup(assetNoInput.value.trim())) {
+          savedNumberError = assetNoInput.value.trim();
+          checkValid();
+          return;
+        }
         const pending = [],
           logChange = (script, before, after) => {
             pending.push({
