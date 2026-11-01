@@ -470,7 +470,7 @@
   }
   function timelineHtml(a, query) {
     const q = (query || "").trim().toLowerCase(),
-      entries = activityLog(a).filter(e => window.AssetExtra.historyVisible(a,e)).filter(e => q ? (e.target && (e.target.employee || e.target.worksite) || "").toLowerCase().includes(q) : !0);
+      entries = activityLog(a).map(e => window.AssetMoves.forTarget(e,targetContext)).filter(e => window.AssetExtra.historyVisible(a,e)).filter(e => q ? (e.target && (e.target.employee || e.target.worksite) || "").toLowerCase().includes(q) : !0);
     return entries.length ? `<div class="dtimeline">${entries.map(historyCardHtml).join("")}</div>` : '<p class="muted" style="padding:6px 0">일치하는 이력이 없습니다</p>';
   }
   const STOCK_PAGE_SIZE = 20;
@@ -491,8 +491,8 @@
         <div class="acard-foot">
           <span class="acard-date">배정일 <b>${window.fmtDate(x.since)}</b><button class="icon-edit" data-dateedit aria-label="배정일 수정" title="배정일 수정">${IC_EDIT}</button></span>
           <div class="acard-actions">
-            <button class="btn sm" data-act="재배정">재배정</button>
             <button class="btn sm" data-act="반납">반납</button>
+            <button class="btn sm" data-act="이동">이동</button>
           </div>
         </div>
       </div>`).join("")}</div>${linksHtml(a)}` : `<div class="assign-empty"><p class="muted">배정 대상이 없습니다.</p>${a.status === "disposed" ? "" : '<button class="btn sm" data-assign-new>배정</button>'}</div>`;
@@ -560,7 +560,7 @@
     pop.style.cssText = `position:fixed;top:${r.bottom + 6}px;left:${Math.max(8, r.right - 220)}px`, document.body.appendChild(pop);
     const save = pop.querySelector("[data-dsave]"),
       getValue = wireDateField(pop, max, () => {
-        save.disabled = !getValue();
+        save.disabled = !getValue() || getValue() === cur;
       });
     save.onclick = () => {
       const v = getValue();
@@ -574,12 +574,7 @@
           after: window.fmtDate(v)
         }), toast("배정일이 수정되었습니다."), render();
       });
-    }, pop.querySelector("[data-dcancel]").onclick = () => pop.remove(), save.disabled = !getValue(), pop.querySelector("[data-dtext]").focus(), setTimeout(() => {
-      const close = e => {
-        !pop.contains(e.target) && e.target !== anchor && (pop.remove(), document.removeEventListener("click", close));
-      };
-      document.addEventListener("click", close);
-    });
+    }, pop.querySelector("[data-dcancel]").onclick = () => pop.remove(), save.disabled = !getValue() || getValue() === cur, pop.querySelector("[data-dtext]").focus();
   }
   function wireAssignCards(scope, a) {
     scope.querySelector("[data-assign-new]")?.addEventListener("click", () => openAssignAddModal(a));
@@ -587,7 +582,7 @@
     scope.querySelectorAll("[data-dateedit]").forEach(b => b.onclick = () => {
       const row = b.closest(".acard");
       openDatePopover(b, a, +row.dataset.idx);
-    }), scope.querySelectorAll('[data-act="재배정"]').forEach(b => b.onclick = () => {
+    }), scope.querySelectorAll('[data-act="이동"]').forEach(b => b.onclick = () => {
       const row = b.closest(".acard");
       openReassignModal(a, +row.dataset.idx);
     }), scope.querySelectorAll('[data-act="반납"]').forEach(b => b.onclick = () => {
@@ -747,9 +742,9 @@
     };
     draw();
   }
-  // 연결 자산 재배정·반납 확인(Web_dc_23 3-3-3·3-4-2). onRun(mode, plan)을 확인 시 호출한다.
+  // 연결 자산 이동·반납 확인(Web_dc_23 3-3-3·3-4-2). onRun(mode, plan)을 확인 시 호출한다.
   function openTogetherModal(a, kind, onRun) {
-    const verb = kind === "reassign" ? "재배정" : "반납";
+    const verb = kind === "reassign" ? "이동" : "반납";
     let mode = "all";
     const plan = window.AssetLinks.togetherPlan(a),
       back = document.createElement("div");
@@ -904,7 +899,7 @@
     const back = document.createElement("div");
     back.className = "modal-back", back.innerHTML = `
       <div class="modal" style="width:400px">
-        <h3>재배정</h3>
+        <h3>이동</h3>
         <div class="body" data-body></div>
         <div class="foot">
           <button class="btn" data-close>취소</button>
@@ -925,7 +920,7 @@
     function draw() {
       body.innerHTML = `
         <div class="ra-current">
-          <div class="perm-info-note">${INFO_ICON}<span>기존 배정이 새 대상으로 교체됩니다.</span></div>
+          <div class="perm-info-note">${INFO_ICON}<span>기존 배정을 반납하고 새 대상에게 배정합니다.</span></div>
           <div class="acard">
             ${typeBadge(old)}
             <div class="acard-id">${assignIdentity(old)}</div>
@@ -933,7 +928,7 @@
           </div>
         </div>
         <div class="field">
-          <label>새 배정 대상</label>
+          <label>이동할 대상</label>
           <label class="radio-row"><input type="radio" name="ra-kind" value="employee"${picked === "employee" ? " checked" : ""}><span>구성원</span></label>
           ${picked === "employee" ? `<div class="perm-target-wrap">${targetSummaryHtml("employee")}</div>` : ""}
           <label class="radio-row"><input type="radio" name="ra-kind" value="worksite"${picked === "worksite" ? " checked" : ""}><span>근무지</span></label>
@@ -981,22 +976,18 @@
           worksite: draftTarget.worksite,
           since: d
         };
-      const reassignOne = (x, note) => {
-        const prev = x.assignments[0];
-        x.assignments[0] = { ...record }, logActivity(x, {
-          script: "배정 관리: 재배정" + (note || ""),
-          before: `${prev.employee || prev.worksite} · ${window.fmtDate(prev.since)}`,
-          after: `${record.employee || record.worksite} · ${window.fmtDate(d)}`
-        });
+      const move = (items, plan) => {
+        // Materialize old history before replacing the active record.
+        items.forEach(activityLog);
+        try { window.AssetMoves.moveBatch(items,record,todayStr(),undefined,logActivity,a); }
+        catch (_) { toast("설정이 변경되었습니다. 잠시 후 다시 시도해주세요."); render(); return; }
+        plan && plan.cutPairs.forEach(([x,y]) => window.AssetLinks.remove({id:x},{id:y}));
+        back.remove(); pruneLinks("이동"); toast("이동되었습니다."); render();
       };
       if (window.AssetLinks.count(a.id)) return openTogetherModal(a, "reassign", (mode, plan) => {
-        back.remove();
-        mode === "all" ? (plan.cutPairs.forEach(([x, y]) => window.AssetLinks.remove({ id: x }, { id: y })), plan.move.forEach(x => reassignOne(x, x === a ? "" : ` (${a.product} · ${a.assetNo}과 함께)`))) : reassignOne(a);
-        pruneLinks("재배정"), toast("재배정되었습니다."), render();
+        move(mode === "all" ? plan.move : [a],mode === "all" ? plan : null);
       });
-      confirmModal("재배정하시겠습니까?", () => {
-        back.remove(), reassignOne(a), toast("재배정되었습니다."), render();
-      });
+      confirmModal("이동하시겠습니까?", () => move([a]));
     };
   }
   function openAssignMemberPicker(initial, onApply, exclude) {
@@ -1026,12 +1017,12 @@
           <span class="picker-avatar" style="background:${avatarColor(m.name)}">${m.name[0]}</span>
           <span class="picker-member-info"><b>${m.name}</b><span>${m.team}</span></span>
         </label>`).join("") : '<p class="muted" style="padding:16px 0">결과가 없습니다.</p>', list.querySelectorAll('input[name="aa-member"]').forEach(r => r.onchange = () => {
-        picked = r.value;
+        picked = r.value; p.querySelector('[data-ok]').disabled = !picked;
       });
     }
     p.querySelector(".picker-search").addEventListener("input", e => {
       query = e.target.value, renderList();
-    }), renderList(), p.querySelector("[data-close]").onclick = () => p.remove(), p.querySelector("[data-ok]").onclick = () => {
+    }), renderList(), p.querySelector('[data-ok]').disabled = !picked, p.querySelector("[data-close]").onclick = () => p.remove(), p.querySelector("[data-ok]").onclick = () => {
       p.remove(), onApply(picked);
     };
   }
@@ -1061,12 +1052,12 @@
           <input type="radio" name="aa-worksite" value="${name}"${picked === name ? " checked" : ""}>
           <span class="picker-member-info"><b>${name}</b><span>${WS_CODE[name]}</span></span>
         </label>`).join("") : '<p class="muted" style="padding:16px 0">결과가 없습니다.</p>', list.querySelectorAll('input[name="aa-worksite"]').forEach(r => r.onchange = () => {
-        picked = r.value;
+        picked = r.value; p.querySelector('[data-ok]').disabled = !picked;
       });
     }
     p.querySelector(".picker-search").addEventListener("input", e => {
       query = e.target.value, renderList();
-    }), renderList(), p.querySelector("[data-close]").onclick = () => p.remove(), p.querySelector("[data-ok]").onclick = () => {
+    }), renderList(), p.querySelector('[data-ok]').disabled = !picked, p.querySelector("[data-close]").onclick = () => p.remove(), p.querySelector("[data-ok]").onclick = () => {
       p.remove(), onApply(picked);
     };
   }

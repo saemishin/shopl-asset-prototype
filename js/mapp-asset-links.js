@@ -1,4 +1,4 @@
-// 앱(리더·직원) 자산 상세의 연결된 자산 영역과 연결 자산 재배정·반납 확인 시트.
+// 앱(리더·직원) 자산 상세의 연결된 자산 영역과 연결 자산 이동·반납 확인 시트.
 // 기준은 Policy_15·대시보드 Web_dc_23 4번·3-3-3·3-4-2와 같고 저장소는 window.AssetLinks를 공유한다.
 (() => {
   const L = () => window.AssetLinks;
@@ -141,10 +141,10 @@
     sec.querySelector("[data-mlink-all]")?.addEventListener("click", () => openAll(a, ctx));
     wireRows(sec, a, ctx, ctx.after);
   }
-  // 연결 자산 재배정·반납 확인 시트. 연결이 없으면 false를 돌려 기존 확인을 쓰게 한다.
+  // 연결 자산 이동·반납 확인 시트. 연결이 없으면 false를 돌려 기존 확인을 쓰게 한다.
   function together(a, kind, me, onRun) {
     if (!L().count(a.id)) return false;
-    const verb = kind === "reassign" ? "재배정" : "반납", plan = L().togetherPlan(a, me);
+    const verb = kind === "reassign" ? "이동" : "반납", plan = L().togetherPlan(a, me);
     let mode = "all";
     const s = sheet(`${verb}하시겠습니까?`, `<div class="mlink-modes"><label class="radio-row"><input type="radio" name="mlink-mode" value="all" checked><span>연결된 자산과 함께</span></label><label class="radio-row"><input type="radio" name="mlink-mode" value="one"><span>이 자산만</span></label></div><div data-body></div>`, '<button type="button" class="btn" data-close>취소</button><button type="button" class="btn primary" data-ok>확인</button>', 340);
     const rows = list => list.map(b => rowHtml(a, b, me, false)).join("");
@@ -165,14 +165,13 @@
     draw();
     return true;
   }
-  // 함께 처리 실행: 재배정은 같은 기록을 모두에 적용하고 경계 연결을 끊는다.
-  function runReassign(a, mode, plan, record, log) {
-    const one = (x, note) => {
-      const prev = x.assignments[0];
-      x.assignments[0] = { ...record }, log(x, { script: "배정 관리: 재배정" + (note || ""), before: `${prev.employee || prev.worksite} · ${window.fmtDate(prev.since)}`, after: `${record.employee || record.worksite} · ${window.fmtDate(record.since)}` });
-    };
-    mode === "all" ? (plan.cutPairs.forEach(([x, y]) => L().remove({ id: x }, { id: y })), plan.move.forEach(x => one(x, x === a ? "" : ` (${a.product} · ${a.assetNo}과 함께)`))) : one(a);
-    prune(log, "재배정");
+  // 함께 처리 실행: 이동은 같은 기록을 모두에 적용하고 경계 연결을 끊는다.
+  function runReassign(a, mode, plan, record, log, name) {
+    const items = mode === "all" ? plan.move : [a];
+    // Initialize original activity snapshots before the atomic record transition.
+    window.AssetMoves.moveBatch(items,record,"2026-09-04",name,log,a);
+    if (mode === "all") plan.cutPairs.forEach(([x,y]) => L().remove({id:x},{id:y}));
+    prune(log, "이동");
   }
   function runReturn(a, mode, plan, log, nextStatus) {
     const one = (x, note) => {

@@ -1321,12 +1321,12 @@
           </div>` : ""}
       </div>`;
   }
-  function timelineHtml(a, query) {
+  function timelineHtml(a, query, context = null) {
     const q = (query || "").trim().toLowerCase(),
-      entries = activityLog(a).filter(e => window.AssetExtra.historyVisible(a,e)).filter(e => q ? (e.target && (e.target.employee || e.target.worksite) || "").toLowerCase().includes(q) : !0);
+      entries = activityLog(a).map(e => window.AssetMoves.forTarget(e,context)).filter(e => window.AssetExtra.historyVisible(a,e)).filter(e => q ? (e.target && (e.target.employee || e.target.worksite) || "").toLowerCase().includes(q) : !0);
     return entries.length ? `<div class="dtimeline">${entries.map(historyCardHtml).join("")}</div>` : '<p class="muted" style="padding:6px 0">일치하는 이력이 없습니다</p>';
   }
-  function historyScreenHtml(a) {
+  function historyScreenHtml(a, context = null) {
     return `
       <div class="mapp-topbar">
         <button type="button" class="mapp-back" data-mapp-back aria-label="뒤로">←</button>
@@ -1334,7 +1334,7 @@
       </div>
       <div class="mapp-body">
 
-        <div data-history-list>${timelineHtml(a, "")}</div>
+        <div data-history-list>${timelineHtml(a, "", context)}</div>
       </div>`;
   }
   function openMemberPickerPage(initial, onApply, exclude) {
@@ -1493,9 +1493,9 @@
       confirm: "배정하시겠습니까?"
     },
     reassign: {
-      title: "재배정",
-      targetLabel: "새 배정 대상",
-      confirm: "재배정하시겠습니까?"
+      title: "이동",
+      targetLabel: "이동할 대상",
+      confirm: "이동하시겠습니까?"
     }
   };
   function openFormPage(a, target, kind, afterMutate) {
@@ -1543,7 +1543,7 @@
       body.innerHTML = `
         ${old ? `
           <div class="ra-current">
-            <div class="perm-info-note">${INFO_ICON}<span>기존 배정이 새 대상으로 교체됩니다.</span></div>
+            <div class="perm-info-note">${INFO_ICON}<span>기존 배정을 반납하고 새 대상에게 배정합니다.</span></div>
             <div class="acard">
               ${typeBadge(old)}
               <div class="acard-id">${assignIdentity(old)}</div>
@@ -1619,18 +1619,17 @@
             since: d
           });
         if (window.MappLinks.together(a, "reassign", ME, (mode, plan) => {
-          back.remove(), window.MappLinks.runReassign(a, mode, plan, record, logActivity), toast("재배정되었습니다."), afterMutate();
+          (mode === "all" ? plan.move : [a]).forEach(activityLog);
+          try { window.MappLinks.runReassign(a, mode, plan, record, logActivity, ME); }
+          catch (_) { toast("설정이 변경되었습니다. 잠시 후 다시 시도해주세요."); afterMutate(); return; }
+          back.remove(); toast("이동되었습니다."); afterMutate();
         })) return;
         confirmModal(cfg.confirm, "", () => {
           back.remove();
-          const idx = target.index,
-            beforeLabel = `${old.employee || old.worksite} · ${window.fmtDate(old.since)}`,
-            afterLabel = `${record.employee || record.worksite} · ${window.fmtDate(d)}`;
-          a.assignments[idx] = record, logActivity(a, {
-            script: "배정 관리: 재배정",
-            before: beforeLabel,
-            after: afterLabel
-          }), toast("재배정되었습니다."), afterMutate();
+          activityLog(a);
+          try { window.AssetMoves.moveBatch([a],record,todayStr(),ME,logActivity,a); }
+          catch (_) { toast("설정이 변경되었습니다. 잠시 후 다시 시도해주세요."); afterMutate(); return; }
+          toast("이동되었습니다."); afterMutate();
         });
       }
     };
@@ -1846,12 +1845,12 @@
       label: "배정일 수정",
       sep: !0
     }, {
-      key: "reassign",
-      label: "재배정"
-    }, {
       key: "return",
       label: "반납",
       danger: !0
+    }, {
+      key: "reassign",
+      label: "이동"
     }];
   }
   function leaderAssetDetailHtml(a,target=null) {
@@ -1860,7 +1859,7 @@
  const badge=statusActions(a).length?`<button class="badge ${STATUS_LABEL[a.status][1]} clickable" data-status-open>${STATUS_LABEL[a.status][0]} ▾</button>`:`<span class="badge ${STATUS_LABEL[a.status][1]}">${STATUS_LABEL[a.status][0]}</span>`;
  const info=[['분류',categoryPath(a)],['태그',(a.labels||[]).map(l=>`<span class="tag">${esc(l)}</span>`).join('')||'—']].map(([k,v])=>`<div><div class="k">${k}</div><div class="v">${v}</div></div>`).join('')+window.AssetExtra.detailRows(a,manage,expiryBadge)+[['자산 등록일',window.fmtDate(a.createdAt)],['QR 라벨',`<button type="button" class="btn sm icon-only" data-qr-open aria-label="QR 라벨">${QR_ICON}</button>`],['메모',`${window.AssetMemo.render(a.note)}${editable?`<button class="icon-edit" data-memoedit aria-label="메모 수정">${IC_EDIT}</button>`:''}`]].map(([k,v])=>`<div><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
  const assignments=target?scopedPartySectionHtml(a,target):`<div class="dsection"><div class="mapp-leader-holders-head"><h2>배정 현황</h2></div><div data-holder-list></div></div>`;
- return `<div class="mapp-topbar"><button class="mapp-back" data-mapp-back aria-label="뒤로">←</button>${editable||manage&&!target?`<button class="mapp-more" data-more-open aria-label="더보기">${MORE_ICON}</button>`:''}</div><div class="mapp-body mapp-leader-detail-body">${target?`<div class="mapp-directory-context">${esc(target.value)}</div>`:''}<div class="dhead-id"><div class="mapp-hero-wrap"><button class="mapp-hero-img" data-hero-viewer aria-label="사진 보기"${photos.length?'':' disabled'}>${cardThumb(a)}</button>${photos.length>1?`<span class="mapp-hero-count">+${photos.length-1}</span>`:''}${editable?`<button class="mapp-hero-edit" data-hero-edit aria-label="사진 관리">${IC_EDIT}</button>`:''}</div><div><h1>${esc(a.product)}</h1><div class="dhead-sub">${badge}<div>고유관리번호 <b>${esc(a.assetNo)}</b></div></div></div></div>${window.AssetExtra.tabs()}<div data-detail-panel="assignment">${assignments}${window.MappLinks.sectionHtml(a, ME)}</div><div data-detail-panel="info" hidden><div class="kv2">${info}</div>${window.AssetExtra.detailHtml(a,manage,expiryBadge)}</div><div data-detail-panel="history" hidden>${timelineHtml(a,'')}</div></div>`;
+ return `<div class="mapp-topbar"><button class="mapp-back" data-mapp-back aria-label="뒤로">←</button>${editable||manage&&!target?`<button class="mapp-more" data-more-open aria-label="더보기">${MORE_ICON}</button>`:''}</div><div class="mapp-body mapp-leader-detail-body">${target?`<div class="mapp-directory-context">${esc(target.value)}</div>`:''}<div class="dhead-id"><div class="mapp-hero-wrap"><button class="mapp-hero-img" data-hero-viewer aria-label="사진 보기"${photos.length?'':' disabled'}>${cardThumb(a)}</button>${photos.length>1?`<span class="mapp-hero-count">+${photos.length-1}</span>`:''}${editable?`<button class="mapp-hero-edit" data-hero-edit aria-label="사진 관리">${IC_EDIT}</button>`:''}</div><div><h1>${esc(a.product)}</h1><div class="dhead-sub">${badge}<div>고유관리번호 <b>${esc(a.assetNo)}</b></div></div></div></div>${window.AssetExtra.tabs()}<div data-detail-panel="assignment">${assignments}${window.MappLinks.sectionHtml(a, ME)}</div><div data-detail-panel="info" hidden><div class="kv2">${info}</div>${window.AssetExtra.detailHtml(a,manage,expiryBadge)}</div><div data-detail-panel="history" hidden>${timelineHtml(a,'',target)}</div></div>`;
 }
   function leaderHolderList(a, query, kind, requestedPage) {
     const q = (query || "").trim().toLowerCase(),
@@ -1953,7 +1952,7 @@
     function draw() {
       ["plan-features", "asset-feature"].includes(state.screen) && !canConfigureFeatures() && (state.screen = "menu");
       const showTabBar = state.screen === "menu",
-        screenHtml = state.screen === "menu" ? menuScreenHtml(state.menuExpanded) : state.screen === "member-profile" ? directoryProfileScreenHtml("member", state) : state.screen === "worksite-profile" ? directoryProfileScreenHtml("worksite", state) : state.screen === "directory-member-assets" ? directoryMemberAssetsScreenHtml(state) : state.screen === "directory-worksite-assets" ? directoryWorksiteAssetsScreenHtml(state) : state.screen === "plan-features" ? planFeaturesScreenHtml() : state.screen === "asset-feature" ? assetFeatureScreenHtml() : state.screen === "sub-detail" ? subDetailScreenHtml(state.sub, state.statusFilter, state.popupFilters) : state.screen === "asset-detail" ? leaderAssetDetailHtml(assets.find(a => a.id === state.detailAssetId), state.detailTarget) : state.screen === "asset-history" ? historyScreenHtml(assets.find(a => a.id === state.detailAssetId)) : state.screen === "asset-add" ? assetAddScreenHtml(state.addDraft) : state.screen === "asset-add-category" ? assetAddCategoryScreenHtml(state.addDraft) : state.screen === "asset-add-tags" ? assetAddTagManageScreenHtml(state.tagManageDraft) : assetsScreenHtml(state);
+        screenHtml = state.screen === "menu" ? menuScreenHtml(state.menuExpanded) : state.screen === "member-profile" ? directoryProfileScreenHtml("member", state) : state.screen === "worksite-profile" ? directoryProfileScreenHtml("worksite", state) : state.screen === "directory-member-assets" ? directoryMemberAssetsScreenHtml(state) : state.screen === "directory-worksite-assets" ? directoryWorksiteAssetsScreenHtml(state) : state.screen === "plan-features" ? planFeaturesScreenHtml() : state.screen === "asset-feature" ? assetFeatureScreenHtml() : state.screen === "sub-detail" ? subDetailScreenHtml(state.sub, state.statusFilter, state.popupFilters) : state.screen === "asset-detail" ? leaderAssetDetailHtml(assets.find(a => a.id === state.detailAssetId), state.detailTarget) : state.screen === "asset-history" ? historyScreenHtml(assets.find(a => a.id === state.detailAssetId), state.detailTarget) : state.screen === "asset-add" ? assetAddScreenHtml(state.addDraft) : state.screen === "asset-add-category" ? assetAddCategoryScreenHtml(state.addDraft) : state.screen === "asset-add-tags" ? assetAddTagManageScreenHtml(state.tagManageDraft) : assetsScreenHtml(state);
       root.innerHTML = `
         <div class="mapp-stage">
           <div class="mapp-phone">
@@ -2162,13 +2161,13 @@
                 key: "date",
                 label: "배정일 수정"
               }, {
-                key: "reassign",
-                label: "재배정"
-              }, {
                 key: "return",
                 label: "반납",
                 danger: !0,
                 sep: !0
+              }, {
+                key: "reassign",
+                label: "이동"
               }], key => {
                 if (!canManage(a)) return;
                 const idx = Number(button.dataset.index);

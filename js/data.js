@@ -1320,7 +1320,7 @@ window.AssetExtra.exportValues=(asset,manage=window.hasPrototypeAssetManagePermi
     i >= 0 && pairs.splice(i, 1);
     return i >= 0;
   }
-  // 함께 재배정·반납 범위: 이어진 자산 전체. 상태 관리 권한이 없는 자산은 처리하지 않고 경계 연결을 끊는다(D-20261030-18).
+  // 함께 이동·반납 범위: 이어진 자산 전체. 상태 관리 권한이 없는 자산은 처리하지 않고 경계 연결을 끊는다(D-20261030-18).
   function togetherPlan(a, name) {
     const move = [a], cut = [], cutPairs = [], seen = new Set([a.id]);
     for (let i = 0; i < move.length; i++) {
@@ -1351,4 +1351,55 @@ window.AssetExtra.exportValues=(asset,manage=window.hasPrototypeAssetManagePermi
     return removed.filter(([x, y]) => x && y);
   }
   window.AssetLinks = { MAX, partners, view, candidates, stockMatches, targetKey, add, remove, togetherPlan, prune, linked, count: id => partners(id).length };
+})();
+
+// D-20261101-01: 이동은 기존 기록 종료 + 새 배정 생성. 화면에는 이동 활동 한 건으로 표시한다.
+(() => {
+  let serial = 0;
+  const key = r => r && (r.employee ? 'e:' + r.employee : r.worksite ? 'w:' + r.worksite : '');
+  function moveBatch(items, record, endedAt, name, log, origin) {
+    const unique = [...new Set(items)];
+    if (!unique.length || !key(record) || !!record.employee === !!record.worksite ||
+        !/^\d{4}-\d{2}-\d{2}$/.test(record.since || '') || record.since > endedAt) throw Error('ASSET_CHANGED');
+    // All checks precede every mutation, including together moves.
+    for (const a of unique) {
+      if (!window.AssetAccess.canState(a, name) || (a.assignments || []).length !== 1 ||
+          key(a.assignments[0]) === key(record)) throw Error('ASSET_CHANGED');
+    }
+    const operationId = 'move-' + Date.now() + '-' + (++serial);
+    const staged = unique.map(a => {
+      const previous = {...a.assignments[0]};
+      const closed = {...previous, id: previous.id || a.id + '-previous-' + operationId, endedAt, endedByMove: operationId};
+      const next = {...record, id: a.id + '-assignment-' + operationId, movedBy: operationId};
+      return {a, previous, closed, next};
+    });
+    const snapshots = staged.map(({a}) => ({a, assignments:a.assignments, history:a._assignmentHistory,
+      log:a._activityLog && a._activityLog.slice(), status:a.status}));
+    try {
+      for (const {a,previous,closed,next} of staged) {
+        a._assignmentHistory = [...(a._assignmentHistory || []), closed];
+        a.assignments = [next];
+        log(a, {script:'배정 관리: 이동' + (origin && a !== origin ? ` (${origin.product} · ${origin.assetNo}과 함께)` : ''),
+          assignmentMove:true, operationId, previousTarget:previous, nextTarget:{...next},
+          before:`${previous.employee || previous.worksite} · ${window.fmtDate(previous.since)}`,
+          after:`${next.employee || next.worksite} · ${window.fmtDate(next.since)}`});
+      }
+    } catch (error) {
+      for (const x of snapshots) {
+        x.a.assignments=x.assignments; x.a.status=x.status;
+        x.history === undefined ? delete x.a._assignmentHistory : x.a._assignmentHistory=x.history;
+        x.log === undefined ? delete x.a._activityLog : x.a._activityLog=x.log;
+      }
+      throw error;
+    }
+    return operationId;
+  }
+  function forTarget(entry, context) {
+    if (!entry.assignmentMove || !context) return entry;
+    const old = entry.previousTarget, next = entry.nextTarget;
+    if (old && old[context.type] === context.value) return {...entry,script:'배정 관리: 반납 (이동)',target:old,before:window.fmtDate(old.since),after:''};
+    if (next && next[context.type] === context.value) return {...entry,script:'배정 관리: 신규 배정 (이동)',target:next,before:'',after:window.fmtDate(next.since)};
+    return entry;
+  }
+  window.AssetMoves={moveBatch,forTarget};
 })();

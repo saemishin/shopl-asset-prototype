@@ -26,7 +26,7 @@
     { d: "2026-08-25 09:40", who: "dana", script: "상태 변경: 수리/점검 접수", before: "배정 중", after: "수리/점검 중" },
     // 배정
     { d: "2026-08-20 11:00", who: "dana", script: "배정 관리: 반납", target: ws("역삼점"), before: D("2026-06-01"), after: "" },
-    { d: "2026-08-12 14:30", who: "dana", script: "배정 관리: 재배정", before: `박지훈 · ${D("2026-05-02")}`, after: `이서연 · ${D("2026-08-12")}` },
+    { d: "2026-08-12 14:30", who: "dana", script: "배정 관리: 이동", assignmentMove:true, previousTarget:emp("박지훈",{since:"2026-05-02"}), nextTarget:emp("이서연",{since:"2026-08-12"}), before: `박지훈 · ${D("2026-05-02")}`, after: `이서연 · ${D("2026-08-12")}` },
     { d: "2026-07-01 10:15", who: "김민수", script: "배정 관리: 배정일 변경", target: emp("김민수"), before: D("2024-03-20"), after: D("2024-03-15") },
     { d: "2026-06-01 09:00", who: "dana", script: "배정 관리: 신규 배정", target: ws("역삼점"), before: "", after: D("2026-06-01") },
     { d: "2026-05-02 09:00", who: "dana", script: "배정 관리: 신규 배정", target: emp("박지훈"), before: "", after: D("2026-05-02") },
