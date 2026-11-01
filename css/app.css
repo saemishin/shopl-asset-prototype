@@ -2226,6 +2226,13 @@ fieldset.asset-fixed-inputs{border:0;padding:0;margin:0;min-width:0;}
 .link-hidden { margin:8px 0 0; font-size:12px; color:var(--muted, #8a8f98); }
 .tg-sec { margin-top:12px; }
 .tg-sec-head { font-size:13px; margin-bottom:6px; }
+.tg-permission-note { margin:0 0 8px; font-size:12px; color:var(--text-mut); }
+.link-unavailable-list { margin-top:6px; }
+.link-unavailable-card { cursor:default; background:var(--bg-soft, #f7f8fa); }
+.link-unavailable-card .link-row-name, .link-unavailable-card .mlink-row-main b { color:var(--text-mut); font-weight:500; }
+.link-unavailable-icon { flex:none; display:grid; place-items:center; width:32px; height:32px; border-radius:6px; color:var(--text-mut); background:var(--line); }
+.link-unavailable-icon svg { width:17px; height:17px; }
+.link-unavailable-mask { letter-spacing:2px; }
 .link-row .thumb, .link-cand .thumb { flex:none; }
 .link-target { margin:0 0 8px; font-size:13px; color:var(--text-mut); }
 .link-target b { color:var(--text); }

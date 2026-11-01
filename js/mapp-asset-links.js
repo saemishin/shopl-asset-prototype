@@ -6,6 +6,8 @@
   const STATUS = { assigned: ["배정 중", "assigned"], stock: ["배정 가능", "stock"], repair: ["수리/점검 중", "repair"], lost: ["분실", "lost"], disposed: ["폐기", "disposed"] };
   const CLOSE_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
   const label = b => `${b.product} · ${b.assetNo}`;
+  // A non-interactive placeholder per hidden asset, generated from the permitted count only.
+  const maskedRows = count => Array.from({length: count}, () => `<div class="mlink-row link-unavailable-card"><span class="link-unavailable-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></span><div class="mlink-row-main"><b>조회 불가 자산</b><span class="link-unavailable-mask" aria-hidden="true">••••••••</span></div></div>`).join("");
   const badge = b => `<span class="badge ${STATUS[b.status][1]}">${STATUS[b.status][0]}</span>`;
   const thumb = b => {
     const ph = window.assetPhotos(b);
@@ -44,9 +46,9 @@
     const v = L().view(a, me), full = L().count(a.id) >= L().MAX;
     return `<div class="dsection mlink-sec">
       <div class="mlink-head"><h2>연결된 자산 <span>${v.visible.length}</span></h2>${canState(a, me) ? `<button type="button" class="btn sm" data-mlink-add${full ? " disabled" : ""}>자산 연결</button>` : ""}</div>
-      ${v.visible.length ? `<div class="mlink-list">${v.visible.slice(0, 5).map(b => rowHtml(a, b, me)).join("")}</div>` : '<p class="mlink-empty">연결된 자산이 없습니다.</p>'}
+      ${v.visible.length ? `<div class="mlink-list">${v.visible.slice(0, 5).map(b => rowHtml(a, b, me)).join("")}</div>` : v.hidden ? "" : '<p class="mlink-empty">연결된 자산이 없습니다.</p>'}
       ${v.visible.length > 5 ? `<button type="button" class="mlink-all" data-mlink-all>전체 보기 (${v.visible.length})</button>` : ""}
-      ${v.hidden ? `<p class="mlink-hidden">조회할 수 없는 연결 자산 ${v.hidden}건</p>` : ""}
+      ${v.hidden ? `<p class="mlink-hidden">조회 불가 자산 ${v.hidden}건</p><div class="mlink-list link-unavailable-list">${maskedRows(v.hidden)}</div>` : ""}
     </div>`;
   }
   function prune(log, cause) {
@@ -152,7 +154,7 @@
       const cutCount = plan.cutVisible.length + plan.cutHidden;
       s.querySelector("[data-body]").innerHTML = mode === "all" ? `
         <div class="mlink-group"><div class="mlink-group-head">함께 ${verb}될 자산 <b>${plan.move.length}</b>건</div><div class="mlink-list">${rows(plan.move)}</div>${kind === "return" ? '<p class="mlink-note">반납 시 연결은 모두 해제됩니다.</p>' : ""}</div>
-        ${cutCount ? `<div class="mlink-group warn"><div class="mlink-group-head">상태 관리 권한이 없어 함께 ${verb}되지 않고 연결이 끊어질 자산 <b>${cutCount}</b>건</div><div class="mlink-list">${rows(plan.cutVisible)}</div>${plan.cutHidden ? `<p class="mlink-hidden">조회할 수 없는 자산 ${plan.cutHidden}건</p>` : ""}</div>` : ""}`
+        ${cutCount ? `<div class="mlink-group warn"><div class="mlink-group-head">연결이 끊어질 자산 <b>${cutCount}</b>건</div><p class="tg-permission-note">상태 관리 권한이 없습니다.</p><div class="mlink-list">${rows(plan.cutVisible)}${maskedRows(plan.cutHidden)}</div></div>` : ""}`
         : `<p class="mlink-note">${kind === "return" ? "반납 시 연결은 모두 해제됩니다." : "이 자산에 연결된 자산들은 해제됩니다."}</p>`;
     };
     s.querySelectorAll('[name="mlink-mode"]').forEach(r => r.onchange = () => { mode = r.value, draw(); });

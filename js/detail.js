@@ -592,6 +592,8 @@
   }
   // ── 자산 연결(Web_dc_23 4번, Policy_15) ──
   const linkLabel = b => `${b.product} · ${b.assetNo}`;
+  // Use only the permitted count; do not put hidden asset identities or statuses into markup.
+  const maskedLinkRows = count => Array.from({length: count}, () => `<div class="link-row static link-unavailable-card"><span class="link-unavailable-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></span><div class="link-row-main"><span class="link-row-name">조회 불가 자산</span><span class="link-row-no link-unavailable-mask" aria-hidden="true">••••••••</span></div></div>`).join("");
   const linkThumb = b => {
     const ph = window.assetPhotos(b);
     return ph.length ? `<span class="thumb" style="background:${ph[b._primary || 0].color}"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10" r="1.6"/><path d="m21 16-5-5-9 8"/></svg></span>` : '<span class="thumb empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 15 5-4 4 3 4-4 5 4"/></svg></span>';
@@ -610,9 +612,9 @@
       addBtn = window.AssetAccess.canState(a) ? `<button class="btn sm" data-link-add${full ? " disabled" : ""}>자산 연결</button>` : "";
     return `<div class="link-sec">
       <div class="link-head"><h3>연결된 자산 <span class="muted">${v.visible.length}</span></h3>${addBtn}</div>
-      ${v.visible.length ? `<div class="link-list">${v.visible.slice(0, 5).map(b => linkRowHtml(a, b)).join("")}</div>` : '<p class="muted link-empty">연결된 자산이 없습니다.</p>'}
+      ${v.visible.length ? `<div class="link-list">${v.visible.slice(0, 5).map(b => linkRowHtml(a, b)).join("")}</div>` : v.hidden ? "" : '<p class="muted link-empty">연결된 자산이 없습니다.</p>'}
       ${v.visible.length > 5 ? '<button class="link-all" data-link-all>전체 보기</button>' : ""}
-      ${v.hidden ? `<p class="link-hidden">조회할 수 없는 연결 자산 ${v.hidden}건</p>` : ""}
+      ${v.hidden ? `<p class="link-hidden">조회 불가 자산 ${v.hidden}건</p><div class="link-list link-unavailable-list">${maskedLinkRows(v.hidden)}</div>` : ""}
     </div>`;
   }
   // 대상이 달라지거나 배정이 없어진 연결을 해제하고 양쪽 이력에 원인과 함께 남긴다.
@@ -763,7 +765,7 @@
       const cutCount = plan.cutVisible.length + plan.cutHidden;
       back.querySelector("[data-tg-body]").innerHTML = mode === "all" ? `
         <div class="tg-sec"><div class="tg-sec-head">함께 ${verb}될 자산 <b>${plan.move.length}</b>건</div><div class="link-list">${rows(plan.move)}</div>${kind === "return" ? '<p class="muted" style="margin-top:6px">반납 시 연결은 모두 해제됩니다.</p>' : ""}</div>
-        ${cutCount ? `<div class="tg-sec"><div class="tg-sec-head">상태 관리 권한이 없어 함께 ${verb}되지 않고 연결이 끊어질 자산 <b>${cutCount}</b>건</div><div class="link-list">${rows(plan.cutVisible)}</div>${plan.cutHidden ? `<p class="link-hidden">조회할 수 없는 자산 ${plan.cutHidden}건</p>` : ""}</div>` : ""}` : `<p class="muted">${kind === "return" ? "반납 시 연결은 모두 해제됩니다." : "이 자산에 연결된 자산들은 해제됩니다."}</p>`;
+        ${cutCount ? `<div class="tg-sec"><div class="tg-sec-head">연결이 끊어질 자산 <b>${cutCount}</b>건</div><p class="tg-permission-note">상태 관리 권한이 없습니다.</p><div class="link-list">${rows(plan.cutVisible)}${maskedLinkRows(plan.cutHidden)}</div></div>` : ""}` : `<p class="muted">${kind === "return" ? "반납 시 연결은 모두 해제됩니다." : "이 자산에 연결된 자산들은 해제됩니다."}</p>`;
     };
     back.querySelectorAll('[name="tg-mode"]').forEach(r => r.onchange = () => { mode = r.value, draw(); });
     back.querySelector("[data-cclose]").onclick = () => back.remove();
