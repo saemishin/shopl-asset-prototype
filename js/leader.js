@@ -617,12 +617,13 @@
     replace = !0
   } = {}) {
     const cat = addCategory(draft);
-    if (!cat || !values) return;
-    const hidden = cat.hiddenFields || [],
+    // 분류 미선택이어도 기본 정보는 적용한다(새07 Case 4-2). 커스텀 추가 정보는 소분류가 있어야 적용한다.
+    if (!values) return;
+    const hidden = cat && cat.hiddenFields || [],
       fill = key => {
         replace ? draft[key] = values[key] == null ? "" : String(values[key]) : !String(draft[key] || "").trim() && values[key] != null && values[key] !== "" && (draft[key] = String(values[key]));
       };
-    draft.extraValues={...(values.extraValues||{})};
+    cat && (draft.extraValues={...(values.extraValues||{})});
     fill("product"), fill("note"), draft.labels = (values.labels || []).filter(tag => window.DATA.tags.includes(tag)).slice(0, window.ASSET_TAG_MAX_COUNT), draft._aiDraft = null, draft._aiPendingPhotos = null, fill("assetNo"), hidden.includes("serial") || fill("serial"), hidden.includes("imei") || fill("imei"), hidden.includes("expiry") || fill("expiry"), hidden.includes("manufactured") || fill("manufactured"), hidden.includes("purchaseDate") || fill("purchaseDate"), !hidden.includes("purchasePrice") && (replace || !String(draft.purchasePrice || "").trim()) && (draft.purchasePrice = values.purchasePrice == null || values.purchasePrice === "" ? "" : window.formatPurchasePriceInput(values.purchasePrice));
   }
   function copyCategoryDraft(draft) {
@@ -710,9 +711,13 @@
       }), appendPhotos(), close(), onApplied();
     }
     function direct(values) {
-      appendPhotos(), draft.category ? Object.keys(values).length && applyMobileAiDraft(draft, values, {
-        replace: !0
-      }) : draft._pendingAiOnce = Object.keys(values).length ? values : null, close(), onApplied();
+      appendPhotos();
+      if (Object.keys(values).length) {
+        applyMobileAiDraft(draft, values, { replace: !0 });
+        const extra = values.extraValues || {};
+        draft._pendingAiOnce = !draft.category && Object.keys(extra).length ? { extraOnly: !0, extraValues: extra } : null;
+      }
+      close(), onApplied();
     }
     function renderLoading() {
       analyzing = !0, analyze.hidden = !0, stateEl.innerHTML = `<div class="mapp-ai-loading"><span class="mapp-ai-spinner" aria-hidden="true"></span><b>AI가 자산 정보를 분석하고 있습니다.</b></div>
@@ -2443,7 +2448,10 @@
                 if (previous._pendingAiOnce) {
                   const pending = previous._pendingAiOnce;
                   delete previous._pendingAiOnce;
-                  applyMobileAiDraft(previous, pending, { replace: true });
+                  if (pending.extraOnly) {
+                    previous.extraValues ||= {};
+                    Object.entries(pending.extraValues).forEach(([k, v]) => { !String(previous.extraValues[k] || "").trim() && v && (previous.extraValues[k] = String(v)); });
+                  } else applyMobileAiDraft(previous, pending, { replace: true });
                 }
               } else {
                 const cache = previous._categoryDrafts || new Map();

@@ -652,7 +652,7 @@
         if (activeAiDraft) {
           const pending = activeAiDraft;
           activeAiDraft = null;
-          applyAiValues(pending, { replace: true });
+          pending.extraOnly ? fillEmptyExtra(pending.extraValues) : applyAiValues(pending, { replace: true });
         }
       }
       checkValid();
@@ -804,10 +804,17 @@
         replace: !0
       }), photos = previousPhotos, primaryIdx = previousPrimary, appendAiPhotos(newPhotos), catValue && categoryDrafts.set(catValue, captureCategoryDraft());
     }
+    // 직접 입력 복귀: 기본 정보는 분류 없이도 입력할 수 있으므로 추출값을 바로 적용한다(새07 Case 4-2).
+    // 분류 미선택이면 커스텀 추가 정보 추출값만 보관했다가 최초 소분류 선택 때 빈 항목에 채운다.
     function continueAiDirectly(draft, newPhotos) {
-      appendAiPhotos(newPhotos), catValue ? Object.keys(draft).length && applyAiValues(draft, {
-        replace: !0
-      }) : activeAiDraft = Object.keys(draft).length ? draft : null;
+      appendAiPhotos(newPhotos);
+      if (!Object.keys(draft).length) return;
+      applyAiValues(draft, { replace: !0 });
+      const extra = draft.extraValues || {};
+      activeAiDraft = !catValue && Object.keys(extra).length ? { extraOnly: !0, extraValues: extra } : null;
+    }
+    function fillEmptyExtra(values) {
+      back.querySelectorAll("[data-extra-input]").forEach(el => { !el.value.trim() && values[el.dataset.extraInput] && (el.value = String(values[el.dataset.extraInput])); });
     }
     function openAiInputModal() {
       closeMenu(), closeProdMenu();
