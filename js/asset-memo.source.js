@@ -8,7 +8,8 @@
  * - 추가/수정 폼은 직접 편집하고 자산 최종 저장 시 반영. 상세는 메모만 별도 저장:
  *   대시보드 센터 모달, 앱 풀스크린 팝업. 기존 권한·폐기 동결 판정은 호출 화면에서 유지.
  * - 정규화한 HTML로 변경 판정: 서식만 변경해도 저장/이력 대상, 원복하면 저장 비활성.
- *   메모 팝업의 취소/X/ESC는 미저장 변경 시 수정 중단 확인. 폼은 기존 이탈 확인 사용.
+ *   메모 팝업의 취소/ESC는 미저장 변경 시 수정 중단 확인. 대시보드는 Header X 없음,
+ *   앱 풀스크린은 기존 X를 유지하고 같은 취소 기준 사용. 폼은 기존 이탈 확인 사용.
  * - 지원 서식 붙여넣기 및 HTML 저장/조회/이력 유지, 목록 툴팁은 본문 텍스트.
  * - 링크: 기본 URI 검증·자동 인식, 편집 중 이동 없음, 조회 시 새 탭.
  *   공통 운영 웹과 같은 브라우저 기본 prompt(취소 유지, 빈 URL은 링크 해제). 미지원 내장 미리보기만 URL 모달로 대체.
@@ -184,7 +185,7 @@ function open({value='',back,mobile=false,onSave}) {
   overlay.classList.add('asset-memo-back');
   overlay.classList.toggle('asset-memo-mobile',mobile);
   if (!back) {overlay.style.zIndex=340;document.body.append(overlay);}
-  overlay.innerHTML=`<section class="asset-memo-panel" role="dialog" aria-modal="true" aria-label="메모 수정"><header><h3>메모 수정</h3><button type="button" class="asset-memo-close" aria-label="닫기">${icon('<path d="m6 6 12 12M18 6 6 18"/>')}</button></header><div class="asset-memo-panel-body"><textarea aria-label="메모 입력">${escape(value)}</textarea><p class="muted" data-save-error role="alert" hidden></p></div><footer><button type="button" class="btn" data-cancel>취소</button><button type="button" class="btn primary" data-save disabled>저장</button></footer></section>`;
+  overlay.innerHTML=`<section class="asset-memo-panel" role="dialog" aria-modal="true" aria-label="메모 수정"><header><h3>메모 수정</h3>${mobile ? `<button type="button" class="asset-memo-close" aria-label="닫기">${icon('<path d="m6 6 12 12M18 6 6 18"/>')}</button>` : ''}</header><div class="asset-memo-panel-body"><textarea aria-label="메모 입력">${escape(value)}</textarea><p class="muted" data-save-error role="alert" hidden></p></div><footer><button type="button" class="btn" data-cancel>취소</button><button type="button" class="btn primary" data-save disabled>저장</button></footer></section>`;
   const input=overlay.querySelector('textarea'), api=mountTextarea(input), initial=input.value, save=overlay.querySelector('[data-save]');
   let saving=false;
   const error=overlay.querySelector('[data-save-error]');
@@ -194,7 +195,8 @@ function open({value='',back,mobile=false,onSave}) {
   function onKey(event){if(event.key!=='Escape'||document.querySelector('.asset-memo-link-back'))return;event.preventDefault();event.stopImmediatePropagation();const confirm=overlay.querySelector('.asset-memo-discard');if(confirm)confirm.remove();else requestClose();}
   input.addEventListener('input',()=>save.disabled=saving||!dirty()||count(input.value)>LIMIT);
   overlay.querySelector('[data-cancel]').onclick=requestClose;
-  overlay.querySelector('.asset-memo-close').onclick=requestClose;
+  const closeButton=overlay.querySelector('.asset-memo-close');
+  if(closeButton)closeButton.onclick=requestClose;
   // Input modal: backdrop clicks never dismiss or request exit confirmation.
   // onSave is a commit boundary: failure must not remove the editor or the draft.
   // Current screens save in memory. Real API callers must reject/return false on failure,
