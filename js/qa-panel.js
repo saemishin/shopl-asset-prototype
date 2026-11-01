@@ -70,7 +70,8 @@
   add(5,'links-permissions','연결 자산 권한 혼합',mobile?file:'asset-detail.html',{qa:'review',scenario:'links-permissions',manage:'0',role:'leader',id:'A001'});
   add(5,'links-empty','연결된 자산 없음',mobile?file:'asset-detail.html',{qa:'review',scenario:'links-empty',id:'A001'});
   add(5,'links-hidden','조회 불가 연결 자산',mobile?file:'asset-detail.html',{qa:'review',scenario:'links-hidden',id:'A001'});
-  add(5,'template-manager','템플릿 관리','category.html',{},'templates-manage');
+  add(6,'tag-manager','태그 관리','category.html',{},'tag-manage');
+  add(5,'template-manager','배정 템플릿 관리','category.html',{},'templates-manage');
   add(5,'template-change','템플릿 배정·대상 변경 검토','assets.html',{},'template-change');
   add(5,'member-target','앱 구성원 기준 상세',mobile?file:'leader.html',{qa:'review',scenario:'target',id:'A001'});
   const worksiteSample=D.assets.find(a=>(a.assignments||[])[0]?.worksite);
@@ -104,6 +105,7 @@
       case 'category-manage':click('[data-manage-dropdown]');click('[data-manage-classification]');break;
       case 'extra-manage':click('[data-manage-dropdown]');click('[data-manage-extra]');break;
       case 'category-edit':click('[data-edit-sub]');break;
+      case 'tag-manage':click('[data-manage-dropdown]');click('[data-manage-tag]');break;
       case 'templates-manage':window.AssetTemplates?.openTemplateManager();break;
       case 'template-change':window.AssetTemplates?.openTemplateAssign(undefined,true);break;
       case 'history':click('[data-atab="history"]');break;

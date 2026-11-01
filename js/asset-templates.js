@@ -161,7 +161,7 @@
 
   // ── Web_dc_28 템플릿 관리 ──
   function openTemplateManager() {
-    const back = modal(`<h3>템플릿 관리</h3><div class="body tpl-manage-body"><p class="tpl-manage-desc">함께 배정하고 연결할 자산 구성을 미리 만들어 관리합니다.</p><div class="tpl-manage-head"><button class="btn sm primary" data-tpl-add>+ 템플릿 추가</button></div><div class="link-list" data-tpl-list></div></div><div class="foot"><button class="btn" data-close>닫기</button></div>`, "tpl-modal");
+    const back = modal(`<h3>배정 템플릿 관리</h3><div class="body tpl-manage-body"><p class="tpl-manage-desc">함께 배정하고 연결할 자산 구성을 미리 만들어 관리합니다.</p><div class="tpl-manage-head"><button class="btn sm primary" data-tpl-add>+ 템플릿 추가</button></div><div class="link-list" data-tpl-list></div></div><div class="foot"><button class="btn" data-close>닫기</button></div>`, "tpl-modal");
     const draw = () => {
       const list = D.templates.slice().sort((p, q) => p.name.localeCompare(q.name, "ko"));
       back.querySelector("[data-tpl-list]").innerHTML = list.length ? list.map(t => `<div class="tpl-card"><div class="tpl-card-main"><b>${esc(t.name)}</b><span class="muted">전체 ${totalOf(t)}개</span><div class="tpl-card-items">${[t.base, ...t.items].map((x, i) => `<span class="tpl-chip${i ? "" : " base"}">${i ? "" : "기준 "}${esc(x.product)}${i ? ` ×${x.count}` : ""}</span>`).join("")}</div></div><div class="tpl-card-actions"><button class="btn sm" data-tpl-edit="${t.id}">수정</button><button class="btn sm" data-tpl-del="${t.id}">삭제</button></div></div>`).join("") : '<p class="muted tpl-empty">등록된 템플릿이 없습니다.</p>';
