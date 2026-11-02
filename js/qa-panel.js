@@ -83,6 +83,7 @@
   add(3,'templates-many','배정 템플릿 45개','category.html',{},'templates-many');
   add(3,'template-picker-many','템플릿 선택 45개','assets.html',{},'template-picker-many');
   add(5,'template-change','템플릿 배정·대상 변경 검토','assets.html',{},'template-change');
+  add(5,'template-assets','템플릿 자산 선택·개수 상한','assets.html',{},'template-assets');
   add(5,'member-target','앱 구성원 기준 상세',mobile?file:'leader.html',{qa:'review',scenario:'target',id:'A001'});
   const worksiteSample=D.assets.find(a=>(a.assignments||[])[0]?.worksite);
   add(5,'worksite-target','앱 근무지 기준 상세',mobile?file:'leader.html',{qa:'review',scenario:'target',id:worksiteSample?.id||'A027'});
@@ -123,6 +124,11 @@
       case 'templates-many':window.AssetTemplates?.openTemplateManager();break;
       case 'template-picker-many':window.AssetTemplates?.openTemplateAssign();click('[data-template-open]');break;
       case 'template-change':window.AssetTemplates?.openTemplateAssign(undefined,true);break;
+      case 'template-assets': {
+        const tpl=D.templates.slice().sort((a,b)=>a.name.localeCompare(b.name,'ko'))[0], sample=D.assets.find(a=>a.product===tpl?.items[0]?.product);
+        if(tpl&&sample){tpl.items[0].count=2;for(let i=1;i<=3;i++)D.assets.push({...clone(sample),id:`QA-TPL-ASSET-${i}`,assetNo:`QA-TPL-ASSET-${i}`,status:'stock',assignments:[],_activityLog:[]});}
+        window.AssetTemplates?.openTemplateAssign(undefined,true);break;
+      }
       case 'asset-assign':click('#btn-assign');break;
       case 'history':click('[data-atab="history"]');break;
     }

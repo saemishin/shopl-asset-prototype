@@ -1,4 +1,4 @@
-// 배정 템플릿 관리(Web_dc_24)와 자산 배정(Web_dc_17). 연결 기준은 Policy_15, 저장소는 window.AssetLinks.
+// 배정 템플릿 관리(Web_dc_24)와 자산 배정(Web_dc_13). 연결 기준은 Policy_15, 저장소는 window.AssetLinks.
 (() => {
   const D = window.DATA;
   const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
@@ -289,7 +289,7 @@
     draw();
   }
 
-  // ── Web_dc_17 템플릿으로 배정 ──
+  // ── Web_dc_13 템플릿으로 배정 ──
   const targetKey = t => t ? (t.type === "employee" ? "e:" : "w:") + t.value : null;
   const assetTargetKey = a => { const r = (a.assignments || [])[0]; return r ? (r.employee ? "e:" + r.employee : "w:" + r.worksite) : null; };
   function usableTemplates() {
@@ -299,14 +299,14 @@
   }
   function openTemplateAssign(onDone, qaDemo = false) {
     const today = "2026-09-04"; // 프로토타입 기준일(다른 화면의 TODAY와 같음)
-    const st = { kind: "", target: { employee: null, worksite: null }, tplId: "", date: today, rows: [] };
-    const back = modal(`<h3>템플릿으로 배정</h3><div class="body tpl-edit-body" data-ta></div><div class="foot"><button class="btn" data-cancel>취소</button><button class="btn primary" data-save disabled>저장</button></div>`, "tpl-modal wide");
+    const st = { kind: "", target: { employee: null, worksite: null }, tplId: "", date: "", rows: [] };
+    const back = modal(`<h3>템플릿으로 배정</h3><div class="body tpl-edit-body" data-ta></div><div class="foot"><button class="btn" data-cancel>취소</button><button class="btn primary" data-save disabled>저장</button></div>`, "tpl-modal wide tpl-assignment");
     const body = back.querySelector("[data-ta]"), save = back.querySelector("[data-save]");
     const curTarget = () => st.kind && st.target[st.kind] ? { type: st.kind, value: st.target[st.kind] } : null;
     const assetById = id => D.assets.find(a => a.id === id);
     const allPicked = () => st.rows.flatMap(r => r.picked);
     const isNew = a => !assetTargetKey(a);
-    const candidates = row => D.assets.filter(a => !a.deleted_at && a.status !== "disposed" && a.sub === row.sub && a.product === row.product && window.AssetAccess.canState(a) && (isNew(a) ? a.status === "stock" : assetTargetKey(a) === targetKey(curTarget())) && !allPicked().includes(a.id)).sort((p, q) => String(p.assetNo).localeCompare(String(q.assetNo)));
+    const candidates = row => D.assets.filter(a => !a.deleted_at && a.status !== "disposed" && a.sub === row.sub && a.product === row.product && window.AssetAccess.canView(a) && window.AssetAccess.canState(a) && (isNew(a) ? a.status === "stock" : assetTargetKey(a) === targetKey(curTarget())) && !st.rows.some(other => other !== row && other.picked.includes(a.id))).sort((p, q) => String(p.assetNo).localeCompare(String(q.assetNo)));
     const anyNew = () => allPicked().some(id => isNew(assetById(id)));
     const ready = () => curTarget() && st.tplId && st.rows.length > 1 && st.rows.every(r => r.picked.length === r.count) && (!anyNew() || st.date);
     const loadTemplate = () => {
@@ -319,23 +319,22 @@
       return v ? `<div class="aa-target-selected" data-target-open>${k === "employee" ? `<span class="picker-avatar sm" style="background:${avatarColor(v)}">${v[0]}</span>` : ""}<span class="perm-chip">${esc(v)}</span><button type="button" class="aa-target-x" data-target-clear aria-label="선택 해제">${CLOSE_ICON}</button></div>` : '<button type="button" class="perm-target-btn" data-target-open><span class="muted">선택</span><span class="chev">›</span></button>';
     };
     const slotHtml = (r, i) => {
-      const full = r.picked.length === r.count;
-      return `<div class="tpl-slot${full ? " full" : ""}">
-        <div class="tpl-slot-main">
-          <div class="tpl-slot-title">${r.base ? '<span class="tpl-chip base">기준</span>' : ""}<b>${esc(r.product)}</b></div>
-          <div class="tpl-slot-need">${esc(r.group)} › ${esc(r.sub)} · ${r.count}개 필요 · 선택 <b>${r.picked.length}</b>/${r.count}</div>
+      const selected = r.picked.map(assetById).filter(Boolean), first = selected[0];
+      return `<div class="tpl-slot tpl-assignment-slot${selected.length === r.count ? " full" : ""}">
+        <div class="tpl-assignment-slot-head"><span class="tpl-chip${r.base ? " base" : ""}">${r.base ? "기준 자산" : "연결 자산"}</span>
+          <div class="tpl-slot-actions tpl-count-actions">${r.base ? '<span class="tpl-count-unit">1개</span>' : `<div class="tpl-stepper"><button type="button" data-dec="${i}" aria-label="필요 개수 줄이기"${r.count <= 1 ? " disabled" : ""}>−</button><span>${r.count}</span><button type="button" data-inc="${i}" aria-label="필요 개수 늘리기"${st.rows.filter(x => !x.base).reduce((n,x) => n+x.count,0) >= MAX_ITEMS ? " disabled" : ""}>＋</button></div><span class="tpl-count-unit">개</span>`}${selected.length === r.count ? '<span class="tpl-selection-complete" role="img" aria-label="선택 완료">✓</span>' : ""}${r.base ? "" : `<button type="button" class="tpl-x" data-row-del="${i}" aria-label="연결 자산 제외">${CLOSE_ICON}</button>`}</div>
         </div>
-        <div class="tpl-slot-actions">
-          ${r.base ? "" : `<div class="tpl-stepper"><button type="button" data-dec="${i}"${r.count <= 1 ? " disabled" : ""}>−</button><span>${r.count}</span><button type="button" data-inc="${i}">＋</button></div>`}
-          ${full ? "" : `<button type="button" class="btn sm" data-row-pick="${i}"${curTarget() ? "" : " disabled"}>자산 선택</button>`}
-          ${r.base ? "" : `<button type="button" class="tpl-x" data-row-del="${i}" aria-label="항목 제외">${CLOSE_ICON}</button>`}
+        <div class="tpl-slot-category">${esc(r.group)} › ${esc(r.sub)}</div><b class="tpl-slot-product">${esc(r.product)}</b>
+        <div class="tpl-asset-select-wrap"${curTarget() ? "" : ' data-tip="배정 대상을 먼저 선택해주세요." tabindex="0"'}>
+          <div class="link-search-field"><input type="text" class="picker-search" readonly placeholder="선택" aria-label="${esc(r.product)} 자산 선택" aria-haspopup="dialog" data-row-pick="${i}" value="${first ? esc(first.product + " · " + first.assetNo) : ""}"${curTarget() ? "" : " disabled"}>
+          ${selected.length > 1 ? `<span class="link-search-count tpl-selection-count">+${selected.length - 1}</span>` : ""}${selected.length ? `<button type="button" class="tpl-field-clear" data-clear-picked="${i}" aria-label="${esc(r.product)} 선택 해제">${CLOSE_ICON}</button>` : ""}</div>
         </div>
-        ${r.picked.length ? `<div class="tpl-picked">${r.picked.map(id => { const a = assetById(id); return `<span class="tpl-picked-chip">${thumbOf(a)}<span>${esc(a.assetNo)}</span><span class="badge ${isNew(a) ? "stock" : "assigned"}">${isNew(a) ? "새로 배정" : "이미 배정됨"}</span><button type="button" data-unpick="${i}:${id}" aria-label="선택 해제">${CLOSE_ICON}</button></span>`; }).join("")}</div>` : ""}
       </div>`;
     };
     const draw = () => {
       const template = D.templates.find(t => t.id === st.tplId);
-      body.innerHTML = `
+      back.querySelector(".modal").classList.toggle("expanded", !!st.tplId);
+      body.innerHTML = `<div class="tpl-assignment-columns"><div class="tpl-assignment-form">
         <div class="field"><label>템플릿</label><div class="link-search-field"><input type="text" class="picker-search" readonly placeholder="선택" aria-label="배정 템플릿 선택" aria-haspopup="dialog" data-template-open value="${esc(template?.name || "")}">${template ? `<button type="button" class="tpl-field-clear" data-template-clear aria-label="템플릿 선택 해제">${CLOSE_ICON}</button>` : ""}</div></div>
         <div class="field"><label>배정 대상</label>
           <label class="radio-row"><input type="radio" name="ta-kind" value="employee"${st.kind === "employee" ? " checked" : ""}><span>구성원</span></label>
@@ -343,7 +342,7 @@
           <label class="radio-row"><input type="radio" name="ta-kind" value="worksite"${st.kind === "worksite" ? " checked" : ""}><span>근무지</span></label>
           ${st.kind === "worksite" ? `<div class="perm-target-wrap">${targetField("worksite")}</div>` : ""}</div>
         <div class="field"><label>배정일</label><input type="date" data-date value="${st.date}" max="${today}"><p class="field-help">새로 배정하는 자산에만 적용됩니다.</p></div>
-        ${st.rows.length ? `<div class="tpl-section"><div class="tpl-section-head"><b>항목별 자산 선택</b><span class="muted">항목마다 필요한 개수만큼 자산을 선택해주세요.</span></div>${st.rows.map(slotHtml).join("")}<button type="button" class="tpl-add-row" data-row-add>+ 항목 추가</button></div>` : ""}`;
+        </div>${st.rows.length ? `<section class="tpl-assignment-assets" aria-label="템플릿 자산 선택"><p class="tpl-assignment-help">템플릿에서 필요한 개수만큼 자산을 선택해주세요.</p>${st.rows.map(slotHtml).join("")}<button type="button" class="tpl-add-row" data-row-add>+ 연결 자산 추가</button></section>` : ""}</div>`;
       body.querySelectorAll('[name="ta-kind"]').forEach(r => r.onchange = () => { st.kind = r.value, clearPicked(), draw(); });
       body.querySelectorAll("[data-target-open]").forEach(el => el.onclick = e => {
         if (e.target.closest("[data-target-clear]")) return;
@@ -359,35 +358,54 @@
       body.querySelectorAll("[data-dec]").forEach(b => b.onclick = () => { const r = st.rows[+b.dataset.dec]; r.count--, r.picked = r.picked.slice(0, r.count), draw(); });
       body.querySelectorAll("[data-inc]").forEach(b => b.onclick = () => { const others = st.rows.filter(x => !x.base).reduce((n, x) => n + x.count, 0); others < MAX_ITEMS && st.rows[+b.dataset.inc].count++, draw(); });
       body.querySelectorAll("[data-row-del]").forEach(b => b.onclick = () => { st.rows.splice(+b.dataset.rowDel, 1), draw(); });
-      body.querySelectorAll("[data-unpick]").forEach(b => b.onclick = () => { const [i, id] = b.dataset.unpick.split(":"); st.rows[+i].picked = st.rows[+i].picked.filter(x => x !== id), draw(); });
-      body.querySelectorAll("[data-row-pick]").forEach(b => b.onclick = () => openPicker(st.rows[+b.dataset.rowPick]));
+      body.querySelectorAll("[data-clear-picked]").forEach(b => b.onclick = () => { st.rows[+b.dataset.clearPicked].picked = []; draw(); });
+      body.querySelectorAll("[data-row-pick]").forEach(field => {
+        const open = () => { if (curTarget()) openPicker(st.rows[+field.dataset.rowPick]); };
+        field.onclick = open;
+        field.onkeydown = e => { if (["Enter", " "].includes(e.key)) { e.preventDefault(); open(); } };
+      });
       body.querySelector("[data-row-add]")?.addEventListener("click", openRowAdd);
       refresh();
     };
     const refresh = () => { save.disabled = !ready(); };
     function openPicker(row) {
-      const room = row.count - row.picked.length, picked = new Set();
-      let q = "";
-      const pb = modal(`<h3>자산 선택</h3><div class="body" style="display:flex;flex-direction:column;max-height:60vh"><p class="link-target">${esc(row.group)} › ${esc(row.sub)} · <b>${esc(row.product)}</b> · 남은 ${room}개</p><input type="text" class="picker-search" placeholder="고유관리번호" data-q><div class="link-list" data-pl style="flex:1;min-height:0;overflow-y:auto;margin-top:8px"></div></div><div class="foot"><button class="btn" data-no>취소</button><button class="btn primary" data-ok disabled>적용</button></div>`, "", 360);
+      if (!curTarget()) return;
+      if (row.count >= 2) {
+        const allowed = new Set(candidates(row).map(a => a.id));
+        const picker = window.AssetPicker.open({
+          initial: row.picked.map(assetById).filter(Boolean),
+          maxSelection: row.count,
+          candidateFilter: a => allowed.has(a.id),
+          categoryFilter: c => c.group === row.group && c.sub === row.sub,
+          assignmentBadge: a => ({label: isNew(a) ? "새로 배정" : "배정 중", className: isNew(a) ? "stock" : "assigned"}),
+          onApply: assets => { row.picked = assets.map(a => a.id); draw(); }
+        });
+        picker.style.zIndex = 360;
+        return;
+      }
+      let picked = row.picked[0] || "", q = "";
+      const pb = modal(`<h3>자산 선택</h3><div class="body" style="display:flex;flex-direction:column;max-height:60vh"><p class="link-target">${esc(row.group)} › ${esc(row.sub)} · <b>${esc(row.product)}</b></p><input type="text" class="picker-search" placeholder="고유관리번호" data-q><div class="link-list" data-pl style="flex:1;min-height:0;overflow-y:auto;margin-top:8px"></div></div><div class="foot"><button class="btn" data-no>취소</button><button class="btn primary" data-ok disabled>적용</button></div>`, "", 360);
       pb.querySelector(".modal").style.width = "460px";
       const drawP = () => {
         const all = candidates(row), list = all.filter(a => !q || String(a.assetNo).toLowerCase().includes(q));
-        pb.querySelector("[data-pl]").innerHTML = !all.length ? '<p class="muted">선택할 수 있는 자산이 없습니다.</p>' : !list.length ? '<p class="muted">결과가 없습니다.</p>' : list.map(a => `<label class="link-cand"><input type="checkbox" data-p="${a.id}"${picked.has(a.id) ? " checked" : ""}${!picked.has(a.id) && picked.size >= room ? " disabled" : ""}>${thumbOf(a)}<span class="link-row-name">${esc(a.assetNo)}</span><span class="badge ${isNew(a) ? "stock" : "assigned"}">${isNew(a) ? "새로 배정" : "이미 배정됨"}</span></label>`).join("");
-        pb.querySelectorAll("[data-p]").forEach(c => c.onchange = () => { c.checked ? picked.add(c.dataset.p) : picked.delete(c.dataset.p), drawP(); });
-        pb.querySelector("[data-ok]").disabled = !picked.size;
+        pb.querySelector("[data-pl]").innerHTML = !all.length ? '<p class="muted">선택할 수 있는 자산이 없습니다.</p>' : !list.length ? '<p class="muted">결과가 없습니다.</p>' : list.map(a => `<label class="link-cand"><input type="radio" name="template-single-asset" data-p="${a.id}"${picked === a.id ? " checked" : ""}>${thumbOf(a)}<span class="link-row-main"><span class="link-row-name">${esc(a.product)}</span><span class="link-row-no">${esc(a.assetNo)}</span></span><span class="badge ${isNew(a) ? "stock" : "assigned"}">${isNew(a) ? "새로 배정" : "배정 중"}</span></label>`).join("");
+        pb.querySelectorAll("[data-p]").forEach(r => r.onchange = () => { picked = r.dataset.p; pb.querySelector("[data-ok]").disabled = false; });
+        pb.querySelector("[data-ok]").disabled = !all.some(a => a.id === picked);
       };
-      pb.querySelector("[data-q]").oninput = e => { q = e.target.value.trim().toLowerCase(), drawP(); };
+      pb.querySelector("[data-q]").oninput = e => { q = e.target.value.trim().toLowerCase(); drawP(); };
       pb.querySelector("[data-no]").onclick = () => pb.remove();
-      pb.querySelector("[data-ok]").onclick = () => { row.picked.push(...picked), pb.remove(), draw(); };
+      pb.querySelector("[data-ok]").onclick = () => { if (!picked) return; row.picked = [picked]; pb.remove(); draw(); };
       drawP();
     }
     function openRowAdd() {
       const nr = { group: "", sub: "", product: "", count: 1, picked: [] };
-      const pb = modal(`<h3>항목 추가</h3><div class="body" data-ra></div><div class="foot"><button class="btn" data-no>취소</button><button class="btn primary" data-ok disabled>추가</button></div>`, "", 360);
-      pb.querySelector(".modal").style.width = "460px";
+      const pb = modal(`<h3>연결 자산 추가</h3><div class="body" data-ra></div><div class="foot"><button class="btn" data-no>취소</button><button class="btn primary" data-ok disabled>추가</button></div>`, "tpl-modal tpl-row-add", 360);
       const dup = () => !!nr.product && st.rows.some(r => itemKey(r) === itemKey(nr));
       const drawR = () => {
-        pb.querySelector("[data-ra]").innerHTML = `<div class="tpl-item-fields">${categoryFieldHtml(nr, "data-c")}${productFieldHtml(nr, "data-p")}</div><p class="field-err" data-err hidden></p>`;
+        pb.querySelector("[data-ra]").innerHTML = `<div class="tpl-editor-fields">
+          <div class="tpl-editor-field"><label>소분류</label>${categoryFieldHtml(nr, 'data-c aria-label="소분류 선택"', "선택")}</div>
+          <div class="tpl-editor-field"><label for="tpl-row-product">품목명</label>${productFieldHtml(nr, 'data-p id="tpl-row-product" aria-label="품목명"', "입력")}<p class="field-err" data-err hidden></p></div>
+        </div>`;
         pb.querySelector("[data-c]").onclick = () => pickCategory(nr, drawR);
         wireProductInput(pb.querySelector("[data-p]"), nr, drawR, refreshR);
         refreshR();

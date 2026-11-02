@@ -2249,7 +2249,7 @@ fieldset.asset-fixed-inputs{border:0;padding:0;margin:0;min-width:0;}
 .link-head h3 .muted { font-weight:500; margin-left:2px; }
 .link-cand input[type=checkbox] { flex:none; margin:0; }
 .link-cand .link-row-no { flex:none; }
-/* 배정 템플릿 관리·자산 배정(Web_dc_24·17) */
+/* 배정 템플릿 관리·자산 배정(Web_dc_24·13) */
 .modal.tpl-modal { width:520px; }
 .modal.tpl-modal.wide { width:640px; }
 .tpl-manage-body, .tpl-edit-body, .tpl-picker-body { max-height:66vh; overflow-y:auto; }
@@ -2456,3 +2456,43 @@ table.tbl-target-full .tf-sub .tf-group-name { font-size:11px; font-weight:400; 
 #assign-card .hcard-row { align-items: flex-start; }
 #assign-card .hcard-val { min-width: 0; overflow-wrap: anywhere; flex-wrap: wrap; }
 body.history-capture #prototype-qa { display: none; }
+
+/* 템플릿 선택 후 왼쪽 배정 폼·오른쪽 자산 선택(D-20261102-36) */
+.modal.tpl-assignment.expanded { width:1040px; }
+.tpl-assignment-columns { display:block; }
+.tpl-assignment.expanded .tpl-assignment-columns { display:grid; grid-template-columns:minmax(250px,300px) minmax(0,1fr); gap:20px; align-items:start; }
+.tpl-assignment.expanded .tpl-edit-body { overflow-y:hidden; }
+.tpl-assignment.expanded .tpl-assignment-form, .tpl-assignment-assets { max-height:calc(66vh - 36px); min-height:0; overflow-y:auto; }
+.tpl-assignment-assets { padding:16px; border:1px solid #dfe6f2; border-radius:12px; background:#f0f4fa; }
+.tpl-assignment-help { margin:0 0 14px; color:var(--text-sub); font-size:13px; line-height:1.5; }
+.tpl-assignment-slot { display:block; background:#fff; border-style:solid; }
+.tpl-assignment-slot.full { background:#fff; }
+.tpl-assignment-slot-head { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px; }
+.tpl-slot-category { font-size:11.5px; color:var(--text-mut); margin-bottom:4px; }
+.tpl-slot-product { display:block; font-size:13.5px; margin-bottom:10px; }
+.tpl-assignment-slot .tpl-slot-need { margin-top:6px; }
+.tpl-asset-select-wrap { position:relative; }
+.tpl-asset-select-wrap input:disabled { pointer-events:none; background:#f1f3f5; cursor:not-allowed; }
+.tpl-asset-select-wrap[data-tip] { cursor:not-allowed; }
+.tpl-asset-select-wrap[data-tip]:is(:hover,:focus-visible)::after { content:attr(data-tip); position:absolute; left:0; bottom:calc(100% + 6px); padding:7px 10px; background:#25282c; color:#fff; border-radius:6px; font-size:12px; white-space:nowrap; z-index:5; pointer-events:none; }
+.tpl-assignment-slot .link-search-field .picker-search { margin:0; height:36px; }
+.tpl-assignment-slot .link-search-field:has(.tpl-selection-count) .picker-search { padding-right:76px; }
+.tpl-assignment-slot .tpl-selection-count { right:34px; }
+@media(max-width:800px) {
+  .tpl-assignment.expanded .tpl-assignment-columns { grid-template-columns:1fr; }
+  .tpl-assignment.expanded .tpl-edit-body { overflow-y:auto; }
+  .tpl-assignment.expanded .tpl-assignment-form, .tpl-assignment-assets { max-height:none; overflow-y:visible; }
+}
+
+/* 템플릿 선택의 배정 구분은 행 옆에 짧게 표시한다. */
+.link-select-modal .link-cand > .badge,
+.link-select-modal .link-selected-row > .badge { flex:none; align-self:center; }
+.tpl-selection-complete { display:inline-flex; color:#218653; font-size:15px; font-weight:700; }
+
+.tpl-count-actions { gap:6px; }
+.tpl-count-unit { font-size:12px; color:var(--text-sub); white-space:nowrap; }
+
+/* 연결 자산 추가: 템플릿 편집과 같은 레이블/입력 필드 구조 */
+.modal.tpl-row-add { width:460px; }
+.tpl-row-add .tpl-editor-fields { gap:16px; }
+.tpl-row-add .field-err { margin:6px 0 0; }
