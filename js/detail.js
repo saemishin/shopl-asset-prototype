@@ -243,8 +243,8 @@
   }
   function confirmWriteExit(onLeave) {
     const cb = document.createElement("div");
-    cb.className = "modal-back", cb.style.zIndex = 340, cb.innerHTML = `<div class="modal sm" style="width:340px" role="dialog" aria-modal="true" aria-label="작성을 중단하시겠습니까?">
-      <h3>작성을 중단하시겠습니까?</h3><div class="body" style="font-size:14px">지금까지 작성한 내용은 저장되지 않습니다.</div>
+    cb.className = "modal-back", cb.style.zIndex = 340, cb.innerHTML = `<div class="modal sm" style="width:340px" role="dialog" aria-modal="true" aria-label="취소하시겠습니까?">
+      <h3>취소하시겠습니까?</h3><div class="body" style="font-size:14px">취소 시 편집한 내용이 저장되지 않습니다.</div>
       <div class="foot"><button type="button" class="btn" data-exit-stay>취소</button><button type="button" class="btn primary" data-exit-leave>확인</button></div></div>`, document.body.appendChild(cb), cb.querySelector("[data-exit-stay]").onclick = () => cb.remove(), cb.querySelector("[data-exit-leave]").onclick = () => {
       cb.remove(), onLeave();
     };
@@ -758,7 +758,7 @@
     const searchField = back.querySelector("[data-link-q]");
     searchField.onclick = openStockSelector;
     searchField.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openStockSelector(); } };
-    back.querySelector("[data-close]").onclick = () => back.remove();
+    back.querySelector("[data-close]").onclick = () => picked.size || getDate() !== todayStr() ? confirmWriteExit(() => back.remove()) : back.remove();
     save.onclick = () => {
       const targets = [...picked.values()], key = window.AssetLinks.targetKey(a), d = getDate();
       // 저장 시점 재검증: 같은 대상 후보이거나 여전히 배정 가능한 자산인지(새11 Case 5-7-2)

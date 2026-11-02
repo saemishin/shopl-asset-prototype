@@ -8,7 +8,7 @@
  * - 추가/수정 폼은 직접 편집하고 자산 최종 저장 시 반영. 상세는 메모만 별도 저장:
  *   대시보드 센터 모달, 앱 풀스크린 팝업. 기존 권한·폐기 동결 판정은 호출 화면에서 유지.
  * - 정규화한 HTML로 변경 판정: 서식만 변경해도 저장/이력 대상, 원복하면 저장 비활성.
- *   메모 팝업의 취소/ESC는 미저장 변경 시 수정 중단 확인. 대시보드는 Header X 없음,
+ *   메모 팝업의 취소/ESC는 미저장 변경 시 수정 취소 확인. 대시보드는 Header X 없음,
  *   앱 풀스크린은 기존 X를 유지하고 같은 취소 기준 사용. 폼은 기존 이탈 확인 사용.
  * - 지원 서식 붙여넣기 및 HTML 저장/조회/이력 유지, 목록 툴팁은 본문 텍스트.
  * - 링크: 기본 URI 검증·자동 인식, 편집 중 이동 없음, 조회 시 새 탭.
@@ -175,7 +175,7 @@ function confirmDiscard(back,onDiscard) {
   if (back.querySelector('.asset-memo-discard')) return;
   const confirm=document.createElement('div');
   confirm.className='asset-memo-discard';
-  confirm.innerHTML='<div class="modal" role="alertdialog" aria-modal="true" aria-label="수정 중단 확인"><h3>수정을 중단하시겠습니까?</h3><div class="body">수정을 중단할 경우 변경된 내용은 저장되지 않습니다.</div><div class="foot"><button type="button" class="btn" data-stay>취소</button><button type="button" class="btn primary" data-discard>확인</button></div></div>';
+  confirm.innerHTML='<div class="modal" role="alertdialog" aria-modal="true" aria-label="수정 취소 확인"><h3>수정을 취소하시겠습니까?</h3><div class="body">취소할 경우 수정한 내용이 저장되지 않습니다.</div><div class="foot"><button type="button" class="btn" data-stay>취소</button><button type="button" class="btn primary" data-discard>확인</button></div></div>';
   back.append(confirm);
   confirm.querySelector('[data-stay]').onclick=()=>confirm.remove();
   confirm.querySelector('[data-discard]').onclick=onDiscard;

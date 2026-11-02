@@ -89,6 +89,17 @@
         n && (counts[n] = (counts[n] || 0) + 1);
       }), new Set(Object.keys(counts).filter(n => counts[n] > 1));
     }
+    function confirmTagLeave(onLeave) {
+      const cb = document.createElement("div");
+      cb.className = "modal-back", cb.style.zIndex = 400, cb.innerHTML = `<div class="modal sm" role="dialog" aria-modal="true" aria-label="수정을 취소하시겠습니까?">
+        <h3>수정을 취소하시겠습니까?</h3>
+        <div class="body" style="font-size:14px">취소할 경우 수정한 내용이 저장되지 않습니다.</div>
+        <div class="foot"><button type="button" class="btn" data-tm-stay>취소</button><button type="button" class="btn primary" data-tm-leave>확인</button></div></div>`, document.body.appendChild(cb);
+      cb.querySelector("[data-tm-stay]").onclick = () => cb.remove();
+      cb.querySelector("[data-tm-leave]").onclick = () => {
+        cb.remove(), onLeave();
+      };
+    }
     function isDirty() {
       const current = [...new Set(draft.map(t => normalizeTagName(t.name)).filter(Boolean))].sort((a, b) => a.localeCompare(b, "ko")),
         orig = [...master].sort((a, b) => a.localeCompare(b, "ko"));
@@ -137,7 +148,7 @@
     }), listEl.addEventListener("click", e => {
       const d = e.target.closest("[data-tm-del]");
       d && (draft.splice(+d.dataset.tmDel, 1), renderList());
-    }), back.querySelector("[data-tm-cancel]").onclick = () => back.remove(), saveBtn.onclick = () => {
+    }), back.querySelector("[data-tm-cancel]").onclick = () => isDirty() ? confirmTagLeave(() => back.remove()) : back.remove(), saveBtn.onclick = () => {
       if (!isDirty() || dupNameSet().size > 0 || draft.some(t => !normalizeTagName(t.name))) return;
       const finalNames = [...new Set(draft.map(t => normalizeTagName(t.name)).filter(Boolean))].sort((a, b) => a.localeCompare(b, "ko")),
         remainingOrigs = new Set(draft.filter(t => t.orig).map(t => t.orig)),
@@ -497,8 +508,8 @@
         return;
       }
       if (document.querySelector("[data-register-exit]")) return;
-      const title = opts.asset ? "수정을 중단하시겠습니까?" : "작성을 중단하시겠습니까?",
-        body = opts.asset ? "수정을 중단할 경우 변경된 내용은 저장되지 않습니다." : "지금까지 작성한 내용은 저장되지 않습니다.",
+      const title = opts.asset ? "수정을 취소하시겠습니까?" : "취소하시겠습니까?",
+        body = opts.asset ? "취소할 경우 수정한 내용이 저장되지 않습니다." : "취소 시 편집한 내용이 저장되지 않습니다.",
         cb = document.createElement("div");
       cb.className = "modal-back", cb.style.zIndex = 340, cb.innerHTML = `<div class="modal sm" data-register-exit role="dialog" aria-modal="true" aria-label="${title}">
         <h3>${title}</h3>

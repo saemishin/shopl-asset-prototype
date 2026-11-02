@@ -146,7 +146,7 @@
     }));
   }
   function categoryExit(onLeave) {
-    confirmModal("작성을 중단하시겠습니까?", "지금까지 작성한 내용은 저장되지 않습니다.", onLeave);
+    confirmModal("수정을 취소하시겠습니까?", "취소할 경우 수정한 내용이 저장되지 않습니다.", onLeave);
   }
   function productPhotoAsset(items) {
     return [...items].sort((a, b) => String(a.assetNo || "").localeCompare(String(b.assetNo || ""))).find(a => window.assetPhotos(a).length) || items[0];
@@ -957,7 +957,7 @@ function openManagementMenu(button,sel) {
       currentMode = mode;
       const isList = mode === "list";
       titleEl.textContent = isList ? "분류 관리" : "소분류 추가", backBtn.hidden = isList, addGroupRow.hidden = !isList, back.querySelector("[data-manage-desc]").hidden = !isList, body.hidden = !isList, createEl.hidden = isList, cancelBtn.hidden = !isList, confirmBtn.textContent = "저장", isList ? updateValidity() : confirmBtn.disabled = !0, cancelBtn.onclick = () => {
-        back.remove(), render(sel);
+        dirty ? confirmModal("수정을 취소하시겠습니까?", "취소할 경우 수정한 내용이 저장되지 않습니다.", () => (back.remove(), render(sel))) : (back.remove(), render(sel));
       }, confirmBtn.onclick = isList ? saveAll : commitCreate;
     }
     backBtn.onclick = guardedBack, back.addEventListener("click", e => {

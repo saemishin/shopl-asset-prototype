@@ -232,7 +232,7 @@
       body.querySelectorAll("[data-inc]").forEach(b => b.disabled = itemCount() >= MAX_ITEMS);
       body.querySelectorAll("[data-row-err]").forEach(p => { const i = +p.dataset.rowErr, msg = rowErr(i < 0 ? draft.base : draft.items[i]); p.textContent = msg, p.hidden = !msg; });
     };
-    back.querySelector("[data-cancel]").onclick = () => changed() ? confirmBox("작성을 중단하시겠습니까?", "지금까지 작성한 내용은 저장되지 않습니다.", () => back.remove()) : back.remove();
+    back.querySelector("[data-cancel]").onclick = () => changed() ? (tpl ? confirmBox("수정을 취소하시겠습니까?", "취소할 경우 수정한 내용이 저장되지 않습니다.", () => back.remove()) : confirmBox("취소하시겠습니까?", "취소 시 편집한 내용이 저장되지 않습니다.", () => back.remove())) : back.remove();
     save.onclick = () => {
       if (!valid()) return;
       const data = { name: draft.name.trim(), base: pick(draft.base), items: draft.items.map(x => ({ ...pick(x), count: +x.count })) };
@@ -349,7 +349,7 @@
       pb.querySelector("[data-ok]").onclick = () => { delete nr._text, st.rows.push(nr), pb.remove(), draw(); };
       drawR();
     }
-    back.querySelector("[data-cancel]").onclick = () => st.kind || st.tplId ? confirmBox("작성을 중단하시겠습니까?", "지금까지 작성한 내용은 저장되지 않습니다.", () => back.remove()) : back.remove();
+    back.querySelector("[data-cancel]").onclick = () => st.kind || st.tplId ? confirmBox("취소하시겠습니까?", "취소 시 편집한 내용이 저장되지 않습니다.", () => back.remove()) : back.remove();
     save.onclick = () => {
       if (!ready()) return;
       const target = curTarget(), picked = st.rows.map(r => r.picked.map(assetById));

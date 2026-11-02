@@ -72,7 +72,7 @@
       sync();
     }
     back.querySelector('[data-assignment-cancel]').onclick=()=>{
-      if(selected.length || kind || Object.values(target).some(Boolean) || dateText.trim()) confirm('작성을 중단하시겠습니까?','지금까지 작성한 내용은 저장되지 않습니다.',()=>back.remove());
+      if(selected.length || kind || Object.values(target).some(Boolean) || dateText.trim()) confirm('취소하시겠습니까?','취소 시 편집한 내용이 저장되지 않습니다.',()=>back.remove());
       else back.remove();
     };
     save.onclick=()=>{
