@@ -80,7 +80,9 @@
   add(6,'extra-info','비공개 추가 정보 예시',mobile?file:'asset-detail.html',{qa:'extra-info',id:'A001'});
   add(6,'disposed-manage','폐기 자산·복구 권한',mobile?file:'asset-detail.html',{qa:'access',scenario:'manage',id:'A020'});
   add(6,'disposed-view','폐기 자산·조회만',mobile?file:'asset-detail.html',{qa:'access',scenario:'view',id:'A020'});
-  add(6,'history','이력 표시 예시','asset-detail.html',{qa:'history',id:'A001'},'history');
+  add(6,'history','이력 · 정보/사진 변경','asset-detail.html',{qa:'history',id:'A001'},'history');
+  add(6,'history-operations','이력 · 배정/상태/연결','asset-detail.html',{qa:'history',id:'A106'},'history');
+  add(6,'history-permissions','이력 · 조회 불가 연결/비공개','asset-detail.html',{qa:'history',id:'A106',manage:'0',role:'leader'},'history');
   add(6,'retired-member','퇴사 구성원 배정','asset-detail.html',{qa:'retired',target:'오세훈',id:'A023'});
   add(6,'inactive-worksite','비활성 근무지 배정','asset-detail.html',{qa:'retired',target:worksiteSample?.assignments[0].worksite||'강남점',id:worksiteSample?.id||'A027'});
   add(6,'settings','자산 관리 권한 설정','settings.html');add(6,'plan-lite','Lite 요금제','feature-settings.html',{plan:'Lite'});

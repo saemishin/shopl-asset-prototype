@@ -1,71 +1,81 @@
-/* 이력 카드 QA 도구.
-   ?qa=history일 때만 자산 상세 이력 탭에 Web_dc_24의 모든 활동 케이스를 담은 샘플 이력을 메모리로 넣는다(캡처·확인용).
-   A001(그램 16), A106(네임펜 세트), 폐기 처리 확인용 A020(폐기된 그램 16)에 적용한다.
-   일반 URL과 저장 데이터에는 영향을 주지 않는다. 배열은 화면 표시 순서(최신이 위)이다. */
+/* Dashboard capture fixtures for Web_dc_12.
+   qa=history only; A001 = information/photos, A106 = assignments/status/links.
+   The normal seed and stored data are untouched. capture=1 hides the QA panel. */
 (function () {
-  if (new URLSearchParams(location.search).get("qa") !== "history") return;
-  const assets = window.DATA.assets || [];
-  const find = id => assets.find(a => a.id === id);
-  const D = s => window.fmtDate(s), Mo = s => window.fmtMonth(s), P = v => window.formatPrice(v);
-  const emp = (name, extra) => ({ employee: name, worksite: null, ...extra });
-  const ws = (name, extra) => ({ employee: null, worksite: name, ...extra });
-  const photo = (id, color, at, by) => ({ id, color, at, by });
-  const ph = {
-    a: photo("qa-p1", "#4b7bec", "2026-05-20 11:05", "dana"),
-    b: photo("qa-p2", "#6595ff", "2026-05-20 11:06", "김민수"),
-    c: photo("qa-p3", "#3363d4", "2026-07-15 09:33", "dana"),
-    d: photo("qa-p4", "#e08a3c", "2026-08-28 14:10", "이서연"),
-  };
-
-  const indiv = find("A001");
-  if (indiv) indiv._activityLog = [
-    // 상태 변경
-    { d: "2026-09-03 18:10", who: "dana", script: "상태 변경: 분실 회수", before: "분실", after: "배정 중" },
-    { d: "2026-09-02 10:00", who: "김민수", script: "상태 변경: 분실 신고", before: "배정 중", after: "분실" },
-    { d: "2026-08-30 15:20", who: "dana", script: "상태 변경: 수리/점검 완료", before: "수리/점검 중", after: "배정 중" },
-    { d: "2026-08-25 09:40", who: "dana", script: "상태 변경: 수리/점검 접수", before: "배정 중", after: "수리/점검 중" },
-    // 배정
-    { d: "2026-08-20 11:00", who: "dana", script: "배정 관리: 반납", target: ws("역삼점"), before: D("2026-06-01"), after: "" },
-    { d: "2026-08-12 14:30", who: "dana", script: "배정 관리: 이동", assignmentMove:true, previousTarget:emp("박지훈",{since:"2026-05-02"}), nextTarget:emp("이서연",{since:"2026-08-12"}), before: `박지훈 · ${D("2026-05-02")}`, after: `이서연 · ${D("2026-08-12")}` },
-    { d: "2026-07-01 10:15", who: "김민수", script: "배정 관리: 배정일 변경", target: emp("김민수"), before: D("2024-03-20"), after: D("2024-03-15") },
-    { d: "2026-06-01 09:00", who: "dana", script: "배정 관리: 신규 배정", target: ws("역삼점"), before: "", after: D("2026-06-01") },
-    { d: "2026-05-02 09:00", who: "dana", script: "배정 관리: 신규 배정", target: emp("박지훈"), before: "", after: D("2026-05-02") },
-    // 사진: 추가+대표 변경(같은 저장) / 전부 삭제 / 첫 추가
-    { d: "2026-04-18 16:00", who: "dana", script: "자산 사진 관리: 사진 변경", photoValue: true, before: [ph.a, ph.b], after: [ph.a, ph.b, ph.c] },
-    { d: "2026-04-18 16:00", who: "dana", script: "자산 사진 관리: 대표 사진 변경", photoValue: true, before: [ph.a], after: [ph.c] },
-    { d: "2026-04-15 10:00", who: "이서연", script: "자산 사진 관리: 사진 변경", photoValue: true, before: [ph.a, ph.b], after: [ph.a] },
-    { d: "2026-04-10 08:50", who: "dana", script: "자산 사진 관리: 사진 변경", photoValue: true, before: [], after: [ph.a, ph.b] },
-    // 자산 정보 수정: 한 번의 저장으로 바뀐 항목들(정책09 4.1 순서)
-    { d: "2026-04-02 13:20", who: "dana", script: "자산 정보 수정: 소분류 이동", before: "전자기기류 › 모니터", after: "전자기기류 › 노트북" },
-    { d: "2026-04-02 13:20", who: "dana", script: "자산 정보 수정: 품목명 수정", before: "그램 16", after: "그램 16 (2024)" },
-    { d: "2026-04-02 13:20", who: "dana", script: "자산 정보 수정: 고유관리번호 수정", before: "IT-2024-012", after: "IT-2024-0012" },
-    { d: "2026-04-02 13:20", who: "dana", script: "자산 정보 수정: 유효기한 변경", before: "", after: D("2027-03-10") },
-    { d: "2026-04-02 13:20", who: "dana", script: "자산 정보 수정: 태그 수정", before: "본사", after: "본사, 개발팀" },
-    { d: "2026-04-02 13:20", who: "dana", script: "자산 정보 수정: S/N 수정", before: "SN-8842", after: "SN-8842-AA" },
-    { d: "2026-04-02 13:20", who: "dana", script: "자산 정보 수정: IMEI 수정", before: "", after: "356938035643809" },
-    { d: "2026-04-02 13:20", who: "dana", script: "자산 정보 수정: 제조연월 변경", before: Mo("2023-12-01"), after: Mo("2024-01-01") },
-    { d: "2026-04-02 13:20", who: "dana", script: "자산 정보 수정: 구매연월 변경", before: "", after: Mo("2024-03-01") },
-    { d: "2026-04-02 13:20", who: "dana", script: "자산 정보 수정: 구매가격 변경", before: P(1790000), after: P(1890000) },
-    { d: "2026-04-02 13:20", who: "dana", script: "자산 정보 수정: 메모 수정", before: "", after: "<p><strong>키보드 자판</strong> 일부 마모 확인</p><ul><li>배정 반납 시 상태 재확인</li></ul>" },
-    { d: "2024-03-12 09:00", who: "dana", script: "자산 등록" },
+  const params = new URLSearchParams(location.search);
+  if (params.get("qa") !== "history") return;
+  const find = id => window.DATA.assets.find(a => a.id === id), D = window.fmtDate, Mo = window.fmtMonth;
+  const emp = (employee,since) => ({employee,worksite:null,since}), ws = (worksite,since) => ({employee:null,worksite,since});
+  const photo = (id,color) => ({id,color,at:"2026-04-18 16:00",by:"dana"});
+  const photos = [photo("qa-p1","#4b7bec"),photo("qa-p2","#6595ff"),photo("qa-p3","#e08a3c")];
+  const event = (d,script,before,after,extra={}) => ({d,who:"dana",script,...(before === undefined ? {} : {before,after}),...extra});
+  const info = find("A001"), operations = find("A106");
+  const edit = (label,id,before,after,extra={}) => event("2026-04-02 13:20",`자산 정보 수정: ${label}`,before,after,{fieldId:id,...extra});
+  if (info) {
+    const ownerId="history-owner";
+    if (!window.DATA.extraFields.some(f => f.id === ownerId)) window.DATA.extraFields.push({id:ownerId,name:"구매 담당자"});
+    const cat=window.AssetExtra.category(info);
+    cat.extraEnabled=[...new Set([...(cat.extraEnabled||[]),ownerId])];
+    cat.privateFields=[...new Set([...(cat.privateFields||[]),"purchasePrice",ownerId])];
+    info._activityLog = [
+      event("2026-08-28 14:10","자산 정보 수정: 메모 수정","<p>반납 시 상태 확인</p>","<p><strong>반납 시 상태 확인</strong></p>",{fieldId:"memo"}),
+      event("2026-08-26 09:00","자산 정보 수정: 메모 수정","","<p><strong>키보드 상태 확인</strong></p><ul><li>반납 시 외관 확인</li></ul>",{fieldId:"memo"}),
+      event("2026-08-20 11:00","자산 사진 관리: 사진 변경",photos,[],{photoValue:true}),
+      event("2026-08-18 11:00","자산 사진 관리: 사진 변경",photos,[photos[0],photos[2]],{photoValue:true}),
+      // Same save: photos first, then primary. Both sort directions must preserve this order.
+      event("2026-04-18 16:00","자산 사진 관리: 사진 변경",[photos[0],photos[1]],photos,{photoValue:true}),
+      event("2026-04-18 16:00","자산 사진 관리: 대표 사진 변경",[photos[0]],[photos[2]],{photoValue:true}),
+      event("2026-04-10 08:50","자산 사진 관리: 사진 변경",[],[photos[0],photos[1]],{photoValue:true}),
+      // Current edit-form order; S/N and IMEI are custom fields, not fixed information.
+      edit("소분류 이동","sub","전자기기류 › 모니터","전자기기류 › 노트북"),
+      edit("품목명 수정","product","그램 16","그램 16 (2024)"),
+      edit("고유관리번호 수정","assetNo","IT-2024-012","IT-2024-0012"),
+      edit("태그 수정","tags","본사","본사, 개발팀"),
+      edit("유효기한 변경","expiry","",D("2027-03-10")),
+      edit("제조연월 변경","manufactured",Mo("2023-12-01"),Mo("2024-01-01")),
+      edit("구매연월 변경","purchaseDate","",Mo("2024-03-01")),
+      edit("구매가격 변경","purchasePrice","$1,200","₩1,500,000"),
+      edit("메모 수정","memo","","<p>배정 전 구성품 확인</p>"),
+      edit("S/N 수정","sn","SN-8842","SN-8842-AA",{fieldName:"S/N"}),
+      edit("IMEI 수정","imei","","356938035643809",{fieldName:"IMEI"}),
+      edit("구매 담당자 수정",ownerId,"홍길동","구매팀",{fieldName:"구매 담당자"}),
+      event("2024-03-12 09:00","자산 등록")
+    ];
+  }
+  window.DATA.targetStatuses.employee["오세훈"]="retired";
+  window.DATA.targetStatuses.worksite["강남점"]="inactive";
+  const label = id => {const a=find(id);return a ? `${a.product} · ${a.assetNo}` : "연결 자산";};
+  const link = (d,id,cut=false,cause="") => event(d,`자산 연결: ${cut ? "연결 해제" : "연결"}${cause ? `(${cause})` : ""}`,cut?label(id):"",cut?"":label(id),{relatedAssetId:id});
+  const move = (d,previousTarget,nextTarget,extra={}) => event(d,"배정 관리: 이동",`${previousTarget.employee||previousTarget.worksite} · ${D(previousTarget.since)}`,`${nextTarget.employee||nextTarget.worksite} · ${D(nextTarget.since)}`,{assignmentMove:true,previousTarget,nextTarget,...extra});
+  if (operations) operations._activityLog = [
+    // Visible and permission-restricted counterpart examples. manage=0 uses existing category permissions.
+    link("2026-09-03 18:10","A107",true,"이동"),
+    link("2026-09-03 18:09","A107"),
+    link("2026-09-02 17:00","A001",true,"반납"),
+    event("2026-09-02 17:00",`배정 관리: 반납 (${label("A001")}과 함께)`,D("2026-08-20"),"",{target:emp("김민수","2026-08-20")}),
+    link("2026-09-01 17:00","A001",true,"이동"),
+    move("2026-09-01 17:00",ws("본사","2026-08-01"),emp("김민수","2026-09-01"),{script:`배정 관리: 이동 (${label("A001")}과 함께)`}),
+    link("2026-08-31 15:00","A001",true,"삭제"),
+    link("2026-08-30 15:00","A001",true,"폐기"),
+    event("2026-08-29 15:00","상태 변경: 폐기 복구","폐기","배정 가능"),
+    event("2026-08-28 15:00","상태 변경: 폐기 처리","배정 중","폐기"),
+    event("2026-08-27 11:00","상태 변경: 수리/점검 완료","수리/점검 중","배정 중"),
+    event("2026-08-25 09:40","상태 변경: 수리/점검 접수","배정 중","수리/점검 중"),
+    event("2026-08-24 18:10","상태 변경: 분실 회수","분실","배정 중"),
+    event("2026-08-23 10:00","상태 변경: 분실 신고","배정 중","분실",{who:"오세훈"}),
+    link("2026-08-22 15:00","A001",true),
+    link("2026-08-21 15:00","A001"),
+    move("2026-08-20 14:30",emp("박지훈","2026-05-02"),ws("본사","2026-08-20")),
+    event("2026-08-19 11:00","배정 관리: 반납",D("2026-06-01"),"",{target:ws("역삼점","2026-06-01")}),
+    event("2026-07-01 10:15","배정 관리: 배정일 변경",D("2024-03-20"),D("2024-03-15"),{target:emp("김민수","2024-03-15")}),
+    event("2026-06-01 09:00","배정 관리: 신규 배정","",D("2026-06-01"),{target:ws("강남점","2026-06-01")}),
+    event("2026-05-02 09:00","배정 관리: 신규 배정","",D("2026-05-02"),{target:emp("오세훈","2026-05-02")}),
+    event("2026-03-02 09:00","자산 등록")
   ];
-
-  const disposed = find("A020");
-  if (disposed) disposed._activityLog = [
-    { d: "2025-12-30 09:00", who: "dana", script: "상태 변경: 폐기 처리", before: "배정 중", after: "폐기" },
-    { d: "2024-04-01 09:00", who: "dana", script: "배정 관리: 신규 배정", target: emp("최유진"), before: "", after: D("2024-04-01") },
-    { d: "2024-03-12 09:00", who: "dana", script: "자산 등록" },
-  ];
-
-  const stationery = find("A106");
-  if (stationery) stationery._activityLog = [
-    { d: "2026-09-01 17:00", who: "dana", script: "배정 관리: 반납", target: emp("정우성"), before: D("2026-03-05"), after: "" },
-    { d: "2026-08-10 09:10", who: "dana", script: "배정 관리: 배정일 변경", target: emp("김민수"), before: D("2026-06-02"), after: D("2026-06-01") },
-    { d: "2026-07-01 11:00", who: "dana", script: "자산 사진 관리: 사진 변경", photoValue: true, before: [], after: [ph.d] },
-    { d: "2026-06-15 14:00", who: "dana", script: "자산 정보 수정: 품목명 수정", before: "네임펜", after: "네임펜 세트" },
-    { d: "2026-06-15 14:00", who: "dana", script: "자산 정보 수정: 구매가격 변경", before: P(3000), after: P(3500) },
-    { d: "2026-06-01 09:00", who: "dana", script: "배정 관리: 신규 배정", target: emp("김민수"), before: "", after: D("2026-06-01") },
-    { d: "2026-03-05 09:00", who: "dana", script: "배정 관리: 신규 배정", target: emp("정우성"), before: "", after: D("2026-03-05") },
-    { d: "2026-03-02 09:00", who: "dana", script: "자산 등록" },
-  ];
+  const disposed=find("A020");
+  if (disposed) disposed._activityLog=[event("2025-12-30 09:00","상태 변경: 폐기 처리","배정 중","폐기"),event("2024-03-12 09:00","자산 등록")];
+  document.addEventListener("DOMContentLoaded",() => {
+    if (params.get("capture")==="1") document.body.classList.add("history-capture");
+    document.querySelector('[data-atab="history"]')?.click();
+  },{once:true});
 })();

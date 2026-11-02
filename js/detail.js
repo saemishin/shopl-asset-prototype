@@ -19,6 +19,7 @@
   const chips = arr => arr && arr.length ? arr.map(l => `<span class="tag">${l}</span>`).join("") : '<span class="muted">—</span>';
   const targetParams=new URLSearchParams(location.search), targetContext=["employee","worksite"].includes(targetParams.get("targetType"))?{type:targetParams.get("targetType"),value:targetParams.get("targetValue")}:null;
   function canManageAssets() { return window.hasPrototypeAssetManagePermission(); }
+  let historyDir = "desc", detailTab = "current", historyAssetId = null;
   const memoHtml = note => window.AssetMemo.render(note),
     IC_EMP = '<svg class="hi" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5.5 20c0-4 3-6.5 6.5-6.5s6.5 2.5 6.5 6.5"/></svg>',
     IC_WS = '<svg class="hi" viewBox="0 0 24 24"><path d="M4 20V9.5L12 4l8 5.5V20"/><path d="M9.5 20v-5h5v5"/></svg>',
@@ -448,31 +449,54 @@
       ...entry
     });
   }
+  function historyPerson(name) {
+    const retired = ["retired", "resigned"].includes(window.DATA.targetStatuses?.employee?.[name]);
+    return {label:retired ? `[퇴사] ${Array.from(name || "").map(() => "*").join("")}` : name || "—", initial:retired ? "" : (name || "")[0] || ""};
+  }
+  function historyTargetHtml(target, value) {
+    if (!target || !value) return window.AssetExtra.esc(value || "없음");
+    const person = target.employee && historyPerson(target.employee), inactive = target.worksite && window.DATA.targetStatuses?.worksite?.[target.worksite] === "inactive";
+    const icon = person ? `<span class="hval-avatar" style="background:${avatarColor(target.employee)}">${person.initial}</span>` : IC_WS;
+    return `${icon}${window.AssetExtra.esc(person ? person.label : `${inactive ? "[비활성] " : ""}${target.worksite}`)} · ${window.AssetExtra.esc(value)}`;
+  }
   function historyCardHtml(e) {
-    const val = v => v || "없음",
-      targetName = e.target ? e.target.employee || e.target.worksite : null,
-      targetMark = e.target ? e.target.employee ? `<span class="hval-avatar" style="background:${avatarColor(e.target.employee)}">${e.target.employee[0]}</span>` : IC_WS : "",
-      withTarget = v => e.photoValue ? window.assetPhotoThumbsHtml(v) : e.script === "자산 정보 수정: 메모 수정" ? v ? window.AssetMemo.render(v) : "없음" : targetName && v ? `${targetMark}${targetName} · ${val(v)}` : val(v);
+    const esc = window.AssetExtra.esc, who = historyPerson(e.who), isLink = (e.script || "").startsWith("자산 연결:"),
+      related = isLink ? assets.find(a => a.id === e.relatedAssetId || (!e.relatedAssetId && `${a.product} · ${a.assetNo}` === (e.before || e.after))) : null,
+      hiddenRelated = isLink && (e.relatedAssetId ? !related || !window.AssetAccess.canView(related) : related && !window.AssetAccess.canView(related));
+    const valueHtml = (value, side) => {
+      if (e.photoValue) return window.assetPhotoThumbsHtml(value);
+      if (e.script === "자산 정보 수정: 메모 수정") return value ? window.AssetMemo.render(value) : "없음";
+      if (isLink && value && hiddenRelated) return "조회 불가 자산";
+      if (e.assignmentMove) {
+        const target = side === "before" ? e.previousTarget : e.nextTarget;
+        return target ? historyTargetHtml(target, window.fmtDate(target.since)) : esc(value || "없음");
+      }
+      return e.target ? historyTargetHtml(e.target, value) : esc(value || "없음");
+    };
     return `
-      <div class="hcard">
+      <div class="hcard" data-history-time="${esc(e.d)}">
         <div class="hcard-head">
           <span class="hcard-time">${window.fmtDateTime(e.d)}</span>
-          <span class="hcard-avatar" style="background:${avatarColor(e.who)}">${e.who[0]}</span>
-          <span class="hcard-who">${e.who}</span>
+          <span class="hcard-avatar" style="background:${avatarColor(e.who || "")}">${esc(who.initial)}</span>
+          <span class="hcard-who">${esc(who.label)}</span>
         </div>
-        <div class="hcard-script">${e.script}</div>
+        <div class="hcard-script">${esc(e.script)}</div>
         ${"before" in e ? `
           <div class="hcard-diff">
-            <div class="hcard-row"><span class="hcard-tag old">기존</span><span class="hcard-val">${withTarget(e.before)}</span></div>
-            <div class="hcard-row"><span class="hcard-tag new">변경</span><span class="hcard-val">${withTarget(e.after)}</span></div>
+            <div class="hcard-row"><span class="hcard-tag old">기존</span><span class="hcard-val">${valueHtml(e.before,"before")}</span></div>
+            <div class="hcard-row"><span class="hcard-tag new">변경</span><span class="hcard-val">${valueHtml(e.after,"after")}</span></div>
           </div>` : ""}
       </div>`;
   }
-  function timelineHtml(a, query) {
-    const q = (query || "").trim().toLowerCase(),
-      entries = activityLog(a).map(e => window.AssetMoves.forTarget(e,targetContext)).filter(e => window.AssetExtra.historyVisible(a,e)).filter(e => q ? (e.target && (e.target.employee || e.target.worksite) || "").toLowerCase().includes(q) : !0);
-    return entries.length ? `<div class="dtimeline">${entries.map(historyCardHtml).join("")}</div>` : '<p class="muted" style="padding:6px 0">일치하는 이력이 없습니다</p>';
+  function timelineHtml(a) {
+    // Never reverse the stored log: equal-time activities keep the save/field order in both directions.
+    const entries = activityLog(a).map((e,index) => ({e:window.AssetMoves.forTarget(e,targetContext),index}))
+      .filter(({e}) => window.AssetExtra.historyVisible(a,e))
+      .sort((x,y) => (historyDir === "asc" ? 1 : -1) * String(x.e.d).localeCompare(String(y.e.d)) || x.index-y.index);
+    return entries.length ? `<div class="dtimeline">${entries.map(({e}) => historyCardHtml(e)).join("")}</div>` : '<p class="muted" style="padding:6px 0">표시할 이력이 없습니다.</p>';
   }
+  const HISTORY_ASC_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 18V6M5 6l-3 3M5 6l3 3"/><path d="M11 7h4M11 12h7M11 17h10"/></svg>',
+    HISTORY_DESC_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 6v12M5 18l-3-3M5 18l3-3"/><path d="M11 7h10M11 12h7M11 17h4"/></svg>';
   const STOCK_PAGE_SIZE = 20;
   let stockPage = 1;
   function assignCurrentHtml(a) {
@@ -637,8 +661,8 @@
   // 대상이 달라지거나 배정이 없어진 연결을 해제하고 양쪽 이력에 원인과 함께 남긴다.
   function pruneLinks(cause) {
     window.AssetLinks.prune().forEach(([x, y]) => {
-      logActivity(x, { script: `자산 연결: 연결 해제(${cause})`, before: linkLabel(y), after: "" });
-      logActivity(y, { script: `자산 연결: 연결 해제(${cause})`, before: linkLabel(x), after: "" });
+      logActivity(x, { script: `자산 연결: 연결 해제(${cause})`, relatedAssetId:y.id, before: linkLabel(y), after: "" });
+      logActivity(y, { script: `자산 연결: 연결 해제(${cause})`, relatedAssetId:x.id, before: linkLabel(x), after: "" });
     });
   }
   function wireLinks(scope, a) {
@@ -666,8 +690,8 @@
     cb.querySelector("[data-cok]").onclick = () => {
       cb.remove();
       if (!window.AssetLinks.remove(a, b)) return toast("설정이 변경되었습니다. 잠시 후 다시 시도해주세요."), after();
-      logActivity(a, { script: "자산 연결: 연결 해제", before: linkLabel(b), after: "" });
-      logActivity(b, { script: "자산 연결: 연결 해제", before: linkLabel(a), after: "" });
+      logActivity(a, { script: "자산 연결: 연결 해제", relatedAssetId:b.id, before: linkLabel(b), after: "" });
+      logActivity(b, { script: "자산 연결: 연결 해제", relatedAssetId:a.id, before: linkLabel(a), after: "" });
       toast("연결이 해제되었습니다."), after();
     };
   }
@@ -788,8 +812,8 @@
       targets.forEach(b => {
         isNew(b) && (b.assignments = [{ ...record }], b.status = "assigned", logActivity(b, { script: "배정 관리: 신규 배정", target: record, before: "", after: window.fmtDate(d) }));
         window.AssetLinks.add(a, b);
-        logActivity(a, { script: "자산 연결: 연결", before: "", after: linkLabel(b) });
-        logActivity(b, { script: "자산 연결: 연결", before: "", after: linkLabel(a) });
+        logActivity(a, { script: "자산 연결: 연결", relatedAssetId:b.id, before: "", after: linkLabel(b) });
+        logActivity(b, { script: "자산 연결: 연결", relatedAssetId:a.id, before: "", after: linkLabel(a) });
       });
       back.remove(), toast("저장되었습니다."), render();
     };
@@ -1240,6 +1264,7 @@
  {k:'메모',v:`${memoHtml(a.note)}${window.AssetAccess.canField(a,'memo')?`<button class="icon-edit" data-memoedit aria-label="메모 수정">${IC_EDIT}</button>`:''}`}
 ].map(({k,v})=>`<div><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
     activityLog(a);
+    if (historyAssetId !== a.id) { historyAssetId=a.id; detailTab="current"; historyDir="desc"; }
     let holdCard;
     {
       holdCard = `
@@ -1250,6 +1275,12 @@
               <button data-atab="history">이력</button>
             </div>
             <div class="hactions" id="assign-actions"></div>
+            <div class="history-actions" data-history-actions hidden>
+              <div class="sort-dir-group" role="group" aria-label="이력 정렬 방향">
+                <button type="button" class="sort-dir-btn" data-history-dir="asc" aria-label="오래된순" aria-pressed="false">${HISTORY_ASC_ICON}</button>
+                <button type="button" class="sort-dir-btn" data-history-dir="desc" aria-label="최신순" aria-pressed="true">${HISTORY_DESC_ICON}</button>
+              </div>
+            </div>
           </div>
           <div id="assign-body">${assignCurrentHtml(a)}</div>
         </section>`;
@@ -1295,11 +1326,24 @@
       const body = card.querySelector("#assign-body"),
         actions = card.querySelector("#assign-actions");
       wireAssignCards(body, a);applyTargetContext(c,a);
-      card.querySelectorAll("[data-atab]").forEach(t => t.onclick = () => {
-        card.querySelectorAll("[data-atab]").forEach(x => x.classList.toggle("active", x === t));
-        const isCurrent = t.dataset.atab === "current";
-        body.innerHTML = isCurrent ? assignCurrentHtml(a) : timelineHtml(a), actions.hidden = !isCurrent, bindActs(body), isCurrent && wireAssignCards(body, a);applyTargetContext(c,a);
+      const historyActions = card.querySelector("[data-history-actions]");
+      const drawTab = () => {
+        const isCurrent = detailTab === "current";
+        card.querySelectorAll("[data-atab]").forEach(x => x.classList.toggle("active", x.dataset.atab === detailTab));
+        body.innerHTML = isCurrent ? assignCurrentHtml(a) : timelineHtml(a);
+        actions.hidden = !isCurrent; historyActions.hidden = isCurrent;
+        historyActions.querySelectorAll("[data-history-dir]").forEach(button => {
+          const active = button.dataset.historyDir === historyDir;
+          button.classList.toggle("active", active); button.setAttribute("aria-pressed", String(active));
+        });
+        bindActs(body); if (isCurrent) wireAssignCards(body,a); applyTargetContext(c,a);
+      };
+      card.querySelectorAll("[data-atab]").forEach(t => t.onclick = () => { detailTab=t.dataset.atab; drawTab(); });
+      historyActions.querySelectorAll("[data-history-dir]").forEach(button => button.onclick = () => {
+        if (historyDir === button.dataset.historyDir) return;
+        historyDir=button.dataset.historyDir; drawTab(); card.scrollTop=0;
       });
+      drawTab();
     }
     const scard = c.querySelector("#stock-card");
   }

@@ -2440,3 +2440,9 @@ table.tbl-target-full .tf-sub .tf-group-name { font-size:11px; font-weight:400; 
 @media(max-width:700px){.prototype-qa{right:8px;bottom:8px;width:224px;}.prototype-qa-body{max-height:48vh;}}
 
 .prototype-qa-current{font-size:11px;color:#345b82;margin:8px 0 0;}
+
+/* Dashboard history: icon-only direction controls, plus long history values. */
+.dsection-head .history-actions[hidden] { display: none; }
+#assign-card .hcard-row { align-items: flex-start; }
+#assign-card .hcard-val { min-width: 0; overflow-wrap: anywhere; flex-wrap: wrap; }
+body.history-capture #prototype-qa { display: none; }
