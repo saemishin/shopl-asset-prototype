@@ -297,7 +297,12 @@
   }
   function bulkActions() {
     const actions = [];
-    return canManageAssets() && actions.push("일괄 추가"), (canManageAssets() || window.DATA.categories.some(canAssignCategory)) && actions.push("일괄 배정"), window.AssetTemplates && window.AssetTemplates.usableTemplates().length && actions.push("템플릿으로 배정"), actions;
+    return canManageAssets() && actions.push("일괄 추가"), (canManageAssets() || window.DATA.categories.some(canAssignCategory)) && actions.push("일괄 배정"), actions;
+  }
+  // 현황 [자산 배정] 메뉴: 직접 배정(자산 배정 Modal)·템플릿으로 배정(D-20261102-01)
+  function assignActions() {
+    const actions = [];
+    return (canManageAssets() || window.DATA.categories.some(canAssignCategory)) && actions.push("직접 배정"), window.AssetTemplates && window.AssetTemplates.usableTemplates().length && actions.push("템플릿으로 배정"), actions;
   }
   function viewableCategories() {
     return window.DATA.categories.filter(canViewCategory);
@@ -826,7 +831,7 @@
         ${state.view === "all" ? `
         <div class="sub-actions">
           ${canManageAssets() ? '<button class="btn primary sm" id="btn-add">＋ 자산 추가</button>' : ""}
-          ${canManageAssets() || window.DATA.categories.some(canAssignCategory) ? '<button class="btn sm" id="btn-assign">＋ 자산 배정</button>' : ""}
+          ${canManageAssets() || window.DATA.categories.some(canAssignCategory) ? '<button class="btn sm" id="btn-assign">＋ 자산 배정 <span class="chev">▾</span></button>' : ""}
           ${bulkActions().length ? '<button class="btn sm" id="btn-bulk">일괄 작업 <span class="chev">▾</span></button>' : ""}
         </div>` : ""}
       </div>
@@ -939,7 +944,23 @@
         canManageAssets() && window.openAssetAddModal();
       });
       const assignButton = document.getElementById("btn-assign");
-      assignButton && (assignButton.onclick = () => window.AssetAssignment.open({members:Object.entries(MEMBER_INFO).map(([name,info]) => ({name,...info})),worksites:WS_CODE,onSaved:render,onChanged:render,toast}));
+      const openDirectAssign = () => window.AssetAssignment.open({members:Object.entries(MEMBER_INFO).map(([name,info]) => ({name,...info})),worksites:WS_CODE,onSaved:render,onChanged:render,toast});
+      assignButton && (assignButton.onclick = e => {
+        e.stopPropagation(), document.querySelectorAll(".dropdown-menu, .hover-tip").forEach(m => m.remove());
+        const actions = assignActions();
+        if (!actions.length) return;
+        const menu = document.createElement("div"), r = e.currentTarget.getBoundingClientRect();
+        menu.className = "dropdown-menu", menu.innerHTML = actions.map(label => `<button type="button" data-assign-action="${label}">${label}</button>`).join("");
+        menu.style.cssText = `position:fixed;top:${r.bottom + 4}px;right:${window.innerWidth - r.right}px;min-width:${Math.max(r.width, 160)}px`, document.body.appendChild(menu);
+        menu.querySelectorAll("button").forEach(b => b.onclick = ev => {
+          ev.stopPropagation(), menu.remove();
+          b.dataset.assignAction === "직접 배정" ? openDirectAssign() : window.AssetTemplates.openTemplateAssign(() => render());
+        });
+        setTimeout(() => {
+          const close = ev => { menu.contains(ev.target) || (menu.remove(), document.removeEventListener("click", close)); };
+          document.addEventListener("click", close);
+        });
+      });
       const bulkButton = document.getElementById("btn-bulk");
       bulkButton && (bulkButton.onclick = e => openBulkMenu(e.currentTarget));
     }
@@ -1726,11 +1747,9 @@
         if (event.stopPropagation(), b.dataset.bulkAction === "일괄 추가") {
           if (!canManageAssets()) return;
           menu.remove(), resetBulkRegister(), activeScreen = "bulk-register", render();
-        } else if (b.dataset.bulkAction === "템플릿으로 배정") {
-          menu.remove(), window.AssetTemplates.openTemplateAssign(() => render());
         } else toast("일괄 배정 화면은 기획서에서 확인해 주세요.");
       }, b.addEventListener("mouseenter", () => {
-        if (b.dataset.bulkAction === "일괄 추가" || b.dataset.bulkAction === "템플릿으로 배정") return;
+        if (b.dataset.bulkAction === "일괄 추가") return;
         tip = document.createElement("div"), tip.className = "hover-tip", tip.textContent = "PM: 기획서에서 명세 확인", document.body.appendChild(tip);
         const br = b.getBoundingClientRect();
         tip.style.cssText = `position:fixed;top:${br.top + br.height / 2}px;right:${window.innerWidth - br.left + 8}px;transform:translateY(-50%);`;
