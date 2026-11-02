@@ -46,6 +46,9 @@
   const permissionPage=mobile?file:'asset-detail.html';
   for(const [key,label] of [['manage','자산 관리'],['info','정보 수정만'],['state','상태 관리만'],['both','정보 수정·상태 관리'],['view','조회만'],['private','비공개 정보 숨김']])add(1,`access-${key}`,label,permissionPage,{qa:'access',scenario:key,id:'A001'});
   add(1,'permission-none','조회 가능한 분류 없음','assets.html',{qa:'permission',scenario:'none'});
+  add(1,'category-scope-partial','분류 트리 일부 조회','category.html',{qa:'permission',scenario:'partial',manage:'0',role:'leader'});
+  add(1,'category-scope-empty','자산 0건 소분류만 조회','category.html',{qa:'permission',scenario:'empty',manage:'0',role:'leader'});
+  add(1,'category-scope-none','분류 조회 권한 없음·현황 복귀','category.html',{qa:'permission',scenario:'none',manage:'0',role:'leader'});
   add(1,'permission-partial','일부 분류만 조회','assets.html',{qa:'permission',scenario:'partial'});
   add(2,'empty-assets','등록된 자산 없음','assets.html',{qa:'empty-assets'});
   add(2,'empty-category','대분류·소분류 없음','category.html',{qa:'empty-category'});

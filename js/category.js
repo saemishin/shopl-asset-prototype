@@ -152,12 +152,13 @@
     return [...items].sort((a, b) => String(a.assetNo || "").localeCompare(String(b.assetNo || ""))).find(a => window.assetPhotos(a).length) || items[0];
   }
   const collapsedGroups = /* @__PURE__ */new Set();
+  const canReadCategory = cat => window.AssetAccess.canView({group:cat.group, sub:cat.sub});
   function groupsOf() {
     const order = [],
       map = {};
-    return categories.forEach(c => {
+    return categories.filter(canReadCategory).forEach(c => {
       map[c.group] || (map[c.group] = [], order.push(c.group)), map[c.group].push(c);
-    }), (window.DATA.emptyGroups || []).forEach(g => {
+    }), (window.hasPrototypeAssetManagePermission() ? window.DATA.emptyGroups || [] : []).forEach(g => {
       map[g] || (map[g] = [], order.push(g));
     }), order.map(group => ({
       group,
@@ -254,7 +255,7 @@
     assetEmptyHtml = () => `
     <div class="cat-asset-empty">
       <p class="muted">등록된 자산이 없습니다.</p>
-      <button class="btn sm" data-add-asset>자산 추가</button><button class="btn sm" data-bulk-add>일괄 추가</button>
+      ${window.hasPrototypeAssetManagePermission() ? '<button class="btn sm" data-add-asset>자산 추가</button><button class="btn sm" data-bulk-add>일괄 추가</button>' : ""}
     </div>`;
   function assetSectionHtml(cat) {
     {
@@ -1235,9 +1236,9 @@ function openManagementMenu(button,sel) {
       }, refresh();
     }
     const bulkButton=c.querySelector('[data-bulk-add]');
-    if(bulkButton)bulkButton.onclick=()=>{sessionStorage.setItem('asset-bulk-origin',JSON.stringify({group:cat.group,sub:cat.sub}));location.href='assets.html?screen=bulk-register';};
+    if(bulkButton)bulkButton.onclick=()=>{if(!window.hasPrototypeAssetManagePermission())return;sessionStorage.setItem('asset-bulk-origin',JSON.stringify({group:cat.group,sub:cat.sub}));location.href='assets.html?screen=bulk-register';};
     const addAssetBtn = c.querySelector("[data-add-asset]");
-    addAssetBtn && (addAssetBtn.onclick = () => window.openAssetAddModal({
+    addAssetBtn && (addAssetBtn.onclick = () => window.hasPrototypeAssetManagePermission() && window.openAssetAddModal({
       type: cat.type,
       group: cat.group,
       sub: cat.sub,
@@ -1258,9 +1259,15 @@ function openManagementMenu(button,sel) {
       });
     }
     const c = document.getElementById("content"),
-      groups = groupsOf();
-    (!sel || !categories.some(x => x.group === sel.group && x.sub === sel.sub)) && (sel = firstSelectable(groups));
-    const cat = sel ? categories.find(x => x.group === sel.group && x.sub === sel.sub) : null;
+      groups = groupsOf(), visibleCategories = groups.flatMap(g => g.subs);
+    if (!window.hasPrototypeAssetManagePermission() && !visibleCategories.length) {
+      const destination = new URL("assets.html" + location.search, location.href);
+      ["group", "sub", "review"].forEach(key => destination.searchParams.delete(key));
+      location.replace(destination.href);
+      return;
+    }
+    (!sel || !visibleCategories.some(x => x.group === sel.group && x.sub === sel.sub)) && (sel = firstSelectable(groups));
+    const cat = sel ? visibleCategories.find(x => x.group === sel.group && x.sub === sel.sub) : null;
     c.innerHTML = `
       <div class="tabs">
         <a href="assets.html">현황</a>
