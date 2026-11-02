@@ -17,7 +17,7 @@
     return `${window.fmtDate(d)} <span class="badge ${c}">${t}</span>`;
   }
   const chips = arr => arr && arr.length ? arr.map(l => `<span class="tag">${l}</span>`).join("") : '<span class="muted">—</span>';
-  const targetParams=new URLSearchParams(location.search), targetContext=["employee","worksite"].includes(targetParams.get("targetType"))?{type:targetParams.get("targetType"),value:targetParams.get("targetValue")}:null;
+  // 대시보드는 진입 위치와 관계없이 같은 자산 상세를 제공한다.
   function canManageAssets() { return window.hasPrototypeAssetManagePermission(); }
   let historyDir = "desc", detailTab = "current", historyAssetId = null;
   const memoHtml = note => window.AssetMemo.render(note),
@@ -180,7 +180,7 @@
   function handleLostRecover(a) {
     openStatusConfirmModal("분실 회수 처리하시겠습니까?", "분실 회수 시 배정 여부에 따라 배정 중 또는 배정 가능 상태로 돌아갑니다.", () => applyStatusChange(a, "상태 변경: 분실 회수", deriveReturnStatus(a)));
   }
-  function openDisposeModal(a) {
+  function openDisposeModal(a, after = render) {
     const cb = document.createElement("div");
     cb.className = "modal-back", cb.style.zIndex = 340, cb.innerHTML = `
       <div class="modal" style="width:380px">
@@ -210,7 +210,7 @@
         script: "상태 변경: 폐기 처리",
         before,
         after: STATUS_LABEL[a.status][0]
-      }), pruneLinks("폐기"), cb.remove(), toast("폐기 처리되었습니다."), render();
+      }), pruneLinks("폐기"), cb.remove(), toast("폐기 처리되었습니다."), after();
     }, document.body.appendChild(cb), input.focus();
   }
   const STATUS_ACTION_HANDLERS = {
@@ -276,7 +276,7 @@
     });
   }
   const WARN_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 9v4M12 16.5h.01M10.3 3.9 2.5 17.5a1.7 1.7 0 0 0 1.47 2.55h16.06a1.7 1.7 0 0 0 1.47-2.55L13.7 3.9a1.7 1.7 0 0 0-2.94 0z"/></svg>';
-  function openDeleteAssetModal(a) {
+  function openDeleteAssetModal(a, after) {
     const cb = document.createElement("div");
     cb.className = "modal-back", cb.style.zIndex = 340, cb.innerHTML = `
       <div class="modal" style="width:380px">
@@ -300,8 +300,9 @@
       okBtn.disabled = !confirmed();
     }), okBtn.onclick = () => {
       if (!confirmed()) return;
+      if (!canManageAssets()) { cb.remove(); toast("자산 관리 권한이 없습니다."); after?.(); return; }
       const deleted = window.archiveDeletedAsset(a, "dana");
-      sessionStorage.setItem("justDeletedAssetRecord", JSON.stringify(deleted)), sessionStorage.setItem("justDeletedAssetId", a.id), sessionStorage.setItem("pendingToast", "삭제되었습니다."), location.href = "assets.html";
+      if (after) { cb.remove(); toast("삭제되었습니다."); after(); } else { sessionStorage.setItem("justDeletedAssetRecord", JSON.stringify(deleted)), sessionStorage.setItem("justDeletedAssetId", a.id), sessionStorage.setItem("pendingToast", "삭제되었습니다."), location.href = "assets.html"; }
     }, document.body.appendChild(cb), input.focus();
   }
   function moreDropdown(anchor, items, a) {
@@ -490,7 +491,7 @@
   }
   function timelineHtml(a) {
     // Never reverse the stored log: equal-time activities keep the save/field order in both directions.
-    const entries = activityLog(a).map((e,index) => ({e:window.AssetMoves.forTarget(e,targetContext),index}))
+    const entries = activityLog(a).map((e,index) => ({e,index}))
       .filter(({e}) => window.AssetExtra.historyVisible(a,e))
       .sort((x,y) => (historyDir === "asc" ? 1 : -1) * String(x.e.d).localeCompare(String(y.e.d)) || x.index-y.index);
     return entries.length ? `<div class="dtimeline">${entries.map(({e}) => historyCardHtml(e)).join("")}</div>` : '<p class="muted" style="padding:6px 0">표시할 이력이 없습니다.</p>';
@@ -510,7 +511,7 @@
       idx
     }) => `
       <div class="acard" data-idx="${idx}">
-        ${typeBadge(x)}${targetContext&&x[targetContext.type]===targetContext.value?'<span class="badge assigned">선택 대상</span>':""}
+        ${typeBadge(x)}
         <div class="acard-id">${assignIdentity(x)}</div>
         <div class="acard-foot">
           <span class="acard-date">배정일 <b>${window.fmtDate(x.since)}</b><button class="icon-edit" data-dateedit aria-label="배정일 수정" title="배정일 수정">${IC_EDIT}</button></span>
@@ -521,14 +522,8 @@
         </div>
       </div>`).join("")}</div>${linksHtml(a)}` : `<div class="assign-empty"><p class="muted">배정 대상이 없습니다.</p>${a.status === "disposed" ? "" : '<button class="btn sm" data-assign-new>배정</button>'}</div>`;
   }
-  function applyTargetContext(scope,a){
+  function applyDetailPermissions(scope,a){
     if(!window.AssetAccess.canState(a)){scope.querySelectorAll('[data-dateedit],.acard-actions,#assign-actions,[data-assign-new]').forEach(el=>el.remove());}
-    if(!targetContext)return;
-    const idx=(a.assignments||[]).findIndex(x=>x[targetContext.type]===targetContext.value);
-    if(idx<0){scope.querySelector('.dgrid').innerHTML='<p class="muted">설정이 변경되었습니다. 잠시 후 다시 시도해주세요.</p>';return;}
-    scope.querySelectorAll('.navbtns').forEach(x=>x.remove());
-    scope.querySelectorAll('.acard[data-idx]').forEach(card=>{if(+card.dataset.idx!==idx)card.querySelectorAll('[data-act],[data-dateedit]').forEach(x=>x.remove());});
-    const head=scope.querySelector('.dhead-sub');if(head)head.insertAdjacentHTML('beforeend',`<div>${targetContext.value} · 배정일 ${window.fmtDate(a.assignments[idx].since)}</div>`);
   }
   const IC_CAL = '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>';
   function dateFieldHtml(initialIso) {
@@ -796,21 +791,21 @@
     };
     return { html, wire, plan, get mode() { return mode; }, valid: () => !hasLinks || mode !== "all" || window.AssetLinks.togetherPlan(a).signature === plan.signature };
   }
-  function returnAssignment(a, idx) {
+  function returnAssignment(a, idx, after = render) {
     const old = a.assignments[idx], choice = linkedAssetChoice(a, "return"), back = document.createElement("div");
     back.className = "modal-back";
     back.innerHTML = `<div class="modal scroll-body" style="width:460px"><h3>반납</h3><div class="body">${assetAssignmentSummaryHtml(a, old)}<div class="ra-current"><div class="perm-info-note">${INFO_ICON}<span>현재 배정을 종료합니다.</span></div></div>${choice.html()}</div><div class="foot"><button class="btn" data-close>취소</button><button class="btn primary" data-save>저장</button></div></div>`;
     document.body.appendChild(back); choice.wire(back);
     back.querySelector("[data-close]").onclick = () => back.remove();
     back.querySelector("[data-save]").onclick = () => confirmModal("반납하시겠습니까?", () => {
-      if (!choice.valid()) { back.remove(); toast("설정이 변경되었습니다. 잠시 후 다시 시도해주세요."); render(); return; }
+      if (!choice.valid()) { back.remove(); toast("설정이 변경되었습니다. 잠시 후 다시 시도해주세요."); after(); return; }
       const returnOne = (x, note) => {
         const rec = x.assignments[0];
         x.assignments = []; x.status === "assigned" && (x.status = "stock");
         logActivity(x, { script: "배정 관리: 반납" + (note || ""), target: rec, before: window.fmtDate(rec.since), after: "" });
       };
       (choice.mode === "all" ? choice.plan.move : [a]).forEach(x => returnOne(x, x === a ? "" : ` (${a.product} · ${a.assetNo}과 함께)`));
-      back.remove(); pruneLinks("반납"); toast("반납되었습니다."); render();
+      back.remove(); pruneLinks("반납"); toast("반납되었습니다."); after();
     });
   }
   function openAssignAddModal(a) {
@@ -903,7 +898,7 @@
       });
     };
   }
-  function openReassignModal(a, idx) {
+  function openReassignModal(a, idx, after = render) {
     const old = a.assignments[idx], choice = linkedAssetChoice(a, "reassign");
     let picked = null;
     const draftTarget = {
@@ -992,12 +987,12 @@
         // Materialize old history before replacing the active record.
         items.forEach(activityLog);
         try { window.AssetMoves.moveBatch(items,record,todayStr(),undefined,logActivity,a); }
-        catch (_) { toast("설정이 변경되었습니다. 잠시 후 다시 시도해주세요."); render(); return; }
+        catch (_) { toast("설정이 변경되었습니다. 잠시 후 다시 시도해주세요."); after(); return; }
         plan && plan.cutPairs.forEach(([x,y]) => window.AssetLinks.remove({id:x},{id:y}));
-        back.remove(); pruneLinks("이동"); toast("이동되었습니다."); render();
+        back.remove(); pruneLinks("이동"); toast("이동되었습니다."); after();
       };
       confirmModal("이동하시겠습니까?", () => {
-        if (!choice.valid()) { back.remove(); toast("설정이 변경되었습니다. 잠시 후 다시 시도해주세요."); render(); return; }
+        if (!choice.valid()) { back.remove(); toast("설정이 변경되었습니다. 잠시 후 다시 시도해주세요."); after(); return; }
         move(choice.mode === "all" ? choice.plan.move : [a], choice.mode === "all" ? choice.plan : null);
       });
     };
@@ -1210,7 +1205,7 @@
       subMeta = `<div>${statusBadge}</div>${a.assetNo ? `<div style="margin-top:5px">고유관리번호 <b>${a.assetNo}</b></div>` : ""}`,
       qrBtn = '<button class="btn sm icon-only" data-qr aria-label="QR 라벨" title="QR 라벨"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM19 14h2v2h-2zM14 19h2v2h-2zM19 19h2v2h-2z"/></svg></button>',
       mgrBtn = '<button class="btn sm icon-only corner" data-more aria-label="자산관리" title="자산관리"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></button>',
-      moreItems = [...(window.AssetAccess.canInfo(a)?["자산 수정"]:[]),...(!targetContext&&canManageAssets()?["자산 삭제"]:[])],
+      moreItems = [...(window.AssetAccess.canInfo(a)?["자산 수정"]:[]),...(canManageAssets()?["자산 삭제"]:[])],
       hidden = ((window.DATA.categories || []).find(x => x.group === a.group && x.sub === a.sub) || {}).hiddenFields || [],
       kv = [
  {k:'분류',v:`${a.group} › ${a.sub}`},
@@ -1281,7 +1276,7 @@
     if (card) {
       const body = card.querySelector("#assign-body"),
         actions = card.querySelector("#assign-actions");
-      wireAssignCards(body, a);applyTargetContext(c,a);
+      wireAssignCards(body, a);applyDetailPermissions(c,a);
       const historyActions = card.querySelector("[data-history-actions]");
       const drawTab = () => {
         const isCurrent = detailTab === "current";
@@ -1292,7 +1287,7 @@
           const active = button.dataset.historyDir === historyDir;
           button.classList.toggle("active", active); button.setAttribute("aria-pressed", String(active));
         });
-        bindActs(body); if (isCurrent) wireAssignCards(body,a); applyTargetContext(c,a);
+        bindActs(body); if (isCurrent) wireAssignCards(body,a); applyDetailPermissions(c,a);
       };
       card.querySelectorAll("[data-atab]").forEach(t => t.onclick = () => { detailTab=t.dataset.atab; drawTab(); });
       historyActions.querySelectorAll("[data-history-dir]").forEach(button => button.onclick = () => {
@@ -1303,6 +1298,16 @@
     }
     const scard = c.querySelector("#stock-card");
   }
+  window.AssetRowActions = {
+    open(kind,a,after) {
+      const canManage=canManageAssets(), canState=window.AssetAccess.canState(a);
+      if(!a || a.deleted_at || (['move','return'].includes(kind) ? !canState || !(a.assignments||[]).length : !canManage)) { toast("설정이 변경되었습니다. 잠시 후 다시 시도해주세요."); after?.(); return; }
+      if(kind==='move')openReassignModal(a,0,after);
+      if(kind==='return')returnAssignment(a,0,after);
+      if(kind==='dispose' && a.status!=='disposed')openDisposeModal(a,after);
+      if(kind==='delete')openDeleteAssetModal(a,after);
+    }
+  };
   window.DetailScreen = {
     render
   };

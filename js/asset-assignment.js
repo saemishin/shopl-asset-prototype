@@ -1,4 +1,4 @@
-// 현황 > 전체: 자산 → 대상 → 배정일. 선택 화면의 적용은 초안만 변경한다.
+// 직접 배정과 구성원·근무지 상세의 대상 고정 배정. 선택 적용은 초안만 변경한다.
 (() => {
   const esc = value => window.AssetExtra.esc(value), TODAY = '2026-09-04';
   const activeTarget = (kind,name) => !!name && !['retired','resigned','inactive'].includes(window.DATA.targetStatuses?.[kind]?.[name]);
@@ -35,9 +35,10 @@
       throw error;
     }
   }
-  function open({members,worksites,onSaved,onChanged,toast}) {
-    let selected = [], kind = null, dateText = '';
+  function open({members = [],worksites = {},fixedTarget = null,onSaved,onChanged,toast}) {
+    let selected = [], kind = fixedTarget?.type || null, dateText = '';
     const target = {employee:null,worksite:null};
+    if(fixedTarget){target[fixedTarget.type]=fixedTarget.value; if(!activeTarget(fixedTarget.type,fixedTarget.value)){toast('설정이 변경되었습니다. 잠시 후 다시 시도해주세요.');return;}}
     const back = modal('자산 배정','<div data-assignment-body></div>','<button class="btn" data-assignment-cancel>취소</button><button class="btn primary" data-assignment-save disabled>저장</button>');
     const body = back.querySelector('[data-assignment-body]'), save = back.querySelector('[data-assignment-save]');
     const candidates = k => (k === 'employee' ? members.map(m=>({...m,value:m.name,search:[m.name,m.empNo,m.phone]})) : Object.entries(worksites).map(([name,code])=>({name,value:name,code,search:[name,code]}))).filter(x=>activeTarget(k,x.value)).sort((a,b)=>a.name.localeCompare(b.name,'ko'));
@@ -57,7 +58,9 @@
     }
     const sync = () => {save.disabled = !(selected.length && kind && target[kind] && validDate(dateText));};
     function draw() {
-      body.innerHTML = `<div class="field"><label>자산</label><div class="link-search-field"><input class="picker-search" type="text" readonly placeholder="선택" value="${esc(selected[0]?.product||'')}" aria-label="배정할 자산 선택" aria-haspopup="dialog" data-assignment-assets>${selected.length>1?`<span class="link-search-count">+${selected.length-1}</span>`:''}</div></div><div class="field"><label>배정 대상</label>${[['employee','구성원'],['worksite','근무지']].map(([k,label])=>`<label class="radio-row"><input type="radio" name="assignment-kind" value="${k}"${kind===k?' checked':''}><span>${label}</span></label>${kind===k?`<div class="perm-target-wrap">${target[k]?`<div class="aa-target-selected" data-assignment-target role="button" tabindex="0" aria-label="배정 대상 다시 선택"><span class="perm-chip">${esc(target[k])}</span><button type="button" class="aa-target-x" aria-label="배정 대상 선택 해제" data-assignment-clear>×</button></div>`:'<button type="button" class="perm-target-btn" data-assignment-target><span class="muted">선택</span><span class="chev">›</span></button>'}</div>`:''}`).join('')}</div><div class="field"><label>배정일</label><div class="dfield"><input type="text" inputmode="numeric" placeholder="YYYY.MM.DD" maxlength="10" value="${esc(dateText)}" aria-label="배정일" data-assignment-date><span class="dfield-pick"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><input type="date" min="1926-01-01" max="${TODAY}" data-assignment-calendar tabindex="-1"></span></div><p class="field-err" data-assignment-date-error hidden>유효한 날짜가 아닙니다.</p></div>`;
+      const fixedCard = fixedTarget ? `<div class="field"><label>배정 대상</label><div class="aa-asset-summary target-assignment-summary">${fixedTarget.type === 'worksite' ? '<span class="acard-avatar ws"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 20V9.5L12 4l8 5.5V20"/><path d="M9.5 20v-5h5v5"/></svg></span>' : `<span class="picker-avatar" style="background:${esc(fixedTarget.color || '#5b8def')}">${esc(fixedTarget.value[0])}</span>`}<div class="aa-asset-summary-main"><strong>${esc(fixedTarget.value)}</strong><span>${esc(fixedTarget.subtitle || '')}</span></div></div></div>` : '';
+      const assetsField = `<div class="field"><label>자산</label><div class="link-search-field"><input class="picker-search" type="text" readonly placeholder="선택" value="${esc(selected[0]?.product||'')}" aria-label="배정할 자산 선택" aria-haspopup="dialog" data-assignment-assets>${selected.length>1?`<span class="link-search-count">+${selected.length-1}</span>`:''}</div></div>`, targetFields = `<div class="field"><label>배정 대상</label>${[['employee','구성원'],['worksite','근무지']].map(([k,label])=>`<label class="radio-row"><input type="radio" name="assignment-kind" value="${k}"${kind===k?' checked':''}><span>${label}</span></label>${kind===k?`<div class="perm-target-wrap">${target[k]?`<div class="aa-target-selected" data-assignment-target role="button" tabindex="0" aria-label="배정 대상 다시 선택"><span class="perm-chip">${esc(target[k])}</span><button type="button" class="aa-target-x" aria-label="배정 대상 선택 해제" data-assignment-clear>×</button></div>`:'<button type="button" class="perm-target-btn" data-assignment-target><span class="muted">선택</span><span class="chev">›</span></button>'}</div>`:''}`).join('')}</div>`, dateField = `<div class="field"><label>배정일</label><div class="dfield"><input type="text" inputmode="numeric" placeholder="YYYY.MM.DD" maxlength="10" value="${esc(dateText)}" aria-label="배정일" data-assignment-date><span class="dfield-pick"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><input type="date" min="1926-01-01" max="${TODAY}" data-assignment-calendar tabindex="-1"></span></div><p class="field-err" data-assignment-date-error hidden>유효한 날짜가 아닙니다.</p></div>`;
+      body.innerHTML = fixedCard + assetsField + (fixedTarget ? '' : targetFields) + dateField;
       const openAssets=()=>window.AssetPicker.open({initial:selected,onApply:items=>{selected=items; draw();}}), input=body.querySelector('[data-assignment-assets]');
       input.onclick=openAssets; input.onkeydown=e=>{if(['Enter',' '].includes(e.key)){e.preventDefault();openAssets();}};
       body.querySelectorAll('[name="assignment-kind"]').forEach(r=>r.onchange=()=>{kind=r.value; draw();});
@@ -72,7 +75,7 @@
       sync();
     }
     back.querySelector('[data-assignment-cancel]').onclick=()=>{
-      if(selected.length || kind || Object.values(target).some(Boolean) || dateText.trim()) confirm('취소하시겠습니까?','취소 시 편집한 내용이 저장되지 않습니다.',()=>back.remove());
+      if(selected.length || (!fixedTarget && (kind || Object.values(target).some(Boolean))) || dateText.trim()) confirm('취소하시겠습니까?','취소 시 편집한 내용이 저장되지 않습니다.',()=>back.remove());
       else back.remove();
     };
     save.onclick=()=>{

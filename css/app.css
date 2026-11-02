@@ -2499,3 +2499,10 @@ body.history-capture #prototype-qa { display: none; }
 
 /* 필요 개수 감소 후에도 선택 자산은 보존하고 필드 라인만 오류로 표시한다. */
 .tpl-assignment-slot .picker-search.tpl-selection-error { border-color:var(--danger); }
+
+/* 구성원·근무지 자산: 행 단위 작업 */
+.target-asset-table .target-action-cell { width:48px; min-width:48px; text-align:center; }
+.target-more { width:30px; height:30px; padding:5px; }
+.target-more svg { width:18px; height:18px; }
+.target-assets .countrow .right { display:flex; align-items:center; gap:8px; }
+.target-assignment-summary .picker-avatar { flex:none; }

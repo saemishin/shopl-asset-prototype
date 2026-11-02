@@ -32,6 +32,7 @@
   function collectItems(name) {
     const items = [];
     return assets.forEach(a => {
+      if(a.deleted_at || !window.AssetAccess.canView(a))return;
       (a.assignments || []).forEach(x => {
         x.worksite === name && items.push({
           sub: a.sub,
@@ -56,7 +57,13 @@
   function wireAssetSearch(c) {
   const host=c.querySelector('.target-assets');if(!host)return;
   const name=new URLSearchParams(location.search).get('name')||"강남점";
-  window.TargetAssets.wire(host,window.__targetAssetItems||[],id=>'asset-detail.html?id='+id+'&targetType=worksite&targetValue='+encodeURIComponent(name));
+  window.TargetAssets.wire(host,()=>collectItems(name),id=>'asset-detail.html?id='+id,{
+    download:true,
+    canAssign:()=>!['retired','resigned','inactive'].includes(window.DATA.targetStatuses?.worksite?.[name]) && window.DATA.categories.some(cat=>window.AssetAccess.canState({...cat,status:'stock'})),
+    onAssign:refresh=>window.AssetAssignment.open({worksites:{[name]:WS_CODE[name]||''},fixedTarget:{type:'worksite',value:name,subtitle:WS_CODE[name]},onSaved:refresh,onChanged:refresh,toast}),
+    rowActions:a=>[...(window.AssetAccess.canState(a)&&a.assignments?.length?[{key:'move',label:'이동'},{key:'return',label:'반납'}]:[]),...(window.hasPrototypeAssetManagePermission()?[...(a.status!=='disposed'?[{key:'dispose',label:'폐기',danger:true}]:[]),{key:'delete',label:'삭제',danger:true}]:[])],
+    onAction:(kind,a,refresh)=>window.AssetRowActions.open(kind,a,refresh)
+  });
 }
 
   function render() {

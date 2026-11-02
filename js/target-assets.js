@@ -39,16 +39,17 @@
   const expiryCell = d => d ? `${window.fmtDate(d)} <span class="badge exp-${expiryKey(d)}">${EXP_LABEL[expiryKey(d)]}</span>` : '<span class="muted">—</span>';
   const labelsCell = labels => labels && labels.length ? labels.map(l => `<span class="tag">${esc(l)}</span>`).join("") : '<span class="muted">—</span>';
 
-  function wire(host, items, openUrl) {
+  function wire(host, items, openUrl, options = {}) {
+    const readItems = () => (typeof items === "function" ? items() : items).filter(x => !x.asset.deleted_at);
     const state = { q: "", key: "since", dir: "desc", page: 1, size: 20, filters: { categories: [], statuses: [] } };
     const tools = host.querySelector("[data-target-tools]"), table = host.querySelector("[data-target-table]"), pager = host.querySelector("[data-target-pager]");
     const categoryValues = () => window.DATA.categories
-      .filter(x => !window.AssetPermissionQa || !window.AssetPermissionQa.canViewCategory || window.AssetPermissionQa.canViewCategory(x))
+      .filter(x => window.AssetAccess.canView(x) || readItems().some(it => it.asset.group === x.group && it.asset.sub === x.sub))
       .map(x => `${x.group}/${x.sub}`);
 
     function result() {
       const f = state.filters;
-      return items.filter(x => {
+      return readItems().filter(x => {
         const a = x.asset;
         return (!f.categories.length || f.categories.includes(`${a.group}/${a.sub}`)) &&
           (!f.statuses.length || f.statuses.includes(a.status)) &&
@@ -83,13 +84,16 @@
           </div>
           <button class="filter-btn ${n ? "set" : ""}" data-filter>▤ 필터${n ? ` <b>${n}</b>` : ""}</button>
           <div class="right">
-            <div class="searchbox${state.q ? " has-term" : ""}">
+            <div class="searchbox${state.q ? " has-term" : ""}"${!readItems().length && !state.q && !activeCount() ? ' style="display:none"' : ""}>
               <input class="search${state.q ? " expanded" : ""}" data-search placeholder="${state.q ? "품목명, 고유관리번호" : "검색"}" value="${esc(state.q)}">
               <button class="search-clear" data-search-clear type="button" aria-label="검색어 지우기">✕</button>
             </div>
+            ${options.canAssign?.() ? '<button class="btn primary" data-target-assign>배정</button>' : ''}
+            ${options.download ? `<button class="btn" data-target-download${count ? '' : ' disabled'}>다운로드</button>` : ''}
           </div>
         </div>
         ${chips.length ? `<div class="filterbar"><button class="filter-reset" data-filter-reset aria-label="필터 전체 해제">${RESET_ICON}</button>${chips.map(c => `<span class="fchip">${esc(c.label)}<button data-clear="${c.k}" data-value="${esc(c.v)}">✕</button></span>`).join("")}</div>` : ""}`;
+      tools.querySelector("[data-target-assign]")?.addEventListener("click", () => options.onAssign(draw));
       const search = tools.querySelector("[data-search]");
       search.oninput = e => { state.q = e.target.value.trim().toLowerCase(); state.page = 1; draw(true); };
       tools.querySelector("[data-search-clear]").onclick = () => { state.q = ""; state.page = 1; draw(); tools.querySelector("[data-search]").focus(); };
@@ -133,15 +137,18 @@
           <td>${labelsCell(a.labels)}</td>
           <td class="c">${window.AssetMemo.has(a.note) ? `<button type="button" class="memo-flag memo-view-btn" data-note="${a.id}" aria-label="메모 보기">${MEMO_ICON}</button>` : '<span class="muted">—</span>'}</td>
           <td class="c">${(n => n ? n : '<span class="muted">—</span>')(window.AssetLinks ? window.AssetLinks.view(a).visible.length : 0)}</td>
+          ${options.rowActions ? `<td class="target-action-cell">${options.rowActions(a).length ? `<button type="button" class="btn icon-only target-more" data-target-more="${esc(a.id)}" aria-label="${esc(a.product)} ${esc(a.assetNo)} 더보기"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg></button>` : ''}</td>` : ''}
         </tr>`;
       }).join("");
-      const emptyMsg = items.length ? "결과가 없습니다." : "배정 중인 자산이 없습니다.";
-      table.innerHTML = `<div class="table-wrap"><table class="target-asset-table"><thead><tr><th>분류</th><th>품목명</th><th>고유관리번호</th><th>상태</th><th>배정일</th><th>유효기한</th><th>태그</th><th class="c">메모</th><th class="c">연결된 자산</th></tr></thead><tbody>${rows || `<tr><td colspan="9" style="text-align:center;color:var(--text-mut);padding:32px">${emptyMsg}</td></tr>`}</tbody></table></div>`;
+      const emptyMsg = readItems().length ? "결과가 없습니다." : "배정 중인 자산이 없습니다.";
+      table.innerHTML = `<div class="table-wrap"><table class="target-asset-table"><thead><tr><th>분류</th><th>품목명</th><th>고유관리번호</th><th>상태</th><th>배정일</th><th>유효기한</th><th>태그</th><th class="c">메모</th><th class="c">연결된 자산</th>${options.rowActions ? '<th class="target-action-cell" aria-label="자산 작업"></th>' : ""}</tr></thead><tbody>${rows || `<tr><td colspan="${options.rowActions ? 10 : 9}" style="text-align:center;color:var(--text-mut);padding:32px">${emptyMsg}</td></tr>`}</tbody></table></div>`;
       table.querySelectorAll("[data-target-asset]").forEach(row => row.onclick = e => {
         // 메모 아이콘은 행 클릭과 분리해 조회 Modal만 연다(바깥 클릭·[X]로 닫음).
+        const more = e.target.closest('[data-target-more]');
+        if(more){e.stopPropagation();openActionMenu(more,readItems().find(x=>x.asset.id===more.dataset.targetMore).asset);return;}
         const note = e.target.closest("[data-note]");
         if (note) {
-          const a = items.find(x => x.asset.id === note.dataset.note).asset, view = document.createElement("div");
+          const a = readItems().find(x => x.asset.id === note.dataset.note).asset, view = document.createElement("div");
           view.className = "modal-back";
           view.innerHTML = `<div class="modal help-modal"><div class="help-modal-head"><h3>메모</h3><button class="btn" data-close aria-label="닫기">×</button></div><div class="body">${window.AssetMemo.render(a.note)}</div></div>`;
           document.body.appendChild(view);
@@ -152,6 +159,16 @@
         window.open(openUrl(row.dataset.targetAsset), "_blank", "noopener");
       });
       drawPager(list.length);
+    }
+
+    function openActionMenu(anchor,a) {
+      document.querySelectorAll('.dropdown-menu').forEach(m=>m.remove());
+      const menu=document.createElement('div');menu.className='dropdown-menu';
+      menu.innerHTML=options.rowActions(a).map(x=>`<button type="button" data-row-action="${x.key}"${x.danger?' class="danger"':''}>${esc(x.label)}</button>`).join('');
+      const rect=anchor.getBoundingClientRect();menu.style.cssText=`position:fixed;top:${rect.bottom+4}px;right:${Math.max(12,innerWidth-rect.right)}px;min-width:132px;z-index:200`;
+      document.body.appendChild(menu);
+      menu.querySelectorAll('[data-row-action]').forEach(b=>b.onclick=()=>{menu.remove();options.onAction(b.dataset.rowAction,a,draw);});
+      setTimeout(()=>{const close=e=>{if(!menu.contains(e.target)){menu.remove();document.removeEventListener('click',close);}};document.addEventListener('click',close);});
     }
 
     function openSortMenu(anchor) {
