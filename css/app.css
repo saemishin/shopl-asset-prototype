@@ -734,6 +734,11 @@ button.usebullet { background: var(--panel); font: inherit; cursor: pointer; }
 .aa-asset-summary-main { flex:1; min-width:0; display:flex; flex-direction:column; gap:4px; overflow-wrap:anywhere; }
 .aa-asset-summary-main strong { font-size:14px; font-weight:600; }
 .aa-asset-summary-main span { font-size:12px; color:var(--text-mut); }
+.asset-assignment-summary { border:1px solid var(--line); border-radius:10px; background:var(--bg-soft, #f7f8fa); margin-bottom:18px; overflow:hidden; }
+.asset-assignment-summary .aa-asset-summary { border:0; border-radius:0; margin:0; background:transparent; }
+.asset-assignment-current { display:flex; flex-direction:column; gap:10px; margin:0 12px; padding:12px 0; border-top:1px solid var(--line); }
+.asset-assignment-current .acard-id { min-width:0; overflow-wrap:anywhere; }
+.asset-assignment-current .acard-id .badge { margin-left:auto; flex:none; }
 .aa-target-selected {
   width: 100%; min-height: 32px; display: flex; align-items: center; gap: 8px;
   padding: 5px 6px 5px 10px; border: 1px solid var(--line-strong); border-radius: var(--radius);
@@ -2336,16 +2341,43 @@ fieldset.asset-fixed-inputs{border:0;padding:0;margin:0;min-width:0;}
 .link-cand.on { border-color:var(--primary, #3b6cf6); background:#f5f8ff; }
 .link-cand .link-row-main { flex:1; }
 .link-date { margin:12px 0 0; }
+.link-cut-pair { display:flex; flex-direction:column; gap:10px; margin-bottom:12px; }
+.link-cut-pair .aa-asset-summary { margin:0; }
 .mlink-help { margin:6px 0 0; font-size:12px; color:var(--text-mut); }
 .mlink-date { margin-top:14px; }
 .mlink-date label { display:block; font-size:13px; font-weight:600; margin-bottom:6px; }
 .mlink-date input[type=date] { width:100%; height:40px; border:1px solid var(--line-strong); border-radius:10px; padding:0 12px; background:#fff; }
-/* 자산 연결 Modal 구성(배정 대상 → 연결되지 않은 자산 → 배정 가능 자산 검색) */
+/* 자산 연결 Modal: 현재 자산/배정 → 연결 가능 자산 → 새 배정 및 연결 */
 .modal.link-add-modal { width:480px; }
+.modal.link-select-modal { width:min(900px,calc(100vw - 48px)); }
+.link-select-modal .body { overflow:hidden; }
+.link-select-columns { display:grid; grid-template-columns:minmax(0,1.1fr) minmax(0,1fr); gap:18px; }
+.link-select-pane { min-width:0; display:flex; flex-direction:column; border:1px solid var(--line); border-radius:8px; overflow:hidden; }
+.link-select-tools { display:flex; flex-wrap:wrap; gap:8px; padding:12px; border-bottom:1px solid var(--line); }
+.link-select-tools .btn { max-width:100%; font-size:12px; }
+.link-select-tools .picker-search { width:100%; margin:0; }
+.link-select-pane-head { padding:12px; border-bottom:1px solid var(--line); font-size:13px; font-weight:600; }
+.link-select-pane-head b { color:var(--primary); }
+.link-select-scroll { height:340px; max-height:48vh; overflow-y:auto; padding:10px; }
+.link-select-pane:last-child .link-select-scroll { height:auto; flex:1; max-height:calc(48vh + 90px); }
+.link-select-modal .link-cand { min-width:0; }
+.link-select-modal .link-row-main { min-width:0; overflow-wrap:anywhere; }
+.link-selected-row { display:flex; align-items:center; gap:8px; padding:10px 8px; border:1px solid var(--line); border-radius:8px; }
+.link-selected-row .thumb { width:32px; height:32px; flex:none; }
+.link-selected-row .link-row-main { flex:1; }
+.link-selected-remove { flex:none; color:var(--text-mut); font-size:20px; padding:0 4px; }
+.asset-category-scope-modal .body { max-height:60vh; overflow-y:auto; }
+.asset-category-scope-modal .picker-search { width:100%; margin-bottom:10px; }
+.link-add-sec .picker-search[readonly] { cursor:pointer; }
+.link-search-field { position:relative; margin-bottom:8px; }
+.link-search-field .picker-search { margin-bottom:0; padding-right:70px; text-overflow:ellipsis; }
+.link-search-count { position:absolute; right:12px; top:50%; transform:translateY(-50%); font-size:12px; color:var(--primary); pointer-events:none; }
+.link-search-count[hidden] { display:none; }
 .link-add-modal .body { max-height:68vh; overflow-y:auto; }
 .link-add-sec + .link-add-sec { margin-top:18px; }
 .link-add-sec h4 { margin:0 0 8px; font-size:13px; font-weight:600; }
-.link-add-target { padding:10px 12px; }
+.link-add-sec[hidden] { display:none; }
+.link-section-help { margin:0 0 10px; font-size:12px; line-height:1.5; color:var(--text-mut); }
 .link-add-sec .picker-search { width:100%; margin-bottom:8px; }
 .link-add-count { margin:12px 0 0; }
 .link-add-count:empty { display:none; }

@@ -601,6 +601,21 @@
   function assetSummaryHtml(a) {
     return `<div class="aa-asset-summary" data-current-asset>${linkThumb(a)}<div class="aa-asset-summary-main"><strong>${window.AssetExtra.esc(a.product)}</strong><span>${window.AssetExtra.esc(a.assetNo)}</span></div></div>`;
   }
+  function assignmentTargetActive(r) {
+    const type = r.employee ? "employee" : "worksite", name = r.employee || r.worksite;
+    return !["retired", "resigned", "inactive"].includes(window.DATA.targetStatuses?.[type]?.[name]);
+  }
+  // 자산 연결·이동·반납에서 같은 읽기 전용 현재 자산/배정 카드를 사용한다.
+  function assetAssignmentSummaryHtml(a, r = a.assignments[0]) {
+    const inactive = !assignmentTargetActive(r);
+    return `<div class="asset-assignment-summary" data-current-asset-assignment>
+      ${assetSummaryHtml(a)}
+      <div class="asset-assignment-current">
+        <div class="acard-id">${assignIdentity(r)}${inactive ? `<span class="badge">${r.employee ? "퇴사" : "비활성"}</span>` : ""}</div>
+        <span class="acard-date">배정일 <b>${window.fmtDate(r.since)}</b></span>
+      </div>
+    </div>`;
+  }
   function linkRowHtml(a, b) {
     const canCut = window.AssetAccess.canState(a) && window.AssetAccess.canState(b);
     return `<div class="link-row" data-link-open="${b.id}">
@@ -615,8 +630,7 @@
       addBtn = window.AssetAccess.canState(a) ? `<button class="btn sm" data-link-add${full ? " disabled" : ""}>자산 연결</button>` : "";
     return `<div class="link-sec">
       <div class="link-head"><h3>연결된 자산 <span class="muted">${v.visible.length}</span></h3>${addBtn}</div>
-      ${v.visible.length ? `<div class="link-list">${v.visible.slice(0, 5).map(b => linkRowHtml(a, b)).join("")}</div>` : v.hidden ? "" : '<p class="muted link-empty">연결된 자산이 없습니다.</p>'}
-      ${v.visible.length > 5 ? '<button class="link-all" data-link-all>전체 보기</button>' : ""}
+      ${v.visible.length ? `<div class="link-list">${v.visible.map(b => linkRowHtml(a, b)).join("")}</div>` : v.hidden ? "" : '<p class="muted link-empty">연결된 자산이 없습니다.</p>'}
       ${v.hidden ? `<p class="link-hidden">조회 불가 자산 ${v.hidden}건</p><div class="link-list link-unavailable-list">${maskedLinkRows(v.hidden)}</div>` : ""}
     </div>`;
   }
@@ -629,7 +643,6 @@
   }
   function wireLinks(scope, a) {
     scope.querySelector("[data-link-add]")?.addEventListener("click", () => openLinkAddModal(a));
-    scope.querySelector("[data-link-all]")?.addEventListener("click", () => openLinksAllModal(a));
     wireLinkRows(scope, a, () => render());
   }
   function wireLinkRows(scope, a, after) {
@@ -646,7 +659,7 @@
     cb.className = "modal-back", cb.style.zIndex = 360, cb.innerHTML = `
       <div class="modal" style="width:380px">
         <h3>연결을 해제하시겠습니까?</h3>
-        <div class="body" style="font-size:13px"><b>${linkLabel(a)}</b><br><span aria-hidden="true">↕</span><br><b>${linkLabel(b)}</b><p class="muted" style="margin-top:6px">배정은 바뀌지 않습니다.</p></div>
+        <div class="body"><div class="link-cut-pair">${assetSummaryHtml(a)}${assetSummaryHtml(b)}</div><p class="muted">배정은 바뀌지 않습니다.</p></div>
         <div class="foot"><button class="btn" data-cclose>취소</button><button class="btn primary" data-cok>확인</button></div>
       </div>`, document.body.appendChild(cb);
     cb.querySelector("[data-cclose]").onclick = () => cb.remove();
@@ -658,49 +671,27 @@
       toast("연결이 해제되었습니다."), after();
     };
   }
-  function openLinksAllModal(a) {
-    const back = document.createElement("div");
-    back.className = "modal-back", back.innerHTML = `
-      <div class="modal" style="width:460px">
-        <h3 data-links-title></h3>
-        <div class="body" style="max-height:60vh;overflow-y:auto"><div class="link-list" data-links-list></div></div>
-        <div class="foot"><button class="btn" data-close>닫기</button></div>
-      </div>`, document.body.appendChild(back);
-    const draw = () => {
-      const v = window.AssetLinks.view(a);
-      back.querySelector("[data-links-title]").textContent = `연결된 자산 ${v.visible.length}`;
-      const list = back.querySelector("[data-links-list]");
-      list.innerHTML = v.visible.map(b => linkRowHtml(a, b)).join("") || '<p class="muted">연결된 자산이 없습니다.</p>';
-      wireLinkRows(list, a, () => { draw(), render(); });
-    };
-    draw();
-    back.querySelector("[data-close]").onclick = () => back.remove();
-    back.onclick = e => { e.target === back && back.remove(); };
-  }
-  // 자산 연결 Modal(Web_dc_23 4-6): 배정 대상 → 이 대상의 연결되지 않은 자산 → 고유관리번호 검색(배정 가능 자산 새 배정)
+  // 현재 자산/배정 → 기존 배정 자산 연결 → 새 배정 및 연결
   function openLinkAddModal(a) {
     const room = window.AssetLinks.MAX - window.AssetLinks.count(a.id),
       picked = new Map(),
       r = a.assignments[0];
-    let q = "";
     const back = document.createElement("div");
     back.className = "modal-back", back.innerHTML = `
       <div class="modal link-add-modal">
         <h3>자산 연결</h3>
         <div class="body">
+          ${assetAssignmentSummaryHtml(a, r)}
           <section class="link-add-sec">
-            <h4>배정 대상</h4>
-            <div class="acard link-add-target">${typeBadge(r)}<div class="acard-id">${assignIdentity(r)}</div></div>
-          </section>
-          <section class="link-add-sec">
-            <h4>연결되지 않은 자산</h4>
+            <h4>연결 가능 자산</h4>
+            <p class="link-section-help">현재 배정 대상에게 배정되어 있는 자산입니다.</p>
             <div class="link-list" data-link-same></div>
           </section>
-          <section class="link-add-sec">
-            <h4>배정 가능 자산 검색</h4>
-            <input type="text" class="picker-search" placeholder="고유관리번호" data-link-q>
-            <div class="link-list" data-link-found></div>
-            <div class="field link-date" data-link-date hidden><label>배정일</label>${dateFieldHtml(todayStr())}<p class="link-search-help">검색해서 선택한 자산을 이 대상에게 새로 배정하면서 연결합니다.</p></div>
+          <section class="link-add-sec" data-link-new-section${assignmentTargetActive(r) ? "" : " hidden"}>
+            <h4>자산 추가 배정 및 연결</h4>
+            <p class="link-section-help">현재 배정 대상에게 새로 배정하며 자산을 연결합니다.</p>
+            <div class="link-search-field"><input type="text" class="picker-search" placeholder="고유관리번호" data-link-q readonly aria-label="자산 검색 열기" aria-haspopup="dialog"><span class="link-search-count" data-link-picked-count hidden></span></div>
+            <div class="field link-date" data-link-date><label>배정일</label>${dateFieldHtml(todayStr())}</div>
           </section>
         </div>
         <div class="foot"><button class="btn" data-close>취소</button><button class="btn primary" data-save disabled>저장</button></div>
@@ -708,33 +699,90 @@
     const save = back.querySelector("[data-save]"), dateBox = back.querySelector("[data-link-date]");
     const isNew = b => !(b.assignments || []).length;
     const getDate = wireDateField(dateBox, todayStr(), () => refresh());
-    const rowHtml = b => {
-      const on = picked.has(b.id), lock = !on && picked.size >= room;
-      return `<label class="link-cand${on ? " on" : ""}"><input type="checkbox" data-pick="${b.id}"${on ? " checked" : ""}${lock ? " disabled" : ""}>${linkThumb(b)}<span class="link-row-main"><span class="link-row-name">${b.product}</span><span class="link-row-no">${b.assetNo}</span></span>${isNew(b) ? '<span class="badge stock">새로 배정</span>' : `<span class="badge ${STATUS_LABEL[b.status][1]}">${STATUS_LABEL[b.status][0]}</span>`}</label>`;
+    const rowHtml = (b, selection = picked, count = selection.size) => {
+      const on = selection.has(b.id), lock = !on && count >= room;
+      return `<label class="link-cand${on ? " on" : ""}"><input type="checkbox" data-pick="${b.id}"${on ? " checked" : ""}${lock ? " disabled" : ""}>${linkThumb(b)}<span class="link-row-main"><span class="link-row-name">${b.product}</span><span class="link-row-no">${b.assetNo}</span></span>${isNew(b) ? "" : `<span class="badge ${STATUS_LABEL[b.status][1]}">${STATUS_LABEL[b.status][0]}</span>`}</label>`;
     };
     const refresh = () => {
       const newCount = [...picked.values()].filter(isNew).length;
-      dateBox.hidden = !newCount;
+      back.querySelector("[data-link-new-section]").hidden = !assignmentTargetActive(r);
+      dateBox.hidden = !assignmentTargetActive(r);
       save.disabled = !picked.size || newCount && !getDate();
     };
     const draw = () => {
       const same = window.AssetLinks.candidates(a),
-        pickedNew = [...picked.values()].filter(isNew),
-        found = q ? window.AssetLinks.stockMatches(a, undefined, q).filter(b => !picked.has(b.id)) : [];
-      back.querySelector("[data-link-same]").innerHTML = same.length ? same.map(rowHtml).join("") : '<p class="muted link-empty">연결할 수 있는 자산이 없습니다.</p>';
-      back.querySelector("[data-link-found]").innerHTML = pickedNew.concat(found).map(rowHtml).join("") || (q ? '<p class="muted link-empty">결과가 없습니다.</p>' : "");
+        pickedNew = [...picked.values()].filter(isNew);
+      back.querySelector("[data-link-same]").innerHTML = same.length ? same.map(b => rowHtml(b)).join("") : '<p class="muted link-empty">연결할 수 있는 자산이 없습니다.</p>';
+      const count = back.querySelector("[data-link-picked-count]");
+      back.querySelector("[data-link-q]").value = pickedNew[0]?.product || "";
+      count.hidden = pickedNew.length < 2;
+      count.textContent = pickedNew.length > 1 ? `+${pickedNew.length - 1}` : "";
       back.querySelectorAll("[data-pick]").forEach(c => c.onchange = () => {
         const b = window.DATA.assets.find(x => x.id === c.dataset.pick);
         c.checked ? picked.set(b.id, b) : picked.delete(b.id), draw();
       });
       refresh();
     };
-    back.querySelector("[data-link-q]").oninput = e => { q = e.target.value.trim().toLowerCase(), draw(); };
+    function openStockSelector() {
+      if (!assignmentTargetActive(r)) return;
+      const selection = new Map([...picked].filter(([, b]) => isNew(b))),
+        existingCount = [...picked.values()].filter(b => !isNew(b)).length,
+        initialNewCount = selection.size,
+        selector = document.createElement("div"), esc = window.AssetExtra.esc;
+      let query = "", categoryScope = [];
+      const accessibleCategories = window.DATA.categories.filter(c => {
+        const probe = {group:c.group,sub:c.sub,status:"stock"};
+        return window.AssetAccess.canView(probe) && window.AssetAccess.canState(probe);
+      });
+      const candidates = () => window.DATA.assets.filter(b => b.id !== a.id && !b.deleted_at && b.status === "stock" && !(b.assignments || []).length && window.AssetAccess.canView(b) && window.AssetAccess.canState(b))
+        .sort((x,y) => x.product.localeCompare(y.product,"ko") || String(x.assetNo).localeCompare(String(y.assetNo)));
+      selector.className = "modal-back";
+      selector.style.zIndex = 350;
+      selector.innerHTML = `<div class="modal link-select-modal" role="dialog" aria-label="자산 선택">
+        <h3>자산 선택</h3>
+        <div class="body"><div class="link-select-columns">
+          <section class="link-select-pane"><div class="link-select-tools"><button type="button" class="btn" data-stock-category>분류 <span data-stock-scope-label>전체</span> ▾</button><input type="text" class="picker-search" placeholder="품목명/고유관리번호" aria-label="품목명 또는 고유관리번호 검색" data-stock-search></div><div class="link-select-pane-head">전체 <b data-stock-total>0</b></div><div class="link-list link-select-scroll" data-stock-results></div></section>
+          <section class="link-select-pane"><div class="link-select-pane-head">선택됨 <b data-stock-count>0</b></div><div class="link-list link-select-scroll" data-stock-selected></div></section>
+        </div></div>
+        <div class="foot"><button class="btn" data-stock-cancel>취소</button><button class="btn primary" data-stock-apply>적용</button></div>
+      </div>`;
+      document.body.appendChild(selector);
+      const drawResults = () => {
+        const allCandidates = candidates(),
+          rows = allCandidates.filter(b => (!query || [b.product,b.assetNo].some(value => String(value || "").toLowerCase().includes(query))) && (!categoryScope.length || categoryScope.includes(`${b.group}/${b.sub}`))),
+          count = existingCount + selection.size, results = selector.querySelector("[data-stock-results]"), selected = selector.querySelector("[data-stock-selected]"), scroll = results.scrollTop;
+        selector.querySelector("[data-stock-total]").textContent = rows.length;
+        selector.querySelector("[data-stock-count]").textContent = selection.size;
+        selector.querySelector("[data-stock-scope-label]").textContent = categoryScope.length ? categoryScope[0].split("/").slice(1).join("/") + (categoryScope.length > 1 ? ` +${categoryScope.length-1}` : "") : "전체";
+        results.innerHTML = rows.length ? rows.map(b => rowHtml(b, selection, count)).join("") : `<p class="muted link-empty">${query || categoryScope.length ? "결과가 없습니다." : "표시할 목록이 없습니다."}</p>`;
+        results.scrollTop = scroll;
+        selected.innerHTML = selection.size ? [...selection.values()].map(b => `<div class="link-selected-row">${linkThumb(b)}<div class="link-row-main"><span class="link-row-name">${esc(b.product)}</span><span class="link-row-no">${esc(b.assetNo)}</span></div><button type="button" class="link-selected-remove" data-stock-remove="${esc(b.id)}" aria-label="${esc(b.product)} ${esc(b.assetNo)} 선택 해제">×</button></div>`).join("") : '<p class="muted link-empty">선택된 자산이 없습니다.</p>';
+        selector.querySelector("[data-stock-apply]").disabled = !selection.size && !initialNewCount;
+        results.querySelectorAll("[data-pick]").forEach(c => c.onchange = () => {
+          const b = window.DATA.assets.find(x => x.id === c.dataset.pick);
+          c.checked ? selection.set(b.id, b) : selection.delete(b.id); drawResults();
+        });
+        selected.querySelectorAll("[data-stock-remove]").forEach(button => button.onclick = () => { selection.delete(button.dataset.stockRemove); drawResults(); });
+      };
+      selector.querySelector("[data-stock-search]").oninput = e => { query = e.target.value.trim().toLowerCase(); selector.querySelector("[data-stock-results]").scrollTop=0; drawResults(); };
+      selector.querySelector("[data-stock-category]").onclick = () => window.openAssetCategoryScopeModal({categories:accessibleCategories,selected:categoryScope,onApply:values => {categoryScope=values; selector.querySelector("[data-stock-results]").scrollTop=0; drawResults();}});
+      selector.querySelector("[data-stock-cancel]").onclick = () => selector.remove();
+      selector.querySelector("[data-stock-apply]").onclick = () => {
+        [...picked].forEach(([id, b]) => { if (isNew(b)) picked.delete(id); });
+        selection.forEach((b, id) => picked.set(id, b));
+        selector.remove(); draw();
+      };
+      drawResults();
+      selector.querySelector("[data-stock-search]").focus();
+    }
+    const searchField = back.querySelector("[data-link-q]");
+    searchField.onclick = openStockSelector;
+    searchField.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openStockSelector(); } };
     back.querySelector("[data-close]").onclick = () => back.remove();
     save.onclick = () => {
       const targets = [...picked.values()], key = window.AssetLinks.targetKey(a), d = getDate();
-      // 저장 시점 재검증: 같은 대상 후보이거나 여전히 배정 가능한 자산인지(Case 4-6-1)
-      const stale = targets.filter(b => isNew(b) ? b.status !== "stock" || b.deleted_at : window.AssetLinks.targetKey(b) !== key || window.AssetLinks.linked(a.id, b.id));
+      // 저장 시점 재검증: 같은 대상 후보이거나 여전히 배정 가능한 자산인지(새11 Case 5-7-2)
+      const stale = targets.filter(b => isNew(b) ? !assignmentTargetActive(r) || b.status !== "stock" || b.deleted_at : window.AssetLinks.targetKey(b) !== key || window.AssetLinks.linked(a.id, b.id));
       if (stale.length) return stale.forEach(b => picked.delete(b.id)), toast("설정이 변경되었습니다. 잠시 후 다시 시도해주세요."), draw();
       const record = r.employee ? { employee: r.employee, worksite: null, since: d } : { employee: null, worksite: r.worksite, since: d };
       targets.forEach(b => {
@@ -771,7 +819,7 @@
   function returnAssignment(a, idx) {
     const old = a.assignments[idx], choice = linkedAssetChoice(a, "return"), back = document.createElement("div");
     back.className = "modal-back";
-    back.innerHTML = `<div class="modal scroll-body" style="width:460px"><h3>반납</h3><div class="body">${assetSummaryHtml(a)}<div class="ra-current"><div class="perm-info-note">${INFO_ICON}<span>현재 배정을 종료합니다.</span></div><div class="field"><label>현재 배정</label><div class="acard">${typeBadge(old)}<div class="acard-id">${assignIdentity(old)}</div><div class="acard-foot"><span class="acard-date">배정일 <b>${window.fmtDate(old.since)}</b></span></div></div></div></div>${choice.html()}</div><div class="foot"><button class="btn" data-close>취소</button><button class="btn primary" data-save>저장</button></div></div>`;
+    back.innerHTML = `<div class="modal scroll-body" style="width:460px"><h3>반납</h3><div class="body">${assetAssignmentSummaryHtml(a, old)}<div class="ra-current"><div class="perm-info-note">${INFO_ICON}<span>현재 배정을 종료합니다.</span></div></div>${choice.html()}</div><div class="foot"><button class="btn" data-close>취소</button><button class="btn primary" data-save>저장</button></div></div>`;
     document.body.appendChild(back); choice.wire(back);
     back.querySelector("[data-close]").onclick = () => back.remove();
     back.querySelector("[data-save]").onclick = () => confirmModal("반납하시겠습니까?", () => {
@@ -906,14 +954,9 @@
     let getDate = () => null;
     function draw() {
       body.innerHTML = `
-        ${assetSummaryHtml(a)}
+        ${assetAssignmentSummaryHtml(a, old)}
         <div class="ra-current">
           <div class="perm-info-note">${INFO_ICON}<span>기존 배정을 반납하고 새 대상에게 배정합니다.</span></div>
-          <div class="acard">
-            ${typeBadge(old)}
-            <div class="acard-id">${assignIdentity(old)}</div>
-            <div class="acard-foot"><span class="acard-date">배정일 <b>${window.fmtDate(old.since)}</b></span></div>
-          </div>
         </div>
         <div class="field">
           <label>이동시킬 대상</label>

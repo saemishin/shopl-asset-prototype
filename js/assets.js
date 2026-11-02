@@ -1880,104 +1880,15 @@
     }, drawGroups(), drawOpts();
   }
   function openCategoryFilterModal() {
-    const groups = /* @__PURE__ */new Map();
-    viewableCategories().filter(cat => cat.type === state.productType).forEach(cat => {
-      groups.has(cat.group) || groups.set(cat.group, []), groups.get(cat.group).push(cat.sub);
+    return window.openAssetCategoryScopeModal({
+      categories:viewableCategories().filter(cat => cat.type === state.productType),
+      selected:classificationScopes[state.view] || [],
+      onApply:picked => {
+        classificationScopes[state.view]=picked;
+        try { localStorage.setItem(scopeStorageKey(state.view),JSON.stringify(picked)); } catch {}
+        state.statFilter=null; state.page=1; render();
+      }
     });
-    const draft = [...(classificationScopes[state.view]||[])];
-    let query = "";
-    function optRow(checked, label, val, cls = "") {
-      return `<label class="opt ${cls}"><input type="checkbox" data-v="${val}" ${checked ? "checked" : ""}>${label}</label>`;
-    }
-    function visibleValues() {
-      const q = query.trim().toLowerCase(),
-        out = [];
-      return groups.forEach((subs, g) => {
-        const groupMatches = !q || g.toLowerCase().includes(q),
-          filtered = subs.filter(s => groupMatches || s.toLowerCase().includes(q));
-        filtered.length && filtered.forEach(s => out.push(`${g}/${s}`));
-      }), out;
-    }
-    if (!groups.size) return modal(`
-        <div class="modal">
-          <h3>분류</h3>
-          <div class="body">
-            <p class="muted" style="padding:24px 2px;text-align:center">표시할 목록이 없습니다.</p>
-          </div>
-          <div class="foot">
-            <button class="btn" data-close>취소</button>
-            <button class="btn primary" id="cf-apply" disabled>적용</button>
-          </div>
-        </div>`);
-    const back = modal(`
-      <div class="modal">
-        <h3>분류</h3>
-        <div class="body">
-          <input type="text" class="picker-search" id="cf-search" placeholder="검색">
-          <div id="cf-dynamic" style="margin-top:10px"></div>
-        </div>
-        <div class="foot">
-          <button class="btn" data-close>취소</button>
-          <button class="btn primary" id="cf-apply">적용</button>
-        </div>
-      </div>`);
-    function renderList() {
-      let listHtml = [...groups.entries()].map(([g, subs]) => {
-        const q = query.trim().toLowerCase(),
-          groupMatches = !q || g.toLowerCase().includes(q),
-          filtered = subs.filter(s => groupMatches || s.toLowerCase().includes(q));
-        if (!filtered.length) return "";
-        const all = filtered.map(s => `${g}/${s}`).every(k => draft.includes(k)),
-          parent = groupMatches ? optRow(all, `<b>${g}</b>`, `grp:${g}`) : "",
-          kids = filtered.map(s => optRow(draft.includes(`${g}/${s}`), s, `${g}/${s}`, groupMatches ? "child" : "")).join("");
-        return parent + kids;
-      }).join("");
-      listHtml || (listHtml = `<p class="muted" style="padding:12px 2px">${CAT_GROUPS.size ? "결과가 없습니다." : "표시할 목록이 없습니다."}</p>`);
-      const vis = visibleValues(),
-        allChecked = vis.length > 0 && vis.every(v => draft.includes(v)),
-        dyn = back.querySelector("#cf-dynamic");
-      dyn.innerHTML = `
-        <div class="picker-toolbar">
-          <label class="picker-check"><input type="checkbox" id="cf-select-all" ${allChecked ? "checked" : ""}><span>전체</span></label>
-          <span class="right"><button class="filter-reset" id="cf-reset" aria-label="초기화">${RESET_ICON}</button></span>
-        </div>
-        ${listHtml}
-      `, dyn.querySelector("#cf-select-all").onchange = e => {
-        const vals = visibleValues();
-        e.target.checked ? vals.forEach(v => {
-          draft.includes(v) || draft.push(v);
-        }) : vals.forEach(v => {
-          const i = draft.indexOf(v);
-          i > -1 && draft.splice(i, 1);
-        }), renderList();
-      }, dyn.querySelector("#cf-reset").onclick = () => {
-        draft.length = 0, renderList();
-      }, dyn.querySelectorAll("input[type=checkbox][data-v]").forEach(cb => cb.onchange = () => {
-        const v = cb.dataset.v;
-        if (v.startsWith("grp:")) {
-          const g = v.slice(4),
-            keys = groups.get(g).filter(sub => !query || g.toLowerCase().includes(query.toLowerCase()) || sub.toLowerCase().includes(query.toLowerCase())).map(sub => `${g}/${sub}`);
-          cb.checked ? keys.forEach(k => {
-            draft.includes(k) || draft.push(k);
-          }) : keys.forEach(k => {
-            const i = draft.indexOf(k);
-            i > -1 && draft.splice(i, 1);
-          });
-        } else if (cb.checked) draft.push(v);else {
-          const i = draft.indexOf(v);
-          i > -1 && draft.splice(i, 1);
-        }
-        renderList();
-      });
-    }
-    renderList(), back.querySelector("#cf-search").oninput = e => {
-      query = e.target.value, renderList();
-    }, back.querySelector("#cf-apply").onclick = () => {
-      const ordered=viewableCategories().map(c=>`${c.group}/${c.sub}`),picked=ordered.filter(key=>draft.includes(key));
-      classificationScopes[state.view]=picked.length===ordered.length?[]:picked;
-      try{localStorage.setItem(scopeStorageKey(state.view),JSON.stringify(classificationScopes[state.view]));}catch{}
-      state.statFilter=null;state.page=1;back.remove();render();
-    };
   }
   function openMemberFilterModal() {
     let cat = "그룹";
