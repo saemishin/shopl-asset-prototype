@@ -947,7 +947,7 @@
         if (cat && (cat.group !== asset.group || cat.sub !== asset.sub)) {
           const before = `${asset.group} › ${asset.sub}`,
             after = `${cat.group} › ${cat.sub}`;
-          asset.group = cat.group, asset.sub = cat.sub, logChange("소분류 이동", before, after);
+          asset.group = cat.group, asset.sub = cat.sub, logChange("소분류 변경", before, after);
         }
         const dateFmt = d => d ? window.fmtDate(d) : "",
           setIf = (script, key, val, format) => {

@@ -27,7 +27,7 @@
       event("2026-04-18 16:00","자산 사진 관리: 대표 사진 변경",[photos[0]],[photos[2]],{photoValue:true}),
       event("2026-04-10 08:50","자산 사진 관리: 사진 변경",[],[photos[0],photos[1]],{photoValue:true}),
       // Current edit-form order; S/N and IMEI are custom fields, not fixed information.
-      edit("소분류 이동","sub","전자기기류 › 모니터","전자기기류 › 노트북"),
+      edit("소분류 변경","sub","전자기기류 › 모니터","전자기기류 › 노트북"),
       edit("품목명 수정","product","그램 16","그램 16 (2024)"),
       edit("고유관리번호 수정","assetNo","IT-2024-012","IT-2024-0012"),
       edit("태그 수정","tags","본사","본사, 개발팀"),

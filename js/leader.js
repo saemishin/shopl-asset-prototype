@@ -1055,7 +1055,7 @@
         }), a[key] = value);
       };
     (a.group !== cat.group || a.sub !== cat.sub) && (pending.push({
-      script: "자산 정보 수정: 소분류 이동",
+      script: "자산 정보 수정: 소분류 변경",
       before: `${a.group} › ${a.sub}`,
       after: `${cat.group} › ${cat.sub}`
     }), a.group = cat.group, a.sub = cat.sub), set("product", draft.product.trim(), "품목명 수정"), set("assetNo", draft.assetNo.trim(), "고유관리번호 수정"), JSON.stringify(a.labels || []) !== JSON.stringify(draft.labels) && (pending.push({

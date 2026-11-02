@@ -957,7 +957,7 @@ window.assetPhotoActivities = function (beforePhotos, beforePrimary, afterPhotos
 window.assetPhotoThumbsHtml = function (list) {
   return !list || !list.length ? "없음" : `<span class="hval-photos">${list.map(p => `<span class="hval-photo" style="background:${p.color}"></span>`).join("")}</span>`;
 };
-window.ASSET_ACTIVITY_ORDER = ["자산 정보 수정: 소분류 이동", "자산 정보 수정: 품목명 수정", "자산 사진 관리: 사진 변경", "자산 사진 관리: 대표 사진 변경", "자산 정보 수정: 고유관리번호 수정", "자산 정보 수정: 태그 수정", "자산 정보 수정: 유효기한 변경", "자산 정보 수정: S/N 수정", "자산 정보 수정: IMEI 수정", "자산 정보 수정: 제조연월 변경", "자산 정보 수정: 구매연월 변경", "자산 정보 수정: 구매가격 변경", "자산 정보 수정: 메모 수정"];
+window.ASSET_ACTIVITY_ORDER = ["자산 정보 수정: 소분류 변경", "자산 정보 수정: 품목명 수정", "자산 사진 관리: 사진 변경", "자산 사진 관리: 대표 사진 변경", "자산 정보 수정: 고유관리번호 수정", "자산 정보 수정: 태그 수정", "자산 정보 수정: 유효기한 변경", "자산 정보 수정: S/N 수정", "자산 정보 수정: IMEI 수정", "자산 정보 수정: 제조연월 변경", "자산 정보 수정: 구매연월 변경", "자산 정보 수정: 구매가격 변경", "자산 정보 수정: 메모 수정"];
 window.logAssetActivities = function (entries, log) {
   const rank = e => {
     const i = window.ASSET_ACTIVITY_ORDER.indexOf(e.script);

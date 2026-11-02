@@ -39,7 +39,7 @@
     add(0,'detail','자산 상세',file,{qa:'review',scenario:'detail',id:'A001'});
     add(0,'member','구성원 상세',file,{},'mobile-member');add(0,'worksite','근무지 상세',file,{},'mobile-worksite');
   }else{
-    add(0,'overview','현황','assets.html');add(0,'category','분류','category.html');
+    add(0,'assign','자산 배정','assets.html',{},'asset-assign');add(0,'overview','현황','assets.html');add(0,'category','분류','category.html');
     add(0,'detail','자산 상세','asset-detail.html',{id:'A001'});
     add(0,'member','구성원 상세','member-detail.html',{name:'김민수'});add(0,'worksite','근무지 상세','worksite-detail.html',{name:'강남점'});
   }
@@ -110,6 +110,7 @@
       case 'tag-manage':click('[data-manage-dropdown]');click('[data-manage-tag]');break;
       case 'templates-manage':window.AssetTemplates?.openTemplateManager();break;
       case 'template-change':window.AssetTemplates?.openTemplateAssign(undefined,true);break;
+      case 'asset-assign':click('#btn-assign');break;
       case 'history':click('[data-atab="history"]');break;
     }
   }

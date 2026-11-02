@@ -852,7 +852,7 @@ button.usebullet { background: var(--panel); font: inherit; cursor: pointer; }
 .areg-ai-result b { font-size: 13.5px; }
 .areg-ai-result p { font-size: 12.5px; color: var(--text-sub); }
 
-/* 소분류 이동 모달 — 분류 관리 모달과 같은 대분류/소분류 트리를 라디오 단일선택으로 재구성 */
+/* 소분류 변경 모달 — 분류 관리 모달과 같은 대분류/소분류 트리를 라디오 단일선택으로 재구성 */
 .submove-group { margin-bottom: 16px; }
 .submove-group:last-child { margin-bottom: 0; }
 .submove-group-name { font-size: 12px; color: var(--text-sub); font-weight: 600; margin-bottom: 2px; }
@@ -898,7 +898,7 @@ button.usebullet { background: var(--panel); font: inherit; cursor: pointer; }
 .picker-member-row { display: flex; align-items: center; gap: 10px; padding: 8px 4px; border-radius: 8px; cursor: pointer; }
 .picker-member-row:hover { background: #f7f8f9; }
 /* 배정/보유 변경 권한 대상이 조회 권한 범위 밖일 때 선택 자체를 막고 사유를 보여줌.
-   opacity는 행 전체가 아니라 내부 요소에만 줌(라디오 소분류 이동 트리와 동일한 이유 — 행 전체에 주면
+   opacity는 행 전체가 아니라 내부 요소에만 줌(라디오 소분류 변경 트리와 동일한 이유 — 행 전체에 주면
    hover 툴팁도 같은 렌더링 그룹으로 묶여 흐려짐) */
 .picker-check.is-disabled, .picker-member-row.is-disabled { cursor: not-allowed; }
 .picker-check.is-disabled > *, .picker-member-row.is-disabled > * { opacity: .4; }

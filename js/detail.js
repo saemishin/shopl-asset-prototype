@@ -749,55 +749,11 @@
     };
     function openStockSelector() {
       if (!assignmentTargetActive(r)) return;
-      const selection = new Map([...picked].filter(([, b]) => isNew(b))),
-        existingCount = [...picked.values()].filter(b => !isNew(b)).length,
-        initialNewCount = selection.size,
-        selector = document.createElement("div"), esc = window.AssetExtra.esc;
-      let query = "", categoryScope = [];
-      const accessibleCategories = window.DATA.categories.filter(c => {
-        const probe = {group:c.group,sub:c.sub,status:"stock"};
-        return window.AssetAccess.canView(probe) && window.AssetAccess.canState(probe);
-      });
-      const candidates = () => window.DATA.assets.filter(b => b.id !== a.id && !b.deleted_at && b.status === "stock" && !(b.assignments || []).length && window.AssetAccess.canView(b) && window.AssetAccess.canState(b))
-        .sort((x,y) => x.product.localeCompare(y.product,"ko") || String(x.assetNo).localeCompare(String(y.assetNo)));
-      selector.className = "modal-back";
-      selector.style.zIndex = 350;
-      selector.innerHTML = `<div class="modal link-select-modal" role="dialog" aria-label="자산 선택">
-        <h3>자산 선택</h3>
-        <div class="body"><div class="link-select-columns">
-          <section class="link-select-pane"><div class="link-select-tools"><button type="button" class="btn" data-stock-category>분류 <span data-stock-scope-label>전체</span> ▾</button><input type="text" class="picker-search" placeholder="품목명/고유관리번호" aria-label="품목명 또는 고유관리번호 검색" data-stock-search></div><div class="link-select-pane-head">전체 <b data-stock-total>0</b></div><div class="link-list link-select-scroll" data-stock-results></div></section>
-          <section class="link-select-pane"><div class="link-select-pane-head">선택됨 <b data-stock-count>0</b></div><div class="link-list link-select-scroll" data-stock-selected></div></section>
-        </div></div>
-        <div class="foot"><button class="btn" data-stock-cancel>취소</button><button class="btn primary" data-stock-apply>적용</button></div>
-      </div>`;
-      document.body.appendChild(selector);
-      const drawResults = () => {
-        const allCandidates = candidates(),
-          rows = allCandidates.filter(b => (!query || [b.product,b.assetNo].some(value => String(value || "").toLowerCase().includes(query))) && (!categoryScope.length || categoryScope.includes(`${b.group}/${b.sub}`))),
-          count = existingCount + selection.size, results = selector.querySelector("[data-stock-results]"), selected = selector.querySelector("[data-stock-selected]"), scroll = results.scrollTop;
-        selector.querySelector("[data-stock-total]").textContent = rows.length;
-        selector.querySelector("[data-stock-count]").textContent = selection.size;
-        selector.querySelector("[data-stock-scope-label]").textContent = categoryScope.length ? categoryScope[0].split("/").slice(1).join("/") + (categoryScope.length > 1 ? ` +${categoryScope.length-1}` : "") : "전체";
-        results.innerHTML = rows.length ? rows.map(b => rowHtml(b, selection, count)).join("") : `<p class="muted link-empty">${query || categoryScope.length ? "결과가 없습니다." : "표시할 목록이 없습니다."}</p>`;
-        results.scrollTop = scroll;
-        selected.innerHTML = selection.size ? [...selection.values()].map(b => `<div class="link-selected-row">${linkThumb(b)}<div class="link-row-main"><span class="link-row-name">${esc(b.product)}</span><span class="link-row-no">${esc(b.assetNo)}</span></div><button type="button" class="link-selected-remove" data-stock-remove="${esc(b.id)}" aria-label="${esc(b.product)} ${esc(b.assetNo)} 선택 해제">×</button></div>`).join("") : '<p class="muted link-empty">선택된 자산이 없습니다.</p>';
-        selector.querySelector("[data-stock-apply]").disabled = !selection.size && !initialNewCount;
-        results.querySelectorAll("[data-pick]").forEach(c => c.onchange = () => {
-          const b = window.DATA.assets.find(x => x.id === c.dataset.pick);
-          c.checked ? selection.set(b.id, b) : selection.delete(b.id); drawResults();
-        });
-        selected.querySelectorAll("[data-stock-remove]").forEach(button => button.onclick = () => { selection.delete(button.dataset.stockRemove); drawResults(); });
-      };
-      selector.querySelector("[data-stock-search]").oninput = e => { query = e.target.value.trim().toLowerCase(); selector.querySelector("[data-stock-results]").scrollTop=0; drawResults(); };
-      selector.querySelector("[data-stock-category]").onclick = () => window.openAssetCategoryScopeModal({categories:accessibleCategories,selected:categoryScope,onApply:values => {categoryScope=values; selector.querySelector("[data-stock-results]").scrollTop=0; drawResults();}});
-      selector.querySelector("[data-stock-cancel]").onclick = () => selector.remove();
-      selector.querySelector("[data-stock-apply]").onclick = () => {
-        [...picked].forEach(([id, b]) => { if (isNew(b)) picked.delete(id); });
-        selection.forEach((b, id) => picked.set(id, b));
-        selector.remove(); draw();
-      };
-      drawResults();
-      selector.querySelector("[data-stock-search]").focus();
+      const existingCount = [...picked.values()].filter(b => !isNew(b)).length;
+      window.AssetPicker.open({initial:[...picked.values()].filter(isNew), excludeIds:[a.id], maxSelection:Math.max(0, room-existingCount), onApply:items => {
+        [...picked].forEach(([id,b]) => {if (isNew(b)) picked.delete(id);});
+        items.forEach(b => picked.set(b.id,b)); draw();
+      }});
     }
     const searchField = back.querySelector("[data-link-q]");
     searchField.onclick = openStockSelector;

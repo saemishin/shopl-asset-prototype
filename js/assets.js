@@ -826,6 +826,7 @@
         ${state.view === "all" ? `
         <div class="sub-actions">
           ${canManageAssets() ? '<button class="btn primary sm" id="btn-add">＋ 자산 추가</button>' : ""}
+          ${canManageAssets() || window.DATA.categories.some(canAssignCategory) ? '<button class="btn sm" id="btn-assign">＋ 자산 배정</button>' : ""}
           ${bulkActions().length ? '<button class="btn sm" id="btn-bulk">일괄 작업 <span class="chev">▾</span></button>' : ""}
         </div>` : ""}
       </div>
@@ -937,6 +938,8 @@
       addButton && (addButton.onclick = () => {
         canManageAssets() && window.openAssetAddModal();
       });
+      const assignButton = document.getElementById("btn-assign");
+      assignButton && (assignButton.onclick = () => window.AssetAssignment.open({members:Object.entries(MEMBER_INFO).map(([name,info]) => ({name,...info})),worksites:WS_CODE,onSaved:render,onChanged:render,toast}));
       const bulkButton = document.getElementById("btn-bulk");
       bulkButton && (bulkButton.onclick = e => openBulkMenu(e.currentTarget));
     }
@@ -2037,7 +2040,7 @@
   }
   function toast(msg) {
     const t = document.createElement("div");
-    t.textContent = msg, t.style.cssText = "position:fixed;left:50%;bottom:32px;transform:translateX(-50%);background:#1b1d1f;color:#fff;padding:10px 16px;border-radius:8px;font-size:12.5px;z-index:200;box-shadow:0 8px 24px rgba(0,0,0,.25)", document.body.appendChild(t), setTimeout(() => t.remove(), 1800);
+    t.textContent = msg, t.style.cssText = "position:fixed;left:50%;bottom:32px;transform:translateX(-50%);background:#1b1d1f;color:#fff;padding:10px 16px;border-radius:8px;font-size:12.5px;z-index:500;box-shadow:0 8px 24px rgba(0,0,0,.25)", document.body.appendChild(t), setTimeout(() => t.remove(), 1800);
   }
   window.AssetsScreen = {
     render
