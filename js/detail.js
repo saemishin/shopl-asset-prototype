@@ -688,9 +688,9 @@
             <div class="link-list" data-link-same></div>
           </section>
           <section class="link-add-sec" data-link-new-section${assignmentTargetActive(r) ? "" : " hidden"}>
-            <h4>자산 추가 배정 및 연결</h4>
+            <h4>자산 추가 연결</h4>
             <p class="link-section-help">현재 배정 대상에게 새로 배정하며 자산을 연결합니다.</p>
-            <div class="link-search-field"><input type="text" class="picker-search" placeholder="고유관리번호" data-link-q readonly aria-label="자산 검색 열기" aria-haspopup="dialog"><span class="link-search-count" data-link-picked-count hidden></span></div>
+            <div class="link-search-field"><input type="text" class="picker-search" placeholder="선택" data-link-q readonly aria-label="자산 선택 열기" aria-haspopup="dialog"><span class="link-search-count" data-link-picked-count hidden></span></div>
             <div class="field link-date" data-link-date><label>배정일</label>${dateFieldHtml(todayStr())}</div>
           </section>
         </div>
