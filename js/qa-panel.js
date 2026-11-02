@@ -32,6 +32,11 @@
       }
     }
   }
+  function seedTemplateList() {
+    if (!['templates-many','template-picker-many'].includes(params.get('review')) || !D.templates?.length) return;
+    const samples=clone(D.templates);
+    D.templates.splice(0,D.templates.length,...Array.from({length:45},(_,i)=>({...clone(samples[i%samples.length]),id:`QA-TPL-${i+1}`,name:`QA 배정 템플릿 ${String(i+1).padStart(2,'0')}`})));
+  }
   const entries=[], groups=['화면 바로가기','권한','빈 상태','상한·많은 데이터','추가·AI 입력','연결·템플릿','설정·이력'];
   const add=(group,id,label,page,query={},open='')=>entries.push({group,id,label,page,query,open});
   if(mobile){
@@ -75,6 +80,8 @@
   add(5,'links-hidden','조회 불가 연결 자산',mobile?file:'asset-detail.html',{qa:'review',scenario:'links-hidden',id:'A001'});
   add(6,'tag-manager','태그 관리','category.html',{},'tag-manage');
   add(5,'template-manager','배정 템플릿 관리','category.html',{},'templates-manage');
+  add(3,'templates-many','배정 템플릿 45개','category.html',{},'templates-many');
+  add(3,'template-picker-many','템플릿 선택 45개','assets.html',{},'template-picker-many');
   add(5,'template-change','템플릿 배정·대상 변경 검토','assets.html',{},'template-change');
   add(5,'member-target','앱 구성원 기준 상세',mobile?file:'leader.html',{qa:'review',scenario:'target',id:'A001'});
   const worksiteSample=D.assets.find(a=>(a.assignments||[])[0]?.worksite);
@@ -102,6 +109,7 @@
     location.href=u.href;
   }
   function openReview(){
+    seedTemplateList();
     const click=selector=>document.querySelector(selector)?.click();
     switch(params.get('review')){
       case 'mobile-assets':click('[data-mapp-goto="assets"]');break;
@@ -112,6 +120,8 @@
       case 'category-edit':click('[data-edit-sub]');break;
       case 'tag-manage':click('[data-manage-dropdown]');click('[data-manage-tag]');break;
       case 'templates-manage':window.AssetTemplates?.openTemplateManager();break;
+      case 'templates-many':window.AssetTemplates?.openTemplateManager();break;
+      case 'template-picker-many':window.AssetTemplates?.openTemplateAssign();click('[data-template-open]');break;
       case 'template-change':window.AssetTemplates?.openTemplateAssign(undefined,true);break;
       case 'asset-assign':click('#btn-assign');break;
       case 'history':click('[data-atab="history"]');break;

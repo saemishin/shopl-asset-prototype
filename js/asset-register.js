@@ -65,6 +65,7 @@
       <div class="modal sm">
         <h3>태그 관리</h3>
         <div class="body">
+          <p class="tpl-manage-desc">자산에 사용할 태그를 추가하고 관리합니다.</p>
           <div class="tag-manage-add">
             <input type="text" class="cat-manage-input" data-tm-input placeholder="입력" maxlength="20">
             <button type="button" class="btn primary" data-tm-add>+ 추가</button>

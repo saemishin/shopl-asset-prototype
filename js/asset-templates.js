@@ -1,4 +1,4 @@
-// 템플릿 관리(Web_dc_28)와 템플릿으로 배정(Web_dc_29). 연결 기준은 Policy_15, 저장소는 window.AssetLinks.
+// 배정 템플릿 관리(Web_dc_24)와 자산 배정(Web_dc_17). 연결 기준은 Policy_15, 저장소는 window.AssetLinks.
 (() => {
   const D = window.DATA;
   const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
@@ -159,21 +159,68 @@
     render();
   }
 
-  // ── Web_dc_28 템플릿 관리 ──
+  // 새24 관리와 새17 선택에서 같은 템플릿 구성을 표시한다.
+  const templateSummaryHtml = t => `<div class="tpl-card-main"><b>${esc(t.name)}</b><span class="muted">전체 ${totalOf(t)}개</span><div class="tpl-card-items">${[t.base, ...t.items].map((x, i) => `<span class="tpl-chip${i ? "" : " base"}"><span class="tpl-chip-role">${i ? "연결 자산" : "기준"}</span><span class="tpl-chip-divider" aria-hidden="true">│</span><span class="tpl-chip-value">${esc(x.product)}${i ? `(${x.count}개)` : ""}</span></span>`).join("")}</div></div>`;
+  // 정적 목업의 시드 데이터를 20개씩 표시한다. 운영에서는 같은 경계로 다음 목록을 요청한다.
+  function mountTemplatePages(scrollRoot, listEl, templates, cardHtml, onAppend = () => {}) {
+    let shown = 0;
+    listEl.innerHTML = "";
+    scrollRoot.scrollTop = 0;
+    const append = () => {
+      const next = templates.slice(shown, shown + 20);
+      if (!next.length) return;
+      listEl.insertAdjacentHTML("beforeend", next.map(cardHtml).join(""));
+      shown += next.length;
+      onAppend();
+    };
+    const onScroll = () => {
+      if (shown < templates.length && scrollRoot.scrollHeight - scrollRoot.scrollTop - scrollRoot.clientHeight <= 100) append();
+    };
+    scrollRoot.addEventListener("scroll", onScroll, { passive: true });
+    if (templates.length) append();
+    else listEl.innerHTML = '<p class="muted tpl-empty">등록된 템플릿이 없습니다.</p>';
+    return () => scrollRoot.removeEventListener("scroll", onScroll);
+  }
+
+  // ── Web_dc_24 배정 템플릿 관리 ──
   function openTemplateManager() {
     const back = modal(`<div class="tpl-manager-header"><h3>배정 템플릿 관리</h3><button type="button" class="btn icon-only sm" data-close aria-label="닫기">${CLOSE_ICON}</button></div><div class="body tpl-manage-body"><p class="tpl-manage-desc">함께 배정하고 연결할 자산 구성을 미리 만들어 관리합니다.</p><div class="tpl-manage-head"><button class="btn sm primary" data-tpl-add>+ 템플릿 추가</button></div><div class="link-list" data-tpl-list></div></div>`, "tpl-modal");
+    let dispose = () => {};
     const draw = () => {
+      dispose();
       const list = D.templates.slice().sort((p, q) => p.name.localeCompare(q.name, "ko"));
-      back.querySelector("[data-tpl-list]").innerHTML = list.length ? list.map(t => `<div class="tpl-card"><div class="tpl-card-main"><b>${esc(t.name)}</b><span class="muted">전체 ${totalOf(t)}개</span><div class="tpl-card-items">${[t.base, ...t.items].map((x, i) => `<span class="tpl-chip${i ? "" : " base"}">${i ? "" : "기준 "}${esc(x.product)}${i ? ` ×${x.count}` : ""}</span>`).join("")}</div></div><div class="tpl-card-actions"><button class="btn sm" data-tpl-edit="${t.id}">수정</button><button class="btn sm" data-tpl-del="${t.id}">삭제</button></div></div>`).join("") : '<p class="muted tpl-empty">등록된 템플릿이 없습니다.</p>';
-      back.querySelectorAll("[data-tpl-edit]").forEach(b => b.onclick = () => openTemplateEditor(D.templates.find(t => t.id === b.dataset.tplEdit), draw));
-      back.querySelectorAll("[data-tpl-del]").forEach(b => b.onclick = () => confirmBox("삭제하시겠습니까?", "", () => {
-        D.templates.splice(D.templates.findIndex(t => t.id === b.dataset.tplDel), 1), toast("삭제되었습니다."), draw();
-      }));
+      dispose = mountTemplatePages(back.querySelector(".tpl-manage-body"), back.querySelector("[data-tpl-list]"), list,
+        t => `<div class="tpl-card">${templateSummaryHtml(t)}<div class="tpl-card-actions"><button class="btn sm" data-tpl-edit="${t.id}">수정</button><button class="btn sm" data-tpl-del="${t.id}">삭제</button></div></div>`,
+        () => {
+          back.querySelectorAll("[data-tpl-edit]").forEach(b => b.onclick = () => openTemplateEditor(D.templates.find(t => t.id === b.dataset.tplEdit), draw));
+          back.querySelectorAll("[data-tpl-del]").forEach(b => b.onclick = () => confirmBox("삭제하시겠습니까?", "", () => {
+            D.templates.splice(D.templates.findIndex(t => t.id === b.dataset.tplDel), 1), toast("삭제되었습니다."), draw();
+          }));
+        });
     };
+    const close = () => { dispose(); back.remove(); };
     back.querySelector("[data-tpl-add]").onclick = () => openTemplateEditor(null, draw);
-    back.querySelector("[data-close]").onclick = () => back.remove();
-    back.onclick = e => { e.target === back && back.remove(); };
+    back.querySelector("[data-close]").onclick = close;
+    back.onclick = e => { if (e.target === back) close(); };
     draw();
+  }
+
+  function openTemplatePicker(initialId, onApply) {
+    const templates = usableTemplates().slice().sort((p, q) => p.name.localeCompare(q.name, "ko"));
+    let selected = templates.some(t => t.id === initialId) ? initialId : "";
+    const back = modal(`<h3>템플릿 선택</h3><div class="body tpl-picker-body"><div class="link-list" data-template-list></div></div><div class="foot"><button class="btn" data-template-cancel>취소</button><button class="btn primary" data-template-apply${selected ? "" : " disabled"}>적용</button></div>`, "tpl-modal", 360);
+    const list = back.querySelector("[data-template-list]"), apply = back.querySelector("[data-template-apply]");
+    const dispose = mountTemplatePages(back.querySelector(".tpl-picker-body"), list, templates,
+      t => `<label class="tpl-card tpl-select-card${t.id === selected ? " selected" : ""}"><input type="radio" name="template-pick" data-template-id="${esc(t.id)}"${t.id === selected ? " checked" : ""}>${templateSummaryHtml(t)}</label>`);
+    list.onchange = e => {
+      if (!e.target.matches("[data-template-id]")) return;
+      selected = e.target.dataset.templateId;
+      apply.disabled = false;
+      list.querySelectorAll(".tpl-select-card").forEach(card => card.classList.toggle("selected", card.querySelector("input").checked));
+    };
+    const close = () => { dispose(); back.remove(); };
+    back.querySelector("[data-template-cancel]").onclick = close;
+    apply.onclick = () => { if (!selected) return; close(); onApply(selected); };
   }
   function openTemplateEditor(tpl, onSaved) {
     const pick = x => ({ group: x.group, sub: x.sub, product: x.product, ...(x.count ? { count: x.count } : {}) });
@@ -242,7 +289,7 @@
     draw();
   }
 
-  // ── Web_dc_29 템플릿으로 배정 ──
+  // ── Web_dc_17 템플릿으로 배정 ──
   const targetKey = t => t ? (t.type === "employee" ? "e:" : "w:") + t.value : null;
   const assetTargetKey = a => { const r = (a.assignments || [])[0]; return r ? (r.employee ? "e:" + r.employee : "w:" + r.worksite) : null; };
   function usableTemplates() {
@@ -287,14 +334,14 @@
       </div>`;
     };
     const draw = () => {
-      const tpls = usableTemplates().slice().sort((p, q) => p.name.localeCompare(q.name, "ko"));
+      const template = D.templates.find(t => t.id === st.tplId);
       body.innerHTML = `
+        <div class="field"><label>템플릿</label><div class="link-search-field"><input type="text" class="picker-search" readonly placeholder="선택" aria-label="배정 템플릿 선택" aria-haspopup="dialog" data-template-open value="${esc(template?.name || "")}">${template ? `<button type="button" class="tpl-field-clear" data-template-clear aria-label="템플릿 선택 해제">${CLOSE_ICON}</button>` : ""}</div></div>
         <div class="field"><label>배정 대상</label>
           <label class="radio-row"><input type="radio" name="ta-kind" value="employee"${st.kind === "employee" ? " checked" : ""}><span>구성원</span></label>
           ${st.kind === "employee" ? `<div class="perm-target-wrap">${targetField("employee")}</div>` : ""}
           <label class="radio-row"><input type="radio" name="ta-kind" value="worksite"${st.kind === "worksite" ? " checked" : ""}><span>근무지</span></label>
           ${st.kind === "worksite" ? `<div class="perm-target-wrap">${targetField("worksite")}</div>` : ""}</div>
-        <div class="field"><label>템플릿</label><select data-tpl><option value="">템플릿 선택</option>${tpls.map(t => `<option value="${t.id}"${t.id === st.tplId ? " selected" : ""}>${esc(t.name)}</option>`).join("")}</select></div>
         <div class="field"><label>배정일</label><input type="date" data-date value="${st.date}" max="${today}"><p class="field-help">새로 배정하는 자산에만 적용됩니다.</p></div>
         ${st.rows.length ? `<div class="tpl-section"><div class="tpl-section-head"><b>항목별 자산 선택</b><span class="muted">항목마다 필요한 개수만큼 자산을 선택해주세요.</span></div>${st.rows.map(slotHtml).join("")}<button type="button" class="tpl-add-row" data-row-add>+ 항목 추가</button></div>` : ""}`;
       body.querySelectorAll('[name="ta-kind"]').forEach(r => r.onchange = () => { st.kind = r.value, clearPicked(), draw(); });
@@ -303,7 +350,11 @@
         openTargetPicker(st.kind, st.target[st.kind], v => { v !== st.target[st.kind] && clearPicked(), st.target[st.kind] = v, draw(); });
       });
       body.querySelector("[data-target-clear]")?.addEventListener("click", () => { st.target[st.kind] = null, clearPicked(), draw(); });
-      body.querySelector("[data-tpl]").onchange = e => { st.tplId = e.target.value, loadTemplate(), draw(); };
+      const openTemplates = () => openTemplatePicker(st.tplId, id => { if (id !== st.tplId) { st.tplId = id; loadTemplate(); } draw(); });
+      const templateField = body.querySelector("[data-template-open]");
+      templateField.onclick = openTemplates;
+      templateField.onkeydown = e => { if (["Enter", " "].includes(e.key)) { e.preventDefault(); openTemplates(); } };
+      body.querySelector("[data-template-clear]")?.addEventListener("click", () => { st.tplId = ""; loadTemplate(); draw(); });
       body.querySelector("[data-date]").onchange = e => { st.date = e.target.value, refresh(); };
       body.querySelectorAll("[data-dec]").forEach(b => b.onclick = () => { const r = st.rows[+b.dataset.dec]; r.count--, r.picked = r.picked.slice(0, r.count), draw(); });
       body.querySelectorAll("[data-inc]").forEach(b => b.onclick = () => { const others = st.rows.filter(x => !x.base).reduce((n, x) => n + x.count, 0); others < MAX_ITEMS && st.rows[+b.dataset.inc].count++, draw(); });
