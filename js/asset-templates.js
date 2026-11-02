@@ -326,7 +326,7 @@
         </div>
         <div class="tpl-slot-category">${esc(r.group)} › ${esc(r.sub)}</div><b class="tpl-slot-product">${esc(r.product)}</b>
         <div class="tpl-asset-select-wrap"${curTarget() ? "" : ' data-tip="배정 대상을 먼저 선택해주세요." tabindex="0"'}>
-          <div class="link-search-field"><input type="text" class="picker-search" readonly placeholder="선택" aria-label="${esc(r.product)} 자산 선택" aria-haspopup="dialog" data-row-pick="${i}" value="${first ? esc(first.product + " · " + first.assetNo) : ""}"${curTarget() ? "" : " disabled"}>
+          <div class="link-search-field"><input type="text" class="picker-search${selected.length > r.count ? " tpl-selection-error" : ""}" aria-invalid="${selected.length > r.count}" readonly placeholder="선택" aria-label="${esc(r.product)} 자산 선택" aria-haspopup="dialog" data-row-pick="${i}" value="${first ? esc(first.product + " · " + first.assetNo) : ""}"${curTarget() ? "" : " disabled"}>
           ${selected.length > 1 ? `<span class="link-search-count tpl-selection-count">+${selected.length - 1}</span>` : ""}${selected.length ? `<button type="button" class="tpl-field-clear" data-clear-picked="${i}" aria-label="${esc(r.product)} 선택 해제">${CLOSE_ICON}</button>` : ""}</div>
         </div>
       </div>`;
@@ -355,7 +355,7 @@
       templateField.onkeydown = e => { if (["Enter", " "].includes(e.key)) { e.preventDefault(); openTemplates(); } };
       body.querySelector("[data-template-clear]")?.addEventListener("click", () => { st.tplId = ""; loadTemplate(); draw(); });
       body.querySelector("[data-date]").onchange = e => { st.date = e.target.value, refresh(); };
-      body.querySelectorAll("[data-dec]").forEach(b => b.onclick = () => { const r = st.rows[+b.dataset.dec]; r.count--, r.picked = r.picked.slice(0, r.count), draw(); });
+      body.querySelectorAll("[data-dec]").forEach(b => b.onclick = () => { const r = st.rows[+b.dataset.dec]; r.count--, draw(); });
       body.querySelectorAll("[data-inc]").forEach(b => b.onclick = () => { const others = st.rows.filter(x => !x.base).reduce((n, x) => n + x.count, 0); others < MAX_ITEMS && st.rows[+b.dataset.inc].count++, draw(); });
       body.querySelectorAll("[data-row-del]").forEach(b => b.onclick = () => { st.rows.splice(+b.dataset.rowDel, 1), draw(); });
       body.querySelectorAll("[data-clear-picked]").forEach(b => b.onclick = () => { st.rows[+b.dataset.clearPicked].picked = []; draw(); });
@@ -370,7 +370,7 @@
     const refresh = () => { save.disabled = !ready(); };
     function openPicker(row) {
       if (!curTarget()) return;
-      if (row.count >= 2) {
+      if (row.count >= 2 || row.picked.length > row.count) {
         const allowed = new Set(candidates(row).map(a => a.id));
         const picker = window.AssetPicker.open({
           initial: row.picked.map(assetById).filter(Boolean),

@@ -26,7 +26,7 @@
       results.innerHTML = rows.length ? rows.map(a => `<label class="link-cand${selection.has(a.id) ? ' on' : ''}"><input type="checkbox" data-pick="${esc(a.id)}"${selection.has(a.id) ? ' checked' : ''}${!selection.has(a.id) && selection.size >= maxSelection ? ' disabled' : ''}>${thumb(a)}<span class="link-row-main"><span class="link-row-name">${esc(a.product)}</span><span class="link-row-no">${esc(a.assetNo)}</span></span>${badge(a)}</label>`).join('') : `<p class="muted link-empty">${query || categoryScope.length ? '결과가 없습니다.' : '표시할 목록이 없습니다.'}</p>`;
       results.scrollTop = scroll;
       selected.innerHTML = selection.size ? [...selection.values()].map(a => `<div class="link-selected-row">${thumb(a)}<div class="link-row-main"><span class="link-row-name">${esc(a.product)}</span><span class="link-row-no">${esc(a.assetNo)}</span></div>${badge(a)}<button type="button" class="link-selected-remove" data-stock-remove="${esc(a.id)}" aria-label="${esc(a.product)} ${esc(a.assetNo)} 선택 해제">×</button></div>`).join('') : '<p class="muted link-empty">선택된 자산이 없습니다.</p>';
-      selector.querySelector('[data-stock-apply]').disabled = !selection.size && !initialCount;
+      selector.querySelector('[data-stock-apply]').disabled = selection.size > maxSelection || (!selection.size && !initialCount);
       results.querySelectorAll('[data-pick]').forEach(c => c.onchange = () => {const a = window.DATA.assets.find(a => a.id === c.dataset.pick); if(c.checked && selection.size >= maxSelection){c.checked=false;return;} c.checked ? selection.set(a.id,a) : selection.delete(a.id); draw();});
       selected.querySelectorAll('[data-stock-remove]').forEach(b => b.onclick = () => {selection.delete(b.dataset.stockRemove); draw();});
     };

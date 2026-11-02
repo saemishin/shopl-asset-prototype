@@ -2496,3 +2496,6 @@ body.history-capture #prototype-qa { display: none; }
 .modal.tpl-row-add { width:460px; }
 .tpl-row-add .tpl-editor-fields { gap:16px; }
 .tpl-row-add .field-err { margin:6px 0 0; }
+
+/* 필요 개수 감소 후에도 선택 자산은 보존하고 필드 라인만 오류로 표시한다. */
+.tpl-assignment-slot .picker-search.tpl-selection-error { border-color:var(--danger); }
