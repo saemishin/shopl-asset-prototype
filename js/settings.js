@@ -79,7 +79,47 @@
       </div>`;
   }
 
+  let navigationGuardBound = false;
+  function confirmNavigation(onLeave) {
+    if (document.querySelector('[data-settings-exit]')) return;
+    const back = document.createElement('div');
+    back.className = 'modal-back';
+    back.dataset.settingsExit = '';
+    back.style.zIndex = 340;
+    back.innerHTML = `<div class="modal" style="width:380px" role="dialog" aria-modal="true" aria-labelledby="settings-exit-title">
+      <div class="body" style="padding-top:20px">
+        <p id="settings-exit-title" style="font-size:14px;font-weight:700;margin-bottom:6px">페이지를 벗어나시겠습니까?</p>
+        <p class="hint" style="margin-top:0">페이지를 벗어날 경우 편집한 내용이 저장되지 않습니다.</p>
+      </div>
+      <div class="foot"><button type="button" class="btn" data-exit-cancel>취소</button><button type="button" class="btn primary" data-exit-confirm>확인</button></div>
+    </div>`;
+    back.querySelector('[data-exit-cancel]').onclick = () => back.remove();
+    back.querySelector('[data-exit-confirm]').onclick = () => {
+      back.remove();
+      draft = { leaderMode: saved.leaderMode, leaderTargets: [...saved.leaderTargets] };
+      onLeave();
+    };
+    document.body.appendChild(back);
+  }
+  function bindNavigationGuard() {
+    if (navigationGuardBound) return;
+    navigationGuardBound = true;
+    document.addEventListener('click', event => {
+      const link = event.target.closest('a[href]');
+      if (!link || event.defaultPrevented || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+      if (link.hasAttribute('download') || (link.target && link.target.toLowerCase() !== '_self')) return;
+      const destination = new URL(link.href, window.location.href);
+      if (!['http:', 'https:'].includes(destination.protocol)) return;
+      if (destination.origin === window.location.origin && destination.pathname === window.location.pathname && destination.search === window.location.search) return;
+      if (!isDirty()) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      confirmNavigation(() => window.location.assign(destination.href));
+    }, true);
+  }
+
   function render() {
+    bindNavigationGuard();
     const c = document.getElementById("content");
     c.innerHTML = `
       <div class="tabs">
