@@ -1,6 +1,6 @@
 /* Shared app shell: left LNB + topbar. Only 자산·구성원·근무지·기능 설정 menus are live (others are static placeholders). */
 (function () {
-  // 기능 설정 > 관리 탭의 "자산 관리" 토글 상태 — 이 앱은 페이지 이동마다 전체 새로고침(SPA 아님)이라
+  // 기능 설정 > 자산 탭의 "자산 관리" 토글 상태 — 이 앱은 페이지 이동마다 전체 새로고침(SPA 아님)이라
   // window.DATA 같은 인메모리 값으론 유지가 안 돼서 localStorage로 저장(feature-settings.js와 키 공유)
   const ASSET_MGMT_FLAG_KEY = "shopl_proto_assetMgmtUse";
   // 앱과 동일: 자산 관리는 Pro 이상(무료 체험 Pro 수준), 최초 ON. 사용자가 저장한 OFF는 유지.
@@ -34,7 +34,7 @@
         { ic: "◍", label: "구성원", href: "member-detail.html", key: "member" },
         { ic: "⚑", label: "근무지", href: "worksite-detail.html", key: "worksite" },
         { ic: "◫", label: "그룹" },
-        // 기능 설정 > 관리 > 자산 관리를 끄면 실 서비스처럼 이 메뉴 자체가 사라짐
+        // 기능 설정 > 자산 > 자산 관리를 끄면 실 서비스처럼 이 메뉴 자체가 사라짐
         ...(assetMgmtOn() ? [{ ic: "□", label: "자산", href: "assets.html", key: "assets" }] : []),
       ]},
       { cap: "설정 및 결제", items: [
@@ -45,8 +45,8 @@
     ];
   }
 
-  function renderShell({ active = "assets", title = "자산" } = {}) {
-    const nav = buildNav().map(g => {
+  function renderNav(active = "assets") {
+    return buildNav().map(g => {
       const cap = g.cap ? `<div class="cap">${g.cap}</div>` : "";
       const items = g.items.map(it => {
         const live = !!it.href;
@@ -58,6 +58,10 @@
       return `<div class="nav-group">${cap}${items}</div>`;
     }).join("");
 
+  }
+
+  function renderShell({ active = "assets", title = "자산" } = {}) {
+    const nav = renderNav(active);
     return `
     <aside class="sidebar">
       <div class="brand">
@@ -83,6 +87,10 @@
   }
 
   window.Shell = {
+    refreshNav({ active = "assets" } = {}) {
+      const nav = document.querySelector(".sidebar .nav");
+      if (nav) nav.innerHTML = renderNav(active);
+    },
     mount(opts) {
       document.getElementById("app").innerHTML = renderShell(opts);
       return document.getElementById("content");

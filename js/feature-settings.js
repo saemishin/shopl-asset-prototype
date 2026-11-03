@@ -30,9 +30,7 @@
           <button class="btn" data-cclose>취소</button>
           <button class="btn primary" data-cok>확인</button>
         </div>
-      </div>`, cb.addEventListener("click", e => {
-      e.target === cb && cb.remove();
-    }), cb.querySelector("[data-cclose]").onclick = () => cb.remove(), cb.querySelector("[data-cok]").onclick = () => {
+      </div>`, cb.querySelector("[data-cclose]").onclick = () => cb.remove(), cb.querySelector("[data-cok]").onclick = () => {
       cb.remove(), onOk();
     }, document.body.appendChild(cb);
   }
@@ -48,9 +46,7 @@
         <div class="foot">
           <button class="btn primary" data-cok>확인</button>
         </div>
-      </div>`, cb.addEventListener("click", e => {
-      e.target === cb && cb.remove();
-    }), cb.querySelector("[data-cok]").onclick = () => cb.remove(), cb.querySelector("[data-goto-settings]").onclick = () => {
+      </div>`, cb.querySelector("[data-cok]").onclick = () => cb.remove(), cb.querySelector("[data-goto-settings]").onclick = () => {
       location.href = "settings.html";
     }, document.body.appendChild(cb);
   }
@@ -102,7 +98,7 @@
           <div class="ufs-title-row">
             <span class="ufs-title">${title}</span>
             ${help ? `<button type="button" class="ufs-help" data-tip="도움말" aria-label="도움말">${HELP_ICON}</button>` : ""}
-            ${planBadge ? `<span class="ufs-plan-badge">${planBadge}</span>` : detail ? '<button type="button" class="ufs-detail" data-detail>상세 설정 ↗</button>' : ""}
+            ${planBadge ? `<span class="ufs-plan-badge">${planBadge}</span>` : detail ? `<button type="button" class="ufs-detail" data-detail${isOn ? "" : " disabled"}>상세 설정 ↗</button>` : ""}
           </div>
           <ul class="ufs-desc">${desc.map(d => `<li>${d}</li>`).join("")}</ul>
         </div>
@@ -145,14 +141,14 @@
             return;
           }
           assetMgmtOn() ? confirmModal("사용 안 함으로 설정하시겠습니까?", "사용 안 함으로 설정할 경우 '자산' 메뉴가 비노출 되며, 직원들이 앱에서 더 이상 자산을 관리할 수 없게 됩니다.", () => {
-            setAssetMgmtOn(!1), toast("상태가 변경되었습니다."), draw();
+            setAssetMgmtOn(!1), toast("상태가 변경되었습니다."), draw(), Shell.refreshNav({ active: "features" });
           }) : confirmModal("사용함으로 설정하시겠습니까?", "", () => {
-            setAssetMgmtOn(!0), toast("상태가 변경되었습니다."), draw(), openTurnOnInfoModal();
+            setAssetMgmtOn(!0), toast("상태가 변경되었습니다."), draw(), Shell.refreshNav({ active: "features" }), openTurnOnInfoModal();
           });
         };
         const detailBtn = assetRow.querySelector("[data-detail]");
         detailBtn && (detailBtn.onclick = () => {
-          location.href = "settings.html";
+          if (assetMgmtOn()) location.href = "settings.html";
         });
       }
     }
