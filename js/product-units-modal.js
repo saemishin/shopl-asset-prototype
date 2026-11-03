@@ -29,8 +29,8 @@ window.openProductUnitsModal = function (product, items) {
         <button type="button" class="btn icon-only sm" data-close aria-label="닫기">${CLOSE_ICON}</button>
       </div>
       <div class="body">
-        <div class="modal-info-box"><div class="prodcell">${thumb([...items].sort((a, b) => String(a.assetNo || "").localeCompare(String(b.assetNo || ""))).find(a => window.assetPhotos(a).length) || items[0])}<span class="pname cat-unit-product">${product}</span></div></div>
-        <div class="cat-unit-list">${colsHtml}</div>
+        <div class="modal-info-box"><div class="prodcell">${thumb([...items].sort((a, b) => String(a.assetNo || "").localeCompare(String(b.assetNo || ""))).find(a => window.assetPhotos(a).length) || items[0])}<span class="pname cat-unit-product">${window.AssetExtra.esc(product)}</span></div></div>
+        ${items.length ? `<div class="cat-unit-list">${colsHtml}</div>` : '<p class="tag-manage-empty">등록된 자산이 없습니다.</p>'}
       </div>
     </div>`, document.body.appendChild(m), m.addEventListener("click", e => {
     e.target === m && m.remove();

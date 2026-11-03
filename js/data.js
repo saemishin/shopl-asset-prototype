@@ -919,6 +919,7 @@ window.assetPhotos = /* @__PURE__ */function () {
     DATES = ["2026-08-28 14:10", "2026-08-28 14:12", "2026-07-15 09:33", "2026-07-15 09:34", "2026-06-02 17:20", "2026-06-02 17:22", "2026-05-20 11:05", "2026-05-20 11:06", "2026-04-10 08:48", "2026-04-10 08:49"],
     BY = ["dana", "김민수", "dana", "이서연", "dana", "김민수", "dana", "이서연", "dana", "김민수"];
   return function (a) {
+    if (!a) return [];
     return a._photos ? a._photos : a.photo ? (a._primary = 0, a._photos = TINTS.slice(0, a.photoCount || 5).map((t, i) => ({
       id: `${a.id}-p${i + 1}`,
       color: t === 0 ? a.photo : window.tintHex(a.photo, t),
@@ -989,7 +990,7 @@ window.archiveDeletedAsset = function (asset, actor) {
   const record = JSON.parse(JSON.stringify(asset));
   record.deleted_at = (/* @__PURE__ */new Date()).toISOString(), record.deleted_by = actor, window.DATA.deletedAssets.push(record);
   const index = window.DATA.assets.indexOf(asset);
-  return index > -1 && window.DATA.assets.splice(index, 1), record;
+  return index > -1 && window.DATA.assets.splice(index, 1), window.AssetProducts?.touch(asset.productId), record;
 };
 (function () {
   const counters = /* @__PURE__ */new Map(),
@@ -1058,6 +1059,7 @@ window.archiveDeletedAsset = function (asset, actor) {
           id: `A${String(++nextId).padStart(3, "0")}`,
           status: "stock",
           createdAt: at.slice(0, 10),
+          updatedAt: at,
           assignments: [],
           _activityLog: [{
             d: at,
@@ -1066,7 +1068,7 @@ window.archiveDeletedAsset = function (asset, actor) {
           }]
         };
       });
-      return window.DATA.assets.push(...created), counters.set(key, sequence), created;
+      return window.DATA.assets.push(...created), window.AssetProducts?.reconcile(), counters.set(key, sequence), created;
     }
   }, window.canRestoreDisposedAsset = asset => window.hasPrototypeAssetManagePermission() && window.DATA.assets.includes(asset) && !asset.deleted_at && !0 && asset.status === "disposed", window.restoreDisposedAsset = (asset, who = "dana") => {
     !window.hasPrototypeAssetManagePermission() && fail("PERMISSION_DENIED"), window.canRestoreDisposedAsset(asset) || fail("ASSET_CHANGED"), asset._activityLog || fail("HISTORY_NOT_INITIALIZED"), asset.status = "stock", asset.assignments = [], asset._activityLog.unshift({
@@ -1402,4 +1404,98 @@ window.AssetExtra.exportValues=(asset,manage=window.hasPrototypeAssetManagePermi
     return entry;
   }
   window.AssetMoves={moveBatch,forTarget};
+})();
+
+// Product definitions outlive their assets. Names stay cached on assets for the
+// existing independent screens; productId is the stable catalogue relationship.
+(() => {
+  const D = window.DATA, storageKey = 'shopl-prototype-products-v1';
+  let state = { products: [], bindings: {}, templateBindings: {}, events: {} };
+  try { const saved = JSON.parse(sessionStorage.getItem(storageKey) || 'null'); if (saved?.products && Array.isArray(saved.products)) state = { ...state, ...saved }; } catch {}
+  D.products = state.products;
+  const normalize = name => String(name ?? '').trim();
+  const sameCategory = (a, b) => a.group === b.group && a.sub === b.sub;
+  const categoryExists = p => D.categories.some(c => sameCategory(c, p));
+  const byId = id => D.products.find(p => p.id === id);
+  const now = () => new Date().toISOString();
+  const persist = () => { try { sessionStorage.setItem(storageKey, JSON.stringify(state)); } catch {} };
+  let sequence = 0;
+  const newId = () => `P-${Date.now().toString(36)}-${++sequence}`;
+  function attach(asset) {
+    if (!asset || asset.deleted_at || !categoryExists(asset)) return null;
+    const name = normalize(asset.product);
+    if (!name) return null;
+    let p = D.products.find(p => !p.deleted && sameCategory(p, asset) && p.name === name);
+    if (!p) { const at = asset.updatedAt || asset.createdAt || now(); p = { id: newId(), group: asset.group, sub: asset.sub, name, createdAt: at, updatedAt: at }; D.products.push(p); }
+    const previous = byId(asset.productId);
+    if (previous && previous.id !== p.id) previous.updatedAt = now();
+    p.updatedAt = [p.updatedAt, asset.updatedAt || asset.createdAt].filter(Boolean).sort().at(-1);
+    asset.productId = p.id;
+    state.bindings[asset.id] = p.id;
+    return p;
+  }
+  function reconcile() { D.assets.forEach(attach); persist(); }
+  function all() { reconcile(); return D.products.filter(p => !p.deleted && categoryExists(p)); }
+  function list(group, sub) { return all().filter(p => p.group === group && p.sub === sub).sort((a,b) => a.name.localeCompare(b.name,'ko')); }
+  function assetsOf(id) { return D.assets.filter(a => !a.deleted_at && a.productId === id); }
+  function bindTemplates(restore = false) {
+    for (const t of D.templates || []) [t.base, ...t.items].forEach((row,i) => {
+      const key = `${t.id}:${i}`, bound = byId(row.productId || (restore ? state.templateBindings[key] : null));
+      const p = bound || D.products.find(p => !p.deleted && sameCategory(p,row) && p.name === row.product);
+      if (p) { row.productId = p.id; state.templateBindings[key] = p.id; if (!p.deleted) row.product = p.name; }
+    });
+    persist();
+  }
+  function rowExists(row) { const p = row.productId ? byId(row.productId) : all().find(p => sameCategory(p,row) && p.name === row.product); return !!p && !p.deleted && categoryExists(p); }
+  function problem(code, id) { const e = new Error(code); e.code = code; e.id = id; throw e; }
+  function save(group, sub, original, draft) {
+    if (!window.hasPrototypeAssetManagePermission()) problem('PERMISSION');
+    if (!categoryExists({group,sub})) problem('CATEGORY_CHANGED');
+    reconcile();
+    const initialIds = new Set(original.map(p => p.id)), remaining = new Set(draft.map(p => p.id));
+    const removed = original.filter(p => !remaining.has(p.id));
+    for (const p of removed) if (assetsOf(p.id).length) problem('IN_USE',p.id);
+    for (const p of original) { const current = byId(p.id); if (!current || current.deleted || current.name !== p.name) problem('CHANGED',p.id); }
+    const rows = draft.map(p => ({...p,name:normalize(p.name)}));
+    const final = D.products.filter(p => !p.deleted && sameCategory(p,{group,sub}) && !initialIds.has(p.id)).concat(rows);
+    for (const p of rows) {
+      if (!p.name || p.name.length > 50 || /[\r\n]/.test(p.name)) problem('INVALID',p.id);
+      if (final.filter(other => other.name === p.name).length > 1) problem('DUPLICATE',p.id);
+    }
+    bindTemplates();
+    // All validation is complete before mutating definitions, assets or history.
+    const at = now();
+    for (const p of removed) byId(p.id).deleted = true;
+    for (const row of rows) {
+      const existing = byId(row.id);
+      if (!existing) { D.products.push({id:newId(),group,sub,name:row.name,createdAt:at,updatedAt:at}); continue; }
+      if (existing.name === row.name) continue;
+      const before = existing.name;
+      existing.name = row.name; existing.updatedAt = at;
+      for (const a of assetsOf(existing.id)) {
+        const event = {id:`product-${existing.id}-${at}`,d:at,who:'dana',script:'자산 정보 수정: 품목명 수정',before,after:row.name};
+        a.product = row.name; a.updatedAt = at; a._activityLog ||= []; a._activityLog.unshift(event);
+        (state.events[a.id] ||= []).unshift(event);
+      }
+    }
+    bindTemplates(); persist();
+    window.dispatchEvent(new CustomEvent('asset-products-changed'));
+  }
+  function renameCategory(group, sub, newGroup, newSub) {
+    for (const p of D.products) if (sameCategory(p,{group,sub})) { p.group = newGroup; p.sub = newSub; }
+    for (const t of D.templates || []) for (const row of [t.base,...t.items]) if (sameCategory(row,{group,sub})) { row.group=newGroup; row.sub=newSub; }
+    persist();
+  }
+  function touch(id) { const p=byId(id); if(p){p.updatedAt=now();persist();} }
+  function pruneCategories() { for (const p of D.products) if (!categoryExists(p)) p.deleted=true; persist(); }
+  // Restore only product definitions and their name changes across demo pages.
+  // Other asset edits retain the prototype's existing in-memory behaviour.
+  for (const a of D.assets) {
+    const p = byId(state.bindings[a.id]);
+    if (p && !p.deleted && sameCategory(p,a)) { a.product = p.name; a.productId=p.id; }
+    const events = state.events[a.id] || [];
+    if (events.length) { a._activityLog ||= []; const ids=new Set(a._activityLog.map(e=>e.id));a._activityLog.unshift(...events.filter(e=>!ids.has(e.id)));a.updatedAt=[a.updatedAt,...events.map(e=>e.d)].filter(Boolean).sort().at(-1); }
+  }
+  window.AssetProducts = {all,list,assetsOf,attach,reconcile,save,byId,bindTemplates,rowExists,renameCategory,pruneCategories,touch,normalize};
+  reconcile();
 })();

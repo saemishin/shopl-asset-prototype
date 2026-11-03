@@ -2506,3 +2506,10 @@ body.history-capture #prototype-qa { display: none; }
 .target-more svg { width:18px; height:18px; }
 .target-assets .countrow .right { display:flex; align-items:center; gap:8px; }
 .target-assignment-summary .picker-avatar { flex:none; }
+
+/* Product manager follows the tag manager, with an accessible disabled reason. */
+.product-manage-category { margin: 0 0 16px; }
+.product-delete-wrap { display:inline-flex; position:relative; }
+.product-delete-wrap button:disabled { opacity:.3; cursor:not-allowed; pointer-events:none; }
+.product-delete-wrap[data-tip]:is(:hover,:focus-visible)::after { content:attr(data-tip);position:absolute;right:0;top:100%;margin-top:6px;padding:6px 10px;border-radius:6px;background:#1b1d1f;color:#fff;white-space:nowrap;font-size:12px;z-index:30; }
+.product-manage-toast { position:fixed;left:50%;bottom:32px;transform:translateX(-50%);background:#1b1d1f;color:white;padding:10px 16px;border-radius:8px;font-size:12.5px;z-index:450; }

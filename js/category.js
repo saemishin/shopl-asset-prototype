@@ -197,28 +197,14 @@
     return head + body;
   }
   function productsOf(group, sub) {
-    const list = assetsOf(group, sub),
-      order = [],
-      map = {};
-    return list.forEach(a => {
-      map[a.product] || (map[a.product] = [], order.push(a.product)), map[a.product].push(a);
-    }), order.sort((a, b) => a.localeCompare(b, "ko")), order.map(product => {
-      const items = map[product],
-        assigned = items.filter(a => a.status === "assigned").length,
-        stock = items.filter(a => a.status === "stock").length,
-        repair = items.filter(a => a.status === "repair").length,
-        lost = items.filter(a => a.status === "lost").length,
-        disposed = items.filter(a => a.status === "disposed").length;
-      return {
-        product,
-        items,
-        total: items.length,
-        assigned,
-        stock,
-        repair,
-        lost,
-        disposed
-      };
+    return window.AssetProducts.list(group,sub).map(p => {
+      const items=window.AssetProducts.assetsOf(p.id);
+      return { product:p.name,items,total:items.length,
+        assigned:items.filter(a=>a.status==='assigned').length,
+        stock:items.filter(a=>a.status==='stock').length,
+        repair:items.filter(a=>a.status==='repair').length,
+        lost:items.filter(a=>a.status==='lost').length,
+        disposed:items.filter(a=>a.status==='disposed').length };
     });
   }
   function thumb(a) {
@@ -226,11 +212,11 @@
     return ph.length ? `<span class="thumb" style="background:${ph[a._primary || 0].color}"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10" r="1.6"/><path d="m21 16-5-5-9 8"/></svg></span>` : '<span class="thumb empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 15 5-4 4 3 4-4 5 4"/></svg></span>';
   }
   function prodCell(a, name) {
-    return `<div class="prodcell">${thumb(a)}<span class="pname">${name}</span></div>`;
+    return `<div class="prodcell">${thumb(a)}<span class="pname">${window.AssetExtra.esc(name)}</span></div>`;
   }
   function productRowHtml(p) {
     return `
-      <tr class="clickable cat-prod-row" data-product="${p.product}" data-search-count="${p.total}">
+      <tr class="clickable cat-prod-row" data-product="${window.AssetExtra.esc(p.product)}" data-search-count="${p.total}">
         <td>${prodCell(productPhotoAsset(p.items), p.product)}</td>
         <td class="num">${p.total}</td>
         <td class="num">${p.assigned}</td>
@@ -769,10 +755,11 @@
 function openManagementMenu(button,sel) {
   document.querySelectorAll('[data-category-manage-menu]').forEach(el=>el.remove());
   const menu=document.createElement('div');menu.className='dropdown-menu';menu.dataset.categoryManageMenu='';
-  menu.innerHTML='<button type="button" data-manage-classification>분류</button><button type="button" data-manage-extra>추가 정보</button><button type="button" data-manage-tag>태그</button><button type="button" data-manage-template>배정 템플릿</button>';
+  menu.innerHTML='<button type="button" data-manage-classification>분류</button><button type="button" data-manage-extra>추가 정보</button><button type="button" data-manage-product>품목</button><button type="button" data-manage-tag>태그</button><button type="button" data-manage-template>배정 템플릿</button>';
   const rect=button.getBoundingClientRect();menu.style.cssText=`position:fixed;left:${rect.left}px;top:${rect.bottom+4}px;min-width:160px`;document.body.appendChild(menu);
   menu.querySelector('[data-manage-classification]').onclick=()=>{menu.remove();openManageModal(sel);};
   menu.querySelector('[data-manage-extra]').onclick=()=>{menu.remove();openExtraInfoManager();};
+  menu.querySelector('[data-manage-product]').onclick=()=>{menu.remove();window.openAssetProductManageModal(()=>render(sel),sel);};
   menu.querySelector('[data-manage-tag]').onclick=()=>{menu.remove();if(window.hasPrototypeAssetManagePermission())window.openAssetTagManageModal(()=>render(sel));};
   menu.querySelector('[data-manage-template]').onclick=()=>{menu.remove();window.AssetTemplates.openTemplateManager();};
   const close=e=>{if(!menu.contains(e.target)&&!button.contains(e.target)){menu.remove();document.removeEventListener('click',close);}};document.addEventListener('click',close);
@@ -838,7 +825,7 @@ function openManagementMenu(button,sel) {
         }
         cat.sub !== name && assets.forEach(a => {
           a.group === cat.group && a.sub === cat.sub && (a.sub = name);
-        }), cat.sub = name, cat.type = state.type, cat.hiddenFields = [...state.hiddenFields], cat.extraEnabled=[...(state.extraEnabled||[])], cat.privateFields=[...(state.privateFields||[])], cat.view = state.view, cat.assign = state.assign, cat.edit = state.edit, cat.editTarget = TARGET_NEEDED.has(state.edit) ? structuredClone(state.editTarget) : null, cat.viewTarget = TARGET_NEEDED.has(state.view) ? {
+        }), cat.sub !== name && window.AssetProducts.renameCategory(cat.group,cat.sub,cat.group,name), cat.sub = name, cat.type = state.type, cat.hiddenFields = [...state.hiddenFields], cat.extraEnabled=[...(state.extraEnabled||[])], cat.privateFields=[...(state.privateFields||[])], cat.view = state.view, cat.assign = state.assign, cat.edit = state.edit, cat.editTarget = TARGET_NEEDED.has(state.edit) ? structuredClone(state.editTarget) : null, cat.viewTarget = TARGET_NEEDED.has(state.view) ? {
           ...state.viewTarget
         } : null, cat.assignTarget = TARGET_NEEDED.has(state.assign) ? {
           ...state.assignTarget
@@ -1098,7 +1085,7 @@ function openManagementMenu(button,sel) {
             subName = normalizedName(s.name);
           (oldGroup !== groupName || oldSub !== subName) && assets.forEach(a => {
             a.group === oldGroup && a.sub === oldSub && (a.group = groupName, a.sub = subName);
-          }), newCategories.push({
+          }), window.AssetProducts.renameCategory(oldGroup,oldSub,groupName,subName), newCategories.push({
             ...s.data,
             group: groupName,
             sub: subName
@@ -1107,7 +1094,7 @@ function openManagementMenu(button,sel) {
             sub: subName
           });
         });
-      }), categories.length = 0, categories.push(...newCategories), window.DATA.emptyGroups = newEmptyGroups, back.remove(), toast("저장되었습니다."), render(nextSelection);
+      }), categories.length = 0, categories.push(...newCategories), window.AssetProducts.pruneCategories(), window.DATA.emptyGroups = newEmptyGroups, back.remove(), toast("저장되었습니다."), render(nextSelection);
     }
     function enterCreate(gi) {
       createGi = gi, createState = {

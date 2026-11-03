@@ -2308,7 +2308,7 @@
         const productInput = field("product"),
           productMenu = root.querySelector("[data-add-product-menu]"),
           currentCat = addCategory(draft),
-          productNames = currentCat ? [...new Set(assets.filter(asset => asset.group === currentCat.group && asset.sub === currentCat.sub).map(asset => asset.product).filter(Boolean))] : [];
+          productNames = currentCat ? window.AssetProducts.list(currentCat.group,currentCat.sub).map(p=>p.name) : [];
         productInput.addEventListener("focus", renderProductMenu2), productInput.addEventListener("input", renderProductMenu2), productInput.addEventListener("blur", () => setTimeout(() => {
           productMenu.hidden = !0;
         }, 120));
@@ -2370,7 +2370,7 @@
           if (draft.editingId) {
             const asset2 = assets.find(a => a.id === draft.editingId),
               moved = asset2.group + "|" + asset2.sub !== draft.category;
-            applyAssetEdit(asset2, draft), state.sub = asset2.sub, moved && state.detailTarget && (state.directoryCategory = {
+            applyAssetEdit(asset2, draft), window.AssetProducts.reconcile(), state.sub = asset2.sub, moved && state.detailTarget && (state.directoryCategory = {
               group: asset2.group,
               sub: asset2.sub
             }, state.directorySearch = ""), moved && (state.statusFilter = "all", state.popupFilters = MappAssetFilter.empty(), state.subSearch = "", state.listScroll = 0), state.addDraft = null, state.addOrigin = null, state.screen = "asset-detail", draw(), toast("저장되었습니다.");

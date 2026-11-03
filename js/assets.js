@@ -465,7 +465,9 @@
     };
   }
   function groupByProduct(list) {
-    const map = /* @__PURE__ */new Map();
+    const allowed=new Set(viewableCategories().map(c=>JSON.stringify([c.group,c.sub]))),scope=classificationScopes.product||[],q=state.search.trim().toLowerCase();
+    const definitions=window.AssetProducts.all().filter(p=>allowed.has(JSON.stringify([p.group,p.sub]))&&(!scope.length||scope.includes(`${p.group}/${p.sub}`))&&(!q||p.name.toLowerCase().includes(q)));
+    const map = new Map(definitions.map(p=>[productKey({group:p.group,sub:p.sub,product:p.name}),{id:p.id,product:p.name,group:p.group,sub:p.sub,updatedAt:p.updatedAt,list:[]}]));
     list.forEach(a => {
       const key = productKey(a);
       map.has(key) || map.set(key, {
@@ -478,7 +480,7 @@
     });
     const groups = [...map.values()];
     return groups.forEach(g => {
-      g.updatedAt = g.list.reduce((max, a) => a.updatedAt > max ? a.updatedAt : max, "");
+      g.updatedAt = g.list.reduce((max, a) => a.updatedAt > max ? a.updatedAt : max, g.updatedAt || "");
     }), groups;
   }
   function view_product(list) {
@@ -503,7 +505,7 @@
         counts[a.status] = (counts[a.status] || 0) + 1;
       }), `<tr class="clickable" data-pkey="${productKey(g)}">
         <td>${g.group} <span class="muted">›</span> ${g.sub}</td>
-        <td><div class="prodcell">${thumb([...g.list].sort((a, b) => String(a.assetNo || "").localeCompare(String(b.assetNo || ""))).find(a => window.assetPhotos(a).length) || g.list[0])}<span class="pname">${g.product}</span></div></td>
+        <td><div class="prodcell">${thumb([...g.list].sort((a, b) => String(a.assetNo || "").localeCompare(String(b.assetNo || ""))).find(a => window.assetPhotos(a).length) || g.list[0])}<span class="pname">${window.AssetExtra.esc(g.product)}</span></div></td>
         <td class="num">${g.list.length}</td>
         <td class="num">${counts.assigned}</td>
         <td class="num">${counts.repair}</td>
@@ -745,7 +747,7 @@
   function filterChips(){const f=state.filters,chips=[],push=(k,label,v)=>chips.push(`<span class="fchip">${label}<button data-clear='${JSON.stringify({k,v})}'>✕</button></span>`);f.status.forEach(v=>push('status',STATUS_LABEL[v][0],v));f.expiry.forEach(v=>push('expiry',EXP_LABEL[v],v));f.labels.forEach(v=>push('labels',v,v));f.note.forEach(v=>push('note',v==='has'?'있음':'없음',v));return chips.length?`<div class="filterbar"><button class="filter-reset" id="filter-reset" aria-label="필터 전체 해제">${RESET_ICON}</button>${chips.join('')}</div>`:'';}
   function tableInner(v) {
     const filtering = activeFilterCount() > 0 || !!state.statFilter || !!state.search.trim(),
-      emptyMsg = hasViewScope() ? filtering ? "결과가 없습니다." : ["employee", "worksite"].includes(state.view) ? "표시할 목록이 없습니다." : "등록된 자산이 없습니다." : "조회 가능한 자산이 없습니다.",
+      emptyMsg = hasViewScope() ? filtering ? "결과가 없습니다." : ["employee", "worksite"].includes(state.view) ? "표시할 목록이 없습니다." : state.view === "product" ? "등록된 품목이 없습니다." : "등록된 자산이 없습니다." : "조회 가능한 자산이 없습니다.",
       empty = `<tr><td colspan="${v.cols ? v.cols : state.view === "product" ? 8 : state.view === "employee" ? 4 : state.view === "worksite" ? 3 : canManageAssets() ? 10 : 9}" style="text-align:center;color:var(--text-mut);padding:32px">${emptyMsg}</td></tr>`;
     return `<table class="${state.view === "product" ? `tbl-product tbl-product-${state.productType}` : `tbl-${state.view}${isTargetFull() ? " tbl-target-full" : ""}`}"><thead>${v.head}</thead><tbody>${v.rows || empty}</tbody></table>`;
   }

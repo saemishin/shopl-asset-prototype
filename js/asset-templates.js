@@ -1,4 +1,4 @@
-// 배정 템플릿 관리(Web_dc_24)와 자산 배정(Web_dc_13). 연결 기준은 Policy_15, 저장소는 window.AssetLinks.
+// 배정 템플릿 관리(Web_dc_25)와 자산 배정(Web_dc_13). 연결 기준은 Policy_15, 저장소는 window.AssetLinks.
 (() => {
   const D = window.DATA;
   const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
@@ -85,6 +85,7 @@
     { id: "T2", name: "매장 업무석 세트", base: { group: "가구류", sub: "책상", product: "데스커 1400" }, items: [{ group: "가구류", sub: "의자", product: "시디즈 T50", count: 2 }] }
   ];
   D.templates.forEach(t => [t.base, ...t.items].forEach(x => { x.group ||= (D.categories.find(c => c.sub === x.sub) || {}).group || ""; }));
+  window.AssetProducts.bindTemplates(true);
   function toast(msg) {
     const t = document.createElement("div");
     t.textContent = msg, t.style.cssText = "position:fixed;left:50%;bottom:32px;transform:translateX(-50%);background:#1b1d1f;color:#fff;padding:10px 16px;border-radius:8px;font-size:12.5px;z-index:400", document.body.appendChild(t), setTimeout(() => t.remove(), 1800);
@@ -100,7 +101,7 @@
     cb.querySelector("[data-no]").onclick = () => cb.remove();
     cb.querySelector("[data-ok]").onclick = () => { cb.remove(), onOk(); };
   }
-  const productsOf = sub => [...new Set(D.assets.filter(a => a.sub === sub && !a.deleted_at).map(a => a.product))].sort((p, q) => p.localeCompare(q, "ko"));
+  const productsOf = (sub,group) => window.AssetProducts.all().filter(p=>p.sub===sub&&(!group||p.group===group)).map(p=>p.name).sort((p,q)=>p.localeCompare(q,"ko"));
   const totalOf = t => 1 + t.items.reduce((n, x) => n + (+x.count || 0), 0);
   const itemKey = x => x.sub + "\u0000" + x.product;
   const thumbOf = a => {
@@ -115,7 +116,7 @@
   function pickCategory(x, onDone) {
     window.openAssetCategoryPickModal(D.categories, x.sub ? `${x.group}|${x.sub}` : null, v => {
       const [group, sub] = String(v).split("|");
-      sub !== x.sub && (x.product = "", x._text = ""), x.group = group, x.sub = sub, onDone();
+      (sub !== x.sub || group !== x.group) && (x.product = "", x.productId = null, x._text = ""), x.group = group, x.sub = sub, onDone();
     });
     const backs = document.querySelectorAll(".modal-back");
     backs.length && (backs[backs.length - 1].style.zIndex = 390);
@@ -128,17 +129,17 @@
     const close = () => { menu && (menu.remove(), menu = null); };
     const open = () => {
       close();
-      const q = input.value.trim().toLowerCase(), list = productsOf(x.sub).filter(p => !q || p.toLowerCase().includes(q));
+      const q = input.value.trim().toLowerCase(), list = productsOf(x.sub,x.group).filter(p => !q || p.toLowerCase().includes(q));
       menu = document.createElement("div");
       menu.className = "dropdown-menu tpl-prod-menu";
       menu.innerHTML = list.length ? list.map(p => `<button type="button" data-prod="${esc(p)}">${esc(p)}</button>`).join("") : '<p class="muted" style="padding:8px 12px;margin:0">등록된 품목이 없습니다.</p>';
       const r = input.getBoundingClientRect();
       menu.style.cssText = `position:fixed;top:${r.bottom + 4}px;left:${r.left}px;width:${r.width}px;max-height:220px;overflow-y:auto;z-index:400`;
       document.body.appendChild(menu);
-      menu.querySelectorAll("[data-prod]").forEach(b => b.onmousedown = e => { e.preventDefault(), x.product = b.dataset.prod, x._text = undefined, close(), onPick(); });
+      menu.querySelectorAll("[data-prod]").forEach(b => b.onmousedown = e => { e.preventDefault(), x.product = b.dataset.prod, x.productId = window.AssetProducts.all().find(p=>p.group===x.group&&p.sub===x.sub&&p.name===x.product)?.id, x._text = undefined, close(), onPick(); });
     };
     input.addEventListener("focus", open);
-    input.addEventListener("input", () => { x._text = input.value, x.product = productsOf(x.sub).includes(input.value.trim()) ? input.value.trim() : "", open(), onType(); });
+    input.addEventListener("input", () => { x._text = input.value, x.product = productsOf(x.sub,x.group).includes(input.value.trim()) ? input.value.trim() : "", x.productId = window.AssetProducts.all().find(p=>p.group===x.group&&p.sub===x.sub&&p.name===x.product)?.id || null, open(), onType(); });
     input.addEventListener("blur", () => setTimeout(close, 120));
   }
   function openTargetPicker(kind, initial, onApply) {
@@ -159,7 +160,7 @@
     render();
   }
 
-  // 새24 관리와 새17 선택에서 같은 템플릿 구성을 표시한다.
+  // 새25 관리와 새13 선택에서 같은 템플릿 구성을 표시한다.
   const templateSummaryHtml = t => `<div class="tpl-card-main"><b>${esc(t.name)}</b><span class="muted">전체 ${totalOf(t)}개</span><div class="tpl-card-items">${[t.base, ...t.items].map((x, i) => `<span class="tpl-chip${i ? "" : " base"}"><span class="tpl-chip-role">${i ? "연결 자산" : "기준"}</span><span class="tpl-chip-divider" aria-hidden="true">│</span><span class="tpl-chip-value">${esc(x.product)}${i ? `(${x.count}개)` : ""}</span></span>`).join("")}</div></div>`;
   // 정적 목업의 시드 데이터를 20개씩 표시한다. 운영에서는 같은 경계로 다음 목록을 요청한다.
   function mountTemplatePages(scrollRoot, listEl, templates, cardHtml, onAppend = () => {}) {
@@ -223,7 +224,7 @@
     apply.onclick = () => { if (!selected) return; close(); onApply(selected); };
   }
   function openTemplateEditor(tpl, onSaved) {
-    const pick = x => ({ group: x.group, sub: x.sub, product: x.product, ...(x.count ? { count: x.count } : {}) });
+    const pick = x => ({ group: x.group, sub: x.sub, product: x.product, productId: x.productId, ...(x.count ? { count: x.count } : {}) });
     const original = tpl ? JSON.stringify({ name: tpl.name, base: pick(tpl.base), items: tpl.items.map(pick) }) : "";
     const draft = tpl ? JSON.parse(original) : { name: "", base: { group: "", sub: "", product: "" }, items: [{ group: "", sub: "", product: "", count: 1 }] };
     const back = modal(`<h3>${tpl ? "템플릿 수정" : "템플릿 추가"}</h3><div class="body tpl-edit-body" data-ed></div><div class="foot"><button class="btn" data-cancel>취소</button><button class="btn primary" data-save disabled>저장</button></div>`, "tpl-modal wide", 340);
@@ -235,11 +236,11 @@
         keys = rows.map(itemKey);
       return { dup: !!name && D.templates.some(t => t !== tpl && t.name.trim() === name), dupKeys: new Set(keys.filter((k, i) => keys.indexOf(k) !== i)), over: draft.items.reduce((n, x) => n + (+x.count || 0), 0) > MAX_ITEMS };
     };
-    const valid = () => { const e = errors(); return draft.name.trim() && !e.dup && !e.over && !e.dupKeys.size && draft.base.product && draft.items.length && draft.items.every(x => x.product && +x.count >= 1); };
+    const valid = () => { const e = errors(); return draft.name.trim() && !e.dup && !e.over && !e.dupKeys.size && window.AssetProducts.rowExists(draft.base) && draft.items.length && draft.items.every(x => window.AssetProducts.rowExists(x) && +x.count >= 1); };
     const changed = () => tpl ? JSON.stringify({ name: draft.name, base: pick(draft.base), items: draft.items.map(pick) }) !== original : !!(draft.name.trim() || draft.base.sub || draft.items.length > 1 || draft.items.some(x => x.sub || x.product || x._text?.trim() || +x.count !== 1));
     const rowErr = x => {
       const e = errors();
-      if (x._text && !x.product) return "등록된 품목에서 선택해주세요.";
+      if (x._text && !x.product || x.product && !window.AssetProducts.rowExists(x)) return "등록된 품목에서 선택해주세요.";
       if (x.product && e.dupKeys.has(itemKey(x))) return "같은 품목이 이미 있습니다.";
       return "";
     };
@@ -293,9 +294,10 @@
   const targetKey = t => t ? (t.type === "employee" ? "e:" : "w:") + t.value : null;
   const assetTargetKey = a => { const r = (a.assignments || [])[0]; return r ? (r.employee ? "e:" + r.employee : "w:" + r.worksite) : null; };
   function usableTemplates() {
-    if (window.hasPrototypeAssetManagePermission()) return D.templates;
+    const available=D.templates.filter(t=>[t.base,...t.items].every(row=>window.AssetProducts.rowExists(row)));
+    if (window.hasPrototypeAssetManagePermission()) return available;
     const ok = sub => D.assets.some(a => a.sub === sub && window.AssetAccess.canState(a));
-    return D.templates.filter(t => [t.base, ...t.items].every(x => ok(x.sub)));
+    return available.filter(t => [t.base, ...t.items].every(x => ok(x.sub)));
   }
   function openTemplateAssign(onDone, qaDemo = false) {
     const today = "2026-09-04"; // 프로토타입 기준일(다른 화면의 TODAY와 같음)
@@ -306,7 +308,7 @@
     const assetById = id => D.assets.find(a => a.id === id);
     const allPicked = () => st.rows.flatMap(r => r.picked);
     const isNew = a => !assetTargetKey(a);
-    const candidates = row => D.assets.filter(a => !a.deleted_at && a.status !== "disposed" && a.sub === row.sub && a.product === row.product && window.AssetAccess.canView(a) && window.AssetAccess.canState(a) && (isNew(a) ? a.status === "stock" : assetTargetKey(a) === targetKey(curTarget())) && !st.rows.some(other => other !== row && other.picked.includes(a.id))).sort((p, q) => String(p.assetNo).localeCompare(String(q.assetNo)));
+    const candidates = row => D.assets.filter(a => !a.deleted_at && a.status !== "disposed" && a.group === row.group && a.sub === row.sub && (row.productId ? a.productId === row.productId : a.product === row.product) && window.AssetAccess.canView(a) && window.AssetAccess.canState(a) && (isNew(a) ? a.status === "stock" : assetTargetKey(a) === targetKey(curTarget())) && !st.rows.some(other => other !== row && other.picked.includes(a.id))).sort((p, q) => String(p.assetNo).localeCompare(String(q.assetNo)));
     const anyNew = () => allPicked().some(id => isNew(assetById(id)));
     const ready = () => curTarget() && st.tplId && st.rows.length > 1 && st.rows.every(r => r.picked.length === r.count) && (!anyNew() || st.date);
     const loadTemplate = () => {

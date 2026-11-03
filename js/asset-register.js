@@ -547,14 +547,14 @@
       const cat = findCat(catValue);
       if (!cat) return [];
       const q = nameInput.value.trim().toLowerCase(),
-        names = [...new Set((window.DATA.assets || []).filter(a => a.group === cat.group && a.sub === cat.sub).map(a => a.product).filter(Boolean))];
+        names = window.AssetProducts.list(cat.group,cat.sub).map(p=>p.name);
       return q ? names.filter(n => n.toLowerCase().includes(q)) : names;
     }
     function openProdMenu() {
       if(nameInput.readOnly)return;
       const opts2 = productOptions();
       if (closeProdMenu(), !opts2.length) return;
-      prodMenu = document.createElement("div"), prodMenu.className = "dropdown-menu", prodHi = 0, prodMenu.innerHTML = opts2.map((n, i) => `<button type="button" data-v="${n}" class="${i === 0 ? "active" : ""}">${n}</button>`).join("");
+      prodMenu = document.createElement("div"), prodMenu.className = "dropdown-menu", prodHi = 0, prodMenu.innerHTML = opts2.map((n, i) => `<button type="button" data-v="${window.AssetExtra.esc(n)}" class="${i === 0 ? "active" : ""}">${window.AssetExtra.esc(n)}</button>`).join("");
       const r = nameInput.getBoundingClientRect();
       prodMenu.style.cssText = `position:fixed;top:${r.bottom + 4}px;left:${r.left}px;min-width:${r.width}px`, document.body.appendChild(prodMenu), prodMenu.querySelectorAll("[data-v]").forEach(b => b.onclick = () => {
         nameInput.value = b.dataset.v, closeProdMenu(), checkValid();
@@ -980,7 +980,7 @@
         const purchaseDate = getPurchaseDate();
         fieldIsShown(purchaseDateField) && purchaseDate !== null && (purchaseDate || "").slice(0, 7) !== (asset.purchaseDate || "").slice(0, 7) && (logChange("구매연월 변경", monthFmt(asset.purchaseDate), monthFmt(purchaseDate)), asset.purchaseDate = purchaseDate || void 0);
         const price = window.normalizePurchasePrice(purchasePriceInput.value);
-        setIf("구매가격 변경", "price", price || void 0, v => v != null ? window.formatPrice(v) : ""), setIf("메모 수정", "note", noteInput.value.trim() || void 0), window.AssetExtra.applyCustom(asset,window.AssetExtra.readInputs(back),e=>pending.push(e)), pending.push(...window.assetPhotoActivities(window.assetPhotos(asset), asset._primary || 0, photos, primaryIdx)), opts.logActivity && window.logAssetActivities(pending, e => opts.logActivity(e)), asset._photos = photos, asset._primary = primaryIdx, back.remove(), toast("저장되었습니다."), opts.onSaved && opts.onSaved();
+        setIf("구매가격 변경", "price", price || void 0, v => v != null ? window.formatPrice(v) : ""), setIf("메모 수정", "note", noteInput.value.trim() || void 0), window.AssetExtra.applyCustom(asset,window.AssetExtra.readInputs(back),e=>pending.push(e)), pending.push(...window.assetPhotoActivities(window.assetPhotos(asset), asset._primary || 0, photos, primaryIdx)), window.AssetProducts.reconcile(), opts.logActivity && window.logAssetActivities(pending, e => opts.logActivity(e)), asset._photos = photos, asset._primary = primaryIdx, back.remove(), toast("저장되었습니다."), opts.onSaved && opts.onSaved();
       } else {
         const cat = findCat(catValue),
           draft = {
