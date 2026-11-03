@@ -2526,3 +2526,6 @@ body.history-capture #prototype-qa { display: none; }
 .mapp-pick-empty { padding: 24px 0; text-align: center; }
 .mapp-add-category-group button.on { color: var(--primary, #3a6cf4); font-weight: 600; }
 .mapp-add-category-group[hidden] { display: none; }
+
+/* QA 패널 숨김(2026-11-03, 새미 요청). 시나리오 파라미터 처리는 유지한다. */
+.prototype-qa, .permission-qa-panel { display: none !important; }

@@ -256,6 +256,7 @@
       }
     };
   function myWorksites(name) {
+    if (new URLSearchParams(location.search).get("qa") === "no-worksite") return { fixed: null, assigned: [] };
     return MY_WORKSITES[name] || {
       fixed: "본사",
       assigned: []
@@ -406,7 +407,9 @@
     }, ...assignedSorted.map(ws => ({
       ws,
       label: "assigned"
-    }))].map(({
+    }))].filter(({
+      ws
+    }) => ws).map(({
       ws,
       label
     }) => ({
@@ -522,12 +525,12 @@
       </div>
       ${assetTabsHtml("worksite")}
       <div class="mapp-body">
-        <div class="mapp-search">
+        ${groups.length ? `<div class="mapp-search">
           <input type="text" data-mapp-ws-search placeholder="근무지명/코드/주소">
-        </div>
+        </div>` : ""}
         <div class="mapp-count">전체 <b data-worksite-count>${groups.length}</b></div>
-        <div class="mapp-ws-list" data-mapp-ws-list>${groups.map(worksiteCardHtml).join("")}</div>
-        <p class="mapp-empty" data-mapp-ws-empty${groups.length ? " hidden" : ""}>결과가 없습니다.</p>
+        ${groups.length ? `<div class="mapp-ws-list" data-mapp-ws-list>${groups.map(worksiteCardHtml).join("")}</div>
+        <p class="mapp-empty" data-mapp-ws-empty hidden>결과가 없습니다.</p>` : '<p class="mapp-empty">표시할 목록이 없습니다.</p>'}
       </div>`;
   }
   function worksiteDetailScreenHtml(ws, sub, items, filters) {
