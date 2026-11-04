@@ -724,7 +724,23 @@
   function timelineHtml(a, query, context = null) {
     const q = (query || "").trim().toLowerCase(),
       entries = activityLog(a).map(e => window.AssetMoves.forTarget(e,context)).filter(e => window.AssetExtra.historyVisible(a,e)).filter(e => q ? (e.target && (e.target.employee || e.target.worksite) || "").toLowerCase().includes(q) : !0);
-    return entries.length ? `<div class="dtimeline">${entries.map(historyCardHtml).join("")}</div>` : '<p class="muted" style="padding:6px 0">일치하는 이력이 없습니다</p>';
+    // 오래된순: 발생 일시 묶음 단위로만 뒤집어 같은 일시의 표시 순서를 유지한다(App(E,L)_dc_07 1번).
+    const ordered = historyOrderFor(a) === "asc" ? (() => { const groups = []; entries.forEach(e => { const g = groups[groups.length - 1]; g && g[0].d === e.d ? g.push(e) : groups.push([e]); }); return groups.reverse().flat(); })() : entries;
+    return ordered.length ? `<div class="dtimeline">${ordered.map(historyCardHtml).join("")}</div>` : '<p class="muted" style="padding:6px 0">일치하는 이력이 없습니다</p>';
+  }
+  let historyOrderState = { id: null, order: "desc" };
+  function historyOrderFor(a) { return historyOrderState.id === a.id ? historyOrderState.order : "desc"; }
+  function historyPanelHtml(a, context) {
+    const asc = historyOrderFor(a) === "asc";
+    return `<div style="display:flex;justify-content:flex-end;margin-bottom:8px"><button type="button" class="btn sm" data-history-sort aria-label="${asc ? "오래된순" : "최신순"}">${asc ? "↑ 오래된순" : "↓ 최신순"}</button></div><div data-history-list>${timelineHtml(a, "", context)}</div>`;
+  }
+  function wireHistorySort(root, a, context) {
+    const btn = root.querySelector("[data-history-sort]");
+    btn && (btn.onclick = () => {
+      historyOrderState = { id: a.id, order: historyOrderFor(a) === "asc" ? "desc" : "asc" };
+      const panel = root.querySelector('[data-detail-panel="history"]');
+      panel.innerHTML = historyPanelHtml(a, context), panel.scrollTop = 0, wireHistorySort(root, a, context);
+    });
   }
   function historyScreenHtml(a, context = null) {
     return `
@@ -1275,7 +1291,7 @@ function openLeaderQr(a) {
  const info=[['분류',categoryPath(a)],['태그',chips(a.labels)]].map(([k,v])=>`<div><div class="k">${k}</div><div class="v">${v}</div></div>`).join('')+window.AssetExtra.detailRows(a,manage,expiryBadge)+[['자산 등록일',window.fmtDate(a.createdAt)],['QR 라벨','<button class="btn sm" data-qr-open aria-label="QR 라벨">QR 라벨</button>'],['메모',`${memoHtml(a.note)}${window.AssetAccess.canField(a,'memo',ME)?`<button class="icon-edit" data-memoedit aria-label="메모 수정">${IC_EDIT}</button>`:''}`]].map(([k,v])=>`<div><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
  // 자산 한 건은 한 대상에게만 배정하므로 배정 탭에는 이 대상의 배정 기록 하나만 보여준다(D-20261030-14·15).
  const party=`<div class="dsection"><h2 class="mapp-party-head">배정 현황</h2>${rec?`<div class="acard${manageActions(a,target).length?' has-actions':''}">${typeBadge(rec)}${manageActions(a,target).length?`<button type="button" class="mapp-holder-more" data-card-more aria-label="배정 관리" aria-haspopup="menu">${MORE_ICON}</button>`:''}<div class="acard-id">${assignIdentity(rec)}</div><div class="acard-foot"><span class="acard-date">배정일 <b>${window.fmtDate(rec.since)}</b></span>${canManage(a)?`<button type="button" class="icon-edit acard-date-edit" data-date-edit aria-label="배정일 수정">${IC_EDIT}</button>`:''}</div></div>`:`<div class="assign-empty"><p class="mapp-party-empty">배정 대상이 없습니다.</p>${canManage(a)&&!(a.assignments||[]).length?'<button type="button" class="btn sm" data-assign-open>배정</button>':''}</div>`}</div>`;
- return `<div class="mapp-topbar"><button class="mapp-back" data-mapp-back aria-label="뒤로">←</button>${menuActions(a,target).length?`<button class="mapp-more" data-more-open aria-label="더보기">${MORE_ICON}</button>`:''}</div><div class="mapp-body"><div class="dhead-id"><div class="mapp-hero-wrap"><button class="mapp-hero-img" data-hero-viewer aria-label="사진 보기"${photos.length?'':' disabled'}>${cardThumb(a)}</button>${photos.length>1?`<span class="mapp-hero-count">+${photos.length-1}</span>`:''}</div><div><h1>${a.product}</h1><div class="dhead-sub">${actions.length?`<button class="badge ${STATUS_LABEL[a.status][1]} clickable" data-status-open>${STATUS_LABEL[a.status][0]} ▾</button>`:`<span class="badge ${STATUS_LABEL[a.status][1]}">${STATUS_LABEL[a.status][0]}</span>`}<div>고유관리번호 <b>${a.assetNo}</b></div></div></div></div>${window.AssetExtra.tabs()}<div data-detail-panel="assignment">${party}${window.MappLinks.sectionHtml(a, ME)}</div><div data-detail-panel="info" hidden><div class="kv2">${info}</div>${window.AssetExtra.detailHtml(a,manage,expiryBadge)}</div><div data-detail-panel="history" hidden>${timelineHtml(a,'',target)}</div></div>`;
+ return `<div class="mapp-topbar"><button class="mapp-back" data-mapp-back aria-label="뒤로">←</button>${menuActions(a,target).length?`<button class="mapp-more" data-more-open aria-label="더보기">${MORE_ICON}</button>`:''}</div><div class="mapp-body"><div class="dhead-id"><div class="mapp-hero-wrap"><button class="mapp-hero-img" data-hero-viewer aria-label="사진 보기"${photos.length?'':' disabled'}>${cardThumb(a)}</button>${photos.length>1?`<span class="mapp-hero-count">+${photos.length-1}</span>`:''}</div><div><h1>${a.product}</h1><div class="dhead-sub">${actions.length?`<button class="badge ${STATUS_LABEL[a.status][1]} clickable" data-status-open>${STATUS_LABEL[a.status][0]} ▾</button>`:`<span class="badge ${STATUS_LABEL[a.status][1]}">${STATUS_LABEL[a.status][0]}</span>`}<div>고유관리번호 <b>${a.assetNo}</b></div></div></div></div>${window.AssetExtra.tabs()}<div data-detail-panel="assignment">${party}${window.MappLinks.sectionHtml(a, ME)}</div><div data-detail-panel="info" hidden><div class="kv2">${info}</div>${window.AssetExtra.detailHtml(a,manage,expiryBadge)}</div><div data-detail-panel="history" hidden>${historyPanelHtml(a,target)}</div></div>`;
 }
   const MENU_ICON_ASSET = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10" r="1.6"/><path d="m21 16-5-5-9 8"/></svg>',
     DEMO_DIRECTORY_MEMBER = "김민수",
@@ -1629,6 +1645,7 @@ function openLeaderQr(a) {
         window.MappLinks.wire(root, a, { me: ME, log: logActivity, after: afterMutate, identityInner: rec => assignIdentity(rec), pickDate: (iso, cb) => openDateSheet(iso, todayStr(), cb), identity: rec => `<div class="acard">${typeBadge(rec)}<div class="acard-id">${assignIdentity(rec)}</div></div>`, open: id => { state.detailAssetId = id, draw(); } });
         const heroBtn = root.querySelector("[data-hero-viewer]");
         heroBtn && (heroBtn.onclick = () => openPhotoViewer(a, draw));
+        wireHistorySort(root, a, target);
         const heroEdit = root.querySelector("[data-hero-edit]");
         heroEdit && (heroEdit.onclick = e => {
           e.stopPropagation(), openPhotoManageModal(a, afterMutate);

@@ -1346,7 +1346,23 @@
   function timelineHtml(a, query, context = null) {
     const q = (query || "").trim().toLowerCase(),
       entries = activityLog(a).map(e => window.AssetMoves.forTarget(e,context)).filter(e => window.AssetExtra.historyVisible(a,e)).filter(e => q ? (e.target && (e.target.employee || e.target.worksite) || "").toLowerCase().includes(q) : !0);
-    return entries.length ? `<div class="dtimeline">${entries.map(historyCardHtml).join("")}</div>` : '<p class="muted" style="padding:6px 0">일치하는 이력이 없습니다</p>';
+    // 오래된순: 발생 일시 묶음 단위로만 뒤집어 같은 일시의 표시 순서를 유지한다(App(E,L)_dc_07 1번).
+    const ordered = historyOrderFor(a) === "asc" ? (() => { const groups = []; entries.forEach(e => { const g = groups[groups.length - 1]; g && g[0].d === e.d ? g.push(e) : groups.push([e]); }); return groups.reverse().flat(); })() : entries;
+    return ordered.length ? `<div class="dtimeline">${ordered.map(historyCardHtml).join("")}</div>` : '<p class="muted" style="padding:6px 0">일치하는 이력이 없습니다</p>';
+  }
+  let historyOrderState = { id: null, order: "desc" };
+  function historyOrderFor(a) { return historyOrderState.id === a.id ? historyOrderState.order : "desc"; }
+  function historyPanelHtml(a, context) {
+    const asc = historyOrderFor(a) === "asc";
+    return `<div style="display:flex;justify-content:flex-end;margin-bottom:8px"><button type="button" class="btn sm" data-history-sort aria-label="${asc ? "오래된순" : "최신순"}">${asc ? "↑ 오래된순" : "↓ 최신순"}</button></div><div data-history-list>${timelineHtml(a, "", context)}</div>`;
+  }
+  function wireHistorySort(root, a, context) {
+    const btn = root.querySelector("[data-history-sort]");
+    btn && (btn.onclick = () => {
+      historyOrderState = { id: a.id, order: historyOrderFor(a) === "asc" ? "desc" : "asc" };
+      const panel = root.querySelector('[data-detail-panel="history"]');
+      panel.innerHTML = historyPanelHtml(a, context), panel.scrollTop = 0, wireHistorySort(root, a, context);
+    });
   }
   function historyScreenHtml(a, context = null) {
     return `
@@ -1979,7 +1995,7 @@
  const badge=statusActions(a).length?`<button class="badge ${STATUS_LABEL[a.status][1]} clickable" data-status-open>${STATUS_LABEL[a.status][0]} ▾</button>`:`<span class="badge ${STATUS_LABEL[a.status][1]}">${STATUS_LABEL[a.status][0]}</span>`;
  const info=[['분류',categoryPath(a)],['태그',(a.labels||[]).map(l=>`<span class="tag">${esc(l)}</span>`).join('')||'—']].map(([k,v])=>`<div><div class="k">${k}</div><div class="v">${v}</div></div>`).join('')+window.AssetExtra.detailRows(a,manage,expiryBadge)+[['자산 등록일',window.fmtDate(a.createdAt)],['QR 라벨',`<button type="button" class="btn sm icon-only" data-qr-open aria-label="QR 라벨">${QR_ICON}</button>`],['메모',`${window.AssetMemo.render(a.note)}${editable?`<button class="icon-edit" data-memoedit aria-label="메모 수정">${IC_EDIT}</button>`:''}`]].map(([k,v])=>`<div><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
  const assignments=target?scopedPartySectionHtml(a,target):`<div class="dsection"><div class="mapp-leader-holders-head"><h2>배정 현황</h2></div><div data-holder-list></div></div>`;
- return `<div class="mapp-topbar"><button class="mapp-back" data-mapp-back aria-label="뒤로">←</button>${editable||manage&&!target?`<button class="mapp-more" data-more-open aria-label="더보기">${MORE_ICON}</button>`:''}</div><div class="mapp-body mapp-leader-detail-body"><div class="dhead-id"><div class="mapp-hero-wrap"><button class="mapp-hero-img" data-hero-viewer aria-label="사진 보기"${photos.length?'':' disabled'}>${cardThumb(a)}</button>${photos.length>1?`<span class="mapp-hero-count">+${photos.length-1}</span>`:''}</div><div><h1>${esc(a.product)}</h1><div class="dhead-sub">${badge}<div>고유관리번호 <b>${esc(a.assetNo)}</b></div></div></div></div>${window.AssetExtra.tabs()}<div data-detail-panel="assignment">${assignments}${window.MappLinks.sectionHtml(a, ME)}</div><div data-detail-panel="info" hidden><div class="kv2">${info}</div>${window.AssetExtra.detailHtml(a,manage,expiryBadge)}</div><div data-detail-panel="history" hidden>${timelineHtml(a,'',target)}</div></div>`;
+ return `<div class="mapp-topbar"><button class="mapp-back" data-mapp-back aria-label="뒤로">←</button>${editable||manage&&!target?`<button class="mapp-more" data-more-open aria-label="더보기">${MORE_ICON}</button>`:''}</div><div class="mapp-body mapp-leader-detail-body"><div class="dhead-id"><div class="mapp-hero-wrap"><button class="mapp-hero-img" data-hero-viewer aria-label="사진 보기"${photos.length?'':' disabled'}>${cardThumb(a)}</button>${photos.length>1?`<span class="mapp-hero-count">+${photos.length-1}</span>`:''}</div><div><h1>${esc(a.product)}</h1><div class="dhead-sub">${badge}<div>고유관리번호 <b>${esc(a.assetNo)}</b></div></div></div></div>${window.AssetExtra.tabs()}<div data-detail-panel="assignment">${assignments}${window.MappLinks.sectionHtml(a, ME)}</div><div data-detail-panel="info" hidden><div class="kv2">${info}</div>${window.AssetExtra.detailHtml(a,manage,expiryBadge)}</div><div data-detail-panel="history" hidden>${historyPanelHtml(a,target)}</div></div>`;
 }
   function leaderHolderList(a, query, kind, requestedPage) {
     const q = (query || "").trim().toLowerCase(),
@@ -2339,7 +2355,7 @@
             label: "자산 삭제",
             danger: !0
           }), openDropdownMenu(more, items, dispatchAction2);
-        }), root.querySelector("[data-date-edit]")?.addEventListener("click", () => dispatchAction2("date")), root.querySelector("[data-card-more]")?.addEventListener("click", e => openDropdownMenu(e.currentTarget, scopedManageActions(a, target).map((x, i) => i ? x : { ...x, sep: !1 }), dispatchAction2)), root.querySelector("[data-assign-open]")?.addEventListener("click", () => dispatchAction2("assign-add")), root.querySelector("[data-hero-viewer]").onclick = () => openPhotoViewer(a, draw);
+        }), root.querySelector("[data-date-edit]")?.addEventListener("click", () => dispatchAction2("date")), root.querySelector("[data-card-more]")?.addEventListener("click", e => openDropdownMenu(e.currentTarget, scopedManageActions(a, target).map((x, i) => i ? x : { ...x, sep: !1 }), dispatchAction2)), root.querySelector("[data-assign-open]")?.addEventListener("click", () => dispatchAction2("assign-add")), root.querySelector("[data-hero-viewer]").onclick = () => openPhotoViewer(a, draw), wireHistorySort(root, a, target);
         const photoEdit = root.querySelector("[data-hero-edit]");
         photoEdit && (photoEdit.onclick = () => {
           canEditInfo(a) && openPhotoManageModal(a, afterMutate);
