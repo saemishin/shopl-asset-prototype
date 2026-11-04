@@ -364,6 +364,13 @@
           }).join('')}</section>`).join('')}
         </div>
       </div>`;
+
+    const caseRoot=container.closest('.modal-back');
+    window.DashboardCases?.attach(caseRoot,{when:()=>!!container.getClientRects().length,cases:[
+      ['sub-name-empty','소분류명 미입력',caseRoot.querySelector('h3')?.textContent==='소분류 수정'?'2번':'3번',()=>window.DashboardCases.input(caseRoot,'[data-f-name]','')],
+      ['sub-name-duplicate','같은 대분류 내 이름 중복',caseRoot.querySelector('h3')?.textContent==='소분류 수정'?'2번':'3번',()=>window.DashboardCases.input(caseRoot,'[data-f-name]',opts.siblingNames?.[0]||state.name)],
+      ['sub-name-ready','소분류명 입력',caseRoot.querySelector('h3')?.textContent==='소분류 수정'?'2번':'3번',()=>window.DashboardCases.input(caseRoot,'[data-f-name]','디자인 확인용 소분류')]
+    ]});
     const nameInputEl = container.querySelector("[data-f-name]"),
       nameErrEl = container.querySelector("[data-f-name-err]");
     container.querySelectorAll('[data-private-field]').forEach(el=>el.onchange=()=>{state.privateFields ||= [];const i=state.privateFields.indexOf(el.dataset.privateField);if(el.checked&&i<0)state.privateFields.push(el.dataset.privateField);else if(!el.checked&&i>=0)state.privateFields.splice(i,1);checkName();});
@@ -460,6 +467,8 @@
         picked === "특정 그룹 및 직무/직급" ? (draftTarget.groups = [], draftTarget.jobTitles = []) : draftTarget.members = [], render2();
       }), okBtn.disabled = TARGET_NEEDED.has(picked) && !isTargetSetFor(picked);
     }
+
+    window.DashboardCases?.attach(p,{reference:'Web'+(document.querySelector('[data-modal-title]')?.textContent==='소분류 추가'?'21':'22'),title:permLabel(kind),cases:()=>VIEW_OPTIONS.filter(v=>isView||ASSIGN_BY_VIEW[state.view].options.includes(v)).map((v,i)=>['permission-'+i,v,isView?'조회 권한':kind==='edit'?'정보 수정 권한':'상태 관리 권한',()=>{picked=v;draftTarget.groups=[];draftTarget.jobTitles=[];draftTarget.members=[];render2();}])});
     render2(), p.querySelector("[data-close]").onclick = () => p.remove(), okBtn.onclick = () => {
       if (okBtn.disabled) return;
       const appliedTarget = picked === "특정 그룹 및 직무/직급" ? {
@@ -750,7 +759,13 @@
     const ids=new Set(draft.map(f=>f.id)), retired=master.filter(f=>!ids.has(f.id)).map(f=>({...f,deleted:true}));
     master.splice(0,master.length,...draft.map(f=>({...f,name:f.name.trim()})),...retired);
     back.remove();toast('저장되었습니다.');render();
-  };draw();
+
+  };
+  if(window.DashboardCases){const source=JSON.parse(JSON.stringify(draft));window.DashboardCases.attach(back,{reference:'Web23',reset:()=>{draft.splice(0,draft.length,...JSON.parse(JSON.stringify(source)));input.value='';draw();},cases:[
+    ['extra-list-empty','등록된 추가 정보 없음','3번',()=>{draft.splice(0);input.value='';draw();}],
+    ['extra-max','추가 정보 30개 상한','2번',()=>{draft.splice(0,draft.length,...Array.from({length:30},(_,i)=>({id:'design-extra-'+i,name:'디자인 항목 '+(i+1)})));draw();}]
+  ]});}
+  draw();
 }
 function openManagementMenu(button,sel) {
   document.querySelectorAll('[data-category-manage-menu]').forEach(el=>el.remove());
@@ -1096,6 +1111,12 @@ function openManagementMenu(button,sel) {
         });
       }), categories.length = 0, categories.push(...newCategories), window.AssetProducts.pruneCategories(), window.DATA.emptyGroups = newEmptyGroups, back.remove(), toast("저장되었습니다."), render(nextSelection);
     }
+
+    if(window.DashboardCases){const seedDraft=JSON.parse(JSON.stringify(draft));const fixture=rows=>{draft=rows;dirty=true;renderBody();updateValidity();};window.DashboardCases.attach(back,{reference:'Web20',when:()=>back.querySelector('h3')?.textContent==='분류 관리',reset:()=>{draft=JSON.parse(JSON.stringify(seedDraft));dirty=false;setMode('list');renderBody();updateValidity();},cases:()=>currentMode==='list'?[
+      ['groups-empty','대분류 목록 없음','3번',()=>fixture([])],
+      ['groups-max','대분류 30개 상한','2번',()=>fixture(Array.from({length:30},(_,i)=>({name:'디자인 대분류 '+(i+1),origName:null,subs:[]})))],
+      ['subs-max','소분류 300개 상한','5번',()=>fixture([{name:seedDraft[0]?.name||'디자인 대분류',origName:seedDraft[0]?.origName,subs:Array.from({length:300},(_,i)=>({name:'디자인 소분류 '+(i+1),data:{group:seedDraft[0]?.name,sub:'디자인 소분류 '+(i+1)}}))}])]
+    ]:[]});}
     function enterCreate(gi) {
       createGi = gi, createState = {
         name: "",
@@ -1286,6 +1307,23 @@ function openManagementMenu(button,sel) {
     }), c.querySelectorAll("[data-manage]").forEach(b => b.onclick = () => openManageModal(sel)); c.querySelectorAll("[data-manage-dropdown]").forEach(b=>b.onclick=()=>openManagementMenu(b,sel));
     const editBtn = c.querySelector("[data-edit-sub]");
     editBtn && (editBtn.onclick = () => openSubEditModal(cat)), c.querySelectorAll("[data-perm-target]").forEach(b => b.onclick = () => openPermTargetModal(cat, b.dataset.permTarget)), wireAssetSection(c, cat);
+  }
+
+  if(window.DashboardCases){
+    const C=window.DashboardCases;
+    const apply=key=>{
+      C.restore();
+      if(key==='none'){categories.splice(0);window.DATA.emptyGroups.splice(0);}
+      if(key==='groups'){const groups=[...new Set(categories.map(c=>c.group))];categories.splice(0);window.DATA.emptyGroups.splice(0,window.DATA.emptyGroups.length,...groups);}
+      if(key==='partial'){C.access('view');categories.forEach((c,i)=>c.view=i===0?'회사의 모든 구성원':'관리자만');}
+      if(key==='no-products')assets.splice(0),window.DATA.products?.splice(0);
+      if(key==='extra-none')categories.forEach(c=>c.extraEnabled=[]);
+      if(key==='private')C.access('private');
+      render();
+    };
+    window.PrototypeCases.fixture({id:'category-page',title:'분류 > 소분류 상세',reference:'Web18·19',matches:()=>true,reset:()=>apply('default'),cases:[
+      ['default','기본 트리·소분류 상세','Web18 · 2·3번',()=>apply('default')],['none','등록된 분류 없음','Web18 · 5번',()=>apply('none')],['groups','대분류만 있음','Web18 · 4번',()=>apply('groups')],['partial','일부 소분류만 조회 가능','Web18 · 3번',()=>apply('partial')],['no-products','품목 목록 빈 상태','Web19 · 8번',()=>apply('no-products')],['extra-none','사용하는 추가 정보 없음','Web19 · 6번',()=>apply('extra-none')],['private','비공개 정보·관리 불가','Web19 · 6번',()=>apply('private')]
+    ]});
   }
   window.CategoryScreen = {
     render: () => render(null)

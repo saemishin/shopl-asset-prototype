@@ -39,6 +39,11 @@
     back.querySelector(".picker-search").oninput = e => { query = e.target.value, draw(); };
     back.querySelector("[data-close]").onclick = () => back.remove();
     ok.onclick = () => { if (ok.disabled) return; back.remove(), onApply(picked); };
+
+    if(window.DashboardCases){const initialMembers=members.slice(),initialSites={...worksites};window.DashboardCases.attach(back,{reference:isMember?'Web 공통09':'Web 공통10',reset:()=>{members=initialMembers.slice();worksites={...initialSites};picked=initial;query='';back.querySelector('.picker-search').value='';draw();},cases:[
+      ['pick-none','선택 없음','2·4번',()=>{picked=null;draw();}],
+      ['candidates-none','선택 가능한 대상 없음','2번',()=>{members=[];worksites={};picked=null;query='';draw();}]
+    ]});}
     draw();
   }
   window.TargetPicker = { open };

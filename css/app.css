@@ -2559,3 +2559,27 @@ body.history-capture #prototype-qa { display: none; }
 .link-search-field:has(.tpl-field-clear:not([hidden])) .link-search-count { right:34px; }
 .link-search-field:has(.tpl-field-clear:not([hidden])) .picker-search { padding-right:76px; }
 .mlink-cut-cards .aa-asset-summary-main strong { color:var(--text); }
+
+/* 페이지·모달별 디자인 케이스 패널. 기존 통합 QA 패널의 숨김 설정과 분리한다. */
+.case-scenarios { position:fixed; right:16px; bottom:16px; width:288px; max-width:calc(100vw - 24px); z-index:20000; border:1px solid #d8e0e8; border-radius:14px; background:#fff; color:#243345; box-shadow:0 8px 30px #17243329; font:12px/1.5 -apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo",sans-serif; }
+.case-scenarios>header { display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-bottom:1px solid #e9eef4; }
+.case-scenarios>header strong { font-size:14px; }
+.case-scenarios-header-actions { display:flex; align-items:center; gap:4px; }
+.case-scenarios>header button { width:26px; height:26px; border-radius:6px; background:#f0f3f7; color:#536478; cursor:pointer; }
+.case-scenarios-body { padding:12px; max-height:65vh; overflow:auto; }
+.case-scenarios-body[hidden] { display:none!important; }
+.case-scenarios-context { position:sticky; top:-12px; z-index:1; box-shadow:0 4px 8px #fff; display:flex; flex-direction:column; gap:3px; padding:10px; border-radius:8px; background:#f1f6ff; }
+.case-scenarios-context strong { font-size:13px; }
+.case-scenarios-context span,.case-scenarios-summary { font-size:11px; color:#5c7087; }
+.case-scenarios-summary { margin:8px 1px 12px; }
+.case-scenarios details { margin:0 0 11px; }
+.case-scenarios summary { cursor:pointer; font-weight:600; padding:5px 1px; }
+.case-scenarios-options { display:flex; flex-direction:column; gap:5px; margin-top:5px; }
+.case-scenarios-options button { font:inherit; display:flex; flex-direction:column; align-items:flex-start; gap:1px; border:1px solid #e1e7ee; border-radius:7px; background:#fafbfd; color:#243345; padding:7px 9px; text-align:left; cursor:pointer; }
+.case-scenarios-options button small { font-size:10px; color:#738297; }
+.case-scenarios-options button[aria-pressed=true] { border-color:#719bf1; background:#edf4ff; color:#245cb4; }
+.case-scenarios-options button:hover:not(:disabled) { border-color:#719bf1; }
+.case-scenarios-options button:disabled { opacity:.45; cursor:not-allowed; }
+.case-scenarios-note { margin:10px 1px; font-size:11px; color:#778596; }
+.case-scenarios-reset { font:inherit; width:100%; padding:8px; border:1px solid #d8e0e8; border-radius:7px; background:#fff; cursor:pointer; }
+@media(max-width:700px){.case-scenarios{right:8px;bottom:8px;width:248px;}.case-scenarios-body{max-height:55vh;}}

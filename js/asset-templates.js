@@ -189,6 +189,11 @@
     back.querySelector("[data-tpl-add]").onclick = () => openTemplateEditor(null, draw);
     back.querySelector("[data-close]").onclick = close;
     back.onclick = e => { if (e.target === back) close(); };
+
+    if(window.DashboardCases){const source=JSON.parse(JSON.stringify(D.templates));const apply=rows=>{D.templates.splice(0,D.templates.length,...rows);draw();};window.DashboardCases.attach(back,{reference:'Web25',reset:()=>apply(JSON.parse(JSON.stringify(source))),cases:[
+      ['templates-empty','등록된 템플릿 없음','2번',()=>apply([])],
+      ['templates-many','템플릿 45개·20개씩 추가 로드','2번',()=>apply(Array.from({length:45},(_,i)=>({...JSON.parse(JSON.stringify(source[0])),id:'design-template-'+i,name:'디자인 템플릿 '+String(i+1).padStart(2,'0')})))]
+    ]});}
     draw();
   }
 
@@ -197,7 +202,7 @@
     let selected = templates.some(t => t.id === initialId) ? initialId : "";
     const back = modal(`<h3>템플릿 선택</h3><div class="body tpl-picker-body"><div class="link-list" data-template-list></div></div><div class="foot"><button class="btn" data-template-cancel>취소</button><button class="btn primary" data-template-apply${selected ? "" : " disabled"}>적용</button></div>`, "tpl-modal", 360);
     const list = back.querySelector("[data-template-list]"), apply = back.querySelector("[data-template-apply]");
-    const dispose = mountTemplatePages(back.querySelector(".tpl-picker-body"), list, templates,
+    let dispose = mountTemplatePages(back.querySelector(".tpl-picker-body"), list, templates,
       t => `<label class="tpl-card tpl-select-card${t.id === selected ? " selected" : ""}"><input type="radio" name="template-pick" data-template-id="${esc(t.id)}"${t.id === selected ? " checked" : ""}>${templateSummaryHtml(t)}</label>`);
     list.onchange = e => {
       if (!e.target.matches("[data-template-id]")) return;
@@ -205,6 +210,11 @@
       apply.disabled = false;
       list.querySelectorAll(".tpl-select-card").forEach(card => card.classList.toggle("selected", card.querySelector("input").checked));
     };
+
+    if(window.DashboardCases){const source=templates.slice();const review=rows=>{dispose();templates.splice(0,templates.length,...rows);selected='';apply.disabled=true;dispose=mountTemplatePages(back.querySelector('.tpl-picker-body'),list,templates,t=>`<label class="tpl-card tpl-select-card"><input type="radio" name="template-pick" data-template-id="${esc(t.id)}">${templateSummaryHtml(t)}</label>`);};window.DashboardCases.attach(back,{reference:'Web13',reset:()=>review(source),cases:[
+      ['templates-none','선택 가능한 템플릿 없음','2번',()=>review([])],
+      ['templates-paging','템플릿 45개·20개씩 추가 로드','2번',()=>review(Array.from({length:45},(_,i)=>({...source[0],id:'design-template-pick-'+i,name:'디자인 템플릿 '+String(i+1).padStart(2,'0')})))]
+    ]});}
     const close = () => { dispose(); back.remove(); };
     back.querySelector("[data-template-cancel]").onclick = close;
     apply.onclick = () => { if (!selected) return; close(); onApply(selected); };
@@ -273,6 +283,12 @@
       tpl ? Object.assign(tpl, data) : D.templates.push({ id: "T" + Date.now(), ...data });
       back.remove(), toast("저장되었습니다."), onSaved();
     };
+
+    if(window.DashboardCases){const seed=JSON.parse(JSON.stringify(draft));const reset=()=>{Object.assign(draft,JSON.parse(JSON.stringify(seed)));draw();};window.DashboardCases.attach(back,{reference:'Web25',reset,cases:[
+      ['editor-first','기본 연결 자산 1개·삭제 비활성','3번',()=>{draft.items=[{group:'',sub:'',product:'',count:1}];draw();}],
+      ['editor-max','연결할 자산 합계 50개·추가 비활성','3번',()=>{draft.items=[{...(draft.items[0]||{}),count:50}];draw();}],
+      ['editor-duplicate','기준·연결 품목 중복','3번',()=>{const t=D.templates[0];if(t){draft.base={...t.base};draft.items=[{...t.base,count:1}];draw();}}]
+    ]});}
     draw();
   }
 
@@ -431,6 +447,27 @@
     if (qaDemo) {
       const t=usableTemplates().slice().sort((a,b)=>a.name.localeCompare(b.name,'ko'))[0];
       if(t){st.kind='employee';st.target.employee='김민수';st.tplId=t.id;loadTemplate();st.rows.forEach(row=>row.picked=candidates(row).slice(0,row.count).map(a=>a.id));}
+    }
+
+    if(window.DashboardCases){
+      const initial=JSON.parse(JSON.stringify(st));
+      const fixture=key=>{
+        Object.assign(st,JSON.parse(JSON.stringify(initial)));
+        if(key!=='initial'){
+          const tpl=usableTemplates().slice().sort((a,b)=>a.name.localeCompare(b.name,'ko'))[0];
+          if(tpl){st.tplId=tpl.id;loadTemplate();}
+          if(key!=='template'){st.kind='employee';st.target.employee='김민수';}
+          if(['selected','over'].includes(key)){st.rows.forEach(row=>row.picked=candidates(row).slice(0,row.count).map(a=>a.id));}
+          if(key==='over'&&st.rows[1]){
+            const row=st.rows[1],original=D.assets.find(a=>row.productId?a.productId===row.productId:a.product===row.product);
+            if(original){const a={...JSON.parse(JSON.stringify(original)),id:'DESIGN-COUNT-OVER',assetNo:'DESIGN-COUNT-OVER',assignments:[],status:'stock'};D.assets.splice(D.assets.findIndex(a=>a.id==='DESIGN-COUNT-OVER')<0?D.assets.length:D.assets.findIndex(a=>a.id==='DESIGN-COUNT-OVER'),1,a);row.picked=[original.id,a.id];row.count=1;}
+          }
+        }
+        draw();
+      };
+      window.DashboardCases.attach(back,{reference:'Web13',reset:()=>fixture('initial'),cases:[
+        ['initial','템플릿 미선택','1번',()=>fixture('initial')],['template','템플릿 선택·대상 미선택','1번',()=>fixture('template')],['target','대상 선택·자산 선택 활성','1번',()=>fixture('target')],['selected','자산 선택·배정일 미입력','1번',()=>fixture('selected')],['over','선택 자산이 필요 개수 초과·필드 오류','1번',()=>fixture('over')]
+      ]});
     }
     draw();
   }

@@ -276,6 +276,16 @@
       drawGroups(); drawOpts(); drawSum();
     }
 
+
+    if(window.PrototypeCases){
+      const ref=location.pathname.includes('member-detail')?'Web27':'Web28';
+      // page provider is in the target detail module; supplemental actions remain on its current context.
+      window.DashboardCases?.pageActions(ref,[
+        ['target-search-empty','자산 검색 결과 없음','4·7번',()=>{state.q='일치하는 자산 없음 999';state.page=1;draw();}],
+        ['target-filter','상태 필터 적용·선택 칩','11번',()=>{state.q='';state.filters.statuses=['assigned'];state.page=1;draw();}],
+        ['target-clear','검색·필터 초기화','4·11번',()=>{state.q='';state.filters={categories:[],statuses:[]};state.page=1;draw();}]
+      ]);
+    }
     draw();
   }
 

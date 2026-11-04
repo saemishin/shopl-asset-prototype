@@ -1245,6 +1245,49 @@
       if(kind==='delete')openDeleteAssetModal(a,after);
     }
   };
+
+  if(window.DashboardCases && location.pathname.endsWith('asset-detail.html')){
+    const C=window.DashboardCases,D=window.DATA,id=new URLSearchParams(location.search).get('id'),current=()=>assets.find(a=>a.id===id)||assets[0];
+
+    const axes={permission:null,status:null,links:null,photos:null,memo:null,extra:null,history:null};
+    const apply=next=>{
+      if(next==='default')Object.keys(axes).forEach(k=>axes[k]=null);
+      else{const axis=next.startsWith('status:')?'status':['manage','view','info','state','both','private'].includes(next)?'permission':next.startsWith('links-')||['retired','inactive'].includes(next)?'links':next.startsWith('photos-')?'photos':next.startsWith('history-')?'history':next.startsWith('extra-')?'extra':'memo';axes[axis]=next;if(next==='links-mixed')axes.permission='state';if(['retired','inactive','links-mixed','links-many'].includes(next))axes.status='status:assigned';if(['status:stock','status:disposed'].includes(next))axes.links='links-none';}
+      C.restore();const a=current();if(!a)return;
+      for(const key of Object.values(axes).filter(Boolean)){
+      if(['manage','view','info','state','both','private'].includes(key))C.access(key);
+      if(key.startsWith('status:')){a.status=key.split(':')[1];if(['stock','disposed'].includes(a.status)){a.assignments=[];D.links.splice(0,D.links.length,...D.links.filter(p=>!p.includes(a.id)));}else if(!a.assignments?.length)a.assignments=[{employee:'김민수',worksite:null,since:'2026-09-01'}];}
+      if(key==='photos-none'){a._photos=[];a.photos=[];a.photo=null;}
+      if(key==='photos-many')a._photos=Array.from({length:10},(_,i)=>({id:'DESIGN-PHOTO-'+i,color:['#e5efff','#ffe8df','#d8f3e5'][i%3],at:'2026-09-01 10:00',by:'dana'})),a._primary=0;
+      if(key==='memo-none')a.note='';
+      if(key==='extra-none')D.categories.find(c=>c.group===a.group&&c.sub===a.sub).extraEnabled=[];
+      if(key==='links-none')D.links.splice(0,D.links.length,...D.links.filter(p=>!p.includes(a.id)));
+      if(['links-mixed','links-many','retired','inactive'].includes(key)){
+        a.status='assigned';a.assignments=[{employee:key==='inactive'?null:'김민수',worksite:key==='inactive'?'강남점':null,since:'2026-09-01'}];
+        D.links.splice(0,D.links.length,...D.links.filter(p=>!p.includes(a.id)));
+        const n=key==='links-many'?50:3;
+        // Access is selected independently above; linked fixtures preserve it.
+        for(let i=0;i<n;i++){
+          const b=C.clone(a);b.id='DESIGN-LINK-'+i;b.assetNo='DESIGN-LINK-'+String(i+1).padStart(3,'0');b.product=['함께 처리할 자산','상태 관리 불가 자산','조회 불가 자산'][i%3];b._activityLog=[];
+          if(key==='links-mixed'&&i>0){b.sub='디자인 권한 '+i;D.categories.push({...C.clone(D.categories.find(c=>c.group===a.group&&c.sub===a.sub)),sub:b.sub,view:i===2?'관리자만':'회사의 모든 구성원',assign:'관리자만',edit:'관리자만'});}
+          assets.push(b);D.links.push([a.id,b.id]);
+        }
+        if(key==='retired')D.targetStatuses.employee['김민수']='retired';
+        if(key==='inactive')D.targetStatuses.worksite['강남점']='inactive';
+      }
+      if(key==='history-empty')a._activityLog=[];
+      if(key==='history-many')a._activityLog=Array.from({length:25},(_,i)=>({d:`2026-08-${String(28-i).padStart(2,'0')} 09:00`,who:i%2?'dana':'퇴사 구성원',script:i%3?'자산 정보 수정: 품목명 수정':'자산 연결: 연결',before:'이전 품목명',after:'변경된 품목명',...(i%3?{}:{relatedAssetId:assets.find(b=>b.id!==a.id)?.id})}));
+      }
+      render();
+    };
+    const make=(id,label,reference)=>[id,label,reference,()=>apply(id)];
+    window.PrototypeCases.fixture({id:'asset-detail',title:'자산 상세',reference:'Web08·10·11·12',matches:()=>true,summary:()=>`상태: ${STATUS_LABEL[current().status][0]} · 권한: ${{manage:'자산 관리',view:'조회만',info:'정보 수정만',state:'상태 관리만',both:'정보 수정·상태 관리',private:'비공개 숨김'}[axes.permission]||'기본'} · 연결: ${window.AssetLinks.count(current().id)}건`,groups:[['자산 상태',['default',...Object.keys(STATUS_LABEL).map(k=>'status:'+k)]],['권한',['manage','view','info','state','both','private']],['사진·정보',['photos-none','photos-many','memo-none','extra-none']],['연결·배정 대상',['links-none','links-mixed','links-many','retired','inactive']],['이력',['history-empty','history-many']]],reset:()=>apply('default'),cases:[
+      make('default','현재 자산 기본 상태','Web08 · 도입부'),...Object.entries(STATUS_LABEL).map(([s,l])=>make('status:'+s,l[0]+' 상태','Web08 · 4번')),
+      ...[['manage','자산 관리'],['view','조회만'],['info','정보 수정만'],['state','상태 관리만'],['both','정보 수정·상태 관리'],['private','비공개 정보 숨김']].map(([s,l])=>make(s,l+' 권한','Web08 · 4~9번')),
+      make('photos-none','사진 없음','Web08 · 3번'),make('photos-many','사진 10장·대표 사진','Web08 · 3번'),make('memo-none','메모 없음','Web08 · 9번'),make('extra-none','추가 정보 없음','Web08 · 7번'),
+      make('links-none','연결된 자산 없음','Web11 · 1~3번'),make('links-mixed','연결 자산 조회·상태 관리 권한 혼합','Web11 · 3·4번 / Web 공통12·13 · 1번'),make('links-many','연결 자산 50개 상한','Web11 · 2번'),make('retired','퇴사 구성원 배정·추가 연결 숨김','Web11 · 5번'),make('inactive','비활성 근무지 배정·추가 연결 숨김','Web11 · 5번'),make('history-empty','이력 없음','Web12 · 2번'),make('history-many','여러 활동·연결 이력','Web12 · 2번')
+    ]});
+  }
   window.DetailScreen = {
     render
   };

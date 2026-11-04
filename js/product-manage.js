@@ -64,6 +64,13 @@
         if(e.code==='IN_USE'){const p=original.find(p=>p.id===e.id);if(p&&!draft.some(x=>x.id===p.id))draft.push({...p});draw();toast('설정이 변경되었습니다. 잠시 후 다시 시도해주세요.');return;}
         toast(e.code==='CATEGORY_CHANGED'||e.code==='CHANGED'?'설정이 변경되었습니다. 잠시 후 다시 시도해주세요.':'에러가 발생하였습니다. 잠시 후 다시 시도해보세요.');
       }
-    };load(category);return back;
+
+    };load(category);
+    if(window.DashboardCases){const seedCategory=category;window.DashboardCases.attach(back,{reference:'Web24',reset:()=>load(seedCategory),cases:[
+      ['product-category-none','소분류 미선택','1·2번',()=>load(null)],
+      ['product-list-empty','선택한 소분류에 등록된 품목 없음','3번',()=>{if(!category)load(window.DATA.categories[0]);draft=[];draw();}],
+      ['product-unused','삭제 가능한 0건 품목','3번',()=>{if(!category)load(window.DATA.categories[0]);draft.unshift({id:'design-unused-product',name:'디자인 미사용 품목'});draw();}]
+    ]});}
+    return back;
   };
 })();

@@ -2,16 +2,19 @@
   const ASSET_MGMT_FLAG_KEY = "shopl_proto_assetMgmtUse",
     COMPANY_PLAN_KEY = "shopl_proto_companyPlan",
     QA_PLAN = new URLSearchParams(location.search).get("plan");
+  let reviewPlan=null, reviewUse=null;
   function companyPlan() {
+    if(reviewPlan!==null)return reviewPlan;
     return QA_PLAN || localStorage.getItem(COMPANY_PLAN_KEY) || "Enterprise";
   }
   function assetPlanEligible() {
     return ["Pro", "Enterprise", "Trial"].includes(companyPlan());
   }
   function assetMgmtOn() {
-    return assetPlanEligible() && localStorage.getItem(ASSET_MGMT_FLAG_KEY) !== "0";
+    return assetPlanEligible() && (reviewUse===null?localStorage.getItem(ASSET_MGMT_FLAG_KEY) !== "0":reviewUse);
   }
   function setAssetMgmtOn(v) {
+    if(reviewPlan!==null){reviewUse=!!v;return;}
     localStorage.setItem(ASSET_MGMT_FLAG_KEY, v ? "1" : "0");
   }
   function toast(msg) {
@@ -153,6 +156,13 @@
       }
     }
     draw();
+  }
+
+  if(window.PrototypeCases){
+    const apply=(plan,on)=>{reviewPlan=plan;reviewUse=on;render();};
+    window.PrototypeCases.fixture({id:'feature-settings',title:'기능 설정 > 자산',reference:'Web29',matches:()=>!!document.querySelector('[data-asset-mgmt-row]'),reset:()=>{reviewPlan=null;reviewUse=null;render();},cases:[
+      ['on','사용 가능 요금제·사용 중','2번',()=>apply('Enterprise',true)],['off','사용 가능 요금제·미사용','2번',()=>apply('Pro',false)],['lite','Lite 요금제·업그레이드 안내','2번',()=>apply('Lite',false)],['trial','Trial 요금제','2번',()=>apply('Trial',true)]
+    ]});
   }
   window.FeatureSettingsScreen = {
     render

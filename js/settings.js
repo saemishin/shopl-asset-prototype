@@ -244,5 +244,12 @@
     p.querySelector("[data-ok]").onclick = () => { p.remove(); onApply([...sel]); };
   }
 
+
+  if(window.PrototypeCases){
+    const apply=key=>{draft={leaderMode:key,leaderTargets:key==='specific'?['김민수']:[]};renderBody();};
+    window.PrototypeCases.fixture({id:'asset-settings',title:'설정 > 자산 관리',reference:'Web26',matches:()=>true,reset:()=>{draft={leaderMode:saved.leaderMode,leaderTargets:[...saved.leaderTargets]};renderBody();},cases:[
+      ['none','관리자만','3·4번',()=>apply('none')],['all','모든 리더 포함','4번',()=>apply('all')],['specific','특정 리더 선택 완료','4번',()=>apply('specific')],['empty','특정 리더 선택 없음·저장 비활성','4·5번',()=>{draft={leaderMode:'specific',leaderTargets:[]};renderBody();}]
+    ]});
+  }
   window.SettingsScreen = { render };
 })();

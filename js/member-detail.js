@@ -141,6 +141,22 @@
       </section>`;
     wireAssetSearch(c);
   }
+
+  if(window.DashboardCases){
+    const C=window.DashboardCases,D=window.DATA,name=new URLSearchParams(location.search).get('name')||"김민수";
+    const apply=key=>{
+      C.restore();
+      if(key==='view')C.access('view');
+      if(key==='state')C.access('state');
+      if(key==='empty')assets.forEach(a=>a.assignments=(a.assignments||[]).filter(r=>r.employee!==name));
+      if(key==='inactive')D.targetStatuses.employee[name]='retired';
+      if(key==='many'&&assets[0])for(let i=0;i<45;i++){const a=C.clone(assets[0]);a.id='DESIGN-TARGET-'+i;a.assetNo='DESIGN-'+i;a.assignments=[{employee:name,since:'2026-09-01'}];a.status='assigned';assets.push(a);}
+      render();
+    };
+    window.PrototypeCases.fixture({id:'target-detail',title:'구성원 상세 > 자산',reference:'Web27',matches:()=>true,reset:()=>apply('default'),cases:[
+      ['default','기본 배정 목록','7번',()=>apply('default')],['empty','배정된 자산 없음','7번',()=>apply('empty')],['many','다수 자산·페이지네이션','12번',()=>apply('many')],['view','조회만 가능·행 관리 숨김','5·9번',()=>apply('view')],['state','상태 관리 가능·이동·반납','9번',()=>apply('state')],['inactive','비활성 대상·신규 배정 숨김','5번',()=>apply('inactive')]
+    ]});
+  }
   window.MemberDetailScreen = {
     render
   };

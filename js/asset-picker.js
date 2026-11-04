@@ -15,8 +15,9 @@
     selector.innerHTML = `<div class="modal link-select-modal" role="dialog" aria-modal="true" aria-label="자산 선택"><h3>자산 선택</h3><div class="body"><div class="link-select-columns"><section class="link-select-pane"><div class="link-select-tools"><button type="button" class="btn" data-stock-category>분류 <span data-stock-scope-label>전체</span> ▾</button><input type="text" class="picker-search" placeholder="품목명/고유관리번호" aria-label="품목명 또는 고유관리번호 검색" data-stock-search></div><div class="link-select-pane-head">전체 <b data-stock-total>0</b></div><div class="link-list link-select-scroll" data-stock-results></div></section><section class="link-select-pane"><div class="link-select-pane-head">선택됨 <b data-stock-count>0</b></div><div class="link-list link-select-scroll" data-stock-selected></div></section></div></div><div class="foot"><button class="btn" data-stock-cancel>취소</button><button class="btn primary" data-stock-apply>적용</button></div></div>`;
     document.body.appendChild(selector);
     const badge = a => assignmentBadge ? `<span class="badge ${esc(assignmentBadge(a).className)}">${esc(assignmentBadge(a).label)}</span>` : '';
+    let reviewEmpty=false;
     const draw = () => {
-      const rows = window.DATA.assets.filter(a => candidateFilter(a) && !excluded.has(a.id))
+      const rows = window.DATA.assets.filter(a => !reviewEmpty && candidateFilter(a) && !excluded.has(a.id))
         .filter(a => (!query || [a.product,a.assetNo].some(v => String(v || '').toLowerCase().includes(query))) && (!categoryScope.length || categoryScope.includes(`${a.group}/${a.sub}`)))
         .sort((a,b) => a.product.localeCompare(b.product,'ko') || String(a.assetNo).localeCompare(String(b.assetNo))),
         results = selector.querySelector('[data-stock-results]'), selected = selector.querySelector('[data-stock-selected]'), scroll = results.scrollTop;
@@ -34,6 +35,12 @@
     selector.querySelector('[data-stock-category]').onclick = () => window.openAssetCategoryScopeModal({categories, selected:categoryScope, onApply:values => {categoryScope = values; selector.querySelector('[data-stock-results]').scrollTop = 0; draw();}});
     selector.querySelector('[data-stock-cancel]').onclick = () => selector.remove();
     selector.querySelector('[data-stock-apply]').onclick = () => {if (selector.querySelector('[data-stock-apply]').disabled) return; selector.remove(); onApply([...selection.values()]);};
+
+    window.DashboardCases?.attach(selector,{reference:'Web 공통14',reset:()=>{reviewEmpty=false;query='';categoryScope=[];selection.clear();initial.forEach(a=>selection.set(a.id,a));selector.querySelector('[data-stock-search]').value='';draw();},cases:[
+      ['asset-none','선택된 자산 없음','4·6번',()=>{selection.clear();draw();}],
+      ['asset-empty','후보 자산 없음','3번',()=>{reviewEmpty=true;selection.clear();query='';draw();}],
+      ['asset-full',Number.isFinite(maxSelection)?'선택 상한 도달':'자산 최대 3개 선택', '3·4번',()=>{reviewEmpty=false;selection.clear();window.DATA.assets.filter(a=>candidateFilter(a)&&!excluded.has(a.id)).slice(0,Number.isFinite(maxSelection)?maxSelection:3).forEach(a=>selection.set(a.id,a));draw();}]
+    ]});
     draw(); selector.querySelector('[data-stock-search]').focus();
     return selector;
   }

@@ -132,6 +132,11 @@
         draft[+input.dataset.tmRename].name = input.value, updateValidity();
       })), updateValidity();
     }
+
+    if(window.DashboardCases){const seed=JSON.parse(JSON.stringify(draft));window.DashboardCases.attach(back,{reference:'Web 공통07',reset:()=>{draft=JSON.parse(JSON.stringify(seed));addInput.value='';renderList();},cases:[
+      ['tag-list-empty','등록된 태그 없음','2번',()=>{draft=[];addInput.value='';renderList();}],
+      ['tag-list-many','긴 태그 목록','2번',()=>{draft=Array.from({length:40},(_,i)=>({name:'디자인 태그 '+String(i+1).padStart(2,'0'),orig:null}));renderList();}]
+    ]});}
     renderList();
     function addRow() {
       const name = normalizeTagName(addInput.value).slice(0, 20);
@@ -217,6 +222,11 @@
         selected = b.dataset.v, renderList();
       });
     }
+
+    if(window.DashboardCases){const source=categories.slice();window.DashboardCases.attach(back,{reference:'Web 공통06',reset:()=>{categories=source.slice();selected=currentValue;query='';searchInput.value='';renderList();},cases:[
+      ['category-none','선택된 분류 없음','2·4번',()=>{selected=null;renderList();}],
+      ['category-empty','선택 가능한 분류 없음','2번',()=>{categories=[];selected=null;query='';renderList();}]
+    ]});}
     return renderList(), searchInput.addEventListener("input", () => {
       query = searchInput.value, renderList();
     }), back.querySelector("[data-cp-cancel]").onclick = () => back.remove(), back.querySelector("[data-cp-apply]").onclick = () => {
@@ -917,7 +927,29 @@
           aiBack.remove(), continueAiDirectly(insufficient ? mockAiDraft(!0) : {}, newPhotos);
         }, renderAiPhotos();
       }
+
+      window.DashboardCases?.attach(aiBack,{reference:'Web07',reset:()=>{newPhotos.splice(0);renderInitial();},cases:[
+        ['ai-no-photo','새로 첨부한 사진 없음','1번',()=>{newPhotos.splice(0);renderInitial();}],
+        ['ai-photo','새 사진 첨부','1번',()=>{newPhotos.splice(0,newPhotos.length,aiPhoto(0));renderInitial();}],
+        ['ai-limit','사진 상한 10장','1번',()=>{newPhotos.splice(0,newPhotos.length,...Array.from({length:Math.max(0,10-photos.length)},(_,i)=>aiPhoto(i)));renderInitial();}],
+        ['ai-loading','분석 중','3번',()=>{if(!newPhotos.length&&!photos.length)newPhotos.push(aiPhoto(0));renderLoading();}],
+        ['ai-insufficient','정보 부족','4번',()=>renderFailure('insufficient')],
+        ['ai-error','기술적 분석 오류','4번',()=>renderFailure('error')]
+      ]});
       renderInitial(), analyzeBtn.onclick = renderLoading, aiBack.querySelector("[data-ai-cancel]").onclick = requestAiClose;
+    }
+
+    if(window.DashboardCases){
+      const samplePhoto=i=>({id:'design-photo-'+i,color:['#d8e7ff','#ffe6d5','#def4e5'][i%3],at:'2026-09-01 10:00',by:'dana'});
+      const fill=()=>{if(!catValue&&categories[0])selectCat(`${categories[0].group}|${categories[0].sub}`);nameInput.value='디자인 검토용 품목';checkValid();};
+      const ref=opts.asset?'Web09':'Web06';
+      window.DashboardCases.attach(back,{reference:ref,cases:[
+        ['form-minimum','분류·품목명 입력 완료',opts.asset?'1·2번':'2·3번',fill],
+        ['photos-none','사진 미첨부',opts.asset?'3번':'4번',()=>{photos.splice(0);primaryIdx=0;renderPhotos();}],
+        ['photos-full','사진 10장·추가 비활성',opts.asset?'3번':'4번',()=>{photos.splice(0,photos.length,...Array.from({length:10},(_,i)=>samplePhoto(i)));primaryIdx=0;renderPhotos();}],
+        ['tags-full','태그 10개 선택',opts.asset?'5번':'6번',()=>{tags.splice(0,tags.length,...(window.DATA.tags||[]).slice(0,10));renderChips();checkValid();}],
+        ['duplicate-on-save','기존 고유관리번호 입력·저장 검증 대기',opts.asset?'13번':'14번',()=>{fill();assetNoInput.value=window.DATA.assets.find(a=>a!==opts.asset&&!a.deleted_at)?.assetNo||'';checkValid();}]
+      ]});
     }
     const aiInputBtn = back.querySelector("[data-ai-input]");
     return aiInputBtn && (aiInputBtn.onclick = openAiInputModal), renderChips(), checkValid(), opts.asset ? prefillFromAsset(opts.asset) : preselectValue && selectCat(preselectValue), opts.asset && (initialEditValues = editValues()), checkValid(), opts.asset && window.AssetAccess.protectForm(back,opts.asset), back.addEventListener("input", checkValid), back.addEventListener("change", checkValid), back.querySelector("#areg-tag-manage").onclick = () => {

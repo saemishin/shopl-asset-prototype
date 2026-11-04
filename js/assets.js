@@ -319,7 +319,8 @@
     qaBulkInitialized = !1,
     bulkAnalyzeTimer = null,
     bulkPhotoSeq = 0,
-    bulkGroupSeq = 0;
+    bulkGroupSeq = 0,
+    designBulkHold = false;
   const bulkRegister = {
       method: "company",
       type: "individual",
@@ -1053,6 +1054,7 @@
     return String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
   }
   function resetBulkRegister() {
+    designBulkHold=false;
     bulkRegister.groups.flatMap(g => g.photos).forEach(p => {
       p.url?.startsWith("blob:") && URL.revokeObjectURL(p.url);
     }), bulkRegister.method = "company", bulkRegister.type = "individual", bulkRegister.fileName = "", bulkRegister.groups = [], bulkRegister.selectedPhotos.clear(), bulkRegister.lastSelectedPhoto = null, bulkRegister.results.clear(), bulkRegister.dirtyGroups.clear(), bulkRegister.attempts.clear(), bulkRegister.hasAnalyzed = !1, bulkRegister.excluded.clear(), bulkRegister.selectedRows.clear(), bulkRegister.page = 1, bulkRegister.pageSize = 300, bulkRegister.errorsOnly = !1, bulkRegister.duplicateErrors.clear();
@@ -1656,9 +1658,13 @@
         bulkRegister.results.set(id, v), bulkRegister.dirtyGroups.delete(id);
       }), bulkRegister.duplicateErrors.clear(), bulkRegister.selectedRows.clear(), bulkRegister.page = 1, bulkRegister.hasAnalyzed = !0, bulkRegister.errorsOnly = bulkErrorCount() > 0, renderBulkRegister();
     }
+
+    if(designBulkHold)window.DashboardCases?.attach(back,{reference:'Web14',summary:'디자인 샘플은 결과를 선택할 때까지 분석 중 상태를 유지합니다.',cases:[
+      ['analyze-success','전체 분석 성공','8번',()=>finish('success')],['analyze-review','분류 확인 필요','8번',()=>finish('review')],['analyze-error','전체 분석 기술 실패','8번',()=>finish('error')]
+    ]});
     back.querySelector("[data-close]").onclick = () => {
       settled = !0, close();
-    }, back.querySelectorAll("[data-bulk-outcome]").forEach(b => b.onclick = () => finish(b.dataset.bulkOutcome)), document.body.appendChild(back), !qa && new URLSearchParams(location.search).get("hold") !== "loading" && (bulkAnalyzeTimer = setTimeout(() => finish("success"), 1100));
+    }, back.querySelectorAll("[data-bulk-outcome]").forEach(b => b.onclick = () => finish(b.dataset.bulkOutcome)), document.body.appendChild(back), !qa && !designBulkHold && new URLSearchParams(location.search).get("hold") !== "loading" && (bulkAnalyzeTimer = setTimeout(() => finish("success"), 1100));
   }
   function bindBulkResultInputs(content) {
     content.querySelectorAll('[data-result-extra]').forEach(el=>el.oninput=()=>{const result=bulkRegister.results.get(el.dataset.gid);result.extraValues||={};result.extraValues[el.dataset.resultExtra]=el.value;el.classList.toggle('is-error',el.value.length>100);content.querySelector('[data-bulk-save]').disabled=!bulkCanSave();});
@@ -2062,6 +2068,107 @@
   function toast(msg) {
     const t = document.createElement("div");
     t.textContent = msg, t.style.cssText = "position:fixed;left:50%;bottom:32px;transform:translateX(-50%);background:#1b1d1f;color:#fff;padding:10px 16px;border-radius:8px;font-size:12.5px;z-index:500;box-shadow:0 8px 24px rgba(0,0,0,.25)", document.body.appendChild(t), setTimeout(() => t.remove(), 1800);
+  }
+  // 디자인 시나리오는 현황 > 전체의 데이터/조건만 바꾼다. 다른 화면을 열지 않는다.
+  if(window.PrototypeCases){
+    const copy=value=>JSON.parse(JSON.stringify(value)), seedAssets=copy(assets),seedCategories=copy(window.DATA.categories),originalManage=window.hasPrototypeAssetManagePermission;
+    let activeCase='default';
+    function resetOverviewCase(){
+      assets.splice(0,assets.length,...copy(seedAssets));
+      window.DATA.categories.splice(0,window.DATA.categories.length,...copy(seedCategories));
+      window.hasPrototypeAssetManagePermission=originalManage;
+      state.search='';state.filters=emptyFilters();state.statFilter=null;state.page=1;state.pageSize=20;state.sort={key:'updatedAt',dir:'desc'};classificationScopes.all=[];
+      selected.clear();
+    }
+    function applyOverviewCase(key){
+      resetOverviewCase();activeCase=key;
+      const cats=window.DATA.categories;
+      if(['state-only','view-only','partial-view','no-view','private-expiry'].includes(key)){
+        window.hasPrototypeAssetManagePermission=()=>false;
+        cats.forEach((c,i)=>{
+          c.view=key==='no-view'||key==='partial-view'&&i!==0?'관리자만':'회사의 모든 구성원';
+          c.assign=key==='state-only'?'회사의 모든 구성원':'관리자만';
+          c.edit='관리자만';
+          if(key==='private-expiry')c.privateFields=[...new Set([...(c.privateFields||[]),'expiry'])];
+        });
+      }
+      if(key==='no-assets')assets.splice(0);
+      if(key==='no-results')state.search='일치하는 자산 없음';
+      if(key==='filter-chips'){state.filters.status=['assigned'];state.filters.labels=[seedAssets.find(a=>a.labels?.length)?.labels[0]].filter(Boolean);}
+      if(key.startsWith('status:'))state.filters.status=[key.split(':')[1]];
+      if(key.startsWith('expiry:'))state.filters.expiry=[key.split(':')[1]];
+      if(key==='many-rows'&&seedAssets[0])for(let i=0;i<65;i++)assets.push({...copy(seedAssets[0]),id:`DESIGN-PAGE-${i}`,assetNo:`DESIGN-${String(i+1).padStart(3,'0')}`});
+      if(key==='row-variants'){
+        const rows=assets.filter(a=>!a.deleted_at).slice(0,5);
+        rows.forEach((a,i)=>{a.updatedAt=`2099-01-0${9-i}`;a.photo=null;a.photos=[];a._photos=[];a.labels=i===0?['본사','개발팀','신규','중요','공용','테스트','IT','업무용','보안','확인']:[];a.note=i===0?'디자인 확인용 메모':'';a.expiry=['2026-10-01','2026-09-08','2026-09-01','',null][i];});
+      }
+      render();
+      if(key==='selected-one')document.querySelector('tbody [data-check]')?.click();
+      if(key==='selected-all')document.querySelector('[data-check-all]')?.click();
+      if(key==='search-focus')document.querySelector('#search-input')?.focus();
+      window.PrototypeCases.refresh();
+    }
+    const item=(id,label,reference)=>({id,label,reference,run:()=>applyOverviewCase(id)});
+    const provider={
+      id:'overview-all',title:'현황 > 전체',reference:'Web02',
+      matches:()=>activeScreen==='list'&&state.view==='all',
+      get active(){return activeCase;},set active(value){activeCase=value;},
+      summary:()=>`${canManageAssets()?'자산 관리 가능':'자산 관리 불가'} · 조회 가능 소분류 ${viewableCategories().length}개 · 결과 ${getFiltered().length}건`,
+      reset:()=>applyOverviewCase('default'),
+      sections:[
+        {title:'데이터·빈 상태',items:[item('default','기본 데이터','명세 5·6·14'),item('no-assets','등록된 자산 없음','Case 14-2'),item('no-results','검색 결과 없음','Case 14-3'),item('filter-chips','필터 적용·선택값 칩','명세 10'),item('many-rows','다수 데이터·페이지네이션','명세 16')]},
+        {title:'권한에 따른 표시',items:[item('state-only','조회·상태 관리 가능','추가·삭제 숨김 / 배정 가능'),item('view-only','조회만 가능','추가·배정·일괄 작업·삭제 숨김'),item('partial-view','일부 소분류만 조회 가능','조회 범위·통계·목록 축소'),item('no-view','조회 가능한 소분류 없음','Case 14-1'),item('private-expiry','유효기한 비공개·조회 제한','명세 6·14-2')]},
+        {title:'목록의 상태·정보 표현',items:[...Object.entries(STATUS_LABEL).map(([key,value])=>item(`status:${key}`,`${value[0]} 자산만 표시`,'명세 14-2 상태')),...[['valid','유효'],['soon','만료 예정'],['over','만료'],['none','미설정']].map(([key,label])=>item(`expiry:${key}`,`유효기한: ${label}`,'명세 6·14-2')),item('row-variants','사진 없음·태그 넘침·메모 유무','명세 14-2')]},
+        {title:'선택·입력 상태',items:[item('selected-one','자산 1개 선택·부분 체크','명세 14-2·15'),item('selected-all','현재 페이지 전체 선택','명세 14-2·15'),item('search-focus','검색창 포커스·확장','명세 11')]}
+      ]
+    };
+    window.PrototypeCases.register(provider);
+  }
+
+
+  if(window.DashboardCases){
+    const C=window.DashboardCases, P=window.PrototypeCases;
+    for(const [view,title,num] of [['product','품목별','03'],['employee','구성원별','04'],['worksite','근무지별','05']]){
+      const apply=key=>{
+        C.restore();state.search='';state.filters=emptyFilters();state.statFilter=null;state.page=1;selected.clear();classificationScopes[view]=[];
+        window.ASSET_MEMBER_NUMBER_ENABLED=true;window.ASSET_WORKSITE_CODE_ENABLED=true;
+        if(view!=='product')targetModes[view]='summary';
+        if(key==='empty'){assets.splice(0);if(view==='product')window.DATA.products.splice(0);}
+        if(key==='search-empty')state.search='검색 일치 없음 999';
+        if(key==='private')C.access('private');
+        if(['view','partial','no-view'].includes(key))C.access('view');
+        if(['partial','no-view'].includes(key))window.DATA.categories.forEach((c,i)=>c.view=key==='partial'&&i===0?'회사의 모든 구성원':'관리자만');
+        if(key==='full')targetModes[view]='full';
+        if(key==='no-code'){
+          // 기존 화면의 설정 판정 함수를 이 페이지 메모리에서만 전환한다.
+          window[view==='employee'?'ASSET_MEMBER_NUMBER_ENABLED':'ASSET_WORKSITE_CODE_ENABLED']=false;
+        }
+        if(key==='many' && assets[0])for(let i=0;i<65;i++){
+          const a=C.clone(assets[i%Math.min(assets.length,10)]);a.id='DESIGN-LIST-'+i;a.assetNo='DESIGN-'+i;a.product='디자인 품목 '+String(i).padStart(3,'0');delete a.productId;
+          if(view!=='product')a.assignments=[{employee:view==='employee'?'디자인 구성원 '+i:null,worksite:view==='worksite'?'디자인 근무지 '+i:null,since:'2026-09-01'}];assets.push(a);
+        }
+        render();
+      };
+      const cases=[['default','기본 데이터','7·8번',()=>apply('default')],['empty','배정·자산 관계 없음','7번',()=>apply('empty')],['search-empty','검색 결과 없음','5번',()=>apply('search-empty')],['many','다수 행·페이지네이션',view==='product'?'8번':'10번',()=>apply('many')],['view','조회만 가능','도입부',()=>apply('view')],['partial','일부 소분류만 조회 가능','도입부',()=>apply('partial')],['no-view','조회 가능한 소분류 없음','도입부',()=>apply('no-view')]];
+      if(view!=='product')cases.push(['full','종합 보기','1번',()=>apply('full')],['summary','요약 보기','1번',()=>apply('default')],['no-code',view==='employee'?'사번 사용 OFF':'근무지 코드 사용 OFF','4·9번',()=>apply('no-code')]);
+      P.fixture({id:'overview-'+view,title:'현황 > '+title,reference:'Web'+num,matches:()=>activeScreen==='list'&&state.view===view,reset:()=>apply('default'),cases:cases.map(x=>{if(view!=='product'&&x[0]==='search-empty')x[2]='7번';if(view!=='product'&&['default','empty'].includes(x[0]))x[2]='9번';return x;})});
+    }
+    const bulk=key=>{
+      resetBulkRegister();
+      if(key==='file')bulkRegister.fileName='디자인_확인.xlsx';
+      if(key.startsWith('ai')){
+        designBulkHold=true;bulkRegister.method='ai';addBulkQaPhotos();
+        if(key!=='ai-photos'){
+          bulkRegister.groups.forEach((g,i)=>{const values=analyzedBulkValues(i);bulkRegister.results.set(g.id,{...values,status:'success'});});
+          bulkRegister.hasAnalyzed=true;
+          if(key==='ai-error'){const r=bulkRegister.results.values().next().value;if(r)r.product='';bulkRegister.errorsOnly=true;}
+        }
+      }
+      renderBulkRegister();
+    };
+    P.fixture({id:'bulk-add',title:'일괄 작업 > 일괄 추가',reference:'Web14·15',matches:()=>activeScreen==='bulk-register',reset:()=>bulk('default'),summary:'현재 구현된 파일 선택·AI 그룹·확인 테이블을 검토합니다. 일괄 배정(Web16·17)은 현재 프로토타입에 화면 구현이 없습니다.',cases:[
+      ['default','파일 선택 전','Web14 · 3~5번',()=>bulk('default')],['file','파일 선택 완료','Web14 · 5번',()=>bulk('file')],['ai-photos','AI 사진 그룹·최초 분석 전','Web14 · 7번',()=>bulk('ai-photos')],['ai-result','AI 분석 결과 테이블','Web15 · 11·12번',()=>bulk('ai-result')],['ai-error','필수값 누락·오류 라인','Web15 · 12번',()=>bulk('ai-error')]
+    ]});
   }
   window.AssetsScreen = {
     render
