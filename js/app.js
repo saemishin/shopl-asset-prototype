@@ -609,13 +609,42 @@
       okBtn.disabled = !confirmed();
     }), okBtn.onclick = () => {
       if (!confirmed()) return;
-      if(!window.hasPrototypeAssetManagePermission()){cb.remove();toast("자산 관리 권한이 없습니다.");return;}
+      if(!window.hasPrototypeAssetManagePermission()){cb.remove();toast("설정이 변경되었습니다. 잠시 후 다시 시도해주세요.");return;}
       const before = STATUS_LABEL[a.status][0];
       a.status = "disposed", a.assignments = [], logActivity(a, {
         script: "상태 변경: 폐기 처리",
         before,
         after: STATUS_LABEL[a.status][0]
       }), window.MappLinks.prune(logActivity, "폐기"), cb.remove(), toast("폐기 처리되었습니다."), onDone();
+    }, document.body.appendChild(cb), input.focus();
+  }
+  // 자산 삭제 팝업: 리더모드와 같은 DELETE 입력 방식(App(E,L)_dc_04 9번).
+  function openDeleteAssetModal(a, onDone) {
+    const cb = document.createElement("div");
+    cb.className = "modal-back", cb.style.zIndex = 340, cb.innerHTML = `
+      <div class="modal" style="width:380px">
+        <h3>삭제하시겠습니까?</h3>
+        <div class="body">
+          <div class="danger-note">${WARN_ICON}<span>삭제하면 복구할 수 없으니 신중하게 결정해주세요.${window.MappLinks.unlinkNote(a)}</span></div>
+          <div class="field" style="margin-top:14px;margin-bottom:0">
+            <input type="text" data-del-input placeholder="입력">
+          </div>
+          <p class="muted" style="margin-top:6px">박스에 DELETE를 입력하면 [삭제] 버튼이 활성화됩니다.</p>
+        </div>
+        <div class="foot">
+          <button class="btn" data-cclose>취소</button>
+          <button class="btn danger" data-cok disabled>삭제</button>
+        </div>
+      </div>`, cb.querySelector("[data-cclose]").onclick = () => cb.remove();
+    const input = cb.querySelector("[data-del-input]"),
+      okBtn = cb.querySelector("[data-cok]"),
+      confirmed = () => input.value.trim().toUpperCase() === "DELETE";
+    input.addEventListener("input", () => {
+      okBtn.disabled = !confirmed();
+    }), okBtn.onclick = () => {
+      if (!confirmed()) return;
+      if (!window.hasPrototypeAssetManagePermission()) { cb.remove(); toast("자산 관리 권한이 없습니다."); return; }
+      window.archiveDeletedAsset(a, ME), window.MappLinks.prune(logActivity, "삭제"), cb.remove(), onDone(), toast("삭제되었습니다.");
     }, document.body.appendChild(cb), input.focus();
   }
   function activityOf(a) {
@@ -1523,7 +1552,7 @@ function openLeaderQr(a) {
             idx
           } = findRecord(a, target);
           if(key === "edit"){if(!canEditInfo(a))return;window.openAssetAddModal({asset:a,logActivity:e=>logActivity(a,e),onSaved:draw});return;}
-          if(key === "delete"){confirmModal("삭제하시겠습니까?","삭제하면 복구할 수 없습니다."+window.MappLinks.unlinkNote(a),()=>{window.archiveDeletedAsset(a,ME);window.MappLinks.prune(logActivity,"삭제");Object.assign(state,state.detailFrom);draw();toast("삭제되었습니다.");});return;}
+          if(key === "delete"){if(target||!window.hasPrototypeAssetManagePermission())return;openDeleteAssetModal(a,()=>{Object.assign(state,state.detailFrom);draw();});return;}
           if (key === "history") state.screen = "asset-history", draw();else if (key === "date") {
             if (a.status === "disposed" || !canManage(a) || idx < 0) return;
             const record = a.assignments[idx];
@@ -1538,7 +1567,7 @@ function openLeaderQr(a) {
                 }), afterMutate(), toast("배정일이 수정되었습니다.");
               });
             });
-          } else key === "assign-add" ? (a.assignments || []).length || openFormPage(a, target, "assign-add", afterMutate) : key === "reassign" ? openFormPage(a, target, "reassign", afterMutate) : key === "return" ? openReturnConfirm(a, idx, afterMutate) : key === "lost-report" ? openStatusChangeConfirm(a, "분실 신고하시겠습니까?", "분실 신고 시 기존 배정은 유지된 채 상태만 분실로 변경됩니다.", setStatus("상태 변경: 분실 신고", () => "lost"), afterMutate) : key === "lost-recover" ? openStatusChangeConfirm(a, "분실 회수 처리하시겠습니까?", "분실 회수 시 배정 여부에 따라 배정 중 또는 배정 가능 상태로 돌아갑니다.", setStatus("상태 변경: 분실 회수", () => derivedActiveStatus(a)), afterMutate) : key === "repair-start" ? openStatusChangeConfirm(a, "수리/점검을 접수하시겠습니까?", "수리/점검을 접수하면 기존 배정은 유지되고 자산 상태가 수리/점검 중으로 변경됩니다.", setStatus("상태 변경: 수리/점검 접수", () => "repair"), afterMutate, !1, "수리/점검이 접수되었습니다.") : key === "repair-done" ? openStatusChangeConfirm(a, "수리/점검을 완료하시겠습니까?", "수리/점검을 완료하면 현재 배정 여부에 따라 자산 상태가 배정 중 또는 배정 가능 상태로 변경됩니다.", setStatus("상태 변경: 수리/점검 완료", () => derivedActiveStatus(a)), afterMutate, !1, "수리/점검이 완료되었습니다.") : key === "dispose-restore" ? window.openAssetRestoreConfirm(a, message => {
+          } else key === "assign-add" ? (a.assignments || []).length || openFormPage(a, target, "assign-add", afterMutate) : key === "reassign" ? openFormPage(a, target, "reassign", afterMutate) : key === "return" ? openReturnConfirm(a, idx, afterMutate) : key === "lost-report" ? openStatusChangeConfirm(a, "분실 신고하시겠습니까?", "분실 신고 시 기존 배정은 유지된 채 상태만 분실로 변경됩니다.", setStatus("상태 변경: 분실 신고", () => "lost"), afterMutate, !1, "분실 신고되었습니다.") : key === "lost-recover" ? openStatusChangeConfirm(a, "분실 회수 처리하시겠습니까?", "분실 회수 시 배정 여부에 따라 배정 중 또는 배정 가능 상태로 돌아갑니다.", setStatus("상태 변경: 분실 회수", () => derivedActiveStatus(a)), afterMutate, !1, "분실 회수되었습니다.") : key === "repair-start" ? openStatusChangeConfirm(a, "수리/점검을 접수하시겠습니까?", "수리/점검을 접수하면 기존 배정은 유지되고 자산 상태가 수리/점검 중으로 변경됩니다.", setStatus("상태 변경: 수리/점검 접수", () => "repair"), afterMutate, !1, "수리/점검이 접수되었습니다.") : key === "repair-done" ? openStatusChangeConfirm(a, "수리/점검을 완료하시겠습니까?", "수리/점검을 완료하면 현재 배정 여부에 따라 자산 상태가 배정 중 또는 배정 가능 상태로 변경됩니다.", setStatus("상태 변경: 수리/점검 완료", () => derivedActiveStatus(a)), afterMutate, !1, "수리/점검이 완료되었습니다.") : key === "dispose-restore" ? window.openAssetRestoreConfirm(a, message => {
             afterMutate(), toast(message);
           }, ME) : key === "dispose" && openDisposeConfirmModal(a, afterMutate);
         };

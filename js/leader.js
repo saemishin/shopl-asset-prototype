@@ -1253,7 +1253,7 @@
       okBtn.disabled = !confirmed();
     }), okBtn.onclick = () => {
       if (!confirmed()) return;
-      if(!window.hasPrototypeAssetManagePermission()){cb.remove();toast("자산 관리 권한이 없습니다.");return;}
+      if(!window.hasPrototypeAssetManagePermission()){cb.remove();toast("설정이 변경되었습니다. 잠시 후 다시 시도해주세요.");return;}
       const before = STATUS_LABEL[a.status][0];
       a.status = "disposed", a.assignments = [], logActivity(a, {
         script: "상태 변경: 폐기 처리",
@@ -2214,8 +2214,8 @@
               return;
             }
             const transitions = {
-                "lost-report": ["분실 신고하시겠습니까?", "분실 신고 시 기존 배정은 유지된 채 상태만 분실로 변경됩니다.", "분실 신고", () => "lost"],
-                "lost-recover": ["분실 회수 처리하시겠습니까?", "분실 회수 시 배정 여부에 따라 배정 중 또는 배정 가능 상태로 돌아갑니다.", "분실 회수", () => derivedActiveStatus(a)],
+                "lost-report": ["분실 신고하시겠습니까?", "분실 신고 시 기존 배정은 유지된 채 상태만 분실로 변경됩니다.", "분실 신고", () => "lost", "분실 신고되었습니다."],
+                "lost-recover": ["분실 회수 처리하시겠습니까?", "분실 회수 시 배정 여부에 따라 배정 중 또는 배정 가능 상태로 돌아갑니다.", "분실 회수", () => derivedActiveStatus(a), "분실 회수되었습니다."],
                 "repair-start": ["수리/점검을 접수하시겠습니까?", "수리/점검을 접수하면 기존 배정은 유지되고 자산 상태가 수리/점검 중으로 변경됩니다.", "수리/점검 접수", () => "repair", "수리/점검이 접수되었습니다."],
                 "repair-done": ["수리/점검을 완료하시겠습니까?", "수리/점검을 완료하면 현재 배정 여부에 따라 자산 상태가 배정 중 또는 배정 가능 상태로 변경됩니다.", "수리/점검 완료", () => derivedActiveStatus(a), "수리/점검이 완료되었습니다."]
               },
