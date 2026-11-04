@@ -440,7 +440,8 @@
   }
   function findRecord(a, target) {
     const list = a.assignments || (a.assignments = []),
-      idx = list.findIndex(x => target.type === "employee" ? x.employee === target.value : x.worksite === target.value);
+      // 자산 기준 상세(외부 QR)는 특정 대상을 고르지 않으므로 현재 활성 배정(최대 1건)을 대상으로 한다.
+      idx = !target ? list.length ? 0 : -1 : list.findIndex(x => target.type === "employee" ? x.employee === target.value : x.worksite === target.value);
     return {
       list,
       idx
@@ -854,8 +855,8 @@
   };
   function confirmWriteExit(onLeave) {
     const cb = document.createElement("div");
-    cb.className = "modal-back", cb.style.zIndex = 340, cb.innerHTML = `<div class="modal sm" style="width:340px" role="dialog" aria-modal="true" aria-label="작성을 중단하시겠습니까?">
-      <h3>작성을 중단하시겠습니까?</h3><div class="body" style="font-size:14px">지금까지 작성한 내용은 저장되지 않습니다.</div>
+    cb.className = "modal-back", cb.style.zIndex = 340, cb.innerHTML = `<div class="modal sm" style="width:340px" role="dialog" aria-modal="true" aria-label="취소하시겠습니까?">
+      <h3>취소하시겠습니까?</h3><div class="body" style="font-size:14px">취소 시 편집한 내용이 저장되지 않습니다.</div>
       <div class="foot"><button type="button" class="btn" data-exit-stay>취소</button><button type="button" class="btn primary" data-exit-leave>확인</button></div></div>`, document.body.appendChild(cb), cb.querySelector("[data-exit-stay]").onclick = () => cb.remove(), cb.querySelector("[data-exit-leave]").onclick = () => {
       cb.remove(), onLeave();
     };
@@ -1198,7 +1199,7 @@ function openLeaderQr(a) {
  const actions=statusActions(a), idx=findRecord(a,target).idx, rec=idx>=0?a.assignments[idx]:null, photos=window.assetPhotos(a), manage=window.hasPrototypeAssetManagePermission();
  const info=[['분류',categoryPath(a)],['태그',chips(a.labels)]].map(([k,v])=>`<div><div class="k">${k}</div><div class="v">${v}</div></div>`).join('')+window.AssetExtra.detailRows(a,manage,expiryBadge)+[['자산 등록일',window.fmtDate(a.createdAt)],['QR 라벨','<button class="btn sm" data-qr-open aria-label="QR 라벨">QR 라벨</button>'],['메모',`${memoHtml(a.note)}${window.AssetAccess.canField(a,'memo',ME)?`<button class="icon-edit" data-memoedit aria-label="메모 수정">${IC_EDIT}</button>`:''}`]].map(([k,v])=>`<div><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
  // 자산 한 건은 한 대상에게만 배정하므로 배정 탭에는 이 대상의 배정 기록 하나만 보여준다(D-20261030-14·15).
- const party=`<div class="dsection"><h2 class="mapp-party-head">배정 대상</h2>${rec?`<div class="acard${manageActions(a,target).length?' has-actions':''}">${typeBadge(rec)}${manageActions(a,target).length?`<button type="button" class="mapp-holder-more" data-card-more aria-label="배정 관리" aria-haspopup="menu">${MORE_ICON}</button>`:''}<div class="acard-id">${assignIdentity(rec)}</div><div class="acard-foot"><span class="acard-date">배정일 <b>${window.fmtDate(rec.since)}</b></span>${canManage(a)?`<button type="button" class="icon-edit acard-date-edit" data-date-edit aria-label="배정일 수정">${IC_EDIT}</button>`:''}</div></div>`:`<div class="assign-empty"><p class="mapp-party-empty">배정 대상이 없습니다.</p>${canManage(a)&&!(a.assignments||[]).length?'<button type="button" class="btn sm" data-assign-open>배정</button>':''}</div>`}</div>`;
+ const party=`<div class="dsection"><h2 class="mapp-party-head">배정 현황</h2>${rec?`<div class="acard${manageActions(a,target).length?' has-actions':''}">${typeBadge(rec)}${manageActions(a,target).length?`<button type="button" class="mapp-holder-more" data-card-more aria-label="배정 관리" aria-haspopup="menu">${MORE_ICON}</button>`:''}<div class="acard-id">${assignIdentity(rec)}</div><div class="acard-foot"><span class="acard-date">배정일 <b>${window.fmtDate(rec.since)}</b></span>${canManage(a)?`<button type="button" class="icon-edit acard-date-edit" data-date-edit aria-label="배정일 수정">${IC_EDIT}</button>`:''}</div></div>`:`<div class="assign-empty"><p class="mapp-party-empty">배정 대상이 없습니다.</p>${canManage(a)&&!(a.assignments||[]).length?'<button type="button" class="btn sm" data-assign-open>배정</button>':''}</div>`}</div>`;
  return `<div class="mapp-topbar"><button class="mapp-back" data-mapp-back aria-label="뒤로">←</button>${menuActions(a,target).length?`<button class="mapp-more" data-more-open aria-label="더보기">${MORE_ICON}</button>`:''}</div><div class="mapp-body"><div class="dhead-id"><div class="mapp-hero-wrap"><button class="mapp-hero-img" data-hero-viewer aria-label="사진 보기"${photos.length?'':' disabled'}>${cardThumb(a)}</button>${photos.length>1?`<span class="mapp-hero-count">+${photos.length-1}</span>`:''}${canEditInfo(a)?`<button class="mapp-hero-edit" data-hero-edit aria-label="사진 관리">${IC_EDIT}</button>`:''}</div><div><h1>${a.product}</h1><div class="dhead-sub">${actions.length?`<button class="badge ${STATUS_LABEL[a.status][1]} clickable" data-status-open>${STATUS_LABEL[a.status][0]} ▾</button>`:`<span class="badge ${STATUS_LABEL[a.status][1]}">${STATUS_LABEL[a.status][0]}</span>`}<div>고유관리번호 <b>${a.assetNo}</b></div></div></div></div>${window.AssetExtra.tabs()}<div data-detail-panel="assignment">${party}${window.MappLinks.sectionHtml(a, ME)}</div><div data-detail-panel="info" hidden><div class="kv2">${info}</div>${window.AssetExtra.detailHtml(a,manage,expiryBadge)}</div><div data-detail-panel="history" hidden>${timelineHtml(a,'',target)}</div></div>`;
 }
   const MENU_ICON_ASSET = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10" r="1.6"/><path d="m21 16-5-5-9 8"/></svg>',
@@ -1414,6 +1415,11 @@ function openLeaderQr(a) {
         wsFilters: MappAssetFilter.empty(),
         wsSearch: ""
       };
+    if(new URLSearchParams(location.search).get('qa')==='qr-assigned'){
+      // 외부 QR로 다른 대상에게 배정된 자산을 연 경우(자산 기준 상세)
+      const busy=assets.filter(a=>!a.deleted_at&&a.status!=='disposed'&&(a.assignments||[]).length&&!(a.assignments||[]).some(r=>r.employee===ME)), pick=busy.find(a=>window.AssetAccess.canState(a,ME))||busy[0];
+      pick&&Object.assign(state,{screen:'asset-detail',detailAssetId:pick.id,detailTarget:null,detailFrom:{screen:'menu'}});
+    }
     if(new URLSearchParams(location.search).get('qa')==='qr-stock'){
       // 외부 QR로 배정 가능 자산을 연 경우(자산 기준 상세)
       const free=assets.filter(a=>!a.deleted_at&&a.status!=='disposed'&&!(a.assignments||[]).length), stock=free.find(a=>window.AssetAccess.canState(a,ME))||free[0];
@@ -1464,7 +1470,7 @@ function openLeaderQr(a) {
       function afterMutate() {
         const a = assets.find(x => x.id === state.detailAssetId);
         let directoryReturn = !1;
-        findRecord(a, state.detailTarget).idx < 0 && (directoryReturn = ["member-profile", "directory-member-assets", "directory-worksite-assets"].includes(state.detailFrom.screen), Object.assign(state, state.detailFrom), delete state.detailFrom), draw(), directoryReturn && (root.querySelector(".mapp-screen").scrollTop = state.directoryListScroll || 0);
+        state.detailTarget && findRecord(a, state.detailTarget).idx < 0 && (directoryReturn = ["member-profile", "directory-member-assets", "directory-worksite-assets"].includes(state.detailFrom.screen), Object.assign(state, state.detailFrom), delete state.detailFrom), draw(), directoryReturn && (root.querySelector(".mapp-screen").scrollTop = state.directoryListScroll || 0);
       }
       function openDetail(assetId, target) {
         state.detailFrom = {

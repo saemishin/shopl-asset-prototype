@@ -477,8 +477,8 @@
     return !!draft.category || ["product", "assetNo", "expiry", "serial", "imei", "manufactured", "purchaseDate", "purchasePrice", "note"].some(key => String(draft[key] || "").trim()) || draft.photos.length > 0 || draft.labels.length > 0;
   }
   function confirmAddExit(onLeave, editing = !1) {
-    const title = editing ? "수정을 중단하시겠습니까?" : "작성을 중단하시겠습니까?",
-      body = editing ? "수정을 중단할 경우 변경된 내용은 저장되지 않습니다." : "지금까지 작성한 내용은 저장되지 않습니다.",
+    const title = editing ? "수정을 취소하시겠습니까?" : "취소하시겠습니까?",
+      body = editing ? "취소할 경우 수정한 내용이 저장되지 않습니다." : "취소 시 편집한 내용이 저장되지 않습니다.",
       cb = document.createElement("div");
     cb.className = "modal-back", cb.style.zIndex = 340, cb.innerHTML = `<div class="modal sm" style="width:340px" role="dialog" aria-modal="true" aria-label="${title}">
       <h3>${title}</h3>
@@ -1965,7 +1965,7 @@
   // 자산 한 건은 한 대상에게만 배정하므로 대상 기준 상세의 배정 탭에는 이 대상의 기록 하나만 보여준다(D-20261030-14·15).
   function scopedPartySectionHtml(a, target) {
     const record = findRecord(a, target), current = record.idx >= 0 ? record.list[record.idx] : null;
-    return `<div class="dsection"><h2 class="mapp-party-head">배정 대상</h2>${current ? `<div class="acard${scopedManageActions(a, target).length ? " has-actions" : ""}">${typeBadge(current)}${scopedManageActions(a, target).length ? `<button type="button" class="mapp-holder-more" data-card-more aria-label="배정 관리" aria-haspopup="menu">${MORE_ICON}</button>` : ""}<div class="acard-id">${assignIdentity(current)}</div><div class="acard-foot"><span class="acard-date">배정일 <b>${window.fmtDate(current.since)}</b></span>${canManage(a) ? `<button type="button" class="icon-edit acard-date-edit" data-date-edit aria-label="배정일 수정">${IC_EDIT}</button>` : ""}</div></div>` : `<div class="assign-empty"><p class="mapp-party-empty">배정 대상이 없습니다.</p>${canManage(a) && !(a.assignments || []).length ? '<button type="button" class="btn sm" data-assign-open>배정</button>' : ""}</div>`}</div>`;
+    return `<div class="dsection"><h2 class="mapp-party-head">배정 현황</h2>${current ? `<div class="acard${scopedManageActions(a, target).length ? " has-actions" : ""}">${typeBadge(current)}${scopedManageActions(a, target).length ? `<button type="button" class="mapp-holder-more" data-card-more aria-label="배정 관리" aria-haspopup="menu">${MORE_ICON}</button>` : ""}<div class="acard-id">${assignIdentity(current)}</div><div class="acard-foot"><span class="acard-date">배정일 <b>${window.fmtDate(current.since)}</b></span>${canManage(a) ? `<button type="button" class="icon-edit acard-date-edit" data-date-edit aria-label="배정일 수정">${IC_EDIT}</button>` : ""}</div></div>` : `<div class="assign-empty"><p class="mapp-party-empty">배정 대상이 없습니다.</p>${canManage(a) && !(a.assignments || []).length ? '<button type="button" class="btn sm" data-assign-open>배정</button>' : ""}</div>`}</div>`;
   }
   function scopedManageActions(a, target) {
     return !target || !canManage(a) || findRecord(a, target).idx < 0 ? [] : [{
