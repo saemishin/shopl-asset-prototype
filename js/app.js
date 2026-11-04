@@ -1130,8 +1130,8 @@
     });
   }
   const IC_DOWNLOAD = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 21h16"/></svg>';
-  function openPhotoViewer(a) {
-    const items = window.assetPhotos(a);
+  function openPhotoViewer(a, onChange) {
+    let items = window.assetPhotos(a);
     if (!items.length) return;
     let cur = a._primary || 0;
     const back = mappOverlay("mapp-viewer-back", 250);
@@ -1139,25 +1139,59 @@
       <div class="mapp-viewer-bar">
         <button type="button" class="mapp-viewer-back-btn" data-vclose aria-label="닫기">←</button>
         <span class="mapp-viewer-count"></span>
-        <button type="button" class="mapp-viewer-dl" data-vdownload aria-label="다운로드">${IC_DOWNLOAD}</button>
+        <button type="button" class="mapp-viewer-dl" data-vmore aria-label="더보기" style="font-size:20px;line-height:1">⋮</button>
       </div>
       <div class="mapp-viewer-stage">
         <button type="button" class="mapp-viewer-nav" data-vprev aria-label="이전">‹</button>
         <div class="mapp-viewer-img"></div>
         <button type="button" class="mapp-viewer-nav" data-vnext aria-label="다음">›</button>
-      </div>`;
+      </div>
+      <div data-vinfo style="position:absolute;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:14px 16px 24px;color:#fff;font-size:13px"></div>`;
     const img = back.querySelector(".mapp-viewer-img"),
       countEl = back.querySelector(".mapp-viewer-count"),
+      infoEl = back.querySelector("[data-vinfo]"),
       prevBtn = back.querySelector("[data-vprev]"),
-      nextBtn = back.querySelector("[data-vnext]");
+      nextBtn = back.querySelector("[data-vnext]"),
+      moreBtn = back.querySelector("[data-vmore]"),
+      fmtAt = at => String(at || "").replace(/^(\d{4})-(\d{2})-(\d{2})\s*/, "$1.$2.$3. ");
     function draw() {
-      img.style.background = items[cur].color, countEl.textContent = `${cur + 1}/${items.length}`, prevBtn.hidden = nextBtn.hidden = items.length < 2;
+      const p = items[cur], who = p.by || ME;
+      img.style.background = p.color, countEl.textContent = `${cur + 1}/${items.length}`, prevBtn.hidden = nextBtn.hidden = items.length < 2;
+      infoEl.innerHTML = `<span style="display:flex;align-items:center;gap:8px">${window.pickerAvatarHtml(esc(who), avatarColor(who))}<span>${esc(who)}</span></span><span style="opacity:.7">${esc(fmtAt(p.at))}</span>`;
+    }
+    function applyPhotos(photos, primary) {
+      const before = window.assetPhotos(a).map(p => ({ ...p })), beforePrimary = a._primary || 0;
+      window.logAssetActivities(window.assetPhotoActivities(before, beforePrimary, photos, primary), e => logActivity(a, e));
+      a._photos = photos, a._primary = primary, a.photo = photos[primary]?.color || null, a.photoCount = photos.length;
     }
     prevBtn.onclick = () => {
       cur = (cur - 1 + items.length) % items.length, draw();
     }, nextBtn.onclick = () => {
       cur = (cur + 1) % items.length, draw();
-    }, back.querySelector("[data-vclose]").onclick = () => back.remove(), back.querySelector("[data-vdownload]").onclick = () => toast("사진을 저장하였습니다."), draw();
+    }, back.querySelector("[data-vclose]").onclick = () => back.remove(), moreBtn.onclick = () => {
+      const editable = !!onChange && canEditInfo(a) && a.status !== "disposed",
+        menu = [];
+      editable && cur !== (a._primary || 0) && menu.push({ key: "primary", label: "대표 사진으로 지정" });
+      menu.push({ key: "save", label: "저장" });
+      editable && menu.push({ key: "delete", label: "삭제", danger: !0 });
+      openDropdownMenu(moreBtn, menu, key => {
+        if (key === "save") { toast("사진을 저장하였습니다."); return; }
+        if (key === "primary") {
+          confirmModal("대표 사진으로 지정하시겠습니까?", "", () => {
+            applyPhotos(window.assetPhotos(a).map(p => ({ ...p })), cur), items = window.assetPhotos(a), draw(), onChange(), toast("자산 대표 사진으로 지정되었습니다.");
+          });
+          return;
+        }
+        key === "delete" && confirmModal("사진을 삭제하시겠습니까?", "", () => {
+          const photos = window.assetPhotos(a).map(p => ({ ...p })), bp = a._primary || 0;
+          photos.splice(cur, 1);
+          const primary = !photos.length || cur === bp ? 0 : bp > cur ? bp - 1 : bp;
+          applyPhotos(photos, primary), toast("자산 사진이 삭제되었습니다.");
+          if (!photos.length) { back.remove(), onChange(); return; }
+          items = window.assetPhotos(a), cur >= items.length && (cur = items.length - 1), draw(), onChange();
+        }, !0);
+      });
+    }, draw();
   }
   const STATUS_TRANSITIONS = {
     // 배정 가능 상태에서는 상태 메뉴에서 '배정'을 바로 제공한다(D-20261029-52·D-20261030-15).
@@ -1241,7 +1275,7 @@ function openLeaderQr(a) {
  const info=[['분류',categoryPath(a)],['태그',chips(a.labels)]].map(([k,v])=>`<div><div class="k">${k}</div><div class="v">${v}</div></div>`).join('')+window.AssetExtra.detailRows(a,manage,expiryBadge)+[['자산 등록일',window.fmtDate(a.createdAt)],['QR 라벨','<button class="btn sm" data-qr-open aria-label="QR 라벨">QR 라벨</button>'],['메모',`${memoHtml(a.note)}${window.AssetAccess.canField(a,'memo',ME)?`<button class="icon-edit" data-memoedit aria-label="메모 수정">${IC_EDIT}</button>`:''}`]].map(([k,v])=>`<div><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
  // 자산 한 건은 한 대상에게만 배정하므로 배정 탭에는 이 대상의 배정 기록 하나만 보여준다(D-20261030-14·15).
  const party=`<div class="dsection"><h2 class="mapp-party-head">배정 현황</h2>${rec?`<div class="acard${manageActions(a,target).length?' has-actions':''}">${typeBadge(rec)}${manageActions(a,target).length?`<button type="button" class="mapp-holder-more" data-card-more aria-label="배정 관리" aria-haspopup="menu">${MORE_ICON}</button>`:''}<div class="acard-id">${assignIdentity(rec)}</div><div class="acard-foot"><span class="acard-date">배정일 <b>${window.fmtDate(rec.since)}</b></span>${canManage(a)?`<button type="button" class="icon-edit acard-date-edit" data-date-edit aria-label="배정일 수정">${IC_EDIT}</button>`:''}</div></div>`:`<div class="assign-empty"><p class="mapp-party-empty">배정 대상이 없습니다.</p>${canManage(a)&&!(a.assignments||[]).length?'<button type="button" class="btn sm" data-assign-open>배정</button>':''}</div>`}</div>`;
- return `<div class="mapp-topbar"><button class="mapp-back" data-mapp-back aria-label="뒤로">←</button>${menuActions(a,target).length?`<button class="mapp-more" data-more-open aria-label="더보기">${MORE_ICON}</button>`:''}</div><div class="mapp-body"><div class="dhead-id"><div class="mapp-hero-wrap"><button class="mapp-hero-img" data-hero-viewer aria-label="사진 보기"${photos.length?'':' disabled'}>${cardThumb(a)}</button>${photos.length>1?`<span class="mapp-hero-count">+${photos.length-1}</span>`:''}${canEditInfo(a)?`<button class="mapp-hero-edit" data-hero-edit aria-label="사진 관리">${IC_EDIT}</button>`:''}</div><div><h1>${a.product}</h1><div class="dhead-sub">${actions.length?`<button class="badge ${STATUS_LABEL[a.status][1]} clickable" data-status-open>${STATUS_LABEL[a.status][0]} ▾</button>`:`<span class="badge ${STATUS_LABEL[a.status][1]}">${STATUS_LABEL[a.status][0]}</span>`}<div>고유관리번호 <b>${a.assetNo}</b></div></div></div></div>${window.AssetExtra.tabs()}<div data-detail-panel="assignment">${party}${window.MappLinks.sectionHtml(a, ME)}</div><div data-detail-panel="info" hidden><div class="kv2">${info}</div>${window.AssetExtra.detailHtml(a,manage,expiryBadge)}</div><div data-detail-panel="history" hidden>${timelineHtml(a,'',target)}</div></div>`;
+ return `<div class="mapp-topbar"><button class="mapp-back" data-mapp-back aria-label="뒤로">←</button>${menuActions(a,target).length?`<button class="mapp-more" data-more-open aria-label="더보기">${MORE_ICON}</button>`:''}</div><div class="mapp-body"><div class="dhead-id"><div class="mapp-hero-wrap"><button class="mapp-hero-img" data-hero-viewer aria-label="사진 보기"${photos.length?'':' disabled'}>${cardThumb(a)}</button>${photos.length>1?`<span class="mapp-hero-count">+${photos.length-1}</span>`:''}</div><div><h1>${a.product}</h1><div class="dhead-sub">${actions.length?`<button class="badge ${STATUS_LABEL[a.status][1]} clickable" data-status-open>${STATUS_LABEL[a.status][0]} ▾</button>`:`<span class="badge ${STATUS_LABEL[a.status][1]}">${STATUS_LABEL[a.status][0]}</span>`}<div>고유관리번호 <b>${a.assetNo}</b></div></div></div></div>${window.AssetExtra.tabs()}<div data-detail-panel="assignment">${party}${window.MappLinks.sectionHtml(a, ME)}</div><div data-detail-panel="info" hidden><div class="kv2">${info}</div>${window.AssetExtra.detailHtml(a,manage,expiryBadge)}</div><div data-detail-panel="history" hidden>${timelineHtml(a,'',target)}</div></div>`;
 }
   const MENU_ICON_ASSET = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10" r="1.6"/><path d="m21 16-5-5-9 8"/></svg>',
     DEMO_DIRECTORY_MEMBER = "김민수",
@@ -1594,7 +1628,7 @@ function openLeaderQr(a) {
         const qr=root.querySelector("[data-qr-open]");if(qr)qr.onclick=()=>openLeaderQr(a);
         window.MappLinks.wire(root, a, { me: ME, log: logActivity, after: afterMutate, identityInner: rec => assignIdentity(rec), pickDate: (iso, cb) => openDateSheet(iso, todayStr(), cb), identity: rec => `<div class="acard">${typeBadge(rec)}<div class="acard-id">${assignIdentity(rec)}</div></div>`, open: id => { state.detailAssetId = id, draw(); } });
         const heroBtn = root.querySelector("[data-hero-viewer]");
-        heroBtn && (heroBtn.onclick = () => openPhotoViewer(a));
+        heroBtn && (heroBtn.onclick = () => openPhotoViewer(a, draw));
         const heroEdit = root.querySelector("[data-hero-edit]");
         heroEdit && (heroEdit.onclick = e => {
           e.stopPropagation(), openPhotoManageModal(a, afterMutate);

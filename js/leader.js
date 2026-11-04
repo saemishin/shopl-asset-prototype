@@ -1824,8 +1824,8 @@
     });
   }
   const IC_DOWNLOAD = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 21h16"/></svg>';
-  function openPhotoViewer(a) {
-    const items = window.assetPhotos(a);
+  function openPhotoViewer(a, onChange) {
+    let items = window.assetPhotos(a);
     if (!items.length) return;
     let cur = a._primary || 0;
     const back = mappOverlay("mapp-viewer-back", 250);
@@ -1833,25 +1833,59 @@
       <div class="mapp-viewer-bar">
         <button type="button" class="mapp-viewer-back-btn" data-vclose aria-label="닫기">←</button>
         <span class="mapp-viewer-count"></span>
-        <button type="button" class="mapp-viewer-dl" data-vdownload aria-label="다운로드">${IC_DOWNLOAD}</button>
+        <button type="button" class="mapp-viewer-dl" data-vmore aria-label="더보기" style="font-size:20px;line-height:1">⋮</button>
       </div>
       <div class="mapp-viewer-stage">
         <button type="button" class="mapp-viewer-nav" data-vprev aria-label="이전">‹</button>
         <div class="mapp-viewer-img"></div>
         <button type="button" class="mapp-viewer-nav" data-vnext aria-label="다음">›</button>
-      </div>`;
+      </div>
+      <div data-vinfo style="position:absolute;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:14px 16px 24px;color:#fff;font-size:13px"></div>`;
     const img = back.querySelector(".mapp-viewer-img"),
       countEl = back.querySelector(".mapp-viewer-count"),
+      infoEl = back.querySelector("[data-vinfo]"),
       prevBtn = back.querySelector("[data-vprev]"),
-      nextBtn = back.querySelector("[data-vnext]");
+      nextBtn = back.querySelector("[data-vnext]"),
+      moreBtn = back.querySelector("[data-vmore]"),
+      fmtAt = at => String(at || "").replace(/^(\d{4})-(\d{2})-(\d{2})\s*/, "$1.$2.$3. ");
     function draw() {
-      img.style.background = items[cur].color, countEl.textContent = `${cur + 1}/${items.length}`, prevBtn.hidden = nextBtn.hidden = items.length < 2;
+      const p = items[cur], who = p.by || ME;
+      img.style.background = p.color, countEl.textContent = `${cur + 1}/${items.length}`, prevBtn.hidden = nextBtn.hidden = items.length < 2;
+      infoEl.innerHTML = `<span style="display:flex;align-items:center;gap:8px">${window.pickerAvatarHtml(esc(who), avatarColor(who))}<span>${esc(who)}</span></span><span style="opacity:.7">${esc(fmtAt(p.at))}</span>`;
+    }
+    function applyPhotos(photos, primary) {
+      const before = window.assetPhotos(a).map(p => ({ ...p })), beforePrimary = a._primary || 0;
+      window.logAssetActivities(window.assetPhotoActivities(before, beforePrimary, photos, primary), e => logActivity(a, e));
+      a._photos = photos, a._primary = primary, a.photo = photos[primary]?.color || null, a.photoCount = photos.length;
     }
     prevBtn.onclick = () => {
       cur = (cur - 1 + items.length) % items.length, draw();
     }, nextBtn.onclick = () => {
       cur = (cur + 1) % items.length, draw();
-    }, back.querySelector("[data-vclose]").onclick = () => back.remove(), back.querySelector("[data-vdownload]").onclick = () => toast("사진을 저장하였습니다."), draw();
+    }, back.querySelector("[data-vclose]").onclick = () => back.remove(), moreBtn.onclick = () => {
+      const editable = !!onChange && canEditInfo(a) && a.status !== "disposed",
+        menu = [];
+      editable && cur !== (a._primary || 0) && menu.push({ key: "primary", label: "대표 사진으로 지정" });
+      menu.push({ key: "save", label: "저장" });
+      editable && menu.push({ key: "delete", label: "삭제", danger: !0 });
+      openDropdownMenu(moreBtn, menu, key => {
+        if (key === "save") { toast("사진을 저장하였습니다."); return; }
+        if (key === "primary") {
+          confirmModal("대표 사진으로 지정하시겠습니까?", "", () => {
+            applyPhotos(window.assetPhotos(a).map(p => ({ ...p })), cur), items = window.assetPhotos(a), draw(), onChange(), toast("자산 대표 사진으로 지정되었습니다.");
+          });
+          return;
+        }
+        key === "delete" && confirmModal("사진을 삭제하시겠습니까?", "", () => {
+          const photos = window.assetPhotos(a).map(p => ({ ...p })), bp = a._primary || 0;
+          photos.splice(cur, 1);
+          const primary = !photos.length || cur === bp ? 0 : bp > cur ? bp - 1 : bp;
+          applyPhotos(photos, primary), toast("자산 사진이 삭제되었습니다.");
+          if (!photos.length) { back.remove(), onChange(); return; }
+          items = window.assetPhotos(a), cur >= items.length && (cur = items.length - 1), draw(), onChange();
+        }, !0);
+      });
+    }, draw();
   }
   const STATUS_TRANSITIONS = {
     // 배정 가능 상태에서는 상태 메뉴에서 '배정'을 바로 제공한다(D-20261029-52·D-20261030-15).
@@ -1945,7 +1979,7 @@
  const badge=statusActions(a).length?`<button class="badge ${STATUS_LABEL[a.status][1]} clickable" data-status-open>${STATUS_LABEL[a.status][0]} ▾</button>`:`<span class="badge ${STATUS_LABEL[a.status][1]}">${STATUS_LABEL[a.status][0]}</span>`;
  const info=[['분류',categoryPath(a)],['태그',(a.labels||[]).map(l=>`<span class="tag">${esc(l)}</span>`).join('')||'—']].map(([k,v])=>`<div><div class="k">${k}</div><div class="v">${v}</div></div>`).join('')+window.AssetExtra.detailRows(a,manage,expiryBadge)+[['자산 등록일',window.fmtDate(a.createdAt)],['QR 라벨',`<button type="button" class="btn sm icon-only" data-qr-open aria-label="QR 라벨">${QR_ICON}</button>`],['메모',`${window.AssetMemo.render(a.note)}${editable?`<button class="icon-edit" data-memoedit aria-label="메모 수정">${IC_EDIT}</button>`:''}`]].map(([k,v])=>`<div><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
  const assignments=target?scopedPartySectionHtml(a,target):`<div class="dsection"><div class="mapp-leader-holders-head"><h2>배정 현황</h2></div><div data-holder-list></div></div>`;
- return `<div class="mapp-topbar"><button class="mapp-back" data-mapp-back aria-label="뒤로">←</button>${editable||manage&&!target?`<button class="mapp-more" data-more-open aria-label="더보기">${MORE_ICON}</button>`:''}</div><div class="mapp-body mapp-leader-detail-body"><div class="dhead-id"><div class="mapp-hero-wrap"><button class="mapp-hero-img" data-hero-viewer aria-label="사진 보기"${photos.length?'':' disabled'}>${cardThumb(a)}</button>${photos.length>1?`<span class="mapp-hero-count">+${photos.length-1}</span>`:''}${editable?`<button class="mapp-hero-edit" data-hero-edit aria-label="사진 관리">${IC_EDIT}</button>`:''}</div><div><h1>${esc(a.product)}</h1><div class="dhead-sub">${badge}<div>고유관리번호 <b>${esc(a.assetNo)}</b></div></div></div></div>${window.AssetExtra.tabs()}<div data-detail-panel="assignment">${assignments}${window.MappLinks.sectionHtml(a, ME)}</div><div data-detail-panel="info" hidden><div class="kv2">${info}</div>${window.AssetExtra.detailHtml(a,manage,expiryBadge)}</div><div data-detail-panel="history" hidden>${timelineHtml(a,'',target)}</div></div>`;
+ return `<div class="mapp-topbar"><button class="mapp-back" data-mapp-back aria-label="뒤로">←</button>${editable||manage&&!target?`<button class="mapp-more" data-more-open aria-label="더보기">${MORE_ICON}</button>`:''}</div><div class="mapp-body mapp-leader-detail-body"><div class="dhead-id"><div class="mapp-hero-wrap"><button class="mapp-hero-img" data-hero-viewer aria-label="사진 보기"${photos.length?'':' disabled'}>${cardThumb(a)}</button>${photos.length>1?`<span class="mapp-hero-count">+${photos.length-1}</span>`:''}</div><div><h1>${esc(a.product)}</h1><div class="dhead-sub">${badge}<div>고유관리번호 <b>${esc(a.assetNo)}</b></div></div></div></div>${window.AssetExtra.tabs()}<div data-detail-panel="assignment">${assignments}${window.MappLinks.sectionHtml(a, ME)}</div><div data-detail-panel="info" hidden><div class="kv2">${info}</div>${window.AssetExtra.detailHtml(a,manage,expiryBadge)}</div><div data-detail-panel="history" hidden>${timelineHtml(a,'',target)}</div></div>`;
 }
   function leaderHolderList(a, query, kind, requestedPage) {
     const q = (query || "").trim().toLowerCase(),
@@ -2305,7 +2339,7 @@
             label: "자산 삭제",
             danger: !0
           }), openDropdownMenu(more, items, dispatchAction2);
-        }), root.querySelector("[data-date-edit]")?.addEventListener("click", () => dispatchAction2("date")), root.querySelector("[data-card-more]")?.addEventListener("click", e => openDropdownMenu(e.currentTarget, scopedManageActions(a, target).map((x, i) => i ? x : { ...x, sep: !1 }), dispatchAction2)), root.querySelector("[data-assign-open]")?.addEventListener("click", () => dispatchAction2("assign-add")), root.querySelector("[data-hero-viewer]").onclick = () => openPhotoViewer(a);
+        }), root.querySelector("[data-date-edit]")?.addEventListener("click", () => dispatchAction2("date")), root.querySelector("[data-card-more]")?.addEventListener("click", e => openDropdownMenu(e.currentTarget, scopedManageActions(a, target).map((x, i) => i ? x : { ...x, sep: !1 }), dispatchAction2)), root.querySelector("[data-assign-open]")?.addEventListener("click", () => dispatchAction2("assign-add")), root.querySelector("[data-hero-viewer]").onclick = () => openPhotoViewer(a, draw);
         const photoEdit = root.querySelector("[data-hero-edit]");
         photoEdit && (photoEdit.onclick = () => {
           canEditInfo(a) && openPhotoManageModal(a, afterMutate);
