@@ -143,21 +143,7 @@
     input.addEventListener("blur", () => setTimeout(close, 120));
   }
   function openTargetPicker(kind, initial, onApply) {
-    let picked = initial, query = "";
-    const isMember = kind === "employee",
-      p = modal(`<h3>${isMember ? "구성원 선택" : "근무지 선택"}</h3><div class="body" style="display:flex;flex-direction:column;max-height:56vh"><input type="text" class="picker-search" placeholder="${isMember ? "이름/사번/휴대폰번호" : "근무지명/코드"}"><div data-list style="flex:1;min-height:0;overflow-y:auto;margin-top:8px"></div></div><div class="foot"><button class="btn" data-close>취소</button><button class="btn primary" data-ok${picked ? "" : " disabled"}>적용</button></div>`, "sm", 380),
-      list = p.querySelector("[data-list]");
-    const render = () => {
-      const q = query.trim().toLowerCase();
-      const rows = isMember ? MEMBERS.filter(m => !q || m.name.includes(q) || m.empNo.includes(q) || m.phone.includes(q)).map(m => `<label class="picker-member-row"><input type="radio" name="tp-target" value="${m.name}"${picked === m.name ? " checked" : ""}><span class="picker-avatar" style="background:${avatarColor(m.name)}">${m.name[0]}</span><span class="picker-member-info"><b>${m.name}</b><span>${m.team}</span></span></label>`)
-        : Object.keys(WS_CODE).filter(n => !q || n.toLowerCase().includes(q) || WS_CODE[n].toLowerCase().includes(q)).map(n => `<label class="picker-member-row"><input type="radio" name="tp-target" value="${n}"${picked === n ? " checked" : ""}><span class="picker-member-info"><b>${n}</b><span>${WS_CODE[n]}</span></span></label>`);
-      list.innerHTML = rows.join("") || '<p class="muted" style="padding:16px 0">결과가 없습니다.</p>';
-      list.querySelectorAll('[name="tp-target"]').forEach(r => r.onchange = () => { picked = r.value, p.querySelector("[data-ok]").disabled = !1; });
-    };
-    p.querySelector(".picker-search").oninput = e => { query = e.target.value, render(); };
-    p.querySelector("[data-close]").onclick = () => p.remove();
-    p.querySelector("[data-ok]").onclick = () => { p.remove(), onApply(picked); };
-    render();
+    window.TargetPicker.open({ kind, members: MEMBERS.map(m => ({ ...m, color: avatarColor(m.name) })), worksites: WS_CODE, initial, onApply });
   }
 
   // 새25 관리와 새13 선택에서 같은 템플릿 구성을 표시한다.

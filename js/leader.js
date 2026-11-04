@@ -1377,12 +1377,13 @@
     const list = p.querySelector("[data-list]");
     function renderList() {
       const q = query.trim().toLowerCase(),
-        filtered = MEMBERS.filter(m => !excludeNames.includes(m.name) && (!q || m.name.includes(q) || m.empNo.includes(q) || m.phone.includes(q)));
+        all = MEMBERS.filter(m => !excludeNames.includes(m.name)).sort((x, y) => x.name.localeCompare(y.name, "ko")),
+        filtered = all.filter(m => !q || m.name.includes(q) || m.empNo.includes(q) || m.phone.includes(q));
       list.innerHTML = filtered.length ? filtered.map(m => `
         <button type="button" class="picker-member-row" data-pick="${m.name}">
-          <span class="picker-avatar" style="background:${avatarColor(m.name)}">${m.name[0]}</span>
-          <span class="picker-member-info"><b>${m.name}${PICKER_ROLE[m.name] ? `<em class="picker-role">${PICKER_ROLE[m.name]}</em>` : ""}</b><span>${m.team}</span></span>
-        </button>`).join("") : '<p class="muted" style="padding:16px 4px">결과가 없습니다.</p>', list.querySelectorAll("[data-pick]").forEach(b => b.onclick = () => {
+          ${window.pickerAvatarHtml(m.name, avatarColor(m.name), PICKER_ROLE[m.name])}
+          <span class="picker-member-info"><b>${m.name}</b><span>${m.team}</span></span>
+        </button>`).join("") : `<p class="muted" style="padding:16px 4px">${all.length ? "결과가 없습니다." : "표시할 목록이 없습니다."}</p>`, list.querySelectorAll("[data-pick]").forEach(b => b.onclick = () => {
         p.remove(), onApply(b.dataset.pick);
       });
     }
@@ -1581,16 +1582,10 @@
       };
     function drawBody() {
       body.innerHTML = `
-        ${window.MappLinks.assetSummaryHtml(a)}
-        ${old ? `
+        ${old ? `${window.MappLinks.currentCardHtml(a, old, assignIdentity(old))}
           <div class="ra-current">
             <div class="perm-info-note">${INFO_ICON}<span>기존 배정을 반납하고 새 대상에게 배정합니다.</span></div>
-            <div class="acard">
-              ${typeBadge(old)}
-              <div class="acard-id">${assignIdentity(old)}</div>
-              <div class="acard-foot"><span class="acard-date">배정일 <b>${window.fmtDate(old.since)}</b></span></div>
-            </div>
-          </div>` : ""}
+          </div>` : window.MappLinks.assetSummaryHtml(a)}
         <div class="field">
           <label>${cfg.targetLabel}</label>
           <label class="radio-row"><input type="radio" name="form-kind" value="employee"${f.picked === "employee" ? " checked" : ""}><span>구성원</span></label>
@@ -1673,61 +1668,11 @@
     const q = (query || "").trim().toLowerCase();
     return assets.filter(a => !a.deleted_at && a.status !== "disposed" && !(a.assignments || []).length && window.AssetAccess.canState(a, ME) && (!sub || a.sub === sub) && (!q || `${a.product} ${a.assetNo || ""}`.toLowerCase().includes(q))).sort((x, y) => String(x.product).localeCompare(String(y.product), "ko") || String(x.assetNo || "").localeCompare(String(y.assetNo || "")));
   }
-  function openAssetPickPage(initialIds, initialSub, onApply) {
-    const esc = window.AssetExtra.esc,
-      sel = new Set(initialIds),
-      cats = window.DATA.categories.filter(c => window.AssetAccess.scope(c, "view", ME) && window.AssetAccess.scope(c, "assign", ME));
-    let sub = initialSub || "", query = "";
-    const p = mappOverlay("mapp-fullpage-back", 105);
-    p.innerHTML = `
-      <div class="mapp-fullpage-head">
-        <button type="button" class="mapp-back" data-pk-back aria-label="뒤로">←</button>
-        <span class="mapp-fullpage-head-title">자산 선택</span>
-      </div>
-      <div class="mapp-fullpage-body">
-        <div class="field"><label>분류</label><button type="button" class="perm-target-btn" data-pk-sub><span data-pk-sub-label></span><span class="chev">›</span></button></div>
-        <input type="search" class="picker-search" placeholder="품목명·고유관리번호 검색" data-pk-q>
-        <div class="mapp-pick-list" data-pk-list></div>
-      </div>
-      <div class="mapp-fullpage-foot"><button type="button" class="btn primary" data-pk-apply>적용</button></div>`;
-    const list = p.querySelector("[data-pk-list]"),
-      apply = p.querySelector("[data-pk-apply]");
-    function draw() {
-      const items = assignCandidates(sub, query);
-      p.querySelector("[data-pk-sub-label]").textContent = sub ? `${(cats.find(c => c.sub === sub) || {}).group || ""} › ${sub}` : "전체";
-      list.innerHTML = items.length ? items.map(a => `<label class="mapp-pick-row"><input type="checkbox" data-pk-id="${a.id}"${sel.has(a.id) ? " checked" : ""}><span class="mapp-pick-name">${esc(a.product)}</span><span class="mapp-pick-no">${esc(a.assetNo || "")}</span></label>`).join("") : '<p class="muted mapp-pick-empty">배정할 수 있는 자산이 없습니다.</p>';
-      list.querySelectorAll("[data-pk-id]").forEach(c => c.onchange = () => {
-        c.checked ? sel.add(c.dataset.pkId) : sel.delete(c.dataset.pkId);
-      });
-    }
-    p.querySelector("[data-pk-sub]").onclick = () => openSubSelectPopup(cats, sub, v => { sub = v, draw(); });
-    p.querySelector("[data-pk-q]").oninput = e => { query = e.target.value, draw(); };
-    p.querySelector("[data-pk-back]").onclick = () => p.remove();
-    apply.onclick = () => { p.remove(), onApply([...sel], sub); };
-    draw();
-  }
-  function openSubSelectPopup(cats, current, onPick) {
-    const esc = window.AssetExtra.esc,
-      groups = [];
-    cats.forEach(c => { let g = groups.find(x => x.name === c.group); g || groups.push(g = { name: c.group, items: [] }), g.items.push(c); });
-    const p = mappOverlay("mapp-fullpage-back", 110);
-    p.innerHTML = `<div class="mapp-add-category-popup">
-      <div class="mapp-topbar mapp-add-category-head"><span class="mapp-topbar-title">분류</span><button type="button" class="mapp-add-category-close" data-sp-close aria-label="닫기">×</button></div>
-      <div class="mapp-add-category-body">
-        <div class="mapp-directory-search"><input type="search" data-sp-q placeholder="검색" aria-label="분류 검색" autocomplete="off"></div>
-        <section class="mapp-add-category-group"><button type="button" data-sp-pick=""${current ? "" : ' class="on"'}><span>전체</span></button></section>
-        ${groups.map(g => `<section class="mapp-add-category-group" data-sp-group><h2>${esc(g.name)}</h2>${g.items.map(c => `<button type="button" data-sp-pick="${esc(c.sub)}" data-sp-name="${esc(c.sub)}"${c.sub === current ? ' class="on"' : ""}><span>${esc(c.sub)}</span></button>`).join("")}</section>`).join("")}
-      </div></div>`;
-    p.querySelector("[data-sp-close]").onclick = () => p.remove();
-    p.querySelectorAll("[data-sp-pick]").forEach(b => b.onclick = () => { p.remove(), onPick(b.dataset.spPick); });
-    p.querySelector("[data-sp-q]").oninput = e => {
-      const q = e.target.value.trim().toLowerCase();
-      p.querySelectorAll("[data-sp-name]").forEach(b => b.hidden = !!q && !b.dataset.spName.toLowerCase().includes(q));
-      p.querySelectorAll("[data-sp-group]").forEach(g => g.hidden = ![...g.querySelectorAll("[data-sp-name]")].some(b => !b.hidden));
-    };
+  function openAssetPickPage(initialIds, initialSubs, onApply) {
+    window.MappLinks.openAssetPick({ me: ME, candidates: (subs, q) => assignCandidates("", q).filter(a => !subs.length || subs.includes(a.sub)), initialIds, initialSubs, onApply });
   }
   function openMultiAssignPage(presetSub, onDone) {
-    const f = { ids: [], sub: presetSub || "", picked: null, draft: { employee: null, worksite: null }, dateIso: "" },
+    const f = { ids: [], subs: presetSub ? [presetSub] : [], picked: null, draft: { employee: null, worksite: null }, dateIso: "" },
       back = mappOverlay("mapp-fullpage-back", 95);
     back.innerHTML = `
       <div class="mapp-fullpage-head">
@@ -1741,7 +1686,7 @@
       chip = (val, openKey, clearKey) => val ? `<div class="aa-target-selected" ${openKey}><span class="perm-chip">${val}</span><button type="button" class="aa-target-x" ${clearKey} aria-label="선택 해제">${CLOSE_ICON}</button></div>` : `<button type="button" class="perm-target-btn" ${openKey}><span class="muted">선택</span><span class="chev">›</span></button>`;
     function drawBody() {
       const picked = f.ids.map(id => assets.find(a => a.id === id)).filter(Boolean),
-        assetLabel = picked.length ? `${picked[0].product}${picked.length > 1 ? ` 외 ${picked.length - 1}건` : ""}` : "";
+        assetLabel = picked.length ? `${picked[0].product}${picked.length > 1 ? ` +${picked.length - 1}` : ""}` : "";
       body.innerHTML = `
         <div class="field"><label>자산</label>${chip(assetLabel, "data-ma-asset", "data-ma-asset-clear")}</div>
         <div class="field">
@@ -1752,7 +1697,7 @@
           ${f.picked === "worksite" ? `<div class="perm-target-wrap">${chip(f.draft.worksite, "data-ma-target", "data-ma-target-clear")}</div>` : ""}
         </div>
         <div class="field"><label>배정일</label><div class="mapp-date-wrap">${chip(f.dateIso ? window.fmtDate(f.dateIso) : "", "data-ma-date", "data-ma-date-clear")}</div></div>`;
-      body.querySelector("[data-ma-asset]").onclick = () => openAssetPickPage(f.ids, f.sub, (ids, sub) => { f.ids = ids, f.sub = sub, drawBody(); });
+      body.querySelector("[data-ma-asset]").onclick = () => openAssetPickPage(f.ids, f.subs, (ids, subs) => { f.ids = ids, f.subs = subs, drawBody(); });
       body.querySelectorAll('input[name="ma-kind"]').forEach(r => r.onchange = () => { f.picked = r.value, drawBody(); });
       const t = body.querySelector("[data-ma-target]");
       t && (t.onclick = () => f.picked === "employee" ? openMemberPickerPage(f.draft.employee, v => { f.draft.employee = v, drawBody(); }) : openWorksitePickerPage(f.draft.worksite, v => { f.draft.worksite = v, drawBody(); }));
@@ -1787,7 +1732,7 @@
   }
   function openReturnConfirm(a, idx, onDone) {
     const old = a.assignments[idx];
-    const currentHtml = `<div class="acard">${typeBadge(old)}<div class="acard-id">${assignIdentity(old)}</div><div class="acard-foot"><span class="acard-date">배정일 <b>${window.fmtDate(old.since)}</b></span></div></div>`;
+    const currentHtml = window.MappLinks.currentCardHtml(a, old, assignIdentity(old));
     window.MappLinks.returnReview(a, ME, currentHtml, (mode, plan) => {
       window.MappLinks.runReturn(a, mode, plan, logActivity, x => derivedActiveStatus(x));
       toast("반납되었습니다."); onDone();
@@ -2373,7 +2318,7 @@
         const holderQuery = root.querySelector("[data-holder-query]"),
           holderCategory = root.querySelector("[data-holder-category]");
         drawHolders2();
-        window.MappLinks.wire(root, a, { me: ME, log: logActivity, after: afterMutate, identity: rec => `<div class="acard">${typeBadge(rec)}<div class="acard-id">${assignIdentity(rec)}</div></div>`, open: id => { state.detailAssetId = id, state.holderPage = 1, draw(); } });
+        window.MappLinks.wire(root, a, { me: ME, log: logActivity, after: afterMutate, identityInner: rec => assignIdentity(rec), pickDate: (iso, cb) => openDateSheet(iso, todayStr(), cb), identity: rec => `<div class="acard">${typeBadge(rec)}<div class="acard-id">${assignIdentity(rec)}</div></div>`, open: id => { state.detailAssetId = id, state.holderPage = 1, draw(); } });
       }
       if (state.screen === "asset-history") {
         const a = assets.find(x => x.id === state.detailAssetId),

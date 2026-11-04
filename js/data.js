@@ -1499,3 +1499,6 @@ window.AssetExtra.exportValues=(asset,manage=window.hasPrototypeAssetManagePermi
   window.AssetProducts = {all,list,assetsOf,attach,reconcile,save,byId,bindTemplates,rowExists,renameCategory,pruneCategories,touch,normalize};
   reconcile();
 })();
+
+// 구성원 선택 행의 프로필 + 관리자·리더 구분 아이콘(앱·대시보드 공통)
+window.pickerAvatarHtml = (name, color, role) => `<span class="picker-avatar-wrap"><span class="picker-avatar" style="background:${color}">${String(name || "")[0] || ""}</span>${role ? `<span class="picker-role-icon ${role === "관리자" ? "admin" : "leader"}" title="${role}" aria-label="${role}"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></svg></span>` : ""}</span>`;

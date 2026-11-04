@@ -17,6 +17,10 @@
   function assetSummaryHtml(a) {
     return `<div class="aa-asset-summary" data-current-asset>${thumb(a)}<div class="aa-asset-summary-main"><strong>${esc(a.product)}</strong><span>${esc(a.assetNo)}</span></div></div>`;
   }
+  // 현재 자산·배정 정보 카드(대시보드 asset-assignment-summary와 같은 구성)
+  function currentCardHtml(a, r, identityInner) {
+    return `<div class="asset-assignment-summary" data-current-asset-assignment>${assetSummaryHtml(a)}<div class="asset-assignment-current"><div class="acard-id">${identityInner}</div><span class="acard-date">배정일 <b>${window.fmtDate(r.since)}</b></span></div></div>`;
+  }
   function toast(msg) {
     const t = document.createElement("div"), screen = document.querySelector(".mapp-screen"), r = screen ? screen.getBoundingClientRect() : null;
     t.textContent = msg, t.style.cssText = `position:fixed;${r ? `left:${r.left + r.width / 2}px;bottom:${window.innerHeight - r.bottom + 32}px;` : "left:50%;bottom:32px;"}transform:translateX(-50%);background:#1b1d1f;color:#fff;padding:10px 16px;border-radius:8px;font-size:12.5px;z-index:400;max-width:280px;text-align:center`;
@@ -34,7 +38,7 @@
   }
   function confirm(title, body, onOk, z = 340) {
     const cb = document.createElement("div");
-    cb.className = "modal-back", cb.style.zIndex = z, cb.innerHTML = `<div class="modal" style="width:340px"><div class="body" style="padding-top:20px"><p style="font-size:14px;font-weight:700;margin-bottom:6px">${title}</p>${body ? `<p class="hint" style="margin-top:0">${body}</p>` : ""}</div><div class="foot"><button class="btn" data-no>취소</button><button class="btn primary" data-ok>확인</button></div></div>`;
+    cb.className = "modal-back", cb.style.zIndex = z, cb.innerHTML = `<div class="modal" style="width:340px"><div class="body" style="padding-top:20px"><p style="font-size:14px;font-weight:700;margin-bottom:6px">${title}</p>${body ? `<div class="hint" style="margin-top:0">${body}</div>` : ""}</div><div class="foot"><button class="btn" data-no>취소</button><button class="btn primary" data-ok>확인</button></div></div>`;
     document.body.appendChild(cb);
     cb.querySelector("[data-no]").onclick = () => cb.remove();
     cb.querySelector("[data-ok]").onclick = () => { cb.remove(), onOk(); };
@@ -62,7 +66,7 @@
     });
   }
   function cutConfirm(a, b, log, after) {
-    confirm("연결을 해제하시겠습니까?", `<strong>${esc(label(a))}</strong><br><span aria-hidden="true">↕</span><br><strong>${esc(label(b))}</strong><br><br>배정은 바뀌지 않습니다.`, () => {
+    confirm("연결을 해제하시겠습니까?", `<span class="mlink-cut-cards">${assetSummaryHtml(a)}${assetSummaryHtml(b)}</span>배정은 바뀌지 않습니다.`, () => {
       if (!L().remove(a, b)) return toast("설정이 변경되었습니다. 잠시 후 다시 시도해주세요."), after();
       log(a, { script: "자산 연결: 연결 해제", before: label(b), after: "" });
       log(b, { script: "자산 연결: 연결 해제", before: label(a), after: "" });
@@ -91,52 +95,150 @@
     s.onclick = e => { e.target === s && s.remove(); };
     draw();
   }
-  // 자산 연결 시트: 배정 대상 → 이 대상의 연결되지 않은 자산 → 배정 가능 자산 검색(새 배정)
+  // 휴대폰 화면을 덮는 전체 화면·팝업
+  function overlay(cls, z) {
+    const screen = document.querySelector(".mapp-screen"), r = screen ? screen.getBoundingClientRect() : { top: 0, left: 0, width: 390, height: 844 };
+    const back = document.createElement("div");
+    back.className = cls;
+    back.style.cssText = `position:absolute;top:${r.top + window.scrollY}px;left:${r.left + window.scrollX}px;width:${r.width}px;height:${r.height}px;z-index:${z};`;
+    document.body.appendChild(back);
+    return back;
+  }
+  const targetActive = r => {
+    const type = r.employee ? "employee" : "worksite", name = r.employee || r.worksite;
+    return !["retired", "resigned", "inactive"].includes(window.DATA.targetStatuses?.[type]?.[name]);
+  };
+  // 앱 공통06 분류 선택 팝업(조회용 소분류 복수 선택)
+  function openSubSelect(cats, current, onApply) {
+    const groups = [], sel = new Set(current || []);
+    cats.forEach(c => { let g = groups.find(x => x.name === c.group); g || groups.push(g = { name: c.group, items: [] }), g.items.push(c); });
+    let q = "";
+    const p = overlay("mapp-fullpage-back", 160);
+    p.innerHTML = `<div class="mapp-add-category-popup">
+      <div class="mapp-topbar mapp-add-category-head"><span class="mapp-topbar-title">분류</span><button type="button" class="mapp-add-category-close" data-sp-close aria-label="닫기">×</button></div>
+      <div class="mapp-add-category-body" data-sp-body></div>
+      <div class="mapp-fullpage-foot"><button type="button" class="btn primary" data-sp-apply${cats.length ? "" : " disabled"}>적용</button></div></div>`;
+    const body = p.querySelector("[data-sp-body]");
+    const visible = () => groups.map(g => ({ g, items: !q || g.name.toLowerCase().includes(q) ? g.items : g.items.filter(c => c.sub.toLowerCase().includes(q)) })).filter(x => x.items.length);
+    const state = items => { const n = items.filter(c => sel.has(c.sub)).length; return n === 0 ? "" : n === items.length ? "on" : "mixed"; };
+    const box = (st, attr) => `<input type="checkbox" ${attr}${st === "on" ? " checked" : ""} data-mixed="${st === "mixed" ? 1 : 0}">`;
+    function draw() {
+      if (!cats.length) { body.innerHTML = '<p class="muted mapp-pick-empty">선택할 수 있는 분류가 없습니다.</p>'; return; }
+      const v = visible(), all = v.flatMap(x => x.items);
+      body.innerHTML = `<div class="mapp-directory-search"><input type="search" data-sp-q placeholder="검색" aria-label="분류 검색" autocomplete="off" value="${esc(q)}"></div>
+        ${all.length ? `<div class="mapp-cat-tools"><label class="mapp-cat-row">${box(state(all), "data-sp-all")}<span>전체</span></label><button type="button" class="mapp-cat-reset" data-sp-reset>초기화</button></div>
+        ${v.map(({ g, items }, gi) => `<section class="mapp-cat-group"><label class="mapp-cat-row mapp-cat-head">${box(state(items), `data-sp-group="${gi}"`)}<span>${esc(g.name)}</span></label>${items.map(c => `<label class="mapp-cat-row mapp-cat-sub">${box(sel.has(c.sub) ? "on" : "", `data-sp-sub="${esc(c.sub)}"`)}<span>${esc(c.sub)}</span></label>`).join("")}</section>`).join("")}` : '<p class="muted mapp-pick-empty">결과가 없습니다.</p>'}`;
+      body.querySelectorAll('[data-mixed="1"]').forEach(x => x.indeterminate = true);
+      const input = body.querySelector("[data-sp-q]");
+      input.oninput = e => { q = e.target.value.trim().toLowerCase(), draw(); const n = body.querySelector("[data-sp-q]"); n.focus(), n.setSelectionRange(n.value.length, n.value.length); };
+      const toggle = (items, on) => items.forEach(c => on ? sel.add(c.sub) : sel.delete(c.sub));
+      body.querySelector("[data-sp-all]")?.addEventListener("change", e => { toggle(all, e.target.checked), draw(); });
+      body.querySelectorAll("[data-sp-group]").forEach(x => x.onchange = () => { toggle(v[+x.dataset.spGroup].items, x.checked), draw(); });
+      body.querySelectorAll("[data-sp-sub]").forEach(x => x.onchange = () => { x.checked ? sel.add(x.dataset.spSub) : sel.delete(x.dataset.spSub), draw(); });
+      body.querySelector("[data-sp-reset]")?.addEventListener("click", () => { sel.clear(), draw(); });
+    }
+    p.querySelector("[data-sp-close]").onclick = () => p.remove();
+    p.querySelector("[data-sp-apply]").onclick = () => { const subs = sel.size === cats.length ? [] : cats.filter(c => sel.has(c.sub)).map(c => c.sub); p.remove(), onApply(subs); };
+    draw();
+  }
+  // 앱 공통05 자산 선택 화면. candidates(sub, query)가 후보를 돌려준다. limit이 있으면 선택 상한.
+  function openAssetPick({ me, candidates, initialIds = [], initialSubs = [], limit = Infinity, onApply }) {
+    const sel = new Set(initialIds),
+      cats = window.DATA.categories.filter(c => window.AssetAccess.scope(c, "view", me) && window.AssetAccess.scope(c, "assign", me));
+    let subs = [...initialSubs], query = "";
+    const p = overlay("mapp-fullpage-back", 150);
+    p.innerHTML = `
+      <div class="mapp-fullpage-head">
+        <button type="button" class="mapp-back" data-pk-back aria-label="뒤로">←</button>
+        <span class="mapp-fullpage-head-title">자산 선택</span>
+      </div>
+      <div class="mapp-fullpage-body">
+        <div class="field"><label>분류</label><button type="button" class="perm-target-btn" data-pk-sub><span data-pk-sub-label></span><span class="chev">›</span></button></div>
+        <input type="search" class="picker-search" placeholder="품목명·고유관리번호 검색" data-pk-q>
+        <div class="mapp-pick-list" data-pk-list></div>
+      </div>
+      <div class="mapp-fullpage-foot"><button type="button" class="btn primary" data-pk-apply>적용</button></div>`;
+    const list = p.querySelector("[data-pk-list]");
+    function draw() {
+      const items = candidates(subs, query), full = sel.size >= limit;
+      p.querySelector("[data-pk-sub-label]").textContent = subs.length ? `${subs[0]}${subs.length > 1 ? ` +${subs.length - 1}` : ""}` : "전체";
+      list.innerHTML = items.length ? items.map(a => { const on = sel.has(a.id); return `<label class="mapp-pick-row"><input type="checkbox" data-pk-id="${a.id}"${on ? " checked" : ""}${!on && full ? " disabled" : ""}><span class="mapp-pick-name">${esc(a.product)}</span><span class="mapp-pick-no">${esc(a.assetNo || "")}</span></label>`; }).join("") : '<p class="muted mapp-pick-empty">배정할 수 있는 자산이 없습니다.</p>';
+      list.querySelectorAll("[data-pk-id]").forEach(c => c.onchange = () => {
+        c.checked ? sel.add(c.dataset.pkId) : sel.delete(c.dataset.pkId), draw();
+      });
+    }
+    p.querySelector("[data-pk-sub]").onclick = () => openSubSelect(cats, subs, v => { subs = v, draw(); });
+    p.querySelector("[data-pk-q]").oninput = e => { query = e.target.value, draw(); };
+    p.querySelector("[data-pk-back]").onclick = () => p.remove();
+    p.querySelector("[data-pk-apply]").onclick = () => { p.remove(), onApply([...sel], subs); };
+    draw();
+  }
+  const byName = (x, y) => String(x.product).localeCompare(String(y.product), "ko") || String(x.assetNo || "").localeCompare(String(y.assetNo || ""));
+  // 자산 연결 전체 화면: 배정 대상 → 연결되지 않은 자산 → 새로 배정할 자산 선택 → 배정일
   function openAdd(a, ctx) {
-    const room = L().MAX - L().count(a.id), picked = new Map(), r = a.assignments[0], today = "2026-09-04"; // 프로토타입 기준일(다른 화면의 TODAY와 같음)
-    let q = "", date = today;
-    const isNew = b => !(b.assignments || []).length;
-    const s = sheet("자산 연결", `
-      <section class="mlink-add-sec"><h3>배정 대상</h3>${ctx.identity(r)}</section>
-      <section class="mlink-add-sec"><h3>연결되지 않은 자산</h3><div class="mlink-list" data-same></div></section>
-      <section class="mlink-add-sec"><h3>배정 가능 자산 검색</h3><input type="text" class="picker-search" placeholder="고유관리번호" data-q><div class="mlink-list mlink-found" data-found></div>
-        <div class="mlink-date" data-date-box hidden><label>배정일</label><input type="date" data-date value="${today}" max="${today}"><p class="mlink-help">검색해서 선택한 자산을 이 대상에게 새로 배정하면서 연결합니다.</p></div></section>`, '<button type="button" class="btn" data-close>취소</button><button type="button" class="btn primary" data-save disabled>저장</button>');
-    const save = s.querySelector("[data-save]"), dateBox = s.querySelector("[data-date-box]");
-    const rowHtml = b => {
-      const on = picked.has(b.id), lock = !on && picked.size >= room;
-      return `<label class="mlink-row mlink-cand${on ? " on" : ""}"><input type="checkbox" data-pick="${b.id}"${on ? " checked" : ""}${lock ? " disabled" : ""}>${thumb(b)}<div class="mlink-row-main"><b>${esc(b.product)}</b><span>${esc(b.assetNo)}</span></div>${isNew(b) ? '<span class="badge stock">새로 배정</span>' : badge(b)}</label>`;
-    };
-    const refresh = () => {
-      const newCount = [...picked.values()].filter(isNew).length;
-      dateBox.hidden = !newCount;
-      save.disabled = !picked.size || newCount && (!date || date > today);
+    const room = L().MAX - L().count(a.id), r = a.assignments[0], active = targetActive(r),
+      same = new Set(), f = { newIds: [], dateIso: "" };
+    const p = overlay("mapp-fullpage-back", 100);
+    p.innerHTML = `
+      <div class="mapp-fullpage-head">
+        <button type="button" class="mapp-back" data-la-back aria-label="뒤로">←</button>
+        <span class="mapp-fullpage-head-title">자산 연결</span>
+      </div>
+      <div class="mapp-fullpage-body" data-la-body></div>
+      <div class="mapp-fullpage-foot"><button type="button" class="btn primary" data-la-save disabled>저장</button></div>`;
+    const body = p.querySelector("[data-la-body]"), save = p.querySelector("[data-la-save]");
+    const chip = (val, openKey, clearKey) => val ? `<div class="aa-target-selected" ${openKey}><span class="perm-chip">${esc(val)}</span><button type="button" class="aa-target-x" ${clearKey} aria-label="선택 해제">${CLOSE_ICON}</button></div>` : `<button type="button" class="perm-target-btn" ${openKey}><span class="muted">선택</span><span class="chev">›</span></button>`;
+    const stockCandidates = (subs, q) => {
+      q = (q || "").trim().toLowerCase();
+      return window.DATA.assets.filter(b => b.id !== a.id && !b.deleted_at && b.status !== "disposed" && !(b.assignments || []).length && canState(b, ctx.me) && (!subs.length || subs.includes(b.sub)) && (!q || `${b.product} ${b.assetNo || ""}`.toLowerCase().includes(q))).sort(byName);
     };
     const draw = () => {
-      const same = L().candidates(a, ctx.me), pickedNew = [...picked.values()].filter(isNew),
-        found = q ? L().stockMatches(a, ctx.me, q).filter(b => !picked.has(b.id)) : [];
-      s.querySelector("[data-same]").innerHTML = same.length ? same.map(rowHtml).join("") : '<p class="mlink-empty">연결할 수 있는 자산이 없습니다.</p>';
-      s.querySelector("[data-found]").innerHTML = pickedNew.concat(found).map(rowHtml).join("") || (q ? '<p class="mlink-empty">결과가 없습니다.</p>' : "");
-      s.querySelectorAll("[data-pick]").forEach(c => c.onchange = () => {
-        const b = window.DATA.assets.find(x => x.id === c.dataset.pick);
-        c.checked ? picked.set(b.id, b) : picked.delete(b.id), draw();
+      const cands = L().candidates(a, ctx.me), full = same.size + f.newIds.length >= room,
+        picked = f.newIds.map(id => window.DATA.assets.find(x => x.id === id)).filter(Boolean),
+        assetLabel = picked.length ? `${picked[0].product}${picked.length > 1 ? ` +${picked.length - 1}` : ""}` : "";
+      body.innerHTML = `
+        ${currentCardHtml(a, r, ctx.identityInner(r))}
+        <section class="mlink-add-sec"><h3>연결 가능 자산</h3><p class="link-section-help">현재 배정 대상에게 배정되어 있는 자산입니다.</p><div class="mlink-list">${cands.length ? cands.map(b => {
+          const on = same.has(b.id);
+          return `<label class="mlink-row mlink-cand${on ? " on" : ""}"><input type="checkbox" data-pick="${b.id}"${on ? " checked" : ""}${!on && full ? " disabled" : ""}>${thumb(b)}<div class="mlink-row-main"><b>${esc(b.product)}</b><span>${esc(b.assetNo)}</span></div>${badge(b)}</label>`;
+        }).join("") : '<p class="mlink-empty">연결할 수 있는 자산이 없습니다.</p>'}</div></section>
+        ${active ? `<section class="mlink-add-sec"><h3>자산 추가 연결</h3><p class="link-section-help">현재 배정 대상에게 새로 배정하며 자산을 연결합니다.</p>
+          <div class="field"><label>자산</label>${chip(assetLabel, "data-la-asset", "data-la-asset-clear")}</div>
+          <div class="field"><label>배정일</label><div class="mapp-date-wrap">${chip(f.dateIso ? window.fmtDate(f.dateIso) : "", "data-la-date", "data-la-date-clear")}</div></div></section>` : ""}`;
+      body.querySelectorAll("[data-pick]").forEach(c => c.onchange = () => { c.checked ? same.add(c.dataset.pick) : same.delete(c.dataset.pick), draw(); });
+      const assetBtn = body.querySelector("[data-la-asset]");
+      assetBtn && (assetBtn.onclick = () => openAssetPick({ me: ctx.me, candidates: stockCandidates, initialIds: f.newIds, limit: room - same.size, onApply: ids => { f.newIds = ids, draw(); } }));
+      const dateBtn = body.querySelector("[data-la-date]");
+      dateBtn && (dateBtn.onclick = () => ctx.pickDate(f.dateIso, v => { f.dateIso = v, draw(); }));
+      [["[data-la-asset-clear]", () => { f.newIds = []; }], ["[data-la-date-clear]", () => { f.dateIso = ""; }]].forEach(([q, fn]) => {
+        const x = body.querySelector(q);
+        x && (x.onclick = e => { e.stopPropagation(), fn(), draw(); });
       });
-      refresh();
+      save.disabled = !(same.size + f.newIds.length) || f.newIds.length && !f.dateIso;
     };
-    s.querySelector("[data-q]").oninput = e => { q = e.target.value.trim().toLowerCase(), draw(); };
-    s.querySelector("[data-date]").onchange = e => { date = e.target.value, refresh(); };
-    s.querySelector("[data-close]").onclick = () => s.remove();
+    p.querySelector("[data-la-back]").onclick = () => {
+      if (!(same.size || f.newIds.length || f.dateIso)) return p.remove();
+      const cb = document.createElement("div");
+      cb.className = "modal-back", cb.style.zIndex = 340, cb.innerHTML = `<div class="modal sm" style="width:340px" role="dialog" aria-modal="true" aria-label="취소하시겠습니까?"><h3>취소하시겠습니까?</h3><div class="body" style="font-size:14px">취소 시 편집한 내용이 저장되지 않습니다.</div><div class="foot"><button type="button" class="btn" data-stay>취소</button><button type="button" class="btn primary" data-leave>확인</button></div></div>`, document.body.appendChild(cb);
+      cb.querySelector("[data-stay]").onclick = () => cb.remove();
+      cb.querySelector("[data-leave]").onclick = () => { cb.remove(), p.remove(); };
+    };
     save.onclick = () => {
-      const targets = [...picked.values()], key = L().targetKey(a);
-      const stale = targets.filter(b => isNew(b) ? b.status !== "stock" || b.deleted_at : L().targetKey(b) !== key || L().linked(a.id, b.id));
-      if (stale.length) return stale.forEach(b => picked.delete(b.id)), toast("설정이 변경되었습니다. 잠시 후 다시 시도해주세요."), draw();
-      const record = r.employee ? { employee: r.employee, worksite: null, since: date } : { employee: null, worksite: r.worksite, since: date };
-      targets.forEach(b => {
-        isNew(b) && (b.assignments = [{ ...record }], b.status = "assigned", ctx.log(b, { script: "배정 관리: 신규 배정", target: record, before: "", after: window.fmtDate(date) }));
+      if (save.disabled) return;
+      const key = L().targetKey(a), sameAssets = [...same].map(id => window.DATA.assets.find(x => x.id === id)), newAssets = f.newIds.map(id => window.DATA.assets.find(x => x.id === id));
+      const staleSame = sameAssets.filter(b => !b || L().targetKey(b) !== key || L().linked(a.id, b.id)), staleNew = newAssets.filter(b => !b || !active || b.status !== "stock" || b.deleted_at || (b.assignments || []).length);
+      if (staleSame.length || staleNew.length) {
+        staleSame.forEach(b => b && same.delete(b.id)), f.newIds = f.newIds.filter(id => !staleNew.some(b => b && b.id === id));
+        return toast("설정이 변경되었습니다. 잠시 후 다시 시도해주세요."), draw();
+      }
+      const record = r.employee ? { employee: r.employee, worksite: null, since: f.dateIso } : { employee: null, worksite: r.worksite, since: f.dateIso };
+      newAssets.forEach(b => { b.assignments = [{ ...record }], b.status = "assigned", ctx.log(b, { script: "배정 관리: 신규 배정", target: record, before: "", after: window.fmtDate(f.dateIso) }); });
+      sameAssets.concat(newAssets).forEach(b => {
         L().add(a, b);
         ctx.log(a, { script: "자산 연결: 연결", before: "", after: label(b) });
         ctx.log(b, { script: "자산 연결: 연결", before: "", after: label(a) });
       });
-      s.remove(), toast("저장되었습니다."), ctx.after();
+      p.remove(), toast("저장되었습니다."), ctx.after();
     };
     draw();
   }
@@ -151,11 +253,11 @@
   function createChoice(a, kind, me) {
     const hasLinks = !!L().count(a.id), verb = kind === "reassign" ? "이동" : "반납", plan = L().togetherPlan(a, me);
     let mode = "all";
-    const html = () => hasLinks ? `<div class="field" data-mlink-choice><label>연결 자산 처리</label><div class="mlink-modes"><label class="radio-row"><input type="radio" name="mlink-mode" value="all"${mode === "all" ? " checked" : ""}><span>연결된 자산과 함께</span></label><label class="radio-row"><input type="radio" name="mlink-mode" value="one"${mode === "one" ? " checked" : ""}><span>이 자산만</span></label></div><div data-linked-body></div></div>` : "";
+    const html = () => hasLinks ? `<div class="field" data-mlink-choice><label>연결 자산 처리</label><div class="mlink-modes"><label class="radio-row"><input type="radio" name="mlink-mode" value="all"${mode === "all" ? " checked" : ""}><span>함께</span></label><label class="radio-row"><input type="radio" name="mlink-mode" value="one"${mode === "one" ? " checked" : ""}><span>이 자산만</span></label></div><div data-linked-body></div></div>` : "";
     const wire = root => {
       const area = root.querySelector("[data-mlink-choice]");
       if (!area) return;
-      const rows = list => list.map(b => rowHtml(a, b, me, false)).join("");
+      const rows = list => list.map(b => `<div class="mlink-row mlink-row-plain"><div class="mlink-row-main"><b>${esc(b.product)}</b><span>${esc(b.assetNo)}</span></div>${badge(b)}</div>`).join("");
       const draw = () => {
         const cutCount = plan.cutVisible.length + plan.cutHidden, others = plan.move.filter(b => b.id !== a.id);
         area.querySelector("[data-linked-body]").innerHTML = mode === "all" ? `
@@ -169,7 +271,7 @@
   }
   function returnReview(a, me, currentHtml, onRun, onStale) {
     const choice = createChoice(a, "return", me);
-    const s = sheet("반납", `${assetSummaryHtml(a)}<div class="ra-current"><div class="perm-info-note">${INFO_ICON}<span>현재 배정을 종료합니다.</span></div><div class="field"><label>현재 배정</label>${currentHtml}</div></div>${choice.html()}`, '<button type="button" class="btn" data-close>취소</button><button type="button" class="btn primary" data-save>저장</button>', 120);
+    const s = sheet("반납", `${currentHtml}<div class="ra-current"><div class="perm-info-note">${INFO_ICON}<span>현재 배정을 종료합니다.</span></div></div>${choice.html()}`, '<button type="button" class="btn" data-close>취소</button><button type="button" class="btn primary" data-save>저장</button>', 120);
     choice.wire(s);
     s.querySelector("[data-close]").onclick = () => s.remove();
     s.querySelector("[data-save]").onclick = () => confirm("반납하시겠습니까?", "", () => {
@@ -194,5 +296,5 @@
     prune(log, "반납");
   }
   const unlinkNote = a => L().count(a.id) ? ` 연결된 자산 ${L().count(a.id)}건과의 연결이 해제됩니다.` : "";
-  window.MappLinks = { assetSummaryHtml, sectionHtml, wire, createChoice, returnReview, runReassign, runReturn, prune, unlinkNote };
+  window.MappLinks = { currentCardHtml, openAssetPick, openSubSelect, assetSummaryHtml, sectionHtml, wire, createChoice, returnReview, runReassign, runReturn, prune, unlinkNote };
 })();

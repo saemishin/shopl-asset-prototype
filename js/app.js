@@ -738,12 +738,13 @@
     const list = p.querySelector("[data-list]");
     function renderList() {
       const q = query.trim().toLowerCase(),
-        filtered = MEMBERS.filter(m => !excludeNames.includes(m.name) && (!q || m.name.includes(q) || m.empNo.includes(q) || m.phone.includes(q)));
+        all = MEMBERS.filter(m => !excludeNames.includes(m.name)).sort((x, y) => x.name.localeCompare(y.name, "ko")),
+        filtered = all.filter(m => !q || m.name.includes(q) || m.empNo.includes(q) || m.phone.includes(q));
       list.innerHTML = filtered.length ? filtered.map(m => `
         <button type="button" class="picker-member-row" data-pick="${m.name}">
-          <span class="picker-avatar" style="background:${avatarColor(m.name)}">${m.name[0]}</span>
-          <span class="picker-member-info"><b>${m.name}${PICKER_ROLE[m.name] ? `<em class="picker-role">${PICKER_ROLE[m.name]}</em>` : ""}</b><span>${m.team}</span></span>
-        </button>`).join("") : '<p class="muted" style="padding:16px 4px">결과가 없습니다.</p>', list.querySelectorAll("[data-pick]").forEach(b => b.onclick = () => {
+          ${window.pickerAvatarHtml(m.name, avatarColor(m.name), PICKER_ROLE[m.name])}
+          <span class="picker-member-info"><b>${m.name}</b><span>${m.team}</span></span>
+        </button>`).join("") : `<p class="muted" style="padding:16px 4px">${all.length ? "결과가 없습니다." : "표시할 목록이 없습니다."}</p>`, list.querySelectorAll("[data-pick]").forEach(b => b.onclick = () => {
         p.remove(), onApply(b.dataset.pick);
       });
     }
@@ -922,16 +923,10 @@
       };
     function drawBody() {
       body.innerHTML = `
-        ${window.MappLinks.assetSummaryHtml(a)}
-        ${old ? `
+        ${old ? `${window.MappLinks.currentCardHtml(a, old, assignIdentity(old))}
           <div class="ra-current">
             <div class="perm-info-note">${INFO_ICON}<span>기존 배정을 반납하고 새 대상에게 배정합니다.</span></div>
-            <div class="acard">
-              ${typeBadge(old)}
-              <div class="acard-id">${assignIdentity(old)}</div>
-              <div class="acard-foot"><span class="acard-date">배정일 <b>${window.fmtDate(old.since)}</b></span></div>
-            </div>
-          </div>` : ""}
+          </div>` : window.MappLinks.assetSummaryHtml(a)}
         <div class="field">
           <label>${cfg.targetLabel}</label>
           <label class="radio-row"><input type="radio" name="form-kind" value="employee"${f.picked === "employee" ? " checked" : ""}><span>구성원</span></label>
@@ -1012,7 +1007,7 @@
   }
   function openReturnConfirm(a, idx, onDone) {
     const old = a.assignments[idx];
-    const currentHtml = `<div class="acard">${typeBadge(old)}<div class="acard-id">${assignIdentity(old)}</div><div class="acard-foot"><span class="acard-date">배정일 <b>${window.fmtDate(old.since)}</b></span></div></div>`;
+    const currentHtml = window.MappLinks.currentCardHtml(a, old, assignIdentity(old));
     window.MappLinks.returnReview(a, ME, currentHtml, (mode, plan) => {
       window.MappLinks.runReturn(a, mode, plan, logActivity, x => derivedActiveStatus(x));
       toast("반납되었습니다."); onDone();
@@ -1568,7 +1563,7 @@ function openLeaderQr(a) {
         cardMore && (cardMore.onclick = () => openDropdownMenu(cardMore, manageActions(a, target), dispatchAction2));
         root.querySelector("[data-assign-open]")?.addEventListener("click", () => dispatchAction2("assign-add"));
         const qr=root.querySelector("[data-qr-open]");if(qr)qr.onclick=()=>openLeaderQr(a);
-        window.MappLinks.wire(root, a, { me: ME, log: logActivity, after: afterMutate, identity: rec => `<div class="acard">${typeBadge(rec)}<div class="acard-id">${assignIdentity(rec)}</div></div>`, open: id => { state.detailAssetId = id, draw(); } });
+        window.MappLinks.wire(root, a, { me: ME, log: logActivity, after: afterMutate, identityInner: rec => assignIdentity(rec), pickDate: (iso, cb) => openDateSheet(iso, todayStr(), cb), identity: rec => `<div class="acard">${typeBadge(rec)}<div class="acard-id">${assignIdentity(rec)}</div></div>`, open: id => { state.detailAssetId = id, draw(); } });
         const heroBtn = root.querySelector("[data-hero-viewer]");
         heroBtn && (heroBtn.onclick = () => openPhotoViewer(a));
         const heroEdit = root.querySelector("[data-hero-edit]");

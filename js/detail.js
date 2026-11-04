@@ -709,8 +709,8 @@
           <section class="link-add-sec" data-link-new-section${assignmentTargetActive(r) ? "" : " hidden"}>
             <h4>자산 추가 연결</h4>
             <p class="link-section-help">현재 배정 대상에게 새로 배정하며 자산을 연결합니다.</p>
-            <div class="link-search-field"><input type="text" class="picker-search" placeholder="선택" data-link-q readonly aria-label="자산 선택 열기" aria-haspopup="dialog"><span class="link-search-count" data-link-picked-count hidden></span></div>
-            <div class="field link-date" data-link-date><label>배정일</label>${dateFieldHtml(todayStr())}</div>
+            <div class="link-search-field"><input type="text" class="picker-search" placeholder="선택" data-link-q readonly aria-label="자산 선택 열기" aria-haspopup="dialog"><span class="link-search-count tpl-selection-count" data-link-picked-count hidden></span><button type="button" class="tpl-field-clear" data-link-clear hidden aria-label="자산 선택 해제"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+            <div class="field link-date" data-link-date><label>배정일</label>${dateFieldHtml("")}</div>
           </section>
         </div>
         <div class="foot"><button class="btn" data-close>취소</button><button class="btn primary" data-save disabled>저장</button></div>
@@ -736,6 +736,7 @@
       back.querySelector("[data-link-q]").value = pickedNew[0]?.product || "";
       count.hidden = pickedNew.length < 2;
       count.textContent = pickedNew.length > 1 ? `+${pickedNew.length - 1}` : "";
+      back.querySelector("[data-link-clear]").hidden = !pickedNew.length;
       back.querySelectorAll("[data-pick]").forEach(c => c.onchange = () => {
         const b = window.DATA.assets.find(x => x.id === c.dataset.pick);
         c.checked ? picked.set(b.id, b) : picked.delete(b.id), draw();
@@ -751,9 +752,10 @@
       }});
     }
     const searchField = back.querySelector("[data-link-q]");
+    back.querySelector("[data-link-clear]").onclick = e => { e.stopPropagation(); [...picked].forEach(([id, b]) => { if (isNew(b)) picked.delete(id); }); draw(); };
     searchField.onclick = openStockSelector;
     searchField.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openStockSelector(); } };
-    back.querySelector("[data-close]").onclick = () => picked.size || getDate() !== todayStr() ? confirmWriteExit(() => back.remove()) : back.remove();
+    back.querySelector("[data-close]").onclick = () => picked.size || back.querySelector("[data-dtext]").value.trim() ? confirmWriteExit(() => back.remove()) : back.remove();
     save.onclick = () => {
       const targets = [...picked.values()], key = window.AssetLinks.targetKey(a), d = getDate();
       // 저장 시점 재검증: 같은 대상 후보이거나 여전히 배정 가능한 자산인지(새11 Case 5-7-2)
@@ -998,75 +1000,10 @@
     };
   }
   function openAssignMemberPicker(initial, onApply, exclude) {
-    let picked = initial,
-      query = "";
-    const excludeNames = [].concat(exclude || []).filter(Boolean),
-      p = document.createElement("div");
-    p.className = "modal-back", p.style.zIndex = 340, p.innerHTML = `
-      <div class="modal sm">
-        <h3>구성원 선택</h3>
-        <div class="body" style="display:flex;flex-direction:column;max-height:56vh">
-          <input type="text" class="picker-search" placeholder="이름/사번/휴대폰번호">
-          <div data-list style="flex:1;min-height:0;overflow-y:auto;margin-top:8px"></div>
-        </div>
-        <div class="foot">
-          <button class="btn" data-close>취소</button>
-          <button class="btn primary" data-ok>적용</button>
-        </div>
-      </div>`, document.body.appendChild(p);
-    const list = p.querySelector("[data-list]");
-    function renderList() {
-      const q = query.trim().toLowerCase(),
-        filtered = MEMBERS.filter(m => !excludeNames.includes(m.name) && (!q || m.name.includes(q) || m.empNo.includes(q) || m.phone.includes(q)));
-      list.innerHTML = filtered.length ? filtered.map(m => `
-        <label class="picker-member-row">
-          <input type="radio" name="aa-member" value="${m.name}"${picked === m.name ? " checked" : ""}>
-          <span class="picker-avatar" style="background:${avatarColor(m.name)}">${m.name[0]}</span>
-          <span class="picker-member-info"><b>${m.name}</b><span>${m.team}</span></span>
-        </label>`).join("") : '<p class="muted" style="padding:16px 0">결과가 없습니다.</p>', list.querySelectorAll('input[name="aa-member"]').forEach(r => r.onchange = () => {
-        picked = r.value; p.querySelector('[data-ok]').disabled = !picked;
-      });
-    }
-    p.querySelector(".picker-search").addEventListener("input", e => {
-      query = e.target.value, renderList();
-    }), renderList(), p.querySelector('[data-ok]').disabled = !picked, p.querySelector("[data-close]").onclick = () => p.remove(), p.querySelector("[data-ok]").onclick = () => {
-      p.remove(), onApply(picked);
-    };
+    window.TargetPicker.open({ kind: "employee", members: MEMBERS.map(m => ({ ...m, color: avatarColor(m.name) })), initial, exclude, onApply, z: 340 });
   }
   function openAssignWorksitePicker(initial, onApply, exclude) {
-    let picked = initial,
-      query = "";
-    const excludeNames = [].concat(exclude || []).filter(Boolean),
-      p = document.createElement("div");
-    p.className = "modal-back", p.style.zIndex = 340, p.innerHTML = `
-      <div class="modal sm">
-        <h3>근무지 선택</h3>
-        <div class="body" style="display:flex;flex-direction:column;max-height:56vh">
-          <input type="text" class="picker-search" placeholder="근무지명/코드">
-          <div data-list style="flex:1;min-height:0;overflow-y:auto;margin-top:8px"></div>
-        </div>
-        <div class="foot">
-          <button class="btn" data-close>취소</button>
-          <button class="btn primary" data-ok>적용</button>
-        </div>
-      </div>`, document.body.appendChild(p);
-    const list = p.querySelector("[data-list]");
-    function renderList() {
-      const q = query.trim().toLowerCase(),
-        filtered = Object.keys(WS_CODE).filter(name => !excludeNames.includes(name) && (!q || name.toLowerCase().includes(q) || WS_CODE[name].toLowerCase().includes(q)));
-      list.innerHTML = filtered.length ? filtered.map(name => `
-        <label class="picker-member-row">
-          <input type="radio" name="aa-worksite" value="${name}"${picked === name ? " checked" : ""}>
-          <span class="picker-member-info"><b>${name}</b><span>${WS_CODE[name]}</span></span>
-        </label>`).join("") : '<p class="muted" style="padding:16px 0">결과가 없습니다.</p>', list.querySelectorAll('input[name="aa-worksite"]').forEach(r => r.onchange = () => {
-        picked = r.value; p.querySelector('[data-ok]').disabled = !picked;
-      });
-    }
-    p.querySelector(".picker-search").addEventListener("input", e => {
-      query = e.target.value, renderList();
-    }), renderList(), p.querySelector('[data-ok]').disabled = !picked, p.querySelector("[data-close]").onclick = () => p.remove(), p.querySelector("[data-ok]").onclick = () => {
-      p.remove(), onApply(picked);
-    };
+    window.TargetPicker.open({ kind: "worksite", worksites: WS_CODE, initial, exclude, onApply, z: 340 });
   }
   function openViewer(a, start) {
     const items = photosOf(a);
