@@ -2529,3 +2529,7 @@ body.history-capture #prototype-qa { display: none; }
 
 /* QA 패널 숨김(2026-11-03, 새미 요청). 시나리오 파라미터 처리는 유지한다. */
 .prototype-qa, .permission-qa-panel { display: none !important; }
+.acard-date-edit { margin-left: 4px; vertical-align: middle; }
+.acard-foot:has(.acard-date-edit) { display: flex; align-items: center; flex-wrap: nowrap; }
+.acard-foot .acard-date-edit { flex: 0 0 auto; }
+.mapp-leader-detail-body .acard-foot:has(.acard-date-edit) { flex-direction: row; align-items: center; justify-content: flex-start; gap: 0; }

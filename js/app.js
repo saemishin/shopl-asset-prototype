@@ -1143,16 +1143,13 @@
         idx
       } = findRecord(a, target);
       idx >= 0 && acts.push({
-        key: "date",
-        label: "배정일 수정"
-      }, {
         key: "return", label: "반납", danger: !0
       }, {key: "reassign", label: "이동"});
     }
     return acts;
   }
   function menuActions(a,target) {
-    const actions=target?manageActions(a,target):[];
+    const actions=[];
     if(canEditInfo(a))actions.push({key:'edit',label:'자산 수정'});
     if(!target&&window.hasPrototypeAssetManagePermission())actions.push({key:'delete',label:'자산 삭제',danger:true});
     return actions;
@@ -1201,7 +1198,7 @@ function openLeaderQr(a) {
  const actions=statusActions(a), idx=findRecord(a,target).idx, rec=idx>=0?a.assignments[idx]:null, photos=window.assetPhotos(a), manage=window.hasPrototypeAssetManagePermission();
  const info=[['분류',categoryPath(a)],['태그',chips(a.labels)]].map(([k,v])=>`<div><div class="k">${k}</div><div class="v">${v}</div></div>`).join('')+window.AssetExtra.detailRows(a,manage,expiryBadge)+[['자산 등록일',window.fmtDate(a.createdAt)],['QR 라벨','<button class="btn sm" data-qr-open aria-label="QR 라벨">QR 라벨</button>'],['메모',`${memoHtml(a.note)}${window.AssetAccess.canField(a,'memo',ME)?`<button class="icon-edit" data-memoedit aria-label="메모 수정">${IC_EDIT}</button>`:''}`]].map(([k,v])=>`<div><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
  // 자산 한 건은 한 대상에게만 배정하므로 배정 탭에는 이 대상의 배정 기록 하나만 보여준다(D-20261030-14·15).
- const party=`<div class="dsection"><h2 class="mapp-party-head">배정 대상</h2>${rec?`<div class="acard">${typeBadge(rec)}<div class="acard-id">${assignIdentity(rec)}</div><div class="acard-foot"><span class="acard-date">배정일 <b>${window.fmtDate(rec.since)}</b></span></div></div>`:'<p class="mapp-party-empty">배정 대상이 없습니다.</p>'}</div>`;
+ const party=`<div class="dsection"><h2 class="mapp-party-head">배정 대상</h2>${rec?`<div class="acard${manageActions(a,target).length?' has-actions':''}">${typeBadge(rec)}${manageActions(a,target).length?`<button type="button" class="mapp-holder-more" data-card-more aria-label="배정 관리" aria-haspopup="menu">${MORE_ICON}</button>`:''}<div class="acard-id">${assignIdentity(rec)}</div><div class="acard-foot"><span class="acard-date">배정일 <b>${window.fmtDate(rec.since)}</b></span>${canManage(a)?`<button type="button" class="icon-edit acard-date-edit" data-date-edit aria-label="배정일 수정">${IC_EDIT}</button>`:''}</div></div>`:`<div class="assign-empty"><p class="mapp-party-empty">배정 대상이 없습니다.</p>${canManage(a)&&!(a.assignments||[]).length?'<button type="button" class="btn sm" data-assign-open>배정</button>':''}</div>`}</div>`;
  return `<div class="mapp-topbar"><button class="mapp-back" data-mapp-back aria-label="뒤로">←</button>${menuActions(a,target).length?`<button class="mapp-more" data-more-open aria-label="더보기">${MORE_ICON}</button>`:''}</div><div class="mapp-body"><div class="dhead-id"><div class="mapp-hero-wrap"><button class="mapp-hero-img" data-hero-viewer aria-label="사진 보기"${photos.length?'':' disabled'}>${cardThumb(a)}</button>${photos.length>1?`<span class="mapp-hero-count">+${photos.length-1}</span>`:''}${canEditInfo(a)?`<button class="mapp-hero-edit" data-hero-edit aria-label="사진 관리">${IC_EDIT}</button>`:''}</div><div><h1>${a.product}</h1><div class="dhead-sub">${actions.length?`<button class="badge ${STATUS_LABEL[a.status][1]} clickable" data-status-open>${STATUS_LABEL[a.status][0]} ▾</button>`:`<span class="badge ${STATUS_LABEL[a.status][1]}">${STATUS_LABEL[a.status][0]}</span>`}<div>고유관리번호 <b>${a.assetNo}</b></div></div></div></div>${window.AssetExtra.tabs()}<div data-detail-panel="assignment">${party}${window.MappLinks.sectionHtml(a, ME)}</div><div data-detail-panel="info" hidden><div class="kv2">${info}</div>${window.AssetExtra.detailHtml(a,manage,expiryBadge)}</div><div data-detail-panel="history" hidden>${timelineHtml(a,'',target)}</div></div>`;
 }
   const MENU_ICON_ASSET = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10" r="1.6"/><path d="m21 16-5-5-9 8"/></svg>',
@@ -1417,6 +1414,11 @@ function openLeaderQr(a) {
         wsFilters: MappAssetFilter.empty(),
         wsSearch: ""
       };
+    if(new URLSearchParams(location.search).get('qa')==='qr-stock'){
+      // 외부 QR로 배정 가능 자산을 연 경우(자산 기준 상세)
+      const free=assets.filter(a=>!a.deleted_at&&a.status!=='disposed'&&!(a.assignments||[]).length), stock=free.find(a=>window.AssetAccess.canState(a,ME))||free[0];
+      stock&&Object.assign(state,{screen:'asset-detail',detailAssetId:stock.id,detailTarget:null,detailFrom:{screen:'menu'}});
+    }
     if(['access','review','extra-info'].includes(new URLSearchParams(location.search).get('qa'))){
       const sample=assets.find(a=>a.id===(new URLSearchParams(location.search).get('id')||'A001'))||assets[0];
       const record=(sample.assignments||[]).find(r=>r.employee===ME)||(sample.assignments||[])[0];
@@ -1538,6 +1540,10 @@ function openLeaderQr(a) {
         statusOpen && (statusOpen.onclick = () => openDropdownMenu(statusOpen, statusActions(a), dispatchAction2));
         const moreOpen = root.querySelector("[data-more-open]");
         moreOpen && (moreOpen.onclick = () => openDropdownMenu(moreOpen, menuActions(a, target), dispatchAction2));
+        root.querySelector("[data-date-edit]")?.addEventListener("click", () => dispatchAction2("date"));
+        const cardMore = root.querySelector("[data-card-more]");
+        cardMore && (cardMore.onclick = () => openDropdownMenu(cardMore, manageActions(a, target), dispatchAction2));
+        root.querySelector("[data-assign-open]")?.addEventListener("click", () => dispatchAction2("assign-add"));
         const qr=root.querySelector("[data-qr-open]");if(qr)qr.onclick=()=>openLeaderQr(a);
         window.MappLinks.wire(root, a, { me: ME, log: logActivity, after: afterMutate, identity: rec => `<div class="acard">${typeBadge(rec)}<div class="acard-id">${assignIdentity(rec)}</div></div>`, open: id => { state.detailAssetId = id, draw(); } });
         const heroBtn = root.querySelector("[data-hero-viewer]");
@@ -1631,6 +1637,17 @@ function openLeaderQr(a) {
       ([ASSET_MGMT_FLAG_KEY, COMPANY_PLAN_KEY].includes(event.key) || event.key === null) && draw();
     }), draw();
   }
+  /* QR 접근 불가 확인 팝업(정책12 4절). 프로토타입은 ?qa=qr-unavailable / ?qa=qr-feature-off 로 확인한다. */
+  (() => {
+    const kind = new URLSearchParams(location.search).get("qa");
+    if (!["qr-unavailable", "qr-feature-off"].includes(kind)) return;
+    setTimeout(() => {
+      const msg = kind === "qr-unavailable" ? "자산을 조회할 수 없습니다." : "자산 관리 기능을 사용할 수 없습니다.";
+      const cb = document.createElement("div");
+      cb.className = "modal-back", cb.style.zIndex = 340, cb.innerHTML = `<div class="modal sm" style="width:300px" role="alertdialog" aria-modal="true" aria-label="${msg}"><div class="body" style="padding-top:22px;font-size:14px;text-align:center">${msg}</div><div class="foot"><button type="button" class="btn primary" data-qr-ok style="flex:1;justify-content:center;text-align:center">확인</button></div></div>`, document.body.appendChild(cb);
+      cb.querySelector("[data-qr-ok]").onclick = () => cb.remove();
+    }, 300);
+  })();
   window.AppScreen = {
     render
   };
