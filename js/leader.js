@@ -474,7 +474,7 @@
     };
   }
   function hasAddInput(draft) {
-    return !!draft.category || ["product", "assetNo", "expiry", "serial", "imei", "manufactured", "purchaseDate", "purchasePrice", "note"].some(key => String(draft[key] || "").trim()) || draft.photos.length > 0 || draft.labels.length > 0;
+    return (!!draft.category && draft.category !== draft._presetCategory) || !!(draft._categoryDrafts && draft._categoryDrafts.size) || ["product", "assetNo", "expiry", "serial", "imei", "manufactured", "purchaseDate", "purchasePrice", "note"].some(key => String(draft[key] || "").trim()) || draft.photos.length > 0 || draft.labels.length > 0;
   }
   function confirmAddExit(onLeave, editing = !1) {
     const title = editing ? "수정을 취소하시겠습니까?" : "취소하시겠습니까?",
@@ -614,7 +614,7 @@
       <div class="mapp-add-category-body">
         ${groups.length ? `<div class="mapp-directory-search"><input type="search" data-add-category-search placeholder="검색" aria-label="분류 검색" autocomplete="off"></div>
         <div data-add-category-list>${groups.map(group => `<section class="mapp-add-category-group" data-add-category-group data-group-name="${esc(group.name)}">
-          <h2>${esc(group.name)}</h2>${group.items.map(cat => `<button type="button" data-add-category-pick="${esc(`${cat.group}|${cat.sub}`)}" data-sub-name="${esc(cat.sub)}"><span>${esc(cat.sub)}</span></button>`).join("")}
+          <h2>${esc(group.name)}</h2>${group.items.map(cat => { const cur = `${cat.group}|${cat.sub}` === draft.category; return `<button type="button" data-add-category-pick="${esc(`${cat.group}|${cat.sub}`)}" data-sub-name="${esc(cat.sub)}" aria-pressed="${cur}"${cur ? ' style="color:#1f6feb;font-weight:600"' : ""}><span>${esc(cat.sub)}</span>${cur ? '<span aria-hidden="true" style="margin-left:auto">✓</span>' : ""}</button>`; }).join("")}
         </section>`).join("")}</div>
         <p class="mapp-ws-empty" data-add-category-empty hidden>결과가 없습니다.</p>` : '<p class="mapp-ws-empty">표시할 목록이 없습니다.</p>'}
       </div>
@@ -697,7 +697,7 @@
       const addButton = photosEl.querySelector("[data-ai-photo-add]");
       addButton && (addButton.onclick = () => {
         if (total >= window.ASSET_PHOTO_MAX_COUNT) {
-          toast("자산 1개당 사진은 최대 10장까지 첨부할 수 있습니다.");
+          toast(`사진은 최대 ${window.ASSET_PHOTO_MAX_COUNT}개까지 등록할 수 있습니다.`);
           return;
         }
         openAddDropdown(addButton, [{
@@ -1785,7 +1785,7 @@
       const addBtn = row.querySelector("[data-photo-add]");
       addBtn && (addBtn.onclick = () => {
         if (photos.length >= window.ASSET_PHOTO_MAX_COUNT) {
-          toast("자산 1개당 사진은 최대 10장까지 첨부할 수 있습니다.");
+          toast(`사진은 최대 ${window.ASSET_PHOTO_MAX_COUNT}개까지 등록할 수 있습니다.`);
           return;
         }
         openDropdownMenu(addBtn, [{
@@ -2085,7 +2085,7 @@
         const currentCategory = state.screen === "sub-detail" && window.DATA.categories.find(c => c.sub === state.sub) || null;
         openPlusSheet(() => {
           if (!hasAssetManagePermission()) return;
-          state.addOrigin = state.screen, state.addDraft = emptyAddDraft(currentCategory), state.screen = "asset-add", draw();
+          state.addOrigin = state.screen, state.addDraft = emptyAddDraft(currentCategory), state.addDraft._presetCategory = state.addDraft.category, state.screen = "asset-add", draw();
         }, () => openMultiAssignPage(currentCategory ? currentCategory.sub : "", () => draw()), currentCategory);
       }), root.querySelectorAll("[data-tree-collapse]").forEach(b => b.onclick = () => {
         const body = b.nextElementSibling,
@@ -2449,7 +2449,7 @@
         const addPhoto = root.querySelector("[data-add-photo]");
         addPhoto && (addPhoto.onclick = () => {
           if (draft.photos.length >= window.ASSET_PHOTO_MAX_COUNT) {
-            toast("자산 1개당 사진은 최대 10장까지 첨부할 수 있습니다.");
+            toast(`사진은 최대 ${window.ASSET_PHOTO_MAX_COUNT}개까지 등록할 수 있습니다.`);
             return;
           }
           syncAddDraft2(), openAddDropdown(addPhoto, [{
@@ -2614,9 +2614,10 @@
         }), createButton.onclick = addManagedTag2, list.querySelectorAll("[data-add-tag-rename]").forEach(input => bindTagNameInput(input, () => {
           tagDraft[+input.dataset.addTagRename].name = input.value, updateTagManageValidity2();
         })), list.querySelectorAll("[data-add-tag-delete]").forEach(button => button.onclick = () => {
-          tagDraft.splice(+button.dataset.addTagDelete, 1), draw();
+          tagDraft.splice(+button.dataset.addTagDelete, 1), draw(), toast("삭제 시 이 태그를 사용 중인 자산에서 모두 삭제됩니다.");
         }), root.querySelector("[data-add-tag-manage-close]").onclick = () => {
-          state.tagManageDraft = null, state.screen = "asset-add", draw();
+          const leaveTagManage = () => { state.tagManageDraft = null, state.screen = "asset-add", draw(); };
+          tagManageDirty2() ? confirmAddExit(leaveTagManage, !0) : leaveTagManage();
         }, saveButton.onclick = () => {
           if (updateTagManageValidity2(), saveButton.disabled) return;
           const finalNames = [...new Set(tagDraft.map(tag => normalizeTagName(tag.name)).filter(Boolean))].sort((a, b) => a.localeCompare(b, "ko")),

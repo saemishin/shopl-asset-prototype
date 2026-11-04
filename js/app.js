@@ -1551,7 +1551,7 @@ function openLeaderQr(a) {
           const {
             idx
           } = findRecord(a, target);
-          if(key === "edit"){if(!canEditInfo(a))return;window.openAssetAddModal({asset:a,logActivity:e=>logActivity(a,e),onSaved:draw});return;}
+          if(key === "edit"){if(!canEditInfo(a))return;window.MappAssetEdit.open({asset:a,me:ME,toast,activityLog,logActivity,onSaved:draw});return;}
           if(key === "delete"){if(target||!window.hasPrototypeAssetManagePermission())return;openDeleteAssetModal(a,()=>{Object.assign(state,state.detailFrom);draw();});return;}
           if (key === "history") state.screen = "asset-history", draw();else if (key === "date") {
             if (a.status === "disposed" || !canManage(a) || idx < 0) return;
