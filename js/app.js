@@ -720,14 +720,16 @@
       };
     return back.style.cssText = `position:fixed;top:${r.top}px;left:${r.left}px;width:${r.width}px;height:${r.height}px;z-index:${zIndex};`, document.body.appendChild(back), back;
   }
+  // 프로토타입 표시용 역할 구분(관리자·리더)
+  const PICKER_ROLE = { "박지훈": "리더", "정우성": "관리자" };
   function openMemberPickerPage(initial, onApply, exclude) {
     let query = "";
     const excludeNames = [].concat(exclude || []).filter(Boolean),
       p = mappOverlay("mapp-fullpage-back", 105);
     p.innerHTML = `
       <div class="mapp-fullpage-head">
-        <span class="mapp-fullpage-head-title">구성원</span>
-        <button type="button" class="mapp-fullpage-head-close" data-picker-close aria-label="닫기">${CLOSE_ICON}</button>
+        <button type="button" class="mapp-back" data-picker-close aria-label="뒤로">←</button>
+        <span class="mapp-fullpage-head-title">배정 대상</span>
       </div>
       <div class="mapp-fullpage-body">
         <input type="text" class="picker-search" placeholder="이름/사번/휴대폰번호">
@@ -740,7 +742,7 @@
       list.innerHTML = filtered.length ? filtered.map(m => `
         <button type="button" class="picker-member-row" data-pick="${m.name}">
           <span class="picker-avatar" style="background:${avatarColor(m.name)}">${m.name[0]}</span>
-          <span class="picker-member-info"><b>${m.name}</b><span>${m.team}</span></span>
+          <span class="picker-member-info"><b>${m.name}${PICKER_ROLE[m.name] ? `<em class="picker-role">${PICKER_ROLE[m.name]}</em>` : ""}</b><span>${m.team}</span></span>
         </button>`).join("") : '<p class="muted" style="padding:16px 4px">결과가 없습니다.</p>', list.querySelectorAll("[data-pick]").forEach(b => b.onclick = () => {
         p.remove(), onApply(b.dataset.pick);
       });
@@ -750,13 +752,14 @@
     }), renderList(), p.querySelector("[data-picker-close]").onclick = () => p.remove();
   }
   function openWorksitePickerPage(initial, onApply, exclude) {
+    const wsRegions = new Set();
     let query = "";
     const excludeNames = [].concat(exclude || []).filter(Boolean),
       p = mappOverlay("mapp-fullpage-back", 105);
     p.innerHTML = `
       <div class="mapp-fullpage-head">
-        <span class="mapp-fullpage-head-title">근무지</span>
-        <button type="button" class="mapp-fullpage-head-close" data-picker-close aria-label="닫기">${CLOSE_ICON}</button>
+        <button type="button" class="mapp-back" data-picker-close aria-label="뒤로">←</button>
+        <span class="mapp-fullpage-head-title">배정 대상</span><button type="button" class="mapp-picker-filter" data-ws-filter aria-label="필터">필터<span data-ws-filter-count></span></button>
       </div>
       <div class="mapp-fullpage-body">
         <input type="text" class="picker-search" placeholder="근무지명/코드/주소">
@@ -774,7 +777,8 @@
     }
     function renderList() {
       const q = query.trim().toLowerCase(),
-        matches = name => !q || name.toLowerCase().includes(q) || (WS_CODE[name] || "").toLowerCase().includes(q) || (WS_ADDRESS[name] || "").toLowerCase().includes(q),
+        regionOk = name => !wsRegions.size || wsRegions.has((WS_ADDRESS[name] || "").split(" ")[0]),
+        matches = name => regionOk(name) && (!q || name.toLowerCase().includes(q) || (WS_CODE[name] || "").toLowerCase().includes(q) || (WS_ADDRESS[name] || "").toLowerCase().includes(q)),
         rest = Object.keys(WS_CODE).filter(name => name !== fixedName && !excludeNames.includes(name) && matches(name)).sort((x, y) => x.localeCompare(y, "ko")),
         showFixed = fixedName && !excludeNames.includes(fixedName) && matches(fixedName);
       list.innerHTML = showFixed || rest.length ? (showFixed ? `<div class="mapp-picker-section"><span class="mapp-picker-dot"></span>내 고정 근무지</div>${rowHtml(fixedName)}` : "") + rest.map(rowHtml).join("") : '<p class="muted" style="padding:16px 4px">결과가 없습니다.</p>', list.querySelectorAll("[data-pick]").forEach(b => b.onclick = () => {
@@ -784,12 +788,25 @@
     p.querySelector(".picker-search").addEventListener("input", e => {
       query = e.target.value, renderList();
     }), renderList(), p.querySelector("[data-picker-close]").onclick = () => p.remove();
+    p.querySelector("[data-ws-filter]").onclick = () => {
+      const regions = [...new Set(Object.values(WS_ADDRESS).map(v => String(v).split(" ")[0]).filter(Boolean))].sort((x, y) => x.localeCompare(y, "ko")),
+        draft = new Set(wsRegions),
+        sh = mappOverlay("mapp-sheet-back", 120);
+      sh.innerHTML = `<div class="mapp-sheet"><div class="mapp-sheet-head">필터</div><div class="mapp-sheet-body"><div class="mapp-filter-label">시/도</div>${regions.map(r => `<label class="radio-row"><input type="checkbox" data-region="${r}"${draft.has(r) ? " checked" : ""}><span>${r}</span></label>`).join("")}</div><div class="mapp-sheet-foot"><button type="button" class="btn" data-region-reset>초기화</button><button type="button" class="btn primary" data-region-apply>적용</button></div></div>`;
+      sh.onclick = e => { e.target === sh && sh.remove(); };
+      sh.querySelectorAll("[data-region]").forEach(c => c.onchange = () => { c.checked ? draft.add(c.dataset.region) : draft.delete(c.dataset.region); });
+      sh.querySelector("[data-region-reset]").onclick = () => { draft.clear(); sh.querySelectorAll("[data-region]").forEach(c => c.checked = !1); };
+      sh.querySelector("[data-region-apply]").onclick = () => {
+        wsRegions.clear(), draft.forEach(r => wsRegions.add(r)), sh.remove();
+        p.querySelector("[data-ws-filter-count]").textContent = wsRegions.size ? ` ${wsRegions.size}` : "", renderList();
+      };
+    };
   }
   function openDateSheet(initialIso, maxIso, onApply) {
-    const [by, bm] = (initialIso || maxIso).split("-").map(Number);
+    const [by, bm] = (initialIso || maxIso || todayStr()).split("-").map(Number);
     let viewY = by,
       viewM = bm - 1,
-      selected = initialIso || maxIso;
+      selected = initialIso || "";
     const back = mappOverlay("mapp-sheet-back", 110);
     back.innerHTML = `
       <div class="mapp-sheet">
@@ -826,7 +843,7 @@
           cls = ["mapp-cal-cell"];
         return iso === selected ? cls.push("sel") : iso === todayStr() && cls.push("today"), `<button type="button" class="${cls.join(" ")}" data-cal-day="${iso}"${iso > maxIso ? " disabled" : ""}>${d}</button>`;
       }).join("")).join("")}</div>
-        <div class="mapp-cal-sel">${selected ? window.fmtDate(selected) : ""}</div>`, body.querySelector("[data-cal-prev]").onclick = () => {
+        <div class="mapp-cal-sel">${selected ? window.fmtDate(selected) : '<span class="muted">선택</span>'}</div>`, body.querySelector("[data-cal-prev]").onclick = () => {
         viewM--, viewM < 0 && (viewM = 11, viewY--), drawCal();
       }, body.querySelector("[data-cal-next]").onclick = () => {
         viewM++, viewM > 11 && (viewM = 0, viewY++), drawCal();
