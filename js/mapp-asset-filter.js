@@ -159,16 +159,27 @@
       return compactLabel(g, draft[g.key]);
     }
     const content = popup.querySelector(".mapp-filter-content");
+    let query = "";
     function drawOptions() {
       const g = groups.find(x => x.key === selected),
-        options = g.options,
-        list = popup.querySelector("[data-filter-options]");
-      list.innerHTML = options.map(o => `<label class="mapp-filter-option"><input type="checkbox" data-filter-value="${esc(o.value)}"${draft[g.key].includes(o.value) ? " checked" : ""}><span>${esc(o.label)}</span></label>`).join("") + (options.length ? "" : '<p class="mapp-filter-no-options">등록된 태그가 없습니다.</p>'), list.querySelectorAll("[data-filter-value]").forEach(input => input.onchange = () => {
+        q = query.trim().toLowerCase(),
+        options = g.key === "labels" && q ? g.options.filter(o => o.label.toLowerCase().includes(q)) : g.options,
+        list = popup.querySelector("[data-filter-options]"),
+        allBox = popup.querySelector("[data-filter-all]"),
+        shown = options.filter(o => draft[g.key].includes(o.value)).length;
+      // 전체 선택 체크박스: 표시 중인 옵션 기준(App_dc_공통_07 4-2)
+      allBox && (allBox.disabled = !options.length, allBox.checked = !!options.length && shown === options.length, allBox.indeterminate = shown > 0 && shown < options.length, allBox.onchange = () => {
+        const values = options.map(o => o.value);
+        draft[g.key] = allBox.checked ? [...new Set([...draft[g.key], ...values])] : draft[g.key].filter(v => !values.includes(v)), drawOptions();
+      });
+      const emptyText = g.key === "labels" && q && g.options.length ? "결과가 없습니다." : "등록된 태그가 없습니다.";
+      list.innerHTML = options.map(o => `<label class="mapp-filter-option"><input type="checkbox" data-filter-value="${esc(o.value)}"${draft[g.key].includes(o.value) ? " checked" : ""}><span>${esc(o.label)}</span></label>`).join("") + (options.length ? "" : `<p class="mapp-filter-no-options">${emptyText}</p>`), list.querySelectorAll("[data-filter-value]").forEach(input => input.onchange = () => {
         const value = input.dataset.filterValue;
-        draft[g.key] = input.checked ? [...draft[g.key], value] : draft[g.key].filter(v => v !== value);
+        draft[g.key] = input.checked ? [...draft[g.key], value] : draft[g.key].filter(v => v !== value), drawOptions();
       });
     }
     function draw() {
+      popup.querySelector("[data-filter-reset]").disabled = selected === null;
       if (selected === null) {
         content.innerHTML = `<div class="mapp-filter-overview">${groups.map(g2 => `<button type="button" class="mapp-filter-category" data-filter-category="${g2.key}">
           <span class="mapp-filter-category-icon${draft[g2.key].length ? " has-value" : ""}">${ICON[g2.key]}</span><span class="mapp-filter-category-text"><span>${g2.label}</span><strong>${esc(summary(g2))}</strong></span><span class="mapp-filter-chevron">›</span></button>`).join("")}</div>`, content.querySelectorAll("[data-filter-category]").forEach(b => b.onclick = () => {
@@ -178,17 +189,19 @@
       }
       const g = groups.find(x => x.key === selected);
       content.innerHTML = `<nav class="mapp-filter-rail" aria-label="필터 카테고리"><button type="button" data-filter-overview aria-label="카테고리 목록">${ICON.all}</button>${groups.map(x => `<button type="button" class="${x.key === selected ? "active" : ""}" data-filter-nav="${x.key}" aria-label="${x.label}" aria-current="${x.key === selected ? "true" : "false"}">${ICON[x.key]}</button>`).join("")}</nav>
-        <section class="mapp-filter-options-panel"><h3>${g.label}</h3><div data-filter-options></div></section>`, content.querySelector("[data-filter-overview]").onclick = () => {
-        selected = null, draw();
+        <section class="mapp-filter-options-panel"><h3>${g.label}</h3>${g.key === "labels" ? `<div class="mapp-directory-search" style="margin:0 0 8px"><input type="search" data-filter-search placeholder="검색" aria-label="태그 검색" autocomplete="off" value="${esc(query)}"></div>` : ""}<label class="mapp-filter-option" style="font-weight:600"><input type="checkbox" data-filter-all><span>전체</span></label><div data-filter-options></div></section>`, content.querySelector("[data-filter-overview]").onclick = () => {
+        selected = null, query = "", draw();
       }, content.querySelectorAll("[data-filter-nav]").forEach(b => b.onclick = () => {
-        selected = b.dataset.filterNav, draw();
-      }), drawOptions(), content.querySelector(`button[data-filter-nav="${selected}"]`).focus();
+        b.dataset.filterNav !== selected && (query = ""), selected = b.dataset.filterNav, draw();
+      });
+      const search = content.querySelector("[data-filter-search]");
+      search && (search.oninput = () => { query = search.value, drawOptions(); }), drawOptions(), content.querySelector(`button[data-filter-nav="${selected}"]`).focus();
     }
     popup.querySelector("[data-filter-reset]").onclick = () => {
-      draft = empty(), draw();
+      selected !== null && (draft[selected] = [], drawOptions());
     }, popup.querySelector("[data-filter-cancel]").onclick = close, popup.querySelector("[data-filter-confirm]").onclick = () => {
       close(), onApply(normalize(draft, groups));
-    }, document.body.appendChild(popup), align(), window.addEventListener("resize", align), window.addEventListener("scroll", align, !0), document.addEventListener("keydown", keydown), draw(), popup.querySelector("[data-filter-reset]").focus();
+    }, document.body.appendChild(popup), align(), window.addEventListener("resize", align), window.addEventListener("scroll", align, !0), document.addEventListener("keydown", keydown), draw();
   }
   window.MappAssetFilter = {
     empty,
