@@ -57,7 +57,7 @@
     name: "비용",
     items: [["비용 결재", "Pro"]]
   }, {
-    name: "관리",
+    name: "자산",
     items: [["자산 관리", "Pro"]]
   }];
   function featureIsOn(name, minimum) {
@@ -176,8 +176,8 @@
       if (!canConfigureFeatures()) return;
       if (!planAllows("Pro")) {
         openPlanDialog({
-          title: "Pro 요금제부터 사용할 수 있습니다.",
-          body: "<p>자산 관리 기능을 사용하려면 요금제를 업그레이드해주세요.</p>",
+          title: "Pro 요금제에서 제공하는 기능입니다.",
+          body: "<p>대시보드 [결제] 페이지에서 요금제를 업그레이드해 보세요!</p>",
           actions: [{
             label: "취소"
           }, {
@@ -190,8 +190,8 @@
       const on = assetMgmtEnabled();
       openPlanDialog({
         title: on ? "사용 안 함으로 설정하시겠습니까?" : "사용함으로 설정하시겠습니까?",
+        // 앱 공통 ON/OFF 확인: 제목·취소/확인만 제공(App(E,L)_dc_10 3·4번).
         body: "",
-        // 앱 운영 양식: 사용함/사용 안 함 확인은 바디 없이 타이틀·취소/확인만 제공.
         actions: [{
           label: "취소"
         }, {
@@ -204,7 +204,7 @@
             try {
               localStorage.setItem(ASSET_MGMT_FLAG_KEY, on ? "0" : "1");
             } catch {
-              toast("저장하지 못했습니다. 다시 시도해주세요.");
+              toast("알 수 없는 에러가 발생했습니다. 잠시 후 다시 한 번 시도해보세요.");
               return;
             }
             draw(), toast("저장되었습니다.");
