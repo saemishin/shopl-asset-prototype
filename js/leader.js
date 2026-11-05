@@ -831,11 +831,11 @@
       <div class="mapp-directory-asset-list">${items.map(x => {
       const a = x.asset,
         status = STATUS_LABEL[a.status] || [a.status, ""];
-      return `<button type="button" class="mapp-directory-asset-row" data-search="${directoryEsc(`${a.product} ${a.assetNo||''}`.toLowerCase())}" data-directory-asset="${directoryEsc(a.id)}"><span><strong>${directoryEsc(a.product)}</strong>${`<small>${directoryEsc(a.assetNo || "—")}</small>`}${kind === "member" ? `<small class="mapp-directory-asset-category">${directoryEsc(a.group)} › ${directoryEsc(a.sub)}</small>` : ""}</span><span class="badge ${status[1]}">${status[0]}</span><small>${x.since?x.since.replaceAll('-','.'):'—'}</small></button>`;
+      return `<button type="button" class="mapp-directory-asset-row" data-search="${directoryEsc(`${a.product} ${a.assetNo||''}`.toLowerCase())}" data-directory-asset="${directoryEsc(a.id)}">${kind === "member" ? `<span style="display:flex;flex-direction:column;gap:2px;min-width:0"><small class="mapp-directory-asset-category">${directoryEsc(a.group)} › ${directoryEsc(a.sub)}</small><strong>${directoryEsc(a.product)}</strong><small>${directoryEsc(a.assetNo || "—")}</small><small>배정일: ${x.since ? x.since.replaceAll("-", ".") : "—"}</small></span><span class="badge ${status[1]}">${status[0]}</span>` : `<span style="display:flex;flex-direction:column;gap:2px;min-width:0"><strong>${directoryEsc(a.product)}</strong><small>${directoryEsc(a.assetNo || "—")}</small><small>배정일: ${x.since ? x.since.replaceAll("-", ".") : "—"}</small></span><span class="badge ${status[1]}">${status[0]}</span>`}</button>`;
     }).join("")}</div>
       <p class="mapp-directory-empty" data-directory-search-empty hidden>결과가 없습니다.</p>`;
   }
-  function directoryMemberRecentHtml(state){const items=directoryItems('member');return `<div class="mapp-count">전체 <b>${items.length}</b></div>${items.length?items.slice(0,5).map(x=>`<button class="mapp-directory-asset-row" data-directory-asset="${x.asset.id}"><span><strong>${directoryEsc(x.asset.product)}</strong><small>${directoryEsc(x.asset.assetNo)} · ${directoryEsc(x.asset.group)} › ${directoryEsc(x.asset.sub)}</small></span><span class="badge ${STATUS_LABEL[x.asset.status][1]}">${STATUS_LABEL[x.asset.status][0]}</span><small>${x.since?x.since.replaceAll('-','.'):'—'}</small></button>`).join('')+'<button class="btn" data-directory-member-viewall>전체 보기</button>':'<p class="mapp-directory-empty">배정 중인 자산이 없습니다.</p>'}`;}
+  function directoryMemberRecentHtml(state){const items=directoryItems('member');return `<div class="mapp-count">전체 <b>${items.length}</b></div>${items.length?items.slice(0,5).map(x=>`<button class="mapp-directory-asset-row" data-directory-asset="${x.asset.id}"><span style="display:flex;flex-direction:column;gap:2px;min-width:0"><small class="mapp-directory-asset-category">${directoryEsc(x.asset.group)} › ${directoryEsc(x.asset.sub)}</small><strong>${directoryEsc(x.asset.product)}</strong><small>${directoryEsc(x.asset.assetNo)}</small><small>배정일: ${x.since?x.since.replaceAll('-','.'):'—'}</small></span><span class="badge ${STATUS_LABEL[x.asset.status][1]}">${STATUS_LABEL[x.asset.status][0]}</span></button>`).join('')+'<button class="btn" data-directory-member-viewall>전체 보기</button>':'<p class="mapp-directory-empty">배정 중인 자산이 없습니다.</p>'}`;}
   function directoryMemberAssetsScreenHtml(state){return `<div class="mapp-topbar"><button class="mapp-back" data-mapp-back aria-label="뒤로">←</button><span class="mapp-topbar-title">배정 자산</span></div><div class="mapp-body">${directoryAssetSectionHtml('member',state)}</div>`;}
   function directoryWorksiteSummaryHtml() {
     const items = directoryItems("worksite"),
@@ -847,7 +847,7 @@
         sub: item.asset.sub,
         count: 0
       }), groups.get(key).count++;
-    }), `<div class="mapp-count">전체 <b>${items.length}</b></div>${items.length ? `<div class="mapp-ws-cat-tree">${[...groups.values()].map(category => `<button type="button" class="mapp-ws-cat-row" data-directory-sub-open data-group="${directoryEsc(category.group)}" data-sub="${directoryEsc(category.sub)}"><span>${directoryEsc(category.group)} <span class="mapp-cat-sep">›</span> ${directoryEsc(category.sub)}</span><span class="mapp-ws-cat-count">${category.count}<span class="mapp-menu-chev">›</span></span></button>`).join("")}</div>` : '<p class="mapp-directory-empty">배정 중인 자산이 없습니다.</p>'}`;
+    }), `<div class="mapp-count">전체 <b>${items.length}</b></div>${items.length ? `<div class="mapp-ws-cat-tree">${[...groups.values()].sort((x, y) => window.DATA.categories.findIndex(c => c.group === x.group && c.sub === x.sub) - window.DATA.categories.findIndex(c => c.group === y.group && c.sub === y.sub)).map(category => `<button type="button" class="mapp-ws-cat-row" data-directory-sub-open data-group="${directoryEsc(category.group)}" data-sub="${directoryEsc(category.sub)}"><span>${directoryEsc(category.group)} <span class="mapp-cat-sep">›</span> ${directoryEsc(category.sub)}</span><span class="mapp-ws-cat-count">${category.count}<span class="mapp-menu-chev">›</span></span></button>`).join("")}</div>` : '<p class="mapp-directory-empty">배정 중인 자산이 없습니다.</p>'}`;
   }
   function directoryWorksiteAssetsScreenHtml(state) {
     const ws = DEMO_DIRECTORY_WORKSITE,
@@ -866,7 +866,7 @@
       tabs = member ? [["info", "정보"], ["attendance", "근태"], ["work", "업무"]] : [["attendance", "근무"], ["work", "업무"], ["info", "정보"]],
       asset = directoryAssetAvailable(kind),
       otherMenus = directoryTaskMenus(kind),
-      assetCard=asset?`<section class="mapp-directory-task-card"><button class="mapp-directory-fold" data-directory-fold="asset" aria-expanded="true"><strong>자산</strong><span>⌃</span></button><div class="mapp-directory-fold-body">${member?directoryMemberRecentHtml(state):directoryWorksiteSummaryHtml()}</div></section>`:'',
+      assetCard=asset?`<section class="mapp-directory-task-card" style="position:relative">${canAssignAny()?'<button type="button" class="btn sm" data-directory-assign style="position:absolute;top:10px;right:44px;z-index:1">배정</button>':''}<button class="mapp-directory-fold" data-directory-fold="asset" aria-expanded="true"><strong>자산</strong><span>⌃</span></button><div class="mapp-directory-fold-body">${member?directoryMemberRecentHtml(state):directoryWorksiteSummaryHtml()}</div></section>`:'',
       taskBody=otherMenus.map(([key,label])=>`<button class="mapp-directory-nav-card" data-directory-placeholder><span class="mapp-directory-task-icon ${key}">${directoryIcon(key)}</span><strong>${label}</strong></button>`).join(''),
       rows = member ? [["그룹", info.team], ["직무", "매니저"], ["직급", "Lv.3"], ["사번", info.empNo], ["휴대폰번호", info.phone]] : [["근무지 코드", WS_CODE[name]], ["주소", WS_ADDRESS[name]]];
     return `<div class="mapp-directory-page">
@@ -896,6 +896,7 @@
       }
     });
     const search = root.querySelector("[data-directory-search]");
+    root.querySelector('[data-directory-assign]')?.addEventListener('click',()=>openMultiAssignPage('',()=>draw(),directoryTarget(state.screen==='worksite-profile'?'worksite':'member')));
     root.querySelectorAll('[data-directory-member-viewall]').forEach(button=>button.onclick=()=>{state.screen='directory-member-assets';state.directorySearch='';draw();});
     if (!search) return;
     const clear = root.querySelector("[data-directory-search-clear]");
@@ -1687,8 +1688,9 @@
   function openAssetPickPage(initialIds, initialSubs, onApply) {
     window.MappLinks.openAssetPick({ me: ME, candidates: (subs, q) => assignCandidates("", q).filter(a => !subs.length || subs.includes(a.sub)), initialIds, initialSubs, onApply });
   }
-  function openMultiAssignPage(presetSub, onDone) {
-    const f = { ids: [], subs: presetSub ? [presetSub] : [], picked: null, draft: { employee: null, worksite: null }, dateIso: "" },
+  // fixed: 구성원·근무지 상세에서 연 경우 대상을 고정한다(App(L)_dc_04 Case 2).
+  function openMultiAssignPage(presetSub, onDone, fixed) {
+    const f = { ids: [], subs: presetSub ? [presetSub] : [], picked: fixed ? fixed.type : null, draft: { employee: fixed && fixed.type === "employee" ? fixed.value : null, worksite: fixed && fixed.type === "worksite" ? fixed.value : null }, dateIso: "" },
       back = mappOverlay("mapp-fullpage-back", 95);
     back.innerHTML = `
       <div class="mapp-fullpage-head">
@@ -1705,13 +1707,13 @@
         assetLabel = picked.length ? `${picked[0].product}${picked.length > 1 ? ` +${picked.length - 1}` : ""}` : "";
       body.innerHTML = `
         <div class="field"><label>자산</label>${chip(assetLabel, "data-ma-asset", "data-ma-asset-clear")}</div>
-        <div class="field">
+        ${fixed ? `<div class="field"><label>배정 대상</label><div class="acard" style="display:flex;align-items:center;gap:8px">${fixed.type === "employee" ? `${window.pickerAvatarHtml(esc(fixed.value), avatarColor(fixed.value))}<span><strong>${esc(fixed.value)}</strong><small style="display:block;color:#8a8f98">${esc(MEMBER_TEAM[fixed.value] || "")}</small></span>` : `${IC_WS}<span><strong>${esc(fixed.value)}</strong><small style="display:block;color:#8a8f98">${esc(WS_CODE[fixed.value] || "")}</small></span>`}</div></div>` : `<div class="field">
           <label>배정 대상</label>
           <label class="radio-row"><input type="radio" name="ma-kind" value="employee"${f.picked === "employee" ? " checked" : ""}><span>구성원</span></label>
           ${f.picked === "employee" ? `<div class="perm-target-wrap">${chip(f.draft.employee, "data-ma-target", "data-ma-target-clear")}</div>` : ""}
           <label class="radio-row"><input type="radio" name="ma-kind" value="worksite"${f.picked === "worksite" ? " checked" : ""}><span>근무지</span></label>
           ${f.picked === "worksite" ? `<div class="perm-target-wrap">${chip(f.draft.worksite, "data-ma-target", "data-ma-target-clear")}</div>` : ""}
-        </div>
+        </div>`}
         <div class="field"><label>배정일</label><div class="mapp-date-wrap">${chip(f.dateIso ? window.fmtDate(f.dateIso) : "", "data-ma-date", "data-ma-date-clear")}</div></div>`;
       body.querySelector("[data-ma-asset]").onclick = () => openAssetPickPage(f.ids, f.subs, (ids, subs) => { f.ids = ids, f.subs = subs, drawBody(); });
       body.querySelectorAll('input[name="ma-kind"]').forEach(r => r.onchange = () => { f.picked = r.value, drawBody(); });
@@ -1726,7 +1728,7 @@
     }
     drawBody();
     back.querySelector("[data-ma-back]").onclick = () => {
-      if (!(f.ids.length || f.picked || f.dateIso)) return back.remove();
+      if (!(f.ids.length || (!fixed && f.picked) || f.dateIso)) return back.remove();
       const cb = document.createElement("div");
       cb.className = "modal-back", cb.style.zIndex = 340, cb.innerHTML = `<div class="modal sm" style="width:340px" role="dialog" aria-modal="true" aria-label="취소하시겠습니까?"><h3>취소하시겠습니까?</h3><div class="body" style="font-size:14px">취소 시 편집한 내용이 저장되지 않습니다.</div><div class="foot"><button type="button" class="btn" data-ma-stay>취소</button><button type="button" class="btn primary" data-ma-leave>확인</button></div></div>`, document.body.appendChild(cb);
       cb.querySelector("[data-ma-stay]").onclick = () => cb.remove();
