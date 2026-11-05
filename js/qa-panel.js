@@ -43,6 +43,7 @@
     add(0,'menu','메뉴',file);add(0,'assets','자산',file,{},'mobile-assets');
     add(0,'detail','자산 상세',file,{qa:'review',scenario:'detail',id:'A001'});
     add(0,'member','구성원 상세',file,{},'mobile-member');add(0,'worksite','근무지 상세',file,{},'mobile-worksite');
+    add(0,'member-retired','퇴사 구성원 상세',file,{directory:'retired'},'mobile-member');add(0,'worksite-inactive','비활성 근무지 상세',file,{directory:'inactive'},'mobile-worksite');
   }else{
     add(0,'assign','자산 배정','assets.html',{},'asset-assign');add(0,'overview','현황','assets.html');add(0,'category','분류','category.html');
     add(0,'detail','자산 상세','asset-detail.html',{id:'A001'});
