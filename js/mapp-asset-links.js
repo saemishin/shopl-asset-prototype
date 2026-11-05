@@ -113,6 +113,7 @@
     const groups = [], sel = new Set(current || []);
     cats.forEach(c => { let g = groups.find(x => x.name === c.group); g || groups.push(g = { name: c.group, items: [] }), g.items.push(c); });
     let q = "";
+    const originalCats=cats.slice(), originalGroups=groups.map(g=>({...g,items:g.items.slice()}));
     const p = overlay("mapp-fullpage-back", 160);
     p.innerHTML = `<div class="mapp-add-category-popup">
       <div class="mapp-topbar mapp-add-category-head"><span class="mapp-topbar-title">분류</span><button type="button" class="mapp-add-category-close" data-sp-close aria-label="닫기">×</button></div>
@@ -123,6 +124,7 @@
     const state = items => { const n = items.filter(c => sel.has(c.sub)).length; return n === 0 ? "" : n === items.length ? "on" : "mixed"; };
     const box = (st, attr) => `<input type="checkbox" ${attr}${st === "on" ? " checked" : ""} data-mixed="${st === "mixed" ? 1 : 0}">`;
     function draw() {
+      p.querySelector("[data-sp-apply]").disabled=!cats.length;
       if (!cats.length) { body.innerHTML = '<p class="muted mapp-pick-empty">선택할 수 있는 분류가 없습니다.</p>'; return; }
       const v = visible(), all = v.flatMap(x => x.items);
       body.innerHTML = `<div class="mapp-directory-search"><input type="search" data-sp-q placeholder="검색" aria-label="분류 검색" autocomplete="off" value="${esc(q)}"></div>
@@ -139,13 +141,20 @@
     }
     p.querySelector("[data-sp-close]").onclick = () => p.remove();
     p.querySelector("[data-sp-apply]").onclick = () => { const subs = sel.size === cats.length ? [] : cats.filter(c => sel.has(c.sub)).map(c => c.sub); p.remove(), onApply(subs); };
+    window.MobileCases?.fixture(p,'분류 선택','App 공통06',[
+      ['none','선택 없음','1~5번',()=>{sel.clear();q='';draw();}],
+      ['partial','부분 선택 · 중간 체크','2·4번',()=>{sel.clear();const g=groups.find(g=>g.items.length>1);if(g)sel.add(g.items[0].sub);q='';draw();}],
+      ['all','전체 선택','2·4번',()=>{cats.forEach(c=>sel.add(c.sub));q='';draw();}],
+      ['search-none','검색 결과 없음','1번',()=>{q='검색결과없는조건';draw();}],
+      ['candidates-none','선택 가능한 분류 없음','4·5번',()=>{cats=[];groups.splice(0);sel.clear();draw();}]
+    ],()=>{cats=originalCats.slice();groups.splice(0,groups.length,...originalGroups);sel.clear();current.forEach(s=>sel.add(s));q='';draw();});
     draw();
   }
   // 앱 공통05 자산 선택 화면. candidates(sub, query)가 후보를 돌려준다. limit이 있으면 선택 상한.
   function openAssetPick({ me, candidates, initialIds = [], initialSubs = [], limit = Infinity, onApply }) {
     const sel = new Set(initialIds),
       cats = window.DATA.categories.filter(c => window.AssetAccess.scope(c, "view", me) && window.AssetAccess.scope(c, "assign", me));
-    let subs = [...initialSubs], query = "";
+    let subs = [...initialSubs], query = "", fixtureEmpty=false;
     const p = overlay("mapp-fullpage-back", 150);
     p.innerHTML = `
       <div class="mapp-fullpage-head">
@@ -160,7 +169,7 @@
       <div class="mapp-fullpage-foot"><button type="button" class="btn primary" data-pk-apply>적용</button></div>`;
     const list = p.querySelector("[data-pk-list]");
     function draw() {
-      const items = candidates(subs, query), full = sel.size >= limit;
+      const items = fixtureEmpty?[]:candidates(subs, query), full = sel.size >= limit;
       p.querySelector("[data-pk-sub-label]").textContent = subs.length ? `${subs[0]}${subs.length > 1 ? ` +${subs.length - 1}` : ""}` : "전체";
       list.innerHTML = items.length ? items.map(a => { const on = sel.has(a.id); return `<label class="mapp-pick-row"><input type="checkbox" data-pk-id="${a.id}"${on ? " checked" : ""}${!on && full ? " disabled" : ""}><span class="mapp-pick-name">${esc(a.product)}</span><span class="mapp-pick-no">${esc(a.assetNo || "")}</span></label>`; }).join("") : '<p class="muted mapp-pick-empty">배정할 수 있는 자산이 없습니다.</p>';
       list.querySelectorAll("[data-pk-id]").forEach(c => c.onchange = () => {
@@ -171,6 +180,14 @@
     p.querySelector("[data-pk-q]").oninput = e => { query = e.target.value, draw(); };
     p.querySelector("[data-pk-back]").onclick = () => p.remove();
     p.querySelector("[data-pk-apply]").onclick = () => { p.remove(), onApply([...sel], subs); };
+    window.MobileCases?.fixture(p,'자산 선택','App 공통05',[
+      ['none','선택 없음','4·5번',()=>{sel.clear();draw();}],
+      ['one','한 개 선택','4·5번',()=>{const a=candidates(subs,query)[0];sel.clear();if(a)sel.add(a.id);draw();}],
+      ['several','복수 선택','4번',()=>{sel.clear();candidates(subs,query).slice(0,Math.min(limit,3)).forEach(a=>sel.add(a.id));draw();}],
+      ['limit','선택 상한 도달','4번',()=>{sel.clear();candidates(subs,query).slice(0,limit).forEach(a=>sel.add(a.id));draw();},!Number.isFinite(limit)||candidates(subs,query).length<limit],
+      ['search-none','검색 결과 없음','3·4번',()=>{query='검색결과없는조건';p.querySelector('[data-pk-q]').value=query;draw();}],
+      ['empty','후보 없음','4번',()=>{fixtureEmpty=true;draw();}]
+    ],()=>{fixtureEmpty=false;query='';subs=[...initialSubs];sel.clear();initialIds.forEach(id=>sel.add(id));p.querySelector('[data-pk-q]').value='';draw();});
     draw();
   }
   const byName = (x, y) => String(x.product).localeCompare(String(y.product), "ko") || String(x.assetNo || "").localeCompare(String(y.assetNo || ""));

@@ -15,7 +15,7 @@
     },
     QA_PLAN = new URLSearchParams(location.search).get("plan");
   function companyPlan() {
-    const plan = QA_PLAN || localStorage.getItem(COMPANY_PLAN_KEY) || "Enterprise";
+    const plan = window.MobileCases?.plan || QA_PLAN || localStorage.getItem(COMPANY_PLAN_KEY) || "Enterprise";
     return Object.hasOwn(PLAN_RANK, plan) ? plan : "Lite";
   }
   function planAllows(minimum) {
@@ -25,7 +25,7 @@
     return !0;
   }
   function assetMgmtEnabled() {
-    return planAllows("Pro") && localStorage.getItem(ASSET_MGMT_FLAG_KEY) !== "0";
+    return planAllows("Pro") && (window.MobileCases?.featureUse ?? (localStorage.getItem(ASSET_MGMT_FLAG_KEY) !== "0"));
   }
   const FEATURE_GROUPS = [{
     name: "출퇴근 및 방문",
@@ -191,7 +191,7 @@
               return;
             }
             try {
-              localStorage.setItem(ASSET_MGMT_FLAG_KEY, on ? "0" : "1");
+              window.MobileCases?.featureUse !== null && window.MobileCases?.featureUse !== undefined ? window.MobileCases.featureUse = !on : localStorage.setItem(ASSET_MGMT_FLAG_KEY, on ? "0" : "1");
             } catch {
               toast("알 수 없는 에러가 발생했습니다. 잠시 후 다시 한 번 시도해보세요.");
               return;
@@ -900,6 +900,11 @@
         selected = b.dataset.calDay, drawCal();
       }), okBtn.disabled = !selected;
     }
+    window.MobileCases?.fixture(back,'날짜 선택','App 공통02',[
+      ['date-empty','선택 없음 · 확인 비활성','3·6번',()=>{selected='';drawCal();}],
+      ['date-picked','오늘 선택','1·3번',()=>{const value=todayStr();if(value<=maxIso){selected=value;const [y,m]=value.split('-').map(Number);viewY=y;viewM=m-1;drawCal();}}],
+      ['date-future','미래 날짜 비활성','1번',()=>{const [y,m]=maxIso.split('-').map(Number);viewY=y;viewM=m-1;drawCal();}]
+    ],()=>{selected=initialIso||'';viewY=by;viewM=bm-1;drawCal();});
     drawCal(), back.querySelector("[data-cal-cancel]").onclick = () => back.remove(), okBtn.onclick = () => {
       selected && (back.remove(), onApply(selected));
     };
@@ -1293,8 +1298,8 @@ function openLeaderQr(a) {
  const party=`<div class="dsection"><h2 class="mapp-party-head">배정 현황</h2>${rec?`<div class="acard${manageActions(a,target).length?' has-actions':''}">${typeBadge(rec)}${manageActions(a,target).length?`<button type="button" class="mapp-holder-more" data-card-more aria-label="배정 관리" aria-haspopup="menu">${MORE_ICON}</button>`:''}<div class="acard-id">${assignIdentity(rec)}</div><div class="acard-foot"><span class="acard-date">배정일 <b>${window.fmtDate(rec.since)}</b></span>${canManage(a)?`<button type="button" class="icon-edit acard-date-edit" data-date-edit aria-label="배정일 수정">${IC_EDIT}</button>`:''}</div></div>`:`<div class="assign-empty"><p class="mapp-party-empty">배정 대상이 없습니다.</p>${canManage(a)&&!(a.assignments||[]).length?'<button type="button" class="btn sm" data-assign-open>배정</button>':''}</div>`}</div>`;
  return `<div class="mapp-topbar"><button class="mapp-back" data-mapp-back aria-label="뒤로">←</button>${menuActions(a,target).length?`<button class="mapp-more" data-more-open aria-label="더보기">${MORE_ICON}</button>`:''}</div><div class="mapp-body"><div class="dhead-id"><div class="mapp-hero-wrap"><button class="mapp-hero-img" data-hero-viewer aria-label="사진 보기"${photos.length?'':' disabled'}>${cardThumb(a)}</button>${photos.length>1?`<span class="mapp-hero-count">+${photos.length-1}</span>`:''}</div><div><h1>${a.product}</h1><div class="dhead-sub">${actions.length?`<button class="badge ${STATUS_LABEL[a.status][1]} clickable" data-status-open>${STATUS_LABEL[a.status][0]} ▾</button>`:`<span class="badge ${STATUS_LABEL[a.status][1]}">${STATUS_LABEL[a.status][0]}</span>`}<div>고유관리번호 <b>${a.assetNo}</b></div></div></div></div>${window.AssetExtra.tabs()}<div data-detail-panel="assignment">${party}${window.MappLinks.sectionHtml(a, ME)}</div><div data-detail-panel="info" hidden><div class="kv2">${info}</div>${window.AssetExtra.detailHtml(a,manage,expiryBadge)}</div><div data-detail-panel="history" hidden>${historyPanelHtml(a,target)}</div></div>`;
 }
-  const MENU_ICON_ASSET = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10" r="1.6"/><path d="m21 16-5-5-9 8"/></svg>',
-    DIRECTORY_CASE = new URLSearchParams(location.search).get("directory"),
+  const MENU_ICON_ASSET = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10" r="1.6"/><path d="m21 16-5-5-9 8"/></svg>';
+  let DIRECTORY_CASE = new URLSearchParams(location.search).get("directory"),
     DEMO_DIRECTORY_MEMBER = DIRECTORY_CASE === "retired" ? "오세훈" : "김민수",
     DEMO_DIRECTORY_WORKSITE = "강남점";
   function directoryMenuHtml(kind, expanded) {
@@ -1732,6 +1737,7 @@ function openLeaderQr(a) {
         b.setAttribute("aria-expanded", String(!expanded)), body.hidden = expanded, b.classList.toggle("collapsed", expanded);
       });
     }
+    window.MobileCases?.bind({mode:'employee',state,draw,me:ME,directoryTarget,worksites:()=>myWorksites(ME),setDirectory(value){DIRECTORY_CASE=value;DEMO_DIRECTORY_MEMBER=value==='retired'?'오세훈':'김민수';}});
     window.addEventListener("storage", event => {
       ([ASSET_MGMT_FLAG_KEY, COMPANY_PLAN_KEY].includes(event.key) || event.key === null) && draw();
     }), draw();

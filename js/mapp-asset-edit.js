@@ -763,6 +763,13 @@
         }, updateTagManageValidity2();
       }
     }
+    window.MobileCases?.attach(back,{
+      get id(){return 'mobile-edit-'+state.screen;},
+      get title(){return state.screen==='asset-add-tags'?'태그 관리':state.screen==='asset-add-category'?'분류 선택':'자산 수정';},
+      reference:'App(E,L)01',
+      sections:()=>window.MobileCases.formCases(state,draw),
+      summary:'실제 수정 폼의 입력·첨부 상태입니다. 저장·취소는 화면에서 직접 진행하세요.'
+    });
     draw();
   }
   window.MappAssetEdit = { open };

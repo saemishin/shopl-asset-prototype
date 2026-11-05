@@ -197,6 +197,21 @@
       const search = content.querySelector("[data-filter-search]");
       search && (search.oninput = () => { query = search.value, drawOptions(); }), drawOptions(), content.querySelector(`button[data-filter-nav="${selected}"]`).focus();
     }
+    const originalGroups=groups.map(g=>({...g,options:g.options.map(o=>({...o}))})),originalDraft=JSON.parse(JSON.stringify(draft));
+    window.MobileCases?.attach(popup,{
+      get id(){return 'mobile-filter-'+(selected||'overview');},
+      get title(){return '필터 · '+(groups.find(g=>g.key===selected)?.label||'항목 목록');},
+      reference:'App 공통07',
+      summary:'선택한 필터 항목 안에서 상태를 바꿉니다. 확인을 누르기 전에는 목록에 적용되지 않습니다.',
+      sections:()=>[{title:'옵션 상태',items:[
+        {id:'filter-none',label:'선택 없음',reference:'4번',disabled:selected===null,run(){draft[selected]=[];drawOptions();}},
+        {id:'filter-partial',label:'일부 선택 · 중간 체크',reference:'4번',disabled:selected===null,run(){const g=groups.find(g=>g.key===selected);draft[selected]=g.options.slice(0,1).map(o=>o.value);drawOptions();}},
+        {id:'filter-all',label:'전체 선택',reference:'4번',disabled:selected===null,run(){const g=groups.find(g=>g.key===selected);draft[selected]=g.options.map(o=>o.value);drawOptions();}},
+        {id:'tags-search-none',label:'태그 검색 결과 없음',reference:'4번',run(){selected='labels';query='검색결과없는조건';draw();}},
+        {id:'tags-empty',label:'등록된 태그 없음',reference:'4번',run(){selected='labels';query='';const g=groups.find(g=>g.key==='labels');g.options=[];draft.labels=[];draw();}}
+      ]}],
+      reset(){groups.splice(0,groups.length,...originalGroups.map(g=>({...g,options:g.options.map(o=>({...o}))})));draft=JSON.parse(JSON.stringify(originalDraft));selected=null;query='';draw();}
+    });
     popup.querySelector("[data-filter-reset]").onclick = () => {
       selected !== null && (draft[selected] = [], drawOptions());
     }, popup.querySelector("[data-filter-cancel]").onclick = close, popup.querySelector("[data-filter-confirm]").onclick = () => {

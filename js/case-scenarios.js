@@ -5,16 +5,16 @@
   const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
   function source(p,item){
-    if(/^(Web|Policy)/.test(item.reference))return item.reference;
+    if(/^(Web|Policy|App)/.test(item.reference))return item.reference;
     const ref=/^(명세|Case|\d)/.test(item.reference)?p.reference.split(' · ')[0]:p.reference;
     return ref+' · '+item.reference;
   }
   function context() {
-    const overlays = [...document.querySelectorAll('.modal-back,.asset-memo-back,.asset-memo-discard,.asset-memo-link-back')].filter(el => el.getClientRects().length);
+    const overlays = [...document.querySelectorAll('.modal-back,.asset-memo-back,.asset-memo-discard,.asset-memo-link-back'+(window.MobileCases?',.mapp-sheet-back,.mapp-fullpage-back,.mapp-plan-dialog-back,.mapp-viewer-back,.mapp-ai-back,.mapp-asset-filter':''))].filter(el => el.getClientRects().length);
     const top = overlays.map((el, i) => ({el, i, z:Number(getComputedStyle(el).zIndex)||0})).sort((a,b) => b.z-a.z || b.i-a.i)[0]?.el;
     for (const [id,p] of providers) if (p.root && !p.root.isConnected) providers.delete(id);
     const list = [...providers.values()];
-    if (top) return list.find(p => p.root === top) || window.DashboardCases?.modal(top) || {id:'unprepared-modal',title:'현재 열린 모달',reference:'출처 확인 필요',sections:[],summary:'이 모달의 명세 연결을 확인해야 합니다.'};
+    if (top) return list.find(p => p.root === top) || window.MobileCases?.modal(top) || window.DashboardCases?.modal(top) || {id:'unprepared-modal',title:'현재 열린 모달',reference:'출처 확인 필요',sections:[],summary:'이 모달의 명세 연결을 확인해야 합니다.'};
     return list.find(p => !p.root && p.matches()) || {id:'unprepared-page',title:'현재 화면',reference:'자산 화면 밖',sections:[],summary:'자산 대시보드 화면으로 이동하면 해당 화면의 케이스가 표시됩니다.'};
   }
   function refresh() {
@@ -57,7 +57,7 @@
     toggle.onclick=()=>{body.hidden=!body.hidden;toggle.textContent=body.hidden?'+':'−';toggle.setAttribute('aria-expanded',String(!body.hidden));toggle.setAttribute('aria-label',body.hidden?'케이스 시나리오 펼치기':'케이스 시나리오 접기');};
     new MutationObserver(records=>{
       if(records.some(r=>!panel.contains(r.target)&&!r.target.closest?.('#prototype-qa')))schedule();
-    }).observe(document.body,{childList:true,subtree:true});
+    }).observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['class','hidden','aria-current']});
     refresh();
   }
   document.readyState==='loading'?document.addEventListener('DOMContentLoaded',mount,{once:true}):mount();

@@ -26,7 +26,7 @@
     },
     QA_PLAN = new URLSearchParams(location.search).get("plan");
   function companyPlan() {
-    const plan = QA_PLAN || localStorage.getItem(COMPANY_PLAN_KEY) || "Enterprise";
+    const plan = window.MobileCases?.plan || QA_PLAN || localStorage.getItem(COMPANY_PLAN_KEY) || "Enterprise";
     return Object.hasOwn(PLAN_RANK, plan) ? plan : "Lite";
   }
   function planAllows(minimum) {
@@ -36,7 +36,7 @@
     return !0;
   }
   function assetMgmtEnabled() {
-    return planAllows("Pro") && localStorage.getItem(ASSET_MGMT_FLAG_KEY) !== "0";
+    return planAllows("Pro") && (window.MobileCases?.featureUse ?? (localStorage.getItem(ASSET_MGMT_FLAG_KEY) !== "0"));
   }
   const FEATURE_GROUPS = [{
     name: "출퇴근 및 방문",
@@ -202,7 +202,7 @@
               return;
             }
             try {
-              localStorage.setItem(ASSET_MGMT_FLAG_KEY, on ? "0" : "1");
+              window.MobileCases?.featureUse !== null && window.MobileCases?.featureUse !== undefined ? window.MobileCases.featureUse = !on : localStorage.setItem(ASSET_MGMT_FLAG_KEY, on ? "0" : "1");
             } catch {
               toast("알 수 없는 에러가 발생했습니다. 잠시 후 다시 한 번 시도해보세요.");
               return;
@@ -753,11 +753,18 @@
         <p>직접 입력을 선택해도 첨부한 사진과 ${insufficient ? "확인된 정보는" : "확인된 정보가 있으면"} 유지됩니다.</p></div>
         <div class="mapp-ai-result-actions"><button type="button" class="btn" data-ai-retry>다시 시도</button><button type="button" class="btn primary" data-ai-direct>직접 입력</button></div>`, stateEl.querySelector("[data-ai-retry]").onclick = renderLoading, stateEl.querySelector("[data-ai-direct]").onclick = () => direct(insufficient ? mobileAiDraft(!0) : {}), renderPhotos();
     }
+    window.MobileCases?.fixture(back,'AI 입력','App(L)05',[
+      ['photos-none','분석 사진 없음','1·2번',()=>{draft.photos=[];newPhotos.splice(0);analyzing=false;analyze.hidden=false;stateEl.innerHTML='';renderPhotos();}],
+      ['photos-ready','분석 사진 첨부','1·2번',()=>{if(!newPhotos.length)newPhotos.push({id:window.assetPhotoId(),color:'#4b7bec',at:todayStr()+' 10:00',by:ME});analyzing=false;analyze.hidden=false;stateEl.innerHTML='';renderPhotos();}],
+      ['loading','분석 중','3번',()=>{if(!draft.photos.length&&!newPhotos.length)newPhotos.push({id:window.assetPhotoId(),color:'#4b7bec',at:todayStr()+' 10:00',by:ME});renderLoading();}],
+      ['insufficient','정보 부족','4번',()=>renderFailure('insufficient')],
+      ['error','분석 실패','4번',()=>renderFailure('error')]
+    ]);
     renderPhotos(), analyze.onclick = renderLoading, back.querySelector("[data-ai-close]").onclick = requestClose;
   }
   // QA 패널 ?directory=retired / inactive : 퇴사 구성원·비활성 근무지 상세 케이스(App(E,L)_dc_08·09 2번)
-  const DIRECTORY_CASE = new URLSearchParams(location.search).get("directory");
-  const DEMO_DIRECTORY_MEMBER = DIRECTORY_CASE === "retired" ? "오세훈" : "김민수",
+  let DIRECTORY_CASE = new URLSearchParams(location.search).get("directory");
+  let DEMO_DIRECTORY_MEMBER = DIRECTORY_CASE === "retired" ? "오세훈" : "김민수",
     DEMO_DIRECTORY_WORKSITE = "강남점";
   function directoryMenuHtml(kind, expanded) {
     const member = kind === "member",
@@ -1537,6 +1544,11 @@
         selected = b.dataset.calDay, drawCal();
       }), okBtn.disabled = !selected;
     }
+    window.MobileCases?.fixture(back,'날짜 선택','App 공통02',[
+      ['date-empty','선택 없음 · 확인 비활성','3·6번',()=>{selected='';drawCal();}],
+      ['date-picked','오늘 선택','1·3번',()=>{const value=todayStr();if(value<=maxIso){selected=value;const [y,m]=value.split('-').map(Number);viewY=y;viewM=m-1;drawCal();}}],
+      ['date-future','미래 날짜 비활성','1번',()=>{const [y,m]=maxIso.split('-').map(Number);viewY=y;viewM=m-1;drawCal();}]
+    ],()=>{selected=initialIso||'';viewY=by;viewM=bm-1;drawCal();});
     drawCal(), back.querySelector("[data-cal-cancel]").onclick = () => back.remove();
     const calReset = back.querySelector("[data-cal-reset]");
     calReset && (calReset.onclick = () => {
@@ -2691,6 +2703,7 @@
         }, updateTagManageValidity2();
       }
     }
+    window.MobileCases?.bind({mode:'leader',state,draw,me:ME,directoryTarget,setDirectory(value){DIRECTORY_CASE=value;DEMO_DIRECTORY_MEMBER=value==='retired'?'오세훈':'김민수';}});
     window.addEventListener("storage", event => {
       ([ASSET_MGMT_FLAG_KEY, COMPANY_PLAN_KEY].includes(event.key) || event.key === null) && draw();
     }), draw();
