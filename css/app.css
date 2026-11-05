@@ -2583,3 +2583,10 @@ body.history-capture #prototype-qa { display: none; }
 .case-scenarios-note { margin:10px 1px; font-size:11px; color:#778596; }
 .case-scenarios-reset { font:inherit; width:100%; padding:8px; border:1px solid #d8e0e8; border-radius:7px; background:#fff; cursor:pointer; }
 @media(max-width:700px){.case-scenarios{right:8px;bottom:8px;width:248px;}.case-scenarios-body{max-height:55vh;}}
+
+/* App(L)_dc_03 9·10번 소분류 선택 */
+.mapp-sub-switch { display: inline-flex; align-items: center; gap: 4px; margin: 4px 0 12px; padding: 0; background: none; border: 0; font-size: 18px; font-weight: 700; color: var(--text, #222); }
+.mapp-sub-switch svg { width: 18px; height: 18px; }
+.mapp-sub-switch.is-static { cursor: default; }
+.mapp-add-category-group button .mapp-ws-cat-count { flex: 0 0 auto; margin-left: 8px; font-size: 13px; }
+.mapp-sub-switch-check { flex: 0 0 auto !important; margin-left: 8px; }

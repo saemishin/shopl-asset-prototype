@@ -992,6 +992,31 @@
   function matchesStatus(a, type, statusFilter) {
     return statusFilter === "all" ? !0 : a.status === statusFilter;
   }
+  // App(L)_dc_03 9·10번: 소분류 선택 버튼과 소분류 선택 팝업. 후보는 허브 분류 트리와 같고 소분류 없는 대분류는 뺀다.
+  function subSwitchGroups() {
+    return categoryTree().filter(g => g.subs.length);
+  }
+  function subSwitchButtonHtml(sub) {
+    const many = subSwitchGroups().reduce((n, g) => n + g.subs.length, 0) > 1;
+    return many ? `<button type="button" class="mapp-sub-switch" data-sub-switch-open aria-haspopup="dialog"><span>${esc(sub)}</span>${CHEV_DOWN}</button>` : `<div class="mapp-sub-switch is-static"><span>${esc(sub)}</span></div>`;
+  }
+  function subSwitchScreenHtml(current) {
+    const groups = subSwitchGroups();
+    return `
+      <div class="mapp-add-category-popup">
+      <div class="mapp-topbar mapp-add-category-head">
+        <span class="mapp-topbar-title">분류</span>
+        <button type="button" class="mapp-add-category-close" data-sub-switch-close aria-label="닫기">×</button>
+      </div>
+      <div class="mapp-add-category-body">
+        <div class="mapp-directory-search"><input type="search" data-sub-switch-search placeholder="검색" aria-label="분류 검색" autocomplete="off"></div>
+        <div>${groups.map(g => `<section class="mapp-add-category-group" data-sub-switch-group data-group-name="${esc(g.group)}">
+          <h2>${esc(g.group)}</h2>${g.subs.map(sub => { const cur = sub === current; return `<button type="button" class="${cur ? "on" : ""}" data-sub-switch-pick="${esc(sub)}" data-sub-name="${esc(sub)}" aria-pressed="${cur}"><span>${esc(sub)}</span><span class="mapp-ws-cat-count">${countForSub(sub)}</span>${cur ? '<span aria-hidden="true" class="mapp-sub-switch-check">✓</span>' : ""}</button>`; }).join("")}
+        </section>`).join("")}</div>
+        <p class="mapp-ws-empty" data-sub-switch-empty hidden>결과가 없습니다.</p>
+      </div>
+      </div>`;
+  }
   function subDetailScreenHtml(sub, statusFilter, popupFilters) {
     const cat = window.DATA.categories.find(c => c.sub === sub) || {},
       type = cat.type || "individual",
@@ -1004,10 +1029,11 @@
     return `
       <div class="mapp-topbar">
         <button type="button" class="mapp-back" data-mapp-back aria-label="뒤로">←</button>
-        <span class="mapp-topbar-title mapp-category-title"><small>${esc(cat.group||'')}</small>${esc(sub)}</span>
+        <span class="mapp-topbar-title">${esc(cat.group||'')}</span>
         ${subItems.length ? MappAssetFilter.buttonHtml(popupFilters) : ""}
       </div>
       <div class="mapp-body">
+        ${subSwitchButtonHtml(sub)}
         ${subItems.length ? `<div class="mapp-search"><input type="text" data-mapp-search placeholder="${searchPlaceholder}"></div>` : ""}
         ${MappAssetFilter.appliedHtml(popupFilters, filterGroups)}
         <div class="mapp-count">전체 <b data-leader-result-count>${items.length}</b></div>
@@ -2101,10 +2127,13 @@
       const sample=assets.find(a=>a.id===(new URLSearchParams(location.search).get('id')||'A001'))||assets[0];
       Object.assign(state,{screen:'asset-detail',detailAssetId:sample.id,detailTarget:new URLSearchParams(location.search).get('scenario')==='target'?(()=>{const r=(sample.assignments||[])[0];return r?{type:r.employee?'employee':'worksite',value:r.employee||r.worksite}:null;})():null,detailFrom:{screen:'menu'}});
     }
+    function closeSubSwitch() {
+      state.screen = "sub-detail", draw(), root.querySelector(".mapp-screen").scrollTop = state.subSwitchScroll || 0;
+    }
     function draw() {
       ["plan-features", "asset-feature"].includes(state.screen) && !canConfigureFeatures() && (state.screen = "menu");
       const showTabBar = state.screen === "menu",
-        screenHtml = state.screen === "menu" ? menuScreenHtml(state.menuExpanded) : state.screen === "member-profile" ? directoryProfileScreenHtml("member", state) : state.screen === "worksite-profile" ? directoryProfileScreenHtml("worksite", state) : state.screen === "directory-member-assets" ? directoryMemberAssetsScreenHtml(state) : state.screen === "directory-worksite-assets" ? directoryWorksiteAssetsScreenHtml(state) : state.screen === "plan-features" ? planFeaturesScreenHtml() : state.screen === "asset-feature" ? assetFeatureScreenHtml() : state.screen === "sub-detail" ? subDetailScreenHtml(state.sub, state.statusFilter, state.popupFilters) : state.screen === "asset-detail" ? leaderAssetDetailHtml(assets.find(a => a.id === state.detailAssetId), state.detailTarget) : state.screen === "asset-history" ? historyScreenHtml(assets.find(a => a.id === state.detailAssetId), state.detailTarget) : state.screen === "asset-add" ? assetAddScreenHtml(state.addDraft) : state.screen === "asset-add-category" ? assetAddCategoryScreenHtml(state.addDraft) : state.screen === "asset-add-tags" ? assetAddTagManageScreenHtml(state.tagManageDraft) : assetsScreenHtml(state);
+        screenHtml = state.screen === "menu" ? menuScreenHtml(state.menuExpanded) : state.screen === "member-profile" ? directoryProfileScreenHtml("member", state) : state.screen === "worksite-profile" ? directoryProfileScreenHtml("worksite", state) : state.screen === "directory-member-assets" ? directoryMemberAssetsScreenHtml(state) : state.screen === "directory-worksite-assets" ? directoryWorksiteAssetsScreenHtml(state) : state.screen === "plan-features" ? planFeaturesScreenHtml() : state.screen === "asset-feature" ? assetFeatureScreenHtml() : state.screen === "sub-detail" ? subDetailScreenHtml(state.sub, state.statusFilter, state.popupFilters) : state.screen === "sub-switch" ? subSwitchScreenHtml(state.sub) : state.screen === "asset-detail" ? leaderAssetDetailHtml(assets.find(a => a.id === state.detailAssetId), state.detailTarget) : state.screen === "asset-history" ? historyScreenHtml(assets.find(a => a.id === state.detailAssetId), state.detailTarget) : state.screen === "asset-add" ? assetAddScreenHtml(state.addDraft) : state.screen === "asset-add-category" ? assetAddCategoryScreenHtml(state.addDraft) : state.screen === "asset-add-tags" ? assetAddTagManageScreenHtml(state.tagManageDraft) : assetsScreenHtml(state);
       root.innerHTML = `
         <div class="mapp-stage">
           <div class="mapp-phone">
@@ -2137,6 +2166,9 @@
         } else if (state.screen === "asset-history") state.screen = "asset-detail";else if (state.screen === "asset-detail") {
           state.screen = state.directoryDetailFrom || "sub-detail", delete state.directoryDetailFrom, state.detailTarget = null, draw(), root.querySelector(".mapp-screen").scrollTop = state.listScroll;
           return;
+        } else if (state.screen === "sub-switch") {
+          closeSubSwitch();
+          return;
         } else state.screen === "sub-detail" ? (state.screen = "assets", state.sub = null, state.statusFilter = "all", state.popupFilters = MappAssetFilter.empty(), state.subSearch = "") : state.screen = "menu";
         draw();
       });
@@ -2145,7 +2177,23 @@
         state.screen = "assets", draw();
       }), root.querySelectorAll("[data-mapp-tab]").forEach(b => b.onclick = () => {
         b.dataset.mappTab === "menu" && (state.screen = "menu", draw());
-      }), root.querySelectorAll("[data-sub-open]").forEach(b => b.onclick = () => {
+      }), root.querySelectorAll("[data-sub-switch-open]").forEach(b => b.onclick = () => {
+        state.subSwitchScroll = root.querySelector(".mapp-screen").scrollTop, state.screen = "sub-switch", draw();
+      }), root.querySelectorAll("[data-sub-switch-close]").forEach(b => b.onclick = closeSubSwitch), root.querySelectorAll("[data-sub-switch-pick]").forEach(b => b.onclick = () => {
+        const sub = b.dataset.subSwitchPick;
+        if (sub === state.sub) return closeSubSwitch();
+        state.screen = "sub-detail", state.sub = sub, state.statusFilter = "all", state.popupFilters = MappAssetFilter.empty(), state.subSearch = "", state.listScroll = 0, draw(), root.querySelector(".mapp-screen").scrollTop = 0;
+      }), root.querySelectorAll("[data-sub-switch-search]").forEach(input => input.addEventListener("input", () => {
+        const q = input.value.trim().toLowerCase();
+        let shown = 0;
+        root.querySelectorAll("[data-sub-switch-group]").forEach(group => {
+          const groupMatches = !q || group.dataset.groupName.toLowerCase().includes(q);
+          let visible = 0;
+          group.querySelectorAll("[data-sub-switch-pick]").forEach(row => {
+            row.hidden = !(groupMatches || row.dataset.subName.toLowerCase().includes(q)), row.hidden || visible++;
+          }), group.hidden = !visible, shown += visible;
+        }), root.querySelector("[data-sub-switch-empty]").hidden = shown > 0;
+      })), root.querySelectorAll("[data-sub-open]").forEach(b => b.onclick = () => {
         state.screen = "sub-detail", state.sub = b.dataset.sub, state.statusFilter = "all", state.popupFilters = MappAssetFilter.empty(), state.subSearch = "", draw();
       }), root.querySelectorAll("[data-asset-plus-open]").forEach(b => b.onclick = () => {
         const currentCategory = state.screen === "sub-detail" && window.DATA.categories.find(c => c.sub === state.sub) || null;

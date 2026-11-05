@@ -98,7 +98,7 @@
       if(!many){D.assets.splice(0);D.links.splice(0);redraw();return;}
       const s=state.screen,hub=mode==='leader'&&s==='assets',member=s.includes('member'),directory=s.includes('profile')||s.startsWith('directory-');
       const target=directory?directoryTarget(member?'member':'worksite'):s==='worksite-detail'?{type:'worksite',value:state.wsDetail}:mode==='employee'?state.assetTab==='mine'?{type:'employee',value:me}:{type:'worksite',value:worksites().fixed||worksites().assigned[0]}:null;
-      const sub=s==='sub-detail'?state.sub:s==='worksite-detail'?state.wsDetailSub:s==='directory-worksite-assets'?state.directoryCategory?.sub:null;
+      const sub=s==='sub-detail'||s==='sub-switch'?state.sub:s==='worksite-detail'?state.wsDetailSub:s==='directory-worksite-assets'?state.directoryCategory?.sub:null;
       const tree=hub||s==='worksite-profile'||(mode==='employee'&&s==='assets'&&state.assetTab==='worksite');
       const category=D.categories.find(c=>c.sub===sub)||D.categories.find(c=>window.AssetAccess.scope(c,'view',me))||D.categories[0];
       if(!category){redraw();return;}
@@ -122,6 +122,7 @@
       if(s==='plan-features'||s==='asset-feature')return['요금제 및 기능 · 자산 관리',shared(10)];
       if(s==='worksite-detail')return['근무지 자산 · 소분류',ref(mode,3)];
       if(s==='sub-detail')return['소분류 상세',ref(mode,3)];
+      if(s==='sub-switch')return['소분류 상세 · 소분류 선택',ref(mode,3)];
       if(s==='asset-parties')return['배정 현황',shared(3)];
       return[mode==='leader'?'자산 허브':state.assetTab==='mine'?'내 자산':'근무지 자산',ref(mode,2)];
     };
