@@ -122,7 +122,7 @@
       if(s==='plan-features'||s==='asset-feature')return['요금제 및 기능 · 자산 관리',shared(10)];
       if(s==='worksite-detail')return['근무지 자산 · 소분류',ref(mode,3)];
       if(s==='sub-detail')return['소분류 상세',ref(mode,3)];
-      if(s==='sub-switch')return['소분류 상세 · 소분류 선택',ref(mode,3)];
+      if(s==='sub-switch')return['소분류 상세 · 소분류 선택',ref(mode,3)+' · 10번'];
       if(s==='asset-parties')return['배정 현황',shared(3)];
       return[mode==='leader'?'자산 허브':state.assetTab==='mine'?'내 자산':'근무지 자산',ref(mode,2)];
     };
@@ -136,6 +136,16 @@
         if(s==='asset-detail'||s==='asset-parties')return detailCases();
         if(s==='asset-history')return historyCases();
         if(s?.startsWith('asset-add'))return formCases();
+        // App(L)_dc_03 9·10번: 소분류 선택 버튼 노출과 소분류 선택 팝업 후보.
+        const switchRef=ref(mode,3)+' · 10번',baseCats=()=>{D.categories.splice(0,D.categories.length,...clone(baseline.categories));api.managed=null;};
+        const onlyView=keep=>{api.managed=false;D.categories.forEach((c,i)=>c.view=keep(c,i)?'회사의 모든 구성원':'관리자만');};
+        if(s==='sub-switch')return[group('소분류 후보',[
+          item('switch-manage','자산 관리 권한 · 모든 소분류',switchRef,()=>{baseCats();api.managed=true;redraw();}),
+          item('switch-partial','일부 소분류만 조회',switchRef,()=>{baseCats();onlyView((c,i)=>c.sub===state.sub||i<3);redraw();}),
+          item('switch-long','분류 다수 · 스크롤',switchRef,()=>{baseCats();const base=D.categories.find(c=>c.sub===state.sub)||D.categories[0];for(let i=0;i<30;i++)D.categories.push({...clone(base),group:'스크롤 확인용 분류 '+(Math.floor(i/10)+1),sub:'스크롤 확인 '+String(i+1).padStart(2,'0')});redraw();})]),
+          group('검색 결과',[
+          item('search-none','검색 결과 없음',ref(mode,3)+' · 10-1번',()=>setInput(document.getElementById('app'),'[data-sub-switch-search]','검색결과없는조건')),
+          item('search-clear','검색어 없음',ref(mode,3)+' · 10-1번',()=>setInput(document.getElementById('app'),'[data-sub-switch-search]',''))])];
         const directory=s?.includes('profile')||s?.startsWith('directory-'),member=s?.includes('member');
         const listRef=directory?shared(member?8:9)+' · '+(member?'4·6번':'4·5번'):s==='assets'?ref(mode,2)+' · '+(mode==='leader'?'2·3번':state.assetTab==='mine'?'3번':'4번'):ref(mode,3)+' · '+(mode==='leader'?'5·6번':'6번');
         const hub=mode==='leader'&&s==='assets';
@@ -146,6 +156,9 @@
         if(!directory&&mode==='leader')sections.push(group('소분류 조회 범위',[
           item('view-none','조회 가능한 소분류 없음',ref(mode,2)+' · 2번',()=>{api.managed=false;D.categories.forEach(c=>c.view='관리자만');redraw();}),
           item('view-partial','일부 소분류만 조회',ref(mode,2)+' · 2번',()=>{api.managed=false;D.categories.forEach((c,i)=>c.view=i<2?'회사의 모든 구성원':'관리자만');redraw();})]));
+        if(s==='sub-detail'&&mode==='leader')sections.push(group('소분류 선택 버튼',[
+          item('switch-many','후보 소분류 2개 이상',ref(mode,3)+' · Case 9-1',()=>{baseCats();redraw();}),
+          item('switch-single','후보가 현재 소분류 하나뿐',ref(mode,3)+' · Case 9-2',()=>{baseCats();onlyView(c=>c.sub===state.sub);redraw();})]));
         if(directory)sections.push(group('대상 상태',[
           item('target-active','재직 구성원 / 활성 근무지',shared(member?8:9)+' · 2번',()=>{setDirectory(null);redraw();}),
           item('target-inactive',member?'퇴사 구성원':'비활성 근무지',shared(member?8:9)+' · 2번',()=>{setDirectory(member?'retired':'inactive');redraw();})]));
