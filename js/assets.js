@@ -33,7 +33,10 @@
       product: {
         individual: "https://docs.google.com/spreadsheets/d/1JgWLKfL1mQoEH02LDDxufezknWSjKrh6QthCO6SptXk/edit?usp=drive_link"
       },
-      employee: "https://docs.google.com/spreadsheets/d/1pj6N07JExX6p1AqFCahJ9DvxMVcKzgdhS3-J6asFSWE/edit?usp=drive_link",
+      employee: {
+        summary: "https://docs.google.com/spreadsheets/d/1pj6N07JExX6p1AqFCahJ9DvxMVcKzgdhS3-J6asFSWE/edit?usp=drive_link",
+        full: "https://docs.google.com/spreadsheets/d/1RAQLGs8pIU-obTRmiWTYH5AZbFgjJ47MMTafcnHtlew/edit?usp=drive_link"
+      },
       worksite: "https://docs.google.com/spreadsheets/d/10rbRIp_DL3FS-VrtHjV2HXU7VjeQtJilBbHiUFNQkos/edit?usp=drive_link"
     },
     BULK_REGISTER_SHEET_LINKS = {
@@ -968,7 +971,9 @@
       bulkButton && (bulkButton.onclick = e => openBulkMenu(e.currentTarget));
     }
     document.getElementById("btn-list-dl").disabled = v.count === 0, document.getElementById("btn-qr-dl") && (document.getElementById("btn-qr-dl").disabled = v.count === 0), document.getElementById("btn-list-dl").onclick = () => {
-      const url = state.view === "product" ? DOWNLOAD_SHEET_LINKS.product[state.productType] : DOWNLOAD_SHEET_LINKS[state.view];
+      const url = state.view === "product" ? DOWNLOAD_SHEET_LINKS.product[state.productType]
+        : state.view === "employee" ? DOWNLOAD_SHEET_LINKS.employee[targetModes.employee]
+        : DOWNLOAD_SHEET_LINKS[state.view];
       window.open(url, "_blank", "noopener");
     };
   }
