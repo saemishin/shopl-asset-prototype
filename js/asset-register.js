@@ -166,7 +166,7 @@
       }), addInput.value = "", renderList();
     }
     return addBtn.onclick = addRow, bindTagNameInput(addInput, updateValidity), addInput.addEventListener("keydown", e => {
-      e.key === "Enter" && (e.preventDefault(), addRow());
+      e.key === "Enter" && e.preventDefault();
     }), listEl.addEventListener("click", e => {
       const d = e.target.closest("[data-tm-del]");
       d && (draft.splice(+d.dataset.tmDel, 1), renderList());

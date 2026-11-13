@@ -736,7 +736,7 @@
           createError = root.querySelector("[data-add-tag-create-error]"),
           saveButton = root.querySelector("[data-add-tag-manage-save]");
         bindTagNameInput(createInput, updateTagManageValidity2), createInput.addEventListener("keydown", event => {
-          event.key === "Enter" && (event.preventDefault(), addManagedTag2());
+          event.key === "Enter" && event.preventDefault();
         }), createButton.onclick = addManagedTag2, list.querySelectorAll("[data-add-tag-rename]").forEach(input => bindTagNameInput(input, () => {
           tagDraft[+input.dataset.addTagRename].name = input.value, updateTagManageValidity2();
         })), list.querySelectorAll("[data-add-tag-delete]").forEach(button => button.onclick = () => {
