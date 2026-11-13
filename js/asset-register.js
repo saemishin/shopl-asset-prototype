@@ -55,7 +55,7 @@
     return TAG_COLORS[Math.abs(h) % TAG_COLORS.length];
   }
   function openTagManageModal(onSaved) {
-    const master = window.DATA && window.DATA.tags || [];
+    const master = window.DATA && window.DATA.tags || [], originalTags = [...master], caseSeedTags = [...master];
     let draft = master.map(t => ({
       name: t,
       orig: t
@@ -103,7 +103,7 @@
     }
     function isDirty() {
       const current = [...new Set(draft.map(t => normalizeTagName(t.name)).filter(Boolean))].sort((a, b) => a.localeCompare(b, "ko")),
-        orig = [...master].sort((a, b) => a.localeCompare(b, "ko"));
+        orig = [...originalTags].sort((a, b) => a.localeCompare(b, "ko"));
       return current.length !== orig.length ? !0 : current.some((v, i) => v !== orig[i]);
     }
     function updateValidity() {
@@ -114,7 +114,7 @@
         inp.classList.toggle("has-err", invalid), inp.setAttribute("aria-invalid", String(invalid)), listEl.querySelector(`[data-tm-required="${inp.dataset.tmRename}"]`).hidden = !!name, listEl.querySelector(`[data-tm-duplicate="${inp.dataset.tmRename}"]`).hidden = !name || !dups.has(name);
       });
       const addDup = draft.some(t => normalizeTagName(t.name) === normalizeTagName(addInput.value));
-      addInput.classList.toggle("has-err", !!normalizeTagName(addInput.value) && addDup), addErr.hidden = !(normalizeTagName(addInput.value) && addDup), addBtn.disabled = !normalizeTagName(addInput.value) || addDup, saveBtn.disabled = !isDirty() || dups.size > 0 || draft.some(t => !normalizeTagName(t.name));
+      addInput.classList.toggle("has-err", !!normalizeTagName(addInput.value) && addDup), addErr.hidden = !(normalizeTagName(addInput.value) && addDup), addBtn.disabled = draft.length >= window.ASSET_COMPANY_TAG_MAX_COUNT || !normalizeTagName(addInput.value) || addDup, saveBtn.disabled = draft.length > window.ASSET_COMPANY_TAG_MAX_COUNT || !isDirty() || dups.size > 0 || draft.some(t => !normalizeTagName(t.name));
     }
     function renderList() {
       listEl.innerHTML = draft.length ? draft.map((t, i) => `
@@ -133,14 +133,30 @@
       })), updateValidity();
     }
 
-    if(window.DashboardCases){const seed=JSON.parse(JSON.stringify(draft));window.DashboardCases.attach(back,{reference:'Web 공통07',reset:()=>{draft=JSON.parse(JSON.stringify(seed));addInput.value='';renderList();},cases:[
+    function setTagCount(count) {
+      draft = caseSeedTags.slice(0, count).map(name => ({name, orig: name}));
+      let i = 1;
+      while (draft.length < count) {
+        const name = '디자인 태그 ' + String(i++).padStart(3, '0');
+        if (!draft.some(tag => tag.name === name)) draft.push({name, orig: name});
+      }
+      master.splice(0, master.length, ...draft.map(tag => tag.name));
+      originalTags.splice(0, originalTags.length, ...master);
+      let nextName = '새 태그', suffix = 1;
+      while (draft.some(tag => tag.name === nextName)) nextName = '새 태그 ' + suffix++;
+      addInput.value = nextName; renderList();
+    }
+    if(window.DashboardCases){const seed=JSON.parse(JSON.stringify(draft));window.DashboardCases.attach(back,{reference:'Web 공통07',reset:()=>{master.splice(0,master.length,...caseSeedTags);originalTags.splice(0,originalTags.length,...caseSeedTags);draft=JSON.parse(JSON.stringify(seed));addInput.value='';renderList();},cases:[
+      ['tag-list-99','99개 · 추가 가능','1번',()=>setTagCount(99)],
+      ['tag-list-limit','100개 · 추가 불가','1번',()=>setTagCount(window.ASSET_COMPANY_TAG_MAX_COUNT)],
+      ['tag-concurrent-limit','동시 추가 · 저장 시 상한 초과','4-5번',()=>{setTagCount(99);draft.unshift({name:'내가 추가한 태그',orig:null});master.push('다른 사용자가 추가한 태그');addInput.value='';renderList();}],
       ['tag-list-empty','등록된 태그 없음','2번',()=>{draft=[];addInput.value='';renderList();}],
       ['tag-list-many','긴 태그 목록','2번',()=>{draft=Array.from({length:40},(_,i)=>({name:'디자인 태그 '+String(i+1).padStart(2,'0'),orig:null}));renderList();}]
     ]});}
     renderList();
     function addRow() {
       const name = normalizeTagName(addInput.value).slice(0, 20);
-      if (!name || draft.some(t => normalizeTagName(t.name) === name)) {
+      if (draft.length >= window.ASSET_COMPANY_TAG_MAX_COUNT || !name || draft.some(t => normalizeTagName(t.name) === name)) {
         addInput.focus();
         return;
       }
@@ -155,14 +171,21 @@
       const d = e.target.closest("[data-tm-del]");
       d && (draft.splice(+d.dataset.tmDel, 1), renderList());
     }), back.querySelector("[data-tm-cancel]").onclick = () => isDirty() ? confirmTagLeave(() => back.remove()) : back.remove(), saveBtn.onclick = () => {
-      if (!isDirty() || dupNameSet().size > 0 || draft.some(t => !normalizeTagName(t.name))) return;
-      const finalNames = [...new Set(draft.map(t => normalizeTagName(t.name)).filter(Boolean))].sort((a, b) => a.localeCompare(b, "ko")),
+      if (draft.length > window.ASSET_COMPANY_TAG_MAX_COUNT || !isDirty() || dupNameSet().size > 0 || draft.some(t => !normalizeTagName(t.name))) return;
+      const finalNames = window.assetTagSaveNames(draft, originalTags),
         remainingOrigs = new Set(draft.filter(t => t.orig).map(t => t.orig)),
-        deletedOrigs = master.filter(t => !remainingOrigs.has(t)),
+        deletedOrigs = originalTags.filter(t => !remainingOrigs.has(t)),
         renamed = draft.filter(t => t.orig && t.orig !== normalizeTagName(t.name)).map(t => ({
           from: t.orig,
           to: normalizeTagName(t.name)
         }));
+      if (finalNames.length > window.ASSET_COMPANY_TAG_MAX_COUNT) {
+        originalTags.splice(0, originalTags.length, ...master);
+        draft = master.map(name => ({name, orig:name}));
+        addInput.value = ''; renderList(); listEl.scrollTop = 0;
+        toast('저장에 실패했습니다. 다시 시도해 주세요.');
+        return;
+      }
       [...(window.DATA.assets || []), ...(window.DATA.deletedAssets || [])].forEach(a => {
         !a.labels || !a.labels.length || (a.labels = a.labels.filter(l => !deletedOrigs.includes(l)).map(l => {
           const r = renamed.find(rn => rn.from === l);

@@ -906,6 +906,14 @@ window.isAssetGroupPositionSubset = function (target, viewTarget) {
 })();
 window.ASSET_PHOTO_MAX_COUNT = 10;
 window.ASSET_TAG_MAX_COUNT = 10;
+window.ASSET_COMPANY_TAG_MAX_COUNT = 100;
+// Simulate the server result without dropping tags added after the editor opened.
+window.assetTagSaveNames = function (draft, original, current = window.DATA.tags) {
+  const normalize = value => value.trim().replace(/\s+/g, " ");
+  const addedElsewhere = current.filter(name => !original.includes(name));
+  return [...new Set([...draft.map(tag => normalize(tag.name)).filter(Boolean), ...addedElsewhere])]
+    .sort((a, b) => a.localeCompare(b, "ko"));
+};
 window.tintHex = function (hex, amt) {
   const n = parseInt(hex.slice(1), 16),
     cl = v => Math.max(0, Math.min(255, v)),

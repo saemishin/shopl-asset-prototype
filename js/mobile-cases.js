@@ -67,7 +67,20 @@
     }
     function formCases(formState=state,render=redraw){
       const d=formState.addDraft;if(!d)return[];
+      function setTagCount(count) {
+        const draft = baseline.tags.slice(0, count).map(name => ({name, orig:name}));
+        let i=1;
+        while(draft.length<count){const name='디자인 태그 '+String(i++).padStart(3,'0');if(!draft.some(tag=>tag.name===name))draft.push({name,orig:name});}
+        D.tags.splice(0,D.tags.length,...draft.map(tag=>tag.name));
+        formState.tagManageOriginals=[...D.tags];formState.tagManageDraft=draft;render();
+        let nextName='새 태그',suffix=1;
+        while(draft.some(tag=>tag.name===nextName))nextName='새 태그 '+suffix++;
+        setInput(document,'[data-add-tag-create]',nextName);
+      }
       if(formState.screen==='asset-add-tags')return[group('태그 목록',[
+        item('tags-99','99개 · 추가 가능',shared(1)+' · 16-1번',()=>setTagCount(99)),
+        item('tags-limit','100개 · 추가 불가',shared(1)+' · 16-1번',()=>setTagCount(window.ASSET_COMPANY_TAG_MAX_COUNT)),
+        item('tags-concurrent-limit','동시 추가 · 저장 시 상한 초과',shared(1)+' · 16-3-5번',()=>{setTagCount(99);formState.tagManageDraft.unshift({name:'내가 추가한 태그',orig:null});D.tags.push('다른 사용자가 추가한 태그');render();}),
         item('tags-none','등록 태그 없음',shared(1)+' · 16번',()=>{formState.tagManageDraft=[];render();}),
         item('tags-duplicate','기등록 태그명 중복',shared(1)+' · 16번',()=>{const t=formState.tagManageDraft;if(t.length<2)return;t[1].name=t[0].name;render();},formState.tagManageDraft.length<2)])];
       if(formState.screen==='asset-add-category')return[group('분류 후보',[

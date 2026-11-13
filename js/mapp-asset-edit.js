@@ -587,7 +587,7 @@
         }, 120)));
         const tagManage = root.querySelector("[data-add-tag-manage]");
         tagManage && (tagManage.onclick = () => {
-          syncAddDraft2(), state.tagManageDraft = (window.DATA.tags || []).map(tag => ({
+          syncAddDraft2(), state.tagManageOriginals = [...(window.DATA.tags || [])], state.tagManageDraft = state.tagManageOriginals.map(tag => ({
             name: tag,
             orig: tag
           })), state.screen = "asset-add-tags", draw();
@@ -696,7 +696,7 @@
           },
           tagManageDirty2 = function () {
             const next = [...new Set(tagDraft.map(tag => normalizeTagName(tag.name)).filter(Boolean))].sort((a, b) => a.localeCompare(b, "ko")),
-              before = [...master].sort((a, b) => a.localeCompare(b, "ko"));
+              before = [...state.tagManageOriginals].sort((a, b) => a.localeCompare(b, "ko"));
             return next.length !== before.length || next.some((name, index) => name !== before[index]);
           },
           updateTagManageValidity2 = function () {
@@ -710,11 +710,11 @@
             }), listError.hidden = !0;
             const createName = normalizeTagName(createInput.value),
               createDuplicate = !!createName && tagDraft.some(tag => normalizeTagName(tag.name) === createName);
-            createInput.classList.toggle("has-err", createDuplicate), createError.hidden = !createDuplicate, createButton.disabled = !createName || createDuplicate, saveButton.disabled = !tagManageDirty2() || !!duplicates.size || tagDraft.some(tag => !normalizeTagName(tag.name));
+            createInput.classList.toggle("has-err", createDuplicate), createError.hidden = !createDuplicate, createButton.disabled = tagDraft.length >= window.ASSET_COMPANY_TAG_MAX_COUNT || !createName || createDuplicate, saveButton.disabled = tagDraft.length > window.ASSET_COMPANY_TAG_MAX_COUNT || !tagManageDirty2() || !!duplicates.size || tagDraft.some(tag => !normalizeTagName(tag.name));
           },
           addManagedTag2 = function () {
             const name = normalizeTagName(createInput.value);
-            if (!name || tagDraft.some(tag => normalizeTagName(tag.name) === name)) {
+            if (tagDraft.length >= window.ASSET_COMPANY_TAG_MAX_COUNT || !name || tagDraft.some(tag => normalizeTagName(tag.name) === name)) {
               updateTagManageValidity2();
               return;
             }
@@ -746,9 +746,9 @@
           tagManageDirty2() ? confirmAddExit(leaveTagManage, !0) : leaveTagManage();
         }, saveButton.onclick = () => {
           if (updateTagManageValidity2(), saveButton.disabled) return;
-          const finalNames = [...new Set(tagDraft.map(tag => normalizeTagName(tag.name)).filter(Boolean))].sort((a, b) => a.localeCompare(b, "ko")),
+          const finalNames = window.assetTagSaveNames(tagDraft, state.tagManageOriginals),
             remainingOriginals = new Set(tagDraft.filter(tag => tag.orig).map(tag => tag.orig)),
-            deleted = master.filter(tag => !remainingOriginals.has(tag)),
+            deleted = state.tagManageOriginals.filter(tag => !remainingOriginals.has(tag)),
             renamed = tagDraft.filter(tag => tag.orig && tag.orig !== normalizeTagName(tag.name)).map(tag => ({
               from: tag.orig,
               to: normalizeTagName(tag.name)
@@ -757,6 +757,12 @@
               const rename = renamed.find(item => item.from === label);
               return rename ? rename.to : label;
             }).filter((label, index, all) => finalNames.includes(label) && all.indexOf(label) === index);
+          if (finalNames.length > window.ASSET_COMPANY_TAG_MAX_COUNT) {
+            state.tagManageOriginals = [...master];
+            state.tagManageDraft = master.map(name => ({name, orig:name}));
+            draw(); toast('저장에 실패했습니다. 다시 시도해 주세요.');
+            return;
+          }
           [...assets, ...(window.DATA.deletedAssets || [])].forEach(asset => {
             asset.labels = updateLabels(asset.labels);
           }), state.addDraft.labels = updateLabels(state.addDraft.labels), master.length = 0, master.push(...finalNames), state.tagManageDraft = null, state.screen = "asset-add", draw(), toast("저장되었습니다.");
