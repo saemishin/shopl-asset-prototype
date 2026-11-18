@@ -924,6 +924,7 @@
         analyzing = !1, stateEl.innerHTML = "", analyzeBtn.hidden = !1, renderAiPhotos();
       }
       function renderLoading() {
+        aiCases.active = '';
         analyzing = !0, analyzeBtn.hidden = !0, stateEl.innerHTML = `
           <div class="areg-ai-loading"><span class="areg-ai-spinner" aria-hidden="true"></span><b>AI가 자산 정보를 분석하고 있습니다.</b></div>`;
         renderAiPhotos();
@@ -945,15 +946,25 @@
         }, renderAiPhotos();
       }
 
-      window.DashboardCases?.attach(aiBack,{reference:'Web07',reset:()=>{newPhotos.splice(0);renderInitial();},cases:[
-        ['ai-no-photo','새로 첨부한 사진 없음','1번',()=>{newPhotos.splice(0);renderInitial();}],
-        ['ai-photo','새 사진 첨부','1번',()=>{newPhotos.splice(0,newPhotos.length,aiPhoto(0));renderInitial();}],
-        ['ai-limit','사진 상한 10장','1번',()=>{newPhotos.splice(0,newPhotos.length,...Array.from({length:Math.max(0,10-photos.length)},(_,i)=>aiPhoto(i)));renderInitial();}],
-        ['ai-loading','분석 중','3번',()=>{if(!newPhotos.length&&!photos.length)newPhotos.push(aiPhoto(0));renderLoading();}],
-        ['ai-success','분석 성공','Case 3-1',()=>{if(!newPhotos.length&&!photos.length)newPhotos.push(aiPhoto(0));applyAiResult(mockAiDraft(!1),newPhotos,!0);aiBack.remove();}],
-        ['ai-insufficient','정보 부족','4번',()=>renderFailure('insufficient')],
-        ['ai-error','기술적 분석 오류','4번',()=>renderFailure('error')]
-      ]});
+      const aiCaseItems = (rows, disabled = false) => rows.map(([id,label,reference,run]) => ({id,label,reference,run,disabled}));
+      const aiCases = {
+        id:'dashboard-ai-input',root:aiBack,title:'AI로 입력',reference:'Web07',
+        summary:'사진을 준비하고 화면의 [분석하기]를 누르면 분석 결과 케이스가 표시됩니다.',
+        reset:()=>{newPhotos.splice(0);renderInitial();},
+        sections:()=>[
+          {title:'사진 첨부',items:aiCaseItems([
+            ['ai-no-photo','새로 첨부한 사진 없음','1번',()=>{newPhotos.splice(0);renderInitial();}],
+            ['ai-photo','새 사진 첨부','1번',()=>{newPhotos.splice(0,newPhotos.length,aiPhoto(0));renderInitial();}],
+            ['ai-limit','사진 상한 10장','1번',()=>{newPhotos.splice(0,newPhotos.length,...Array.from({length:Math.max(0,10-photos.length)},(_,i)=>aiPhoto(i)));renderInitial();}]
+          ],analyzing)},
+          ...(analyzing ? [{title:'분석 결과',items:aiCaseItems([
+            ['ai-success','분석 성공','Case 3-1',()=>{applyAiResult(mockAiDraft(!1),newPhotos,!0);aiBack.remove();}],
+            ['ai-insufficient','정보 부족','4번',()=>renderFailure('insufficient')],
+            ['ai-error','분석 오류','4번',()=>renderFailure('error')]
+          ])}] : [])
+        ]
+      };
+      window.PrototypeCases?.register(aiCases);
       renderInitial(), analyzeBtn.onclick = renderLoading, aiBack.querySelector("[data-ai-cancel]").onclick = requestAiClose;
     }
 

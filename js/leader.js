@@ -742,6 +742,7 @@
       close(), onApplied();
     }
     function renderLoading() {
+      aiCases.active = '';
       analyzing = !0, analyze.hidden = !0, stateEl.innerHTML = `<div class="mapp-ai-loading"><span class="mapp-ai-spinner" aria-hidden="true"></span><b>AI가 자산 정보를 분석하고 있습니다.</b></div>`;
       renderPhotos();
     }
@@ -753,14 +754,23 @@
         <p>직접 입력을 선택해도 첨부한 사진과 ${insufficient ? "확인된 정보는" : "확인된 정보가 있으면"} 유지됩니다.</p></div>
         <div class="mapp-ai-result-actions"><button type="button" class="btn" data-ai-retry>다시 시도</button><button type="button" class="btn primary" data-ai-direct>직접 입력</button></div>`, stateEl.querySelector("[data-ai-retry]").onclick = renderLoading, stateEl.querySelector("[data-ai-direct]").onclick = () => direct(insufficient ? mobileAiDraft(!0) : {}), renderPhotos();
     }
-    window.MobileCases?.fixture(back,'AI 입력','App(L)05',[
-      ['photos-none','분석 사진 없음','1·2번',()=>{draft.photos=[];newPhotos.splice(0);analyzing=false;analyze.hidden=false;stateEl.innerHTML='';renderPhotos();}],
-      ['photos-ready','분석 사진 첨부','1·2번',()=>{if(!newPhotos.length)newPhotos.push({id:window.assetPhotoId(),color:'#4b7bec',at:todayStr()+' 10:00',by:ME});analyzing=false;analyze.hidden=false;stateEl.innerHTML='';renderPhotos();}],
-      ['loading','분석 중','3번',()=>{if(!draft.photos.length&&!newPhotos.length)newPhotos.push({id:window.assetPhotoId(),color:'#4b7bec',at:todayStr()+' 10:00',by:ME});renderLoading();}],
-      ['success','분석 성공','Case 3-1',()=>{if(!draft.photos.length&&!newPhotos.length)newPhotos.push({id:window.assetPhotoId(),color:'#4b7bec',at:todayStr()+' 10:00',by:ME});applyResult(mobileAiDraft(!1),!0);}],
-      ['insufficient','정보 부족','4번',()=>renderFailure('insufficient')],
-      ['error','분석 실패','4번',()=>renderFailure('error')]
-    ]);
+    const aiCaseItems = (rows, disabled = false) => rows.map(([id,label,reference,run]) => ({id,label,reference,run,disabled}));
+    const aiCases = {
+      id:'leader-ai-input',root:back,title:'AI 입력',reference:'App(L)05',
+      summary:'사진을 준비하고 화면의 [분석하기]를 누르면 분석 결과 케이스가 표시됩니다.',
+      sections:()=>[
+        {title:'사진 첨부',items:aiCaseItems([
+          ['photos-none','분석 사진 없음','1·2번',()=>{draft.photos=[];newPhotos.splice(0);analyzing=false;analyze.hidden=false;stateEl.innerHTML='';renderPhotos();}],
+          ['photos-ready','분석 사진 첨부','1·2번',()=>{if(!newPhotos.length)newPhotos.push({id:window.assetPhotoId(),color:'#4b7bec',at:todayStr()+' 10:00',by:ME});analyzing=false;analyze.hidden=false;stateEl.innerHTML='';renderPhotos();}]
+        ],analyzing)},
+        ...(analyzing ? [{title:'분석 결과',items:aiCaseItems([
+          ['success','분석 성공','Case 3-1',()=>applyResult(mobileAiDraft(!1),!0)],
+          ['insufficient','정보 부족','4번',()=>renderFailure('insufficient')],
+          ['error','분석 오류','4번',()=>renderFailure('error')]
+        ])}] : [])
+      ]
+    };
+    window.PrototypeCases?.register(aiCases);
     renderPhotos(), analyze.onclick = renderLoading, back.querySelector("[data-ai-close]").onclick = requestClose;
   }
   // QA 패널 ?directory=retired / inactive : 퇴사 구성원·비활성 근무지 상세 케이스(App(E,L)_dc_08·09 2번)
