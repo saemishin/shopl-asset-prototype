@@ -925,14 +925,8 @@
       }
       function renderLoading() {
         analyzing = !0, analyzeBtn.hidden = !0, stateEl.innerHTML = `
-          <div class="areg-ai-loading"><span class="areg-ai-spinner" aria-hidden="true"></span><b>AI가 자산 정보를 분석하고 있습니다.</b></div>
-          <div class="areg-ai-test-actions">
-            <button type="button" class="btn" data-ai-outcome="success">성공</button>
-            <button type="button" class="btn" data-ai-outcome="insufficient">정보 부족</button>
-            <button type="button" class="btn" data-ai-outcome="error">분석 오류</button>
-          </div>`, stateEl.querySelector('[data-ai-outcome="success"]').onclick = () => {
-          applyAiResult(mockAiDraft(!1), newPhotos, !0), aiBack.remove();
-        }, stateEl.querySelector('[data-ai-outcome="insufficient"]').onclick = () => renderFailure("insufficient"), stateEl.querySelector('[data-ai-outcome="error"]').onclick = () => renderFailure("error"), renderAiPhotos();
+          <div class="areg-ai-loading"><span class="areg-ai-spinner" aria-hidden="true"></span><b>AI가 자산 정보를 분석하고 있습니다.</b></div>`;
+        renderAiPhotos();
       }
       function renderFailure(kind) {
         analyzing = !1, analyzeBtn.hidden = !0;
@@ -956,6 +950,7 @@
         ['ai-photo','새 사진 첨부','1번',()=>{newPhotos.splice(0,newPhotos.length,aiPhoto(0));renderInitial();}],
         ['ai-limit','사진 상한 10장','1번',()=>{newPhotos.splice(0,newPhotos.length,...Array.from({length:Math.max(0,10-photos.length)},(_,i)=>aiPhoto(i)));renderInitial();}],
         ['ai-loading','분석 중','3번',()=>{if(!newPhotos.length&&!photos.length)newPhotos.push(aiPhoto(0));renderLoading();}],
+        ['ai-success','분석 성공','Case 3-1',()=>{if(!newPhotos.length&&!photos.length)newPhotos.push(aiPhoto(0));applyAiResult(mockAiDraft(!1),newPhotos,!0);aiBack.remove();}],
         ['ai-insufficient','정보 부족','4번',()=>renderFailure('insufficient')],
         ['ai-error','기술적 분석 오류','4번',()=>renderFailure('error')]
       ]});

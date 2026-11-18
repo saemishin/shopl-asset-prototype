@@ -742,8 +742,8 @@
       close(), onApplied();
     }
     function renderLoading() {
-      analyzing = !0, analyze.hidden = !0, stateEl.innerHTML = `<div class="mapp-ai-loading"><span class="mapp-ai-spinner" aria-hidden="true"></span><b>AI가 자산 정보를 분석하고 있습니다.</b></div>
-        <div class="mapp-ai-test-actions"><button type="button" class="btn" data-ai-result="success">성공</button><button type="button" class="btn" data-ai-result="insufficient">정보 부족</button><button type="button" class="btn" data-ai-result="error">분석 오류</button></div>`, stateEl.querySelector('[data-ai-result="success"]').onclick = () => applyResult(mobileAiDraft(!1), !0), stateEl.querySelector('[data-ai-result="insufficient"]').onclick = () => renderFailure("insufficient"), stateEl.querySelector('[data-ai-result="error"]').onclick = () => renderFailure("error"), renderPhotos();
+      analyzing = !0, analyze.hidden = !0, stateEl.innerHTML = `<div class="mapp-ai-loading"><span class="mapp-ai-spinner" aria-hidden="true"></span><b>AI가 자산 정보를 분석하고 있습니다.</b></div>`;
+      renderPhotos();
     }
     function renderFailure(kind) {
       analyzing = !1, analyze.hidden = !0;
@@ -757,6 +757,7 @@
       ['photos-none','분석 사진 없음','1·2번',()=>{draft.photos=[];newPhotos.splice(0);analyzing=false;analyze.hidden=false;stateEl.innerHTML='';renderPhotos();}],
       ['photos-ready','분석 사진 첨부','1·2번',()=>{if(!newPhotos.length)newPhotos.push({id:window.assetPhotoId(),color:'#4b7bec',at:todayStr()+' 10:00',by:ME});analyzing=false;analyze.hidden=false;stateEl.innerHTML='';renderPhotos();}],
       ['loading','분석 중','3번',()=>{if(!draft.photos.length&&!newPhotos.length)newPhotos.push({id:window.assetPhotoId(),color:'#4b7bec',at:todayStr()+' 10:00',by:ME});renderLoading();}],
+      ['success','분석 성공','Case 3-1',()=>{if(!draft.photos.length&&!newPhotos.length)newPhotos.push({id:window.assetPhotoId(),color:'#4b7bec',at:todayStr()+' 10:00',by:ME});applyResult(mobileAiDraft(!1),!0);}],
       ['insufficient','정보 부족','4번',()=>renderFailure('insufficient')],
       ['error','분석 실패','4번',()=>renderFailure('error')]
     ]);
