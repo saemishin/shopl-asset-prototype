@@ -37,7 +37,10 @@
         summary: "https://docs.google.com/spreadsheets/d/1pj6N07JExX6p1AqFCahJ9DvxMVcKzgdhS3-J6asFSWE/edit?usp=drive_link",
         full: "https://docs.google.com/spreadsheets/d/1RAQLGs8pIU-obTRmiWTYH5AZbFgjJ47MMTafcnHtlew/edit?usp=drive_link"
       },
-      worksite: "https://docs.google.com/spreadsheets/d/10rbRIp_DL3FS-VrtHjV2HXU7VjeQtJilBbHiUFNQkos/edit?usp=drive_link"
+      worksite: {
+        summary: "https://docs.google.com/spreadsheets/d/10rbRIp_DL3FS-VrtHjV2HXU7VjeQtJilBbHiUFNQkos/edit?usp=drive_link",
+        full: "https://docs.google.com/spreadsheets/d/1lCvEopFri1wfkg70Vy5w7xCz8Hq1CWtgcV1Pe5KIJrg/edit?usp=drive_link"
+      }
     },
     BULK_REGISTER_SHEET_LINKS = {
       individual: "https://docs.google.com/spreadsheets/d/1bmjjq4zuGAcxDv80f03V52GbNEs6y05nIwzei9boABc/edit?usp=drive_link"
@@ -972,7 +975,7 @@
     }
     document.getElementById("btn-list-dl").disabled = v.count === 0, document.getElementById("btn-qr-dl") && (document.getElementById("btn-qr-dl").disabled = v.count === 0), document.getElementById("btn-list-dl").onclick = () => {
       const url = state.view === "product" ? DOWNLOAD_SHEET_LINKS.product[state.productType]
-        : state.view === "employee" ? DOWNLOAD_SHEET_LINKS.employee[targetModes.employee]
+        : ["employee", "worksite"].includes(state.view) ? DOWNLOAD_SHEET_LINKS[state.view][targetModes[state.view]]
         : DOWNLOAD_SHEET_LINKS[state.view];
       window.open(url, "_blank", "noopener");
     };
