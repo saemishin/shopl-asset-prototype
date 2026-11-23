@@ -112,6 +112,7 @@
   const name=new URLSearchParams(location.search).get('name')||"김민수";
   window.TargetAssets.wire(host,()=>collectItems(name),id=>'asset-detail.html?id='+id,{
     download:true,
+    downloadUrl:"https://docs.google.com/spreadsheets/d/1kCRiwcq3_HNrDBseW9imWi4qJKwMzD23uGLzy_4Bm1s/edit",
     canAssign:()=>!['retired','resigned','inactive'].includes(window.DATA.targetStatuses?.employee?.[name]) && window.DATA.categories.some(cat=>window.AssetAccess.canState({...cat,status:'stock'})),
     onAssign:refresh=>window.AssetAssignment.open({members:[{name,...(MEMBER_INFO[name]||{})}],fixedTarget:{type:'employee',value:name,subtitle:MEMBER_INFO[name]?.team,color:avatarColor(name)},onSaved:refresh,onChanged:refresh,toast}),
     rowActions:a=>[...(window.AssetAccess.canState(a)&&a.assignments?.length?[{key:'move',label:'이동'},{key:'return',label:'반납'}]:[]),...(window.hasPrototypeAssetManagePermission()?[...(a.status!=='disposed'?[{key:'dispose',label:'폐기',danger:true}]:[]),{key:'delete',label:'삭제',danger:true}]:[])],

@@ -94,6 +94,10 @@
         </div>
         ${chips.length ? `<div class="filterbar"><button class="filter-reset" data-filter-reset aria-label="필터 전체 해제">${RESET_ICON}</button>${chips.map(c => `<span class="fchip">${esc(c.label)}<button data-clear="${c.k}" data-value="${esc(c.v)}">✕</button></span>`).join("")}</div>` : ""}`;
       tools.querySelector("[data-target-assign]")?.addEventListener("click", () => options.onAssign(draw));
+      // 정적 프로토타입: 현재 조회 결과를 생성하지 않고 확정된 대상별 샘플을 연다.
+      tools.querySelector("[data-target-download]")?.addEventListener("click", () => {
+        if (options.downloadUrl && result().length) window.open(options.downloadUrl, "_blank", "noopener");
+      });
       const search = tools.querySelector("[data-search]");
       search.oninput = e => { state.q = e.target.value.trim().toLowerCase(); state.page = 1; draw(true); };
       tools.querySelector("[data-search-clear]").onclick = () => { state.q = ""; state.page = 1; draw(); tools.querySelector("[data-search]").focus(); };
