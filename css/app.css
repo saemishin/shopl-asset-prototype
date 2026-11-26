@@ -2597,3 +2597,13 @@ body.history-capture #prototype-qa { display: none; }
 .mapp-sub-switch-list button { display: block; width: 100%; min-height: 54px; background: none; border: 0; border-bottom: 1px solid #ececec; font-size: 16px; color: var(--text, #333); text-align: center; }
 .mapp-sub-switch-list button:last-child { border-bottom: 0; }
 .mapp-sub-switch-list button.on { color: #3a8ef6; font-weight: 600; }
+
+.modal.sub-create-modal { width: 768px; max-height: min(881px, 88vh); height: 881px; }
+.sub-create-modal .cat-manage-create { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; padding: 0; }
+.sub-create-modal .sub-form-identity, .sub-create-modal .sub-form-settings { padding: 20px 24px; min-width: 0; }
+.sub-create-modal .sub-form-settings { border-left: 1px solid var(--line); }
+.sub-create-modal .cat-info-settings-group summary { cursor: pointer; font-size: 14px; font-weight: 600; padding: 8px 0; }
+@media (max-width: 640px) {
+  .sub-create-modal .cat-manage-create { display: block; }
+  .sub-create-modal .sub-form-settings { border-left: 0; border-top: 1px solid var(--line); }
+}
