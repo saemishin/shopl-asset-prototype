@@ -131,7 +131,7 @@
       expiry: "유효기한"
     },
     DEFAULT_HIDDEN_FIELDS = {
-      individual: ["imei"]
+      individual: []
     },
     assignLabel = type => "배정 및 상태 관리 권한",
     permLabel = kind => kind === "view" ? "자산 조회 권한" : kind === "edit" ? "정보 수정 권한" : "배정 및 상태 관리 권한",
@@ -378,13 +378,14 @@
             const basic = group.fields === fixedFields;
             const rows = group.fields.map(field => {
               const name = window.AssetExtra.esc(field.name);
-              const enabled = basic || (state.extraEnabled || []).includes(field.id);
-              const toggle = basic ? '' : `<button type="button" class="toggle-switch${enabled ? ' on' : ''}" data-field="${field.id}" role="switch" aria-checked="${enabled}" aria-label="${name} 노출"><span class="toggle-knob"></span></button>`;
+              const locked = publicBasicFields.includes(field);
+              const enabled = basic ? locked || !(state.hiddenFields || []).includes(field.id) : (state.extraEnabled || []).includes(field.id);
+              const toggle = `<button type="button" class="toggle-switch${enabled ? ' on' : ''}" data-field="${field.id}" ${locked ? 'disabled aria-disabled="true" data-tip="기본 항목이므로 체크를 해제할 수 없습니다."' : ''} role="switch" aria-checked="${enabled}" aria-label="${name} 노출"><span class="toggle-knob"></span></button>`;
               const description = field.description ? `<small>${window.AssetExtra.esc(field.description)}</small>` : '';
               const privacy = publicBasicFields.includes(field) ? '<small>항상 공개되는 정보입니다.</small>' : enabled ? `<label class="extra-private"><input type="checkbox" data-private-field="${field.id}"${(state.privateFields || []).includes(field.id) ? ' checked' : ''}>비공개</label>` : '';
               return `<div class="extra-field-settings"><div class="cat-manage-fieldrow"><span>${name}</span>${toggle}</div>${description}${privacy}</div>`;
             });
-            return `<details class="cat-info-settings-group" data-group="${group.name}" ${expanded.has(group.name) ? 'open' : ''}><summary>${group.name}</summary>${basic ? '<p class="hint">기본 정보는 항상 사용됩니다.</p>' : ''}${rows.join('')}</details>`;
+            return `<details class="cat-info-settings-group" data-group="${group.name}" ${expanded.has(group.name) ? 'open' : ''}><summary>${group.name}</summary>${rows.join('')}</details>`;
           }).join('')}
         </div>
       </div>`;
@@ -427,7 +428,8 @@
       if (!b || b.disabled) return;
       const f=b.dataset.field;
       state.extraEnabled ||= [];state.privateFields ||= [];
-      const list=state.extraEnabled,index=list.indexOf(f);
+      const list = window.AssetExtra.fixed.some(field => field.id === f) ? state.hiddenFields : state.extraEnabled;
+      const index = list.indexOf(f);
       index===-1?list.push(f):list.splice(index,1);renderSubForm(container,state,opts);
     });
   }

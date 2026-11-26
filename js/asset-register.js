@@ -1026,7 +1026,7 @@
           setIf = (script, key, val, format) => {
             if (key === "price" ? window.normalizePurchasePrice(asset[key]) === window.normalizePurchasePrice(val) : asset[key] === val) return;
             const setting=key==="price"?"purchasePrice":key;
-            if(!window.AssetAccess.canField(asset,setting))return;
+            if(!window.AssetAccess.canField(asset,setting) || (window.AssetExtra.fixed.some(f=>f.id===setting) && !window.AssetExtra.enabled(cat,setting)))return;
             const fmt = format || (v => v || "");
             logChange(script, fmt(asset[key]), fmt(val)), asset[key] = val;
           };

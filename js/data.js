@@ -1053,7 +1053,7 @@ window.archiveDeletedAsset = function (asset, actor) {
           category || fail("CATEGORY_CHANGED"), (!asset.product || asset.product.length > 50) && fail("INVALID_PRODUCT"), asset.assetNo && !/^[A-Za-z0-9_-]{1,30}$/.test(asset.assetNo) && fail("INVALID_ASSET_NO"), asset.assetNo && (used.has(asset.assetNo) && fail("DUPLICATE_ASSET_NO"), used.add(asset.assetNo));
           delete asset.totalQty;
           delete asset.stocks; // 회사 양식의 수량을 등록 개수로 해석하지 않는다.
-          const hidden = []; // Basic information is always enabled; only custom fields have use toggles.
+          const hidden = category.hiddenFields || [];
           asset.extraValues = Object.fromEntries((window.DATA.extraFields || []).filter(f => !f.deleted && (category.extraEnabled || []).includes(f.id)).map(f => [f.id,String((draft.extraValues||{})[f.id]||"").trim().slice(0,100)]));
           delete asset.serial; delete asset.imei;
           for (const field of ["expiry", "serial", "imei", "manufactured", "purchaseDate", "price"]) hidden.includes(field === "price" ? "purchasePrice" : field) && delete asset[field];
@@ -1150,7 +1150,13 @@ window.formatAssetCount = value => Number(value || 0).toLocaleString("en-US");
   };
   const category = a => a && window.DATA.categories.find(c => c.group === a.group && c.sub === a.sub);
   const normalizeField = id => ({labels:'tags',note:'memo',price:'purchasePrice'}[id] || id);
-  const enabled = (cat,id) => !!cat && (['tags','memo',...fixed.map(f=>f.id)].includes(normalizeField(id)) || (cat.extraEnabled||[]).includes(id));
+  function enabled(cat, id) {
+    if (!cat) return false;
+    const field = normalizeField(id);
+    if (['photo', 'tags', 'memo'].includes(field)) return true;
+    if (fixed.some(f => f.id === field)) return !(cat.hiddenFields || []).includes(field);
+    return (cat.extraEnabled || []).includes(field);
+  }
   const visible = (cat,id,manage=window.hasPrototypeAssetManagePermission()) => enabled(cat,id) && (['tags','memo'].includes(normalizeField(id)) || manage || !(cat.privateFields||[]).includes(normalizeField(id)));
   const fields = () => [...fixed,...window.DATA.extraFields.filter(f=>!f.deleted)];
   function values(a,manage) {
@@ -1220,7 +1226,7 @@ window.AssetExtra.exportValues=(asset,manage=window.hasPrototypeAssetManagePermi
   const qa = params.get('qa') === 'access';
   const scenario = params.get('scenario') || 'info';
   for (const cat of window.DATA.categories) {
-    cat.hiddenFields = []; // Fixed fields have no OFF state.
+    cat.hiddenFields ||= [];
     cat.privateFields=(cat.privateFields||[]).filter(id=>!['tags','labels','memo','note'].includes(id));
     cat.edit ||= cat.assign || '모든 관리자 및 리더';
     cat.editTarget ||= cat.assignTarget ? JSON.parse(JSON.stringify(cat.assignTarget)) : {groups:[],jobTitles:[],members:[]};
