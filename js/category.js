@@ -760,12 +760,12 @@
   const master=window.DATA.extraFields, draft=master.filter(f=>!f.deleted).map(f=>({...f}));
   const initial=JSON.stringify(draft), back=document.createElement('div');
   back.className='modal-back';
-  back.innerHTML='<div class="modal scroll-body"><h3>추가 정보 관리</h3><div class="body"><p class="tpl-manage-desc">회사에 필요한 자산 정보 항목을 추가하고 관리합니다.</p><div class="extra-manager-row"><div class="field"><input type="text" data-extra-name maxlength="20" placeholder="입력"><p class="field-err" data-extra-create-error hidden>동일한 명칭이 존재합니다.</p></div><button class="btn primary" data-extra-add disabled>+ 추가</button></div><div data-extra-list></div></div><div class="foot"><button class="btn" data-extra-cancel>취소</button><button class="btn primary" data-extra-save disabled>저장</button></div></div>';
+  back.innerHTML='<div class="modal scroll-body"><h3>추가 정보 관리</h3><div class="body"><p class="tpl-manage-desc">회사에 필요한 자산 정보 항목을 추가하고 관리합니다.</p><div class="extra-manager-row"><div class="field"><input type="text" data-extra-name maxlength="20" placeholder="입력"><p class="field-err" data-extra-create-error hidden>동일한 명칭이 존재합니다.</p></div><button class="btn sm" type="button" aria-label="항목 추가" data-extra-add disabled>+</button></div><div data-extra-list></div></div><div class="foot"><button class="btn" data-extra-cancel>취소</button><button class="btn primary" data-extra-save disabled>저장</button></div></div>';
   document.body.appendChild(back);
   let dragging=null;
   const input=back.querySelector('[data-extra-name]'), add=back.querySelector('[data-extra-add]'), save=back.querySelector('[data-extra-save]');
   function validate() {
-    const names=draft.map(f=>f.name.trim()), q=input.value.trim(), reserved=[];
+    const names=draft.map(f=>f.name.trim()), q=input.value.trim(), reserved=window.AssetExtra.fixed.map(field=>field.name);
     const dup=q && [...names,...reserved].includes(q);
     add.disabled=!q || dup || draft.length>=30;
     input.classList.toggle('has-err',!!dup);back.querySelector('[data-extra-create-error]').hidden=!dup;
@@ -780,7 +780,7 @@
   }
   function draw() {
     const list=back.querySelector('[data-extra-list]');
-    list.innerHTML=draft.length?draft.map(f=>`<div class="extra-manager-row" draggable="true" data-extra-row="${f.id}"><span aria-label="순서 이동">☰</span><div class="field"><input type="text" maxlength="20" data-extra-rename="${f.id}" value="${window.AssetExtra.esc(f.name)}"><p class="field-err" hidden></p></div><button class="btn sm" data-extra-delete="${f.id}">삭제</button></div>`).join(''):'<p class="muted" style="padding:40px;text-align:center">등록된 추가 정보가 없습니다.</p>';
+    list.innerHTML=draft.length?draft.map(f=>`<div class="extra-manager-row" draggable="true" data-extra-row="${f.id}"><span aria-label="순서 이동">☰</span><div class="field"><input type="text" maxlength="20" data-extra-rename="${f.id}" value="${window.AssetExtra.esc(f.name)}"><p class="field-err" hidden></p></div><button class="cat-manage-icon" type="button" aria-label="항목 삭제" data-extra-delete="${f.id}">${TRASH_ICON}</button></div>`).join(''):'<p class="muted" style="padding:40px;text-align:center">등록된 추가 정보가 없습니다.</p>';
     list.querySelectorAll('[data-extra-rename]').forEach(el=>el.oninput=()=>{draft.find(f=>f.id===el.dataset.extraRename).name=el.value;validate();});
     list.querySelectorAll('[data-extra-delete]').forEach(button=>button.onclick=()=>confirmModal('삭제하시겠습니까?','',()=>{draft.splice(draft.findIndex(f=>f.id===button.dataset.extraDelete),1);draw();}));
     list.querySelectorAll('[data-extra-row]').forEach(row=>{
@@ -802,6 +802,7 @@
   };
   if(window.DashboardCases){const source=JSON.parse(JSON.stringify(draft));window.DashboardCases.attach(back,{reference:'Web23',reset:()=>{draft.splice(0,draft.length,...JSON.parse(JSON.stringify(source)));input.value='';draw();},cases:[
     ['extra-list-empty','등록된 추가 정보 없음','3번',()=>{draft.splice(0);input.value='';draw();}],
+    ['extra-reserved','고정 항목명 중복','1번',()=>{input.value=window.AssetExtra.fixed[0].name;validate();}],
     ['extra-max','추가 정보 30개 상한','2번',()=>{draft.splice(0,draft.length,...Array.from({length:30},(_,i)=>({id:'design-extra-'+i,name:'디자인 항목 '+(i+1)})));draw();}]
   ]});}
   draw();
