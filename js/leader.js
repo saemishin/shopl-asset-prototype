@@ -842,16 +842,23 @@
   function directoryIcon(key) {
     return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${DIRECTORY_ICONS[key] || DIRECTORY_ICONS.report}</svg>`;
   }
+  function worksiteCard(item, directory) {
+    return window.worksiteAssetCardHtml(item, {
+      directory, cardThumb, escape: directoryEsc,
+      status: STATUS_LABEL[item.asset.status] || [item.asset.status, ""]
+    });
+  }
   function directoryAssetSectionHtml(kind, state, category) {
     const items = directoryItems(kind).filter(item => !category || item.asset.group === category.group && item.asset.sub === category.sub);
     if (!items.length) return `${kind === "member" ? '<div class="mapp-count">전체 <b>0</b></div>' : ""}<p class="mapp-directory-empty">배정 중인 자산이 없습니다.</p>`;
     const cat = category && window.DATA.categories.find(c => c.group === category.group && c.sub === category.sub);
     return `<div class="mapp-directory-asset-tools"><span>전체 <b data-directory-count>${items.length}</b></span>
       <div class="mapp-directory-search"><input type="search" data-directory-search placeholder="품목명/고유관리번호" aria-label="자산 검색" value="${directoryEsc(state.directorySearch || "")}"><button type="button" data-directory-search-clear aria-label="검색어 지우기"${state.directorySearch ? "" : " hidden"}>×</button></div></div>
-      <div class="mapp-directory-asset-list">${items.map(x => {
+      <div class="${kind === "worksite" ? "mapp-card-list" : "mapp-directory-asset-list"}">${items.map(x => {
+      if (kind === "worksite") return worksiteCard(x, true);
       const a = x.asset,
         status = STATUS_LABEL[a.status] || [a.status, ""];
-      return `<button type="button" class="mapp-directory-asset-row" data-search="${directoryEsc(`${a.product} ${a.assetNo||''}`.toLowerCase())}" data-directory-asset="${directoryEsc(a.id)}">${kind === "member" ? `<span style="display:flex;flex-direction:column;gap:2px;min-width:0"><small class="mapp-directory-asset-category">${directoryEsc(a.group)} › ${directoryEsc(a.sub)}</small><strong>${directoryEsc(a.product)}</strong><small>${directoryEsc(a.assetNo || "—")}</small><small>배정일: ${x.since ? x.since.replaceAll("-", ".") : "—"}</small></span><span class="badge ${status[1]}">${status[0]}</span>` : `<span style="display:flex;flex-direction:column;gap:2px;min-width:0"><strong>${directoryEsc(a.product)}</strong><small>${directoryEsc(a.assetNo || "—")}</small><small>배정일: ${x.since ? x.since.replaceAll("-", ".") : "—"}</small></span><span class="badge ${status[1]}">${status[0]}</span>`}</button>`;
+      return `<button type="button" class="mapp-directory-asset-row" data-search="${directoryEsc(`${a.product} ${a.assetNo||''}`.toLowerCase())}" data-directory-asset="${directoryEsc(a.id)}"><span style="display:flex;flex-direction:column;gap:2px;min-width:0"><small class="mapp-directory-asset-category">${directoryEsc(a.group)} › ${directoryEsc(a.sub)}</small><strong>${directoryEsc(a.product)}</strong><small>${directoryEsc(a.assetNo || "—")}</small><small>배정일: ${x.since ? x.since.replaceAll("-", ".") : "—"}</small></span><span class="badge ${status[1]}">${status[0]}</span></button>`;
     }).join("")}</div>
       <p class="mapp-directory-empty" data-directory-search-empty hidden>결과가 없습니다.</p>`;
   }
@@ -2143,6 +2150,15 @@
             ${showTabBar ? tabBarHtml("menu") : ""}
           </div>
         </div>`, window.AssetExtra.bindDetailTabs(root), wireDirectoryMenu(root, state, draw), wireDirectoryProfile(root, state, draw), wirePlanFeatures(root, state, draw);
+      root.querySelectorAll("[data-worksite-thumb]").forEach(button => {
+        button.onclick = event => {
+          const asset = assets.find(item => item.id === button.dataset.worksiteThumb);
+          if (asset && window.assetPhotos(asset).length) {
+            event.stopPropagation();
+            openPhotoViewer(asset, draw);
+          }
+        };
+      });
       const back = root.querySelector("[data-mapp-back]");
       back && (back.onclick = () => {
         if (state.screen === "directory-member-assets") {state.screen="member-profile";draw();return;}
