@@ -575,14 +575,18 @@ th.c, td.c { text-align: center; width: 52px; }
 .cat-layout.cat-layout-empty { align-items: stretch; }
 .cat-empty-page { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; }
 .cat-empty-page p { font-size: 15px; font-weight: 600; }
-.cat-detail-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.cat-detail-head h3 { font-size: 17px; font-weight: 700; }
-.cat-detail-acts { display: flex; gap: 6px; flex-shrink: 0; }
-/* .kv2와 특이성을 똑같이(단일 클래스) 두면 소스 순서상 .kv2에 밀리므로 두 클래스를 묶어 특이성을 더 높여둠 */
-.kv2.cat-detail-kv { grid-template-columns: 110px 1fr 110px 1fr; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
-.cat-usage { display: flex; align-items: center; gap: 32px; margin-top: 14px; }
-.cat-usage .k { width: 110px; flex-shrink: 0; color: var(--text-mut); font-size: 12px; }
-.cat-usage-bullets { display: flex; flex-wrap: nowrap; gap: 6px; overflow-x: auto; }
+.cat-detail-head { display: grid; gap: 6px; padding-bottom: 18px; }
+.cat-parent-title, .cat-title-row small { color: var(--text-sub); font-size: 12px; }
+.cat-title-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.cat-title-row h3 { font-size: 17px; font-weight: 700; }
+.cat-detail-kv {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr));
+  gap: 20px 24px; padding: 18px 0; border-block: 1px solid var(--line);
+}
+.cat-detail-kv > div { display: grid; align-content: start; gap: 7px; min-width: 0; }
+.cat-detail-kv .k { color: var(--text-mut); font-size: 12px; }
+.cat-detail-kv .v { font-size: 13px; overflow-wrap: anywhere; }
+.cat-usage-bullets { display: flex; flex-wrap: wrap; gap: 6px; }
 .usebullet {
   display: inline-flex; align-items: center; height: 22px; padding: 0 9px; flex-shrink: 0;
   border: 1px solid var(--line-strong); border-radius: 6px; font-size: 11px; color: var(--text-mut); white-space: nowrap;
@@ -590,7 +594,7 @@ th.c, td.c { text-align: center; width: 52px; }
 .usebullet.on { border-color: var(--primary); color: var(--primary); }
 .cat-asset-head { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); margin-bottom: 10px; }
 .cat-asset-head h4 { font-size: 13px; font-weight: 700; }
-.cat-asset-countrow { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.cat-asset-countrow { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; padding: 16px 0; }
 .cat-asset-count { font-size: 12px; color: var(--text-mut); }
 .cat-asset-countrow .cat-asset-search { margin-left: 0; margin-bottom: 0; }
 /* 이 패널 폭에 비해 기본 table의 min-width(880px)가 과해서 컬럼 배치가 틀어짐 — fixed 레이아웃으로 폭 전체를 컬럼별 비율대로 분배 */

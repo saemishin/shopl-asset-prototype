@@ -302,17 +302,19 @@
     const products = productsOf(cat.group, cat.sub);
     return `
       <div class="cat-detail-head">
-        <div class="category-two-line"><span>${cat.group}</span><h3>${cat.sub}</h3> <small>품목 ${products.length} · 자산 ${assetsOf(cat.group,cat.sub).length}</small></div>
+        <div class="cat-parent-title">${window.AssetExtra.esc(cat.group)}</div>
+        <div class="cat-title-row"><h3>${window.AssetExtra.esc(cat.sub)}</h3><small>품목 ${products.length} · 자산 ${assetsOf(cat.group,cat.sub).length}</small>
         ${window.hasPrototypeAssetManagePermission()?'<div class="cat-detail-acts"><button class="btn sm" data-edit-sub>수정</button></div>':''}
       </div>
-      <div class="kv2 cat-detail-kv">
+      </div>
+      <div class="cat-detail-kv">
         <div><div class="k">자산 조회 권한</div><div class="v">${permValueHtml(cat, "view")}</div></div>
         <div><div class="k">배정 및 상태 관리 권한</div><div class="v">${permValueHtml(cat, "assign")}</div></div>
         <div><div class="k">정보 수정 권한</div><div class="v">${permValueHtml(cat, "edit")}</div></div>
-      </div>
-      <div class="cat-usage"${usageInfoHtml(cat)?"":" hidden"}>
+        <div class="cat-usage"${usageInfoHtml(cat)?"":" hidden"}>
         <div class="k">추가 정보</div>
         <div class="cat-usage-bullets">${usageInfoHtml(cat)}</div>
+      </div>
       </div>
       ${assetSectionHtml()}
     `;
