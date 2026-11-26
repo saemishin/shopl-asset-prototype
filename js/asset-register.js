@@ -421,7 +421,9 @@
                 <span id="areg-cat-display" style="flex:1;font-size:12.5px">선택</span>
               </div>
             </div>
-            <div class="field" id="areg-name-field"><label>품목명 <span class="req">*</span></label><input type="text" id="areg-name" placeholder="입력" maxlength="50" autocomplete="off" aria-describedby="areg-name-error">
+            <div class="field" id="areg-name-field">
+              <div class="field-label-row"><label for="areg-name">품목명 <span class="req">*</span></label>${hasAssetManagePermission() ? '<button type="button" class="btn sm" data-manage-products>품목 관리</button>' : ''}</div>
+              <input type="text" id="areg-name" placeholder="검색" maxlength="50" autocomplete="off" aria-describedby="areg-name-error">
               <p class="field-err" id="areg-name-error" data-name-err hidden>동일한 명칭이 이미 등록되어 있습니다.</p></div>
           </div>
           <div class="areg-col-right" id="areg-col-right">
@@ -489,6 +491,7 @@
       noteInput = back.querySelector("#areg-note-input");
     window.AssetMemo.mountTextarea(noteInput);
     const saveBtn = back.querySelector("#areg-save");
+    let selectedProductId = opts.asset?.productId || null;
     let initialEditValues = null,
       savedNumberError = null,
       savedNameError = null;
@@ -558,7 +561,7 @@
       savedNameError !== nameKey && (savedNameError = null);
       const nameDup = opts.asset ? !1 : savedNameError === nameKey;
       nameErr.hidden = !nameDup, nameInput.classList.toggle("has-err", nameDup), nameInput.setAttribute("aria-invalid", String(nameDup));
-      const nameOk = name.length > 0 && !nameDup,
+      const nameOk = window.AssetProducts.matches(selectedProductId, name, findCat(catValue)) && !nameDup,
         noVal = assetNoInput.value.trim();
       savedNumberError !== noVal && (savedNumberError = null);
       // Existing-asset duplicates are checked only when saving, including edit mode.
@@ -575,24 +578,40 @@
     function closeProdMenu() {
       prodMenu && (prodMenu.remove(), prodMenu = null), prodHi = -1;
     }
-    function productOptions() {
-      if (!catValue) return [];
-      const cat = findCat(catValue);
-      if (!cat) return [];
-      const q = nameInput.value.trim().toLowerCase(),
-        names = window.AssetProducts.list(cat.group,cat.sub).map(p=>p.name);
-      return q ? names.filter(n => n.toLowerCase().includes(q)) : names;
+    function pickProduct(product) {
+      const next = `${product.group}|${product.sub}`;
+      if (next !== catValue) selectCat(next);
+      selectedProductId = product.id;
+      nameInput.value = product.name;
+      closeProdMenu();
+      checkValid();
     }
     function openProdMenu() {
-      if(nameInput.readOnly)return;
-      const opts2 = productOptions();
-      if (closeProdMenu(), !opts2.length) return;
-      prodMenu = document.createElement("div"), prodMenu.className = "dropdown-menu", prodHi = 0, prodMenu.innerHTML = opts2.map((n, i) => `<button type="button" data-v="${window.AssetExtra.esc(n)}" class="${i === 0 ? "active" : ""}">${window.AssetExtra.esc(n)}</button>`).join("");
+      if (nameInput.readOnly) return;
+      closeProdMenu();
+      const options = window.AssetProducts.search(nameInput.value, findCat(catValue));
+      prodMenu = document.createElement("div");
+      prodMenu.className = "dropdown-menu";
+      prodHi = 0;
+      prodMenu.innerHTML = options.map((p,i) => `<button type="button" data-product-id="${window.AssetExtra.esc(p.id)}" class="${i ? '' : 'active'}">${window.AssetExtra.esc(p.name)}</button>`).join('') || '<span>검색 결과가 없습니다.</span>';
       const r = nameInput.getBoundingClientRect();
-      prodMenu.style.cssText = `position:fixed;top:${r.bottom + 4}px;left:${r.left}px;min-width:${r.width}px`, document.body.appendChild(prodMenu), prodMenu.querySelectorAll("[data-v]").forEach(b => b.onclick = () => {
-        nameInput.value = b.dataset.v, closeProdMenu(), checkValid();
-      });
+      prodMenu.style.cssText = `position:fixed;top:${r.bottom+4}px;left:${r.left}px;min-width:${r.width}px;max-height:240px;overflow:auto`;
+      document.body.appendChild(prodMenu);
+      prodMenu.querySelectorAll('button').forEach((button,i) => button.onclick = () => pickProduct(options[i]));
     }
+    const manageProducts = back.querySelector('[data-manage-products]');
+    if (manageProducts) manageProducts.onclick = () => {
+      closeProdMenu();
+      window.openAssetProductManageModal(() => {
+        if (selectedProductId) {
+          const p = window.AssetProducts.byId(selectedProductId);
+          nameInput.value = p && !p.deleted ? p.name : '';
+          if (!nameInput.value) selectedProductId = null;
+        }
+        checkValid();
+        nameInput.focus();
+      }, findCat(catValue));
+    };
     function moveProdHi(delta) {
       if (!prodMenu) return;
       const btns = [...prodMenu.querySelectorAll("button")];
@@ -601,6 +620,7 @@
       }));
     }
     nameInput.addEventListener("input", () => {
+      selectedProductId = null;
       checkValid(), openProdMenu();
     }), nameInput.addEventListener("focus", () => {
       nameInput.disabled || openProdMenu();
@@ -608,10 +628,10 @@
       if (prodMenu) if (e.key === "ArrowDown") e.preventDefault(), moveProdHi(1);else if (e.key === "ArrowUp") e.preventDefault(), moveProdHi(-1);else if (e.key === "Enter") {
         e.preventDefault();
         const b = [...prodMenu.querySelectorAll("button")][prodHi];
-        b && (nameInput.value = b.dataset.v, closeProdMenu(), checkValid());
+        b?.click();
       } else e.key === "Escape" && closeProdMenu();
     }), document.addEventListener("click", e => {
-      prodMenu && !prodMenu.contains(e.target) && e.target !== nameInput && closeProdMenu();
+      prodMenu && !e.composedPath().includes(document.getElementById("case-scenarios")) && !prodMenu.contains(e.target) && e.target !== nameInput && closeProdMenu();
     }), assetNoInput.addEventListener("input", () => {
       const before = assetNoInput.value,
         pos = assetNoInput.selectionStart,
@@ -683,6 +703,7 @@
       if (changed && !opts.asset && previousValue) {
         categoryDrafts.set(previousValue, captureCategoryDraft());
       }
+      if (changed) { selectedProductId = null; nameInput.value = ""; }
       catValue = v;
       const cat = findCat(v);
       type = cat && cat.type || "individual";
@@ -970,10 +991,11 @@
 
     if(window.DashboardCases){
       const samplePhoto=i=>({id:'design-photo-'+i,color:['#d8e7ff','#ffe6d5','#def4e5'][i%3],at:'2026-09-01 10:00',by:'dana'});
-      const fill=()=>{if(!catValue&&categories[0])selectCat(`${categories[0].group}|${categories[0].sub}`);nameInput.value='디자인 검토용 품목';checkValid();};
+      const fill=()=>{const product=window.AssetProducts.search('',findCat(catValue))[0];if(product)pickProduct(product);};
       const ref=opts.asset?'Web09':'Web06';
       window.DashboardCases.attach(back,{reference:ref,cases:[
-        ['form-minimum','분류·품목명 입력 완료',opts.asset?'1·2번':'2·3번',fill],
+        ['product-no-result','품목 검색 결과 없음',opts.asset?'2번':'3번',()=>{nameInput.focus();nameInput.value='검색 결과 없음 999';nameInput.dispatchEvent(new Event('input',{bubbles:true}));}],
+        ['form-minimum','분류·품목 선택 완료',opts.asset?'1·2번':'2·3번',fill],
         ['photos-none','사진 미첨부',opts.asset?'3번':'4번',()=>{photos.splice(0);primaryIdx=0;renderPhotos();}],
         ['photos-full','사진 10장·추가 비활성',opts.asset?'3번':'4번',()=>{photos.splice(0,photos.length,...Array.from({length:10},(_,i)=>samplePhoto(i)));primaryIdx=0;renderPhotos();}],
         ['tags-full','태그 10개 선택',opts.asset?'5번':'6번',()=>{tags.splice(0,tags.length,...(window.DATA.tags||[]).slice(0,10));renderChips();checkValid();}],

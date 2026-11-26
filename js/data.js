@@ -1455,6 +1455,22 @@ window.AssetExtra.exportValues=(asset,manage=window.hasPrototypeAssetManagePermi
   function reconcile() { D.assets.forEach(attach); persist(); }
   function all() { reconcile(); return D.products.filter(p => !p.deleted && categoryExists(p)); }
   function list(group, sub) { return all().filter(p => p.group === group && p.sub === sub).sort((a,b) => a.name.localeCompare(b.name,'ko')); }
+  function search(query, category) {
+    const term = normalize(query).toLowerCase();
+    const latest = new Map();
+    for (const asset of D.assets) {
+      if (asset.deleted_at) continue;
+      const at = Date.parse(asset.updatedAt || asset.createdAt) || 0;
+      if (at > (latest.get(asset.productId) || 0)) latest.set(asset.productId, at);
+    }
+    const changed = p => Math.max(Date.parse(p.updatedAt || p.createdAt) || 0, latest.get(p.id) || 0);
+    return all().filter(p => (!category || sameCategory(p, category)) && p.name.toLowerCase().includes(term))
+      .sort((a,b) => a.name.localeCompare(b.name,'ko') || changed(b) - changed(a) || a.id.localeCompare(b.id));
+  }
+  function matches(id, name, category) {
+    const p = byId(id);
+    return !!(p && !p.deleted && category && sameCategory(p, category) && p.name === name);
+  }
   function assetsOf(id) { return D.assets.filter(a => !a.deleted_at && a.productId === id); }
   function bindTemplates(restore = false) {
     for (const t of D.templates || []) [t.base, ...t.items].forEach((row,i) => {
@@ -1488,13 +1504,8 @@ window.AssetExtra.exportValues=(asset,manage=window.hasPrototypeAssetManagePermi
       const existing = byId(row.id);
       if (!existing) { D.products.push({id:newId(),group,sub,name:row.name,createdAt:at,updatedAt:at}); continue; }
       if (existing.name === row.name) continue;
-      const before = existing.name;
       existing.name = row.name; existing.updatedAt = at;
-      for (const a of assetsOf(existing.id)) {
-        const event = {id:`product-${existing.id}-${at}`,d:at,who:'dana',script:'자산 정보 수정: 품목명 수정',before,after:row.name};
-        a.product = row.name; a.updatedAt = at; a._activityLog ||= []; a._activityLog.unshift(event);
-        (state.events[a.id] ||= []).unshift(event);
-      }
+      for (const asset of assetsOf(existing.id)) asset.product = row.name;
     }
     bindTemplates(); persist();
     window.dispatchEvent(new CustomEvent('asset-products-changed'));
@@ -1514,7 +1525,7 @@ window.AssetExtra.exportValues=(asset,manage=window.hasPrototypeAssetManagePermi
     const events = state.events[a.id] || [];
     if (events.length) { a._activityLog ||= []; const ids=new Set(a._activityLog.map(e=>e.id));a._activityLog.unshift(...events.filter(e=>!ids.has(e.id)));a.updatedAt=[a.updatedAt,...events.map(e=>e.d)].filter(Boolean).sort().at(-1); }
   }
-  window.AssetProducts = {all,list,assetsOf,attach,reconcile,save,byId,bindTemplates,rowExists,renameCategory,pruneCategories,touch,normalize};
+  window.AssetProducts = {all,list,search,matches,assetsOf,attach,reconcile,save,byId,bindTemplates,rowExists,renameCategory,pruneCategories,touch,normalize};
   reconcile();
 })();
 

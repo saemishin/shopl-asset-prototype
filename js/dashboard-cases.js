@@ -16,7 +16,7 @@
     ['[data-cp-search]','분류 선택','Web 공통06',1,2],
     ['[data-stock-search]','자산 선택','Web 공통14',2,3],
     ['[data-tm-input]','태그 관리','Web 공통07',1,2],
-    ['[data-pm-input]','품목 관리','Web24',2,3],
+    ['[data-pm-input]','품목 관리','Web 공통17',2,3],
     ['[data-extra-name]','추가 정보 관리','Web23',1,3],
     ['#areg-name','자산 추가·수정',null,3,4],
     ['.areg-ai-modal','AI 입력','Web07',null,null],
@@ -24,7 +24,7 @@
     ['[data-template-list]','템플릿 선택','Web13',null,2],
     ['[data-ed]','배정 템플릿 편집','Web25',null,3],
     ['[data-ta]','템플릿으로 배정','Web13',null,1],
-    ['[data-product-manage]','품목 관리','Web24',2,3],
+    ['[data-product-manage]','품목 관리','Web 공통17',2,3],
     ['[data-stock-cancel]','자산 선택','Web 공통14',2,3],
     ['[data-ai-state]','AI 입력','Web07',null,null]
   ];

@@ -11,10 +11,12 @@
   window.openAssetProductManageModal = function(onSaved, initialCategory) {
     if (!window.hasPrototypeAssetManagePermission()) return;
     const catalog=window.AssetProducts;
-    let category=window.DATA.categories.find(c=>initialCategory&&c.group===initialCategory.group&&c.sub===initialCategory.sub)||null;
+    const availableCategories = window.DATA.categories.filter(c => window.AssetAccess.canView(c));
+    const firstCategory = availableCategories[0] || null;
+    let category = availableCategories.find(c => c.group === initialCategory?.group && c.sub === initialCategory?.sub) || firstCategory;
     let original=[],draft=[],serial=0,serverDuplicates=new Set();
     const back=document.createElement('div');back.className='modal-back';back.dataset.productManage='';
-    back.innerHTML='<div class="modal sm" role="dialog" aria-modal="true" aria-label="품목 관리"><h3>품목 관리</h3><div class="body"><p class="tpl-manage-desc">소분류별 품목을 추가하고 관리합니다.</p><div class="field product-manage-category"><label>소분류</label><button type="button" class="perm-target-btn" data-pm-category></button></div><div class="tag-manage-add"><input type="text" class="cat-manage-input" data-pm-input placeholder="입력" maxlength="50" aria-label="추가할 품목명"><button type="button" class="btn primary" data-pm-add disabled>+ 추가</button></div><p class="field-err" data-pm-add-error hidden>동일한 명칭이 존재합니다.</p><div class="tag-manage-list" data-pm-list style="margin-top:14px"></div></div><div class="foot"><button type="button" class="btn" data-pm-cancel>취소</button><button type="button" class="btn primary" data-pm-save disabled>저장</button></div></div>';
+    back.innerHTML='<div class="modal sm" role="dialog" aria-modal="true" aria-label="품목 관리"><h3>품목 관리</h3><div class="body"><p class="tpl-manage-desc">소분류별 품목을 추가하고 관리합니다.</p><div class="field product-manage-category"><label>소분류</label><button type="button" class="perm-target-btn" data-pm-category></button></div><div class="tag-manage-add"><input type="text" class="cat-manage-input" data-pm-input placeholder="품목 입력" maxlength="50" aria-label="추가할 품목명"><button type="button" class="btn sm" aria-label="품목 추가" data-pm-add disabled>+</button></div><p class="field-err" data-pm-add-error hidden>동일한 명칭이 존재합니다.</p><div class="tag-manage-list" data-pm-list style="margin-top:14px"></div></div><div class="foot"><button type="button" class="btn" data-pm-cancel>취소</button><button type="button" class="btn primary" data-pm-save disabled>저장</button></div></div>';
     document.body.appendChild(back);
     const input=back.querySelector('[data-pm-input]'),add=back.querySelector('[data-pm-add]'),save=back.querySelector('[data-pm-save]'),list=back.querySelector('[data-pm-list]'),field=back.querySelector('[data-pm-category]');
     const snapshot=rows=>JSON.stringify(rows.map(p=>[p.id,catalog.normalize(p.name)]).sort((a,b)=>a[0].localeCompare(b[0])));
@@ -33,7 +35,12 @@
     }
     function draw() {
       field.innerHTML=category?`<span>${esc(category.group)} › ${esc(category.sub)}</span><span>›</span>`:'<span class="muted">선택</span><span>›</span>';
-      list.innerHTML=!category?'<p class="tag-manage-empty">소분류를 선택해주세요.</p>':draft.length?draft.map(p=>{
+      if (!category) {
+        list.innerHTML = '<p class="tag-manage-empty">선택할 수 있는 소분류가 없습니다.</p>';
+        validate();
+        return;
+      }
+      list.innerHTML=draft.length?draft.map(p=>{
         const locked=catalog.assetsOf(p.id).length>0;
         return `<div class="cat-manage-row"><div class="tag-manage-name-field"><input type="text" class="cat-manage-name-input" data-pm-name="${p.id}" value="${esc(p.name)}" maxlength="50" aria-label="품목명"><p class="field-err" hidden></p></div><div class="cat-manage-row-acts"><span class="product-delete-wrap"${locked?' tabindex="0" data-tip="등록된 자산이 있어 삭제할 수 없습니다."':''}><button type="button" class="cat-manage-icon" data-pm-delete="${p.id}" aria-label="${esc(p.name)} 삭제"${locked?' disabled':''}>${TRASH}</button></span></div></div>`;
       }).join(''):'<p class="tag-manage-empty">등록된 품목이 없습니다.</p>';
@@ -45,8 +52,8 @@
     }
     function load(next) { category=next;original=next?catalog.list(next.group,next.sub).map(p=>({...p})):[];draft=original.map(p=>({...p}));serverDuplicates.clear();input.value='';draw(); }
     field.onclick=()=>{
-      window.openAssetCategoryPickModal(window.DATA.categories,category?`${category.group}|${category.sub}`:null,value=>{
-        const next=window.DATA.categories.find(c=>`${c.group}|${c.sub}`===value);
+      window.openAssetCategoryPickModal(availableCategories,category?`${category.group}|${category.sub}`:null,value=>{
+        const next=availableCategories.find(c=>`${c.group}|${c.sub}`===value);
         if(!next||next===category)return;
         dirty()?confirmExit(()=>load(next)):load(next);
       });
@@ -66,10 +73,11 @@
       }
 
     };load(category);
-    if(window.DashboardCases){const seedCategory=category;window.DashboardCases.attach(back,{reference:'Web24',reset:()=>load(seedCategory),cases:[
-      ['product-category-none','소분류 미선택','1·2번',()=>load(null)],
-      ['product-list-empty','선택한 소분류에 등록된 품목 없음','3번',()=>{if(!category)load(window.DATA.categories[0]);draft=[];draw();}],
-      ['product-unused','삭제 가능한 0건 품목','3번',()=>{if(!category)load(window.DATA.categories[0]);draft.unshift({id:'design-unused-product',name:'디자인 미사용 품목'});draw();}]
+    if(window.DashboardCases){const seedCategory=category;window.DashboardCases.attach(back,{reference:'Web 공통17',reset:()=>load(seedCategory),cases:[
+      ['product-category-first','사전 선택 없음 · 첫 소분류','1·3번',()=>load(firstCategory)],
+      ['product-category-none','선택 가능한 소분류 없음','1·3번',()=>load(null)],
+      ['product-list-empty','선택한 소분류에 등록된 품목 없음','3번',()=>{if(!category)load(firstCategory);draft=[];draw();}],
+      ['product-unused','삭제 가능한 0건 품목','3번',()=>{if(!category)load(firstCategory);draft.unshift({id:'design-unused-product',name:'디자인 미사용 품목'});draw();}]
     ]});}
     return back;
   };
