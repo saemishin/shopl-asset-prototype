@@ -1372,7 +1372,7 @@ function openManagementMenu(button,sel) {
       render();
     };
     window.PrototypeCases.fixture({id:'category-page',title:'분류 > 소분류 상세',reference:'Web18·19',matches:()=>true,reset:()=>apply('default'),cases:[
-      ['default','기본 트리·소분류 상세','Web18 · 2·3번',()=>apply('default')],['none','등록된 분류 없음','Web18 · 5번',()=>apply('none')],['groups','대분류만 있음','Web18 · 4번',()=>apply('groups')],['partial','일부 소분류만 조회 가능','Web18 · 3번',()=>apply('partial')],['no-products','품목 목록 빈 상태','Web19 · 8번',()=>apply('no-products')],['extra-none','사용하는 추가 정보 없음','Web19 · 6번',()=>apply('extra-none')],['private','비공개 정보·관리 불가','Web19 · 6번',()=>apply('private')]
+      ['default','기본 트리·소분류 상세','Web18 · 1·2번',()=>apply('default')],['none','등록된 분류 없음','Web18 · 5번',()=>apply('none')],['groups','대분류만 있음','Web18 · 4번',()=>apply('groups')],['partial','일부 소분류만 조회 가능','Web18 · 2번',()=>apply('partial')],['no-products','품목 목록 빈 상태','Web19 · 8번',()=>apply('no-products')],['extra-none','사용하는 추가 정보 없음','Web19 · 6번',()=>apply('extra-none')],['private','비공개 정보·관리 불가','Web19 · 6번',()=>apply('private')]
     ]});
   }
   window.CategoryScreen = {
