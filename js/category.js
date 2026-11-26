@@ -343,7 +343,7 @@
     const creating = !opts.editing;
     const assignTitle = creating ? "배정 및 상태 관리 권한" : assignLabel(state.type);
     const fixedFields = creating ? [...publicBasicFields.slice(0, 2), ...window.AssetExtra.fixed, publicBasicFields[2]] : window.AssetExtra.fixed;
-    const closed = new Set(Array.from(container.querySelectorAll("details:not([open])"), el => el.dataset.group));
+    const expanded = new Set(Array.from(container.querySelectorAll("details[open]"), el => el.dataset.group));
     const scrollTop = container.scrollTop;
     container.innerHTML = `
       <div class="sub-form-identity">
@@ -376,7 +376,7 @@
         <label>정보 설정</label>
         <p class="hint" style="margin-top:0;margin-bottom:10px">비공개로 설정한 항목은 자산 관리 권한을 보유한 구성원만 보고 입력할 수 있습니다.</p>
         <div class="cat-manage-fieldlist" data-f-fields>
-          ${[{name:'기본 정보',fields:fixedFields},{name:'추가 정보',fields:window.DATA.extraFields.filter(f=>!f.deleted)}].filter(group=>group.fields.length).map(group=>`${creating ? `<details class="cat-info-settings-group" data-group="${group.name}" ${closed.has(group.name) ? '' : 'open'}><summary>${group.name}</summary>` : `<section class="cat-info-settings-group"><h4>${group.name}</h4>`}${group.fields.map(f => {
+          ${[{name:'기본 정보',fields:fixedFields},{name:'추가 정보',fields:window.DATA.extraFields.filter(f=>!f.deleted)}].filter(group=>group.fields.length).map(group=>`${creating ? `<details class="cat-info-settings-group" data-group="${group.name}" ${expanded.has(group.name) ? 'open' : ''}><summary>${group.name}</summary>` : `<section class="cat-info-settings-group"><h4>${group.name}</h4>`}${group.fields.map(f => {
             const locked=group.fields === fixedFields, enabled=locked||(state.extraEnabled||[]).includes(f.id);
             return `<div class="extra-field-settings"><div class="cat-manage-fieldrow"><span>${window.AssetExtra.esc(f.name)}</span><button type="button" class="toggle-switch${enabled?' on':''}" data-field="${f.id}"${locked?' disabled aria-disabled="true" data-tip="기본 항목이므로 체크를 해제할 수 없습니다."':''} role="switch" aria-checked="${enabled}" aria-label="${window.AssetExtra.esc(f.name)} 노출"><span class="toggle-knob"></span></button></div>${f.description?`<small>${window.AssetExtra.esc(f.description)}</small>`:''}${publicBasicFields.includes(f) ? '<small>항상 공개되는 정보입니다.</small>' : enabled?`<label class="extra-private"><input type="checkbox" data-private-field="${f.id}"${(state.privateFields||[]).includes(f.id)?' checked':''}>비공개</label>`:''}</div>`;
           }).join('')}${creating ? '</details>' : '</section>'}`).join('')}
