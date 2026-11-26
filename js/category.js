@@ -133,8 +133,8 @@
     DEFAULT_HIDDEN_FIELDS = {
       individual: ["imei"]
     },
-    assignLabel = type => "상태 관리 권한",
-    permLabel = kind => kind === "view" ? "자산 조회 권한" : kind === "edit" ? "정보 수정 권한" : "상태 관리 권한",
+    assignLabel = type => "배정 및 상태 관리 권한",
+    permLabel = kind => kind === "view" ? "자산 조회 권한" : kind === "edit" ? "정보 수정 권한" : "배정 및 상태 관리 권한",
     RESTRICT_TIP = "변경 권한을 부여하려면 먼저 조회 권한이 부여되어야 합니다.",
     assetsOf = (group, sub) => assets.filter(a => !a.deleted_at && a.group === group && a.sub === sub),
     categoryName = value => String(value || "").trim().replace(/\s+/g, " ");
@@ -340,10 +340,8 @@
     {id:'memo', name:'메모', description:'자산에 대해 남겨 두고 싶은 내용을 자유롭게 기록합니다.'}
   ];
   function renderSubForm(container, state, opts) {
-    const creating = !opts.editing;
-    const assignTitle = creating ? "배정 및 상태 관리 권한" : assignLabel(state.type);
-    const fixedFields = creating ? [...publicBasicFields.slice(0, 2), ...window.AssetExtra.fixed, publicBasicFields[2]] : window.AssetExtra.fixed;
-    const expanded = new Set(Array.from(container.querySelectorAll("details[open]"), el => el.dataset.group));
+    const fixedFields = [...publicBasicFields.slice(0, 2), ...window.AssetExtra.fixed, publicBasicFields[2]];
+    const expanded = new Set(Array.from(container.querySelectorAll('details[open]'), section => section.dataset.group));
     const scrollTop = container.scrollTop;
     container.innerHTML = `
       <div class="sub-form-identity">
@@ -359,27 +357,35 @@
       <div class="field">
         <label>자산 조회 권한<span class="req">*</span></label>
         <p class="hint" style="margin-top:0;margin-bottom:8px">이 소분류의 자산을 조회할 수 있는 구성원을 설정합니다.</p>
-        <button type="button" class="cat-manage-select-btn" data-f-view-btn><span>${state.view}</span><span class="chev">${creating ? "편집" : "▾"}</span></button>
+        <button type="button" class="cat-manage-select-btn" data-f-view-btn><span>${state.view}</span><span class="chev">편집</span></button>
       </div>
       <div class="field">
         <label>정보 수정 권한<span class="req">*</span></label>
         <p class="hint" style="margin-top:0;margin-bottom:8px">이 소분류의 자산 정보·사진·태그·메모를 수정할 수 있는 구성원을 설정합니다.</p>
-        <button type="button" class="cat-manage-select-btn" data-f-edit-btn><span>${state.edit}</span><span class="chev">${creating ? "편집" : "▾"}</span></button>
+        <button type="button" class="cat-manage-select-btn" data-f-edit-btn><span>${state.edit}</span><span class="chev">편집</span></button>
       </div>
       <div class="field">
-        <label>${assignTitle}<span class="req">*</span></label>
-        <p class="hint" style="margin-top:0;margin-bottom:8px">이 소분류의 자산을 배정·반납하거나 ${creating ? "자산 상태" : "상태"}를 변경할 수 있는 구성원을 설정합니다.</p>
-        <button type="button" class="cat-manage-select-btn" data-f-assign-btn><span>${state.assign}</span><span class="chev">${creating ? "편집" : "▾"}</span></button>
+        <label>${assignLabel(state.type)}<span class="req">*</span></label>
+        <p class="hint" style="margin-top:0;margin-bottom:8px">이 소분류의 자산을 배정·반납하거나 자산 상태를 변경할 수 있는 구성원을 설정합니다.</p>
+        <button type="button" class="cat-manage-select-btn" data-f-assign-btn><span>${state.assign}</span><span class="chev">편집</span></button>
       </div>
       </div>
       <div class="field sub-form-settings">
         <label>정보 설정</label>
         <p class="hint" style="margin-top:0;margin-bottom:10px">비공개로 설정한 항목은 자산 관리 권한을 보유한 구성원만 보고 입력할 수 있습니다.</p>
         <div class="cat-manage-fieldlist" data-f-fields>
-          ${[{name:'기본 정보',fields:fixedFields},{name:'추가 정보',fields:window.DATA.extraFields.filter(f=>!f.deleted)}].filter(group=>group.fields.length).map(group=>`${creating ? `<details class="cat-info-settings-group" data-group="${group.name}" ${expanded.has(group.name) ? 'open' : ''}><summary>${group.name}</summary>` : `<section class="cat-info-settings-group"><h4>${group.name}</h4>`}${group.fields.map(f => {
-            const locked=group.fields === fixedFields, enabled=locked||(state.extraEnabled||[]).includes(f.id);
-            return `<div class="extra-field-settings"><div class="cat-manage-fieldrow"><span>${window.AssetExtra.esc(f.name)}</span><button type="button" class="toggle-switch${enabled?' on':''}" data-field="${f.id}"${locked?' disabled aria-disabled="true" data-tip="기본 항목이므로 체크를 해제할 수 없습니다."':''} role="switch" aria-checked="${enabled}" aria-label="${window.AssetExtra.esc(f.name)} 노출"><span class="toggle-knob"></span></button></div>${f.description?`<small>${window.AssetExtra.esc(f.description)}</small>`:''}${publicBasicFields.includes(f) ? '<small>항상 공개되는 정보입니다.</small>' : enabled?`<label class="extra-private"><input type="checkbox" data-private-field="${f.id}"${(state.privateFields||[]).includes(f.id)?' checked':''}>비공개</label>`:''}</div>`;
-          }).join('')}${creating ? '</details>' : '</section>'}`).join('')}
+          ${[{name:'기본 정보', fields:fixedFields}, {name:'추가 정보', fields:window.DATA.extraFields.filter(f=>!f.deleted)}].filter(group=>group.fields.length).map(group => {
+            const basic = group.fields === fixedFields;
+            const rows = group.fields.map(field => {
+              const name = window.AssetExtra.esc(field.name);
+              const enabled = basic || (state.extraEnabled || []).includes(field.id);
+              const toggle = basic ? '' : `<button type="button" class="toggle-switch${enabled ? ' on' : ''}" data-field="${field.id}" role="switch" aria-checked="${enabled}" aria-label="${name} 노출"><span class="toggle-knob"></span></button>`;
+              const description = field.description ? `<small>${window.AssetExtra.esc(field.description)}</small>` : '';
+              const privacy = publicBasicFields.includes(field) ? '<small>항상 공개되는 정보입니다.</small>' : enabled ? `<label class="extra-private"><input type="checkbox" data-private-field="${field.id}"${(state.privateFields || []).includes(field.id) ? ' checked' : ''}>비공개</label>` : '';
+              return `<div class="extra-field-settings"><div class="cat-manage-fieldrow"><span>${name}</span>${toggle}</div>${description}${privacy}</div>`;
+            });
+            return `<details class="cat-info-settings-group" data-group="${group.name}" ${expanded.has(group.name) ? 'open' : ''}><summary>${group.name}</summary>${basic ? '<p class="hint">기본 정보는 항상 사용됩니다.</p>' : ''}${rows.join('')}</details>`;
+          }).join('')}
         </div>
       </div>`;
 
@@ -416,12 +422,12 @@
     }
     nameInputEl.addEventListener("input", e => {
       state.name = e.target.value, checkName();
-    }), checkName(), container.querySelector("[data-f-edit-btn]").onclick = () => openPermPicker("edit", state, () => renderSubForm(container, state, opts)), container.querySelector("[data-f-view-btn]").onclick = () => openPermPicker("view", state, () => renderSubForm(container, state, opts)), container.querySelector("[data-f-assign-btn]").onclick = () => openPermPicker("assign", state, () => renderSubForm(container, state, opts), assignTitle), container.querySelector("[data-f-fields]").addEventListener("click", e => {
+    }), checkName(), container.querySelector("[data-f-edit-btn]").onclick = () => openPermPicker("edit", state, () => renderSubForm(container, state, opts)), container.querySelector("[data-f-view-btn]").onclick = () => openPermPicker("view", state, () => renderSubForm(container, state, opts)), container.querySelector("[data-f-assign-btn]").onclick = () => openPermPicker("assign", state, () => renderSubForm(container, state, opts), assignLabel(state.type)), container.querySelector("[data-f-fields]").addEventListener("click", e => {
       const b = e.target.closest("[data-field]");
       if (!b || b.disabled) return;
       const f=b.dataset.field;
       state.extraEnabled ||= [];state.privateFields ||= [];
-      const list=window.AssetExtra.fixed.some(x=>x.id===f)?state.hiddenFields:state.extraEnabled,index=list.indexOf(f);
+      const list=state.extraEnabled,index=list.indexOf(f);
       index===-1?list.push(f):list.splice(index,1);renderSubForm(container,state,opts);
     });
   }
@@ -839,7 +845,7 @@ function openManagementMenu(button,sel) {
       initial = subFormSnapshot(state),
       back = document.createElement("div");
     back.className = "modal-back", back.innerHTML = `
-      <div class="modal lg cat-manage-modal">
+      <div class="modal lg cat-manage-modal sub-settings-modal">
         <div class="cat-manage-head"><h3>소분류 수정</h3></div>
         <div class="cat-manage-create" data-form></div>
         <div class="foot">
@@ -994,7 +1000,7 @@ function openManagementMenu(button,sel) {
     function setMode(mode) {
       currentMode = mode;
       const isList = mode === "list";
-      back.querySelector(".cat-manage-modal").classList.toggle("sub-create-modal", !isList);
+      back.querySelector(".cat-manage-modal").classList.toggle("sub-settings-modal", !isList);
       titleEl.textContent = isList ? "분류 관리" : "소분류 추가", backBtn.hidden = isList, addGroupRow.hidden = !isList, back.querySelector("[data-manage-desc]").hidden = !isList, body.hidden = !isList, createEl.hidden = isList, cancelBtn.hidden = !isList, confirmBtn.textContent = "저장", isList ? updateValidity() : confirmBtn.disabled = !0, cancelBtn.onclick = () => {
         dirty ? confirmModal("수정을 취소하시겠습니까?", "취소할 경우 수정한 내용이 저장되지 않습니다.", () => (back.remove(), render(sel))) : (back.remove(), render(sel));
       }, confirmBtn.onclick = isList ? saveAll : commitCreate;
