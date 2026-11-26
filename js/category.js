@@ -208,7 +208,7 @@
     });
   }
   function thumb(a) {
-    const ph = window.assetPhotos(a);
+    const ph = a ? window.assetPhotos(a) : [];
     return ph.length ? `<span class="thumb" style="background:${ph[a._primary || 0].color}"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10" r="1.6"/><path d="m21 16-5-5-9 8"/></svg></span>` : '<span class="thumb empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 15 5-4 4 3 4-4 5 4"/></svg></span>';
   }
   function prodCell(a, name) {
@@ -237,33 +237,22 @@
         <input class="search" type="text" data-product-search placeholder="검색">
         <button class="search-clear" type="button" data-product-search-clear aria-label="검색어 지우기">✕</button>
       </div>
-    </div>`,
-    assetEmptyHtml = () => `
-    <div class="cat-asset-empty">
-      <p class="muted">등록된 자산이 없습니다.</p>
-      ${window.hasPrototypeAssetManagePermission() ? '<button class="btn sm" data-add-asset>자산 추가</button><button class="btn sm" data-bulk-add>일괄 추가</button>' : ""}
     </div>`;
-  function assetSectionHtml(cat) {
-    {
-      const products = productsOf(cat.group, cat.sub);
-      return `
-        <div class="cat-asset-head">
-          <h4>품목 목록</h4>
-        </div>
+  function assetSectionHtml() {
+    return `
         <div class="cat-asset-countrow">
-          <p class="cat-asset-count">전체 <span data-product-result-count>${products.reduce((s, p) => s + p.total, 0)}</span></p>
-          ${products.length ? ASSET_SEARCH_HTML : ""}
+          ${ASSET_SEARCH_HTML}
+          <p class="cat-asset-count">전체 <span data-product-result-count>0</span></p>
+          ${window.hasPrototypeAssetManagePermission() ? '<button type="button" class="btn sm" data-product-add>품목 추가</button>' : ''}
         </div>
-        ${products.length ? `
           <div class="table-wrap" data-asset-table>
             <table class="cat-asset-table">
               <thead><tr><th>품목명</th><th class="num">자산 수</th><th class="num">배정 중</th><th class="num">수리/점검 중</th><th class="num">분실</th><th class="num">폐기</th><th class="num">배정 가능</th></tr></thead>
               <tbody data-asset-tbody></tbody>
             </table>
           </div>
-          <p class="muted" data-search-empty hidden style="padding:12px 0">결과가 없습니다.</p>
-          <div data-asset-pager></div>` : assetEmptyHtml()}`;
-    }
+          <p class="muted" data-search-empty hidden style="padding:12px 0"></p>
+          <div data-asset-pager></div>`;
   }
   function permValueHtml(cat, kind) {
     const value = cat[kind];
@@ -301,7 +290,7 @@
     m.className = "modal-back", m.innerHTML = `
       <div class="modal help-modal perm-target-modal">
         <div class="help-modal-head">
-          <h3>${permLabel(kind)}</h3>
+          <h3>${kind === "assign" ? "배정 및 상태 관리 권한" : permLabel(kind)}</h3>
           <button type="button" class="btn icon-only sm" data-close aria-label="닫기">${CLOSE_ICON}</button>
         </div>
         <div class="body">${bodyHtml}</div>
@@ -310,21 +299,22 @@
     }), m.querySelector("[data-close]").onclick = () => m.remove();
   }
   function detailHtml(cat) {
+    const products = productsOf(cat.group, cat.sub);
     return `
       <div class="cat-detail-head">
-        <div class="category-two-line"><span>${cat.group}</span><h3>${cat.sub}</h3></div>
+        <div class="category-two-line"><span>${cat.group}</span><h3>${cat.sub}</h3> <small>품목 ${products.length} · 자산 ${assetsOf(cat.group,cat.sub).length}</small></div>
         ${window.hasPrototypeAssetManagePermission()?'<div class="cat-detail-acts"><button class="btn sm" data-edit-sub>수정</button></div>':''}
       </div>
       <div class="kv2 cat-detail-kv">
         <div><div class="k">자산 조회 권한</div><div class="v">${permValueHtml(cat, "view")}</div></div>
+        <div><div class="k">배정 및 상태 관리 권한</div><div class="v">${permValueHtml(cat, "assign")}</div></div>
         <div><div class="k">정보 수정 권한</div><div class="v">${permValueHtml(cat, "edit")}</div></div>
-        <div><div class="k">${assignLabel(cat.type)}</div><div class="v">${permValueHtml(cat, "assign")}</div></div>
       </div>
       <div class="cat-usage"${usageInfoHtml(cat)?"":" hidden"}>
         <div class="k">추가 정보</div>
         <div class="cat-usage-bullets">${usageInfoHtml(cat)}</div>
       </div>
-      ${assetSectionHtml(cat)}
+      ${assetSectionHtml()}
     `;
   }
   function subSaveFailure(back, scenario, deleted, limitReached = false) {
@@ -1262,6 +1252,7 @@ function openManagementMenu(button,sel) {
         refresh = () => {
           const q = st.q.trim().toLowerCase(),
             filtered = q ? items.filter(it => nameOf(it).toLowerCase().includes(q)) : items;
+          emptyMsg.textContent = items.length ? "검색 결과가 없습니다." : "등록된 품목이 없습니다.";
           countEl.textContent = filtered.reduce((sum, p) => sum + p.total, 0);
           const totalPages = Math.max(1, Math.ceil(filtered.length / st.size));
           st.page > totalPages && (st.page = totalPages);
@@ -1293,18 +1284,8 @@ function openManagementMenu(button,sel) {
         searchInput.value = "", st.q = "", st.page = 1, refresh(), searchInput.focus();
       }, refresh();
     }
-    const bulkButton=c.querySelector('[data-bulk-add]');
-    if(bulkButton)bulkButton.onclick=()=>{if(!window.hasPrototypeAssetManagePermission())return;sessionStorage.setItem('asset-bulk-origin',JSON.stringify({group:cat.group,sub:cat.sub}));location.href='assets.html?screen=bulk-register';};
-    const addAssetBtn = c.querySelector("[data-add-asset]");
-    addAssetBtn && (addAssetBtn.onclick = () => window.hasPrototypeAssetManagePermission() && window.openAssetAddModal({
-      type: cat.type,
-      group: cat.group,
-      sub: cat.sub,
-      onSaved: () => render({
-        group: cat.group,
-        sub: cat.sub
-      })
-    }));
+    const addProduct = c.querySelector('[data-product-add]');
+    if (addProduct) addProduct.onclick = () => window.openAssetProductManageModal(() => render(cat), cat);
   }
   function render(sel) {
     if(!sel){const params=new URLSearchParams(location.search),group=params.get('group'),sub=params.get('sub');if(categories.some(c=>c.group===group&&c.sub===sub))sel={group,sub};}
@@ -1367,12 +1348,14 @@ function openManagementMenu(button,sel) {
       if(key==='groups'){const groups=[...new Set(categories.map(c=>c.group))];categories.splice(0);window.DATA.emptyGroups.splice(0,window.DATA.emptyGroups.length,...groups);}
       if(key==='partial'){C.access('view');categories.forEach((c,i)=>c.view=i===0?'회사의 모든 구성원':'관리자만');}
       if(key==='no-products')assets.splice(0),window.DATA.products?.splice(0);
+      if(key==='product-zero')assets.splice(0);
       if(key==='extra-none')categories.forEach(c=>c.extraEnabled=[]);
       if(key==='private')C.access('private');
       render();
+      if(key==='product-search-empty'){const input=document.querySelector('[data-product-search]');if(input){input.value='일치하지 않는 품목';input.dispatchEvent(new Event('input'));}}
     };
     window.PrototypeCases.fixture({id:'category-page',title:'분류 > 소분류 상세',reference:'Web18·19',matches:()=>true,reset:()=>apply('default'),cases:[
-      ['default','기본 트리·소분류 상세','Web18 · 1·2번',()=>apply('default')],['none','등록된 분류 없음','Web18 · 5번',()=>apply('none')],['groups','대분류만 있음','Web18 · 4번',()=>apply('groups')],['partial','일부 소분류만 조회 가능','Web18 · 2번',()=>apply('partial')],['no-products','품목 목록 빈 상태','Web19 · 8번',()=>apply('no-products')],['extra-none','사용하는 추가 정보 없음','Web19 · 6번',()=>apply('extra-none')],['private','비공개 정보·관리 불가','Web19 · 6번',()=>apply('private')]
+      ['default','기본 트리·소분류 상세','Web18 · 1·2번',()=>apply('default')],['none','등록된 분류 없음','Web18 · 5번',()=>apply('none')],['groups','대분류만 있음','Web18 · 4번',()=>apply('groups')],['partial','일부 소분류만 조회 가능','Web18 · 2번',()=>apply('partial')],['no-products','등록 품목 없음','Web19 · Case 8-1',()=>apply('no-products')],['product-zero','등록 품목 있음 · 자산 0건','Web19 · Case 8-2',()=>apply('product-zero')],['product-search-empty','품목 검색 결과 없음','Web19 · Case 8-3',()=>apply('product-search-empty')],['extra-none','사용하는 추가 정보 없음','Web19 · 6번',()=>apply('extra-none')],['private','비공개 정보·관리 불가','Web19 · 6번',()=>apply('private')]
     ]});
   }
   window.CategoryScreen = {
