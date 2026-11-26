@@ -455,7 +455,7 @@
             <div class="field" id="areg-purchasedate-field"><label>구매연월</label>${monthFieldHtml()}
               <p class="field-err" data-date-err hidden>유효한 날짜가 아닙니다.</p>
             </div>
-            <div class="field" id="areg-purchaseprice-field"><label>구매가격</label><input type="text" inputmode="decimal" id="areg-purchaseprice-input" placeholder="입력" maxlength="21"></div>
+            <div class="field" id="areg-purchaseprice-field"><label>구매가격 (<span data-price-currency>${opts.asset?.registrationCurrency || window.CLIENT_CURRENCY}</span>)</label><input type="text" inputmode="decimal" id="areg-purchaseprice-input" placeholder="입력" maxlength="21"></div>
             <div class="field" id="areg-note-field"><label>메모</label><textarea id="areg-note-input" placeholder="입력" maxlength="500"></textarea></div>
           </div>
         </div>
@@ -1041,7 +1041,7 @@
         const purchaseDate = getPurchaseDate();
         fieldIsShown(purchaseDateField) && purchaseDate !== null && (purchaseDate || "").slice(0, 7) !== (asset.purchaseDate || "").slice(0, 7) && (logChange("구매연월 변경", monthFmt(asset.purchaseDate), monthFmt(purchaseDate)), asset.purchaseDate = purchaseDate || void 0);
         const price = window.normalizePurchasePrice(purchasePriceInput.value);
-        setIf("구매가격 변경", "price", price || void 0, v => v != null ? window.formatPrice(v) : ""), setIf("메모 수정", "note", noteInput.value.trim() || void 0), window.AssetExtra.applyCustom(asset,window.AssetExtra.readInputs(back),e=>pending.push(e)), pending.push(...window.assetPhotoActivities(window.assetPhotos(asset), asset._primary || 0, photos, primaryIdx)), window.AssetProducts.reconcile(), opts.logActivity && window.logAssetActivities(pending, e => opts.logActivity(e)), asset._photos = photos, asset._primary = primaryIdx, back.remove(), toast("저장되었습니다."), opts.onSaved && opts.onSaved();
+        setIf("구매가격 변경", "price", price || void 0, v => v != null ? window.formatPrice(v, asset.registrationCurrency) : ""), setIf("메모 수정", "note", noteInput.value.trim() || void 0), window.AssetExtra.applyCustom(asset,window.AssetExtra.readInputs(back),e=>pending.push(e)), pending.push(...window.assetPhotoActivities(window.assetPhotos(asset), asset._primary || 0, photos, primaryIdx)), window.AssetProducts.reconcile(), opts.logActivity && window.logAssetActivities(pending, e => opts.logActivity(e)), asset._photos = photos, asset._primary = primaryIdx, back.remove(), toast("저장되었습니다."), opts.onSaved && opts.onSaved();
       } else {
         const cat = findCat(catValue),
           draft = {

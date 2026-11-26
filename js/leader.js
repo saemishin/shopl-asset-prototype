@@ -583,7 +583,7 @@
           ${cat && !window.AssetExtra.visible(cat,"expiry",hasAssetManagePermission()) ? "" : addExpiryFieldHtml(draft)}
           ${cat && !window.AssetExtra.visible(cat,"manufactured") ? "" : addDateSelectHtml("제조연월", "manufactured", draft, "month")}
           ${cat && !window.AssetExtra.visible(cat,"purchaseDate") ? "" : addDateSelectHtml("구매연월", "purchaseDate", draft, "month")}
-          ${cat && !window.AssetExtra.visible(cat,"purchasePrice") ? "" : addInputHtml("구매가격", "purchasePrice", draft, {
+          ${cat && !window.AssetExtra.visible(cat,"purchasePrice") ? "" : addInputHtml(`구매가격 (${draft.registrationCurrency || window.CLIENT_CURRENCY})`, "purchasePrice", draft, {
       inputmode: "decimal",
       maxlength: 21
     })}
@@ -1060,6 +1060,7 @@
         sub: a.sub
       }),
       editingId: a.id,
+      registrationCurrency: a.registrationCurrency,
       extraValues:{...(a.extraValues||{})},
       product: a.product,
       assetNo: a.assetNo || "",
@@ -1128,7 +1129,7 @@
     const expiry = parseAddExpiry(draft.expiry);
     window.AssetExtra.visible(cat,"expiry",hasAssetManagePermission()) && expiry !== null && set("expiry", expiry || void 0, "유효기한 변경", v => v ? window.fmtDate(v) : "");
     for (const [key, script] of [["manufactured", "제조연월 변경"], ["purchaseDate", "구매연월 변경"]]) window.AssetExtra.visible(cat,key,hasAssetManagePermission()) && (a[key] || "").slice(0, 7) !== draft[key] && set(key, draft[key] ? `${draft[key]}-01` : void 0, script, v => v ? window.fmtMonth(v) : "");
-    window.AssetExtra.visible(cat,"purchasePrice",hasAssetManagePermission()) && set("price", window.normalizePurchasePrice(draft.purchasePrice) || void 0, "구매가격 변경", v => v == null ? "" : window.formatPrice(v)), set("note", draft.note.trim() || void 0, "메모 수정"), pending.push(...window.assetPhotoActivities(window.assetPhotos(a), a._primary || 0, draft.photos, draft.primaryPhoto)), window.logAssetActivities(pending, e => logActivity(a, e)), a._photos = draft.photos.map(p => ({
+    window.AssetExtra.visible(cat,"purchasePrice",hasAssetManagePermission()) && set("price", window.normalizePurchasePrice(draft.purchasePrice) || void 0, "구매가격 변경", v => v == null ? "" : window.formatPrice(v, a.registrationCurrency)), set("note", draft.note.trim() || void 0, "메모 수정"), pending.push(...window.assetPhotoActivities(window.assetPhotos(a), a._primary || 0, draft.photos, draft.primaryPhoto)), window.logAssetActivities(pending, e => logActivity(a, e)), a._photos = draft.photos.map(p => ({
       ...p
     })), a._primary = draft.primaryPhoto, a.photo = draft.photos[draft.primaryPhoto]?.color || null, a.photoCount = draft.photos.length;
   }

@@ -64,9 +64,7 @@
         <div class="foot">
           <button class="btn primary" data-cok>업그레이드 →</button>
         </div>
-      </div>`, cb.addEventListener("click", e => {
-      e.target === cb && cb.remove();
-    }), cb.querySelector("[data-cok]").onclick = () => cb.remove(), document.body.appendChild(cb);
+      </div>`, cb.querySelector("[data-cok]").onclick = () => cb.remove(), document.body.appendChild(cb);
   }
   const HELP_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 0 1 4.6-1.4c.6.9.3 1.7-.4 2.3-.7.6-1.2 1-1.2 2.1"/><path d="M12 17h.01"/></svg>',
     TABS = [{

@@ -104,6 +104,11 @@
       for(const [id,label,val,n] of [['expiry','유효기한 날짜 오류','20260230',edit?7:8],['manufactured','제조연월 형식 오류','202613',edit?8:9],['purchasedate','구매연월 미래 날짜','209912',edit?8:9]])add(id+'-invalid',label,`${n}번`,()=>input(root,`#areg-${id}-field input[type="text"]`,val));
       add('date-empty','날짜 입력값 없음',`${edit?7:8}·${edit?8:9}번`,()=>['expiry','manufactured','purchasedate'].forEach(id=>input(root,`#areg-${id}-field input[type="text"]`,'')));
       add('price','구매가격 자릿수·콤마',`${edit?9:10}번`,()=>input(root,'#areg-purchaseprice-input','123456789'));
+      add('company-currency','회사 통화를 USD로 변경',edit?'9번':'10번',()=>{
+        window.CLIENT_CURRENCY='USD';
+        if (!edit) root.querySelector('[data-price-currency]').textContent='USD';
+        input(root,'#areg-purchaseprice-input','5000');
+      });
       add('number','고유관리번호 형식 오류',`${edit?4:5}번`,()=>input(root,'#areg-assetno-input','잘못된 번호!'));
     }
     if(root.querySelector('[data-ed] [data-name]')){

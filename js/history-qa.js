@@ -34,7 +34,7 @@
       edit("유효기한 변경","expiry","",D("2027-03-10")),
       edit("제조연월 변경","manufactured",Mo("2023-12-01"),Mo("2024-01-01")),
       edit("구매연월 변경","purchaseDate","",Mo("2024-03-01")),
-      edit("구매가격 변경","purchasePrice","$1,200","₩1,500,000"),
+      edit("구매가격 변경","purchasePrice",window.formatPrice(1200000,info.registrationCurrency),window.formatPrice(1500000,info.registrationCurrency)),
       edit("메모 수정","memo","","<p>배정 전 구성품 확인</p>"),
       edit("S/N 수정","sn","SN-8842","SN-8842-AA",{fieldName:"S/N"}),
       edit("IMEI 수정","imei","","356938035643809",{fieldName:"IMEI"}),

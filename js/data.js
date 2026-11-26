@@ -867,6 +867,9 @@ window.isAssetGroupPositionSubset = function (target, viewTarget) {
     }
   };
   window.CLIENT_CURRENCY = "KRW";
+  for (const asset of [...window.DATA.assets, ...(window.DATA.deletedAssets || [])]) {
+    asset.registrationCurrency ??= window.CLIENT_CURRENCY;
+  }
   const PRICE_INTEGER_DIGITS = 12,
     PRICE_FRACTION_DIGITS = 5;
   function priceInputText(value) {
@@ -897,9 +900,9 @@ window.isAssetGroupPositionSubset = function (target, viewTarget) {
         input.setSelectionRange(cursor, cursor);
       }
     });
-  }, window.formatPrice = function (amount) {
+  }, window.formatPrice = function (amount, currency = window.CLIENT_CURRENCY) {
     if (amount == null || amount === "") return "";
-    const fmt = CURRENCY_FORMATS[window.CLIENT_CURRENCY] || CURRENCY_FORMATS.KRW,
+    const fmt = CURRENCY_FORMATS[currency] || CURRENCY_FORMATS.KRW,
       n = window.formatPurchasePriceInput(window.normalizePurchasePrice(amount));
     return fmt.position === "prefix" ? `${fmt.symbol}${n}` : `${n}${fmt.symbol}`;
   };
@@ -1039,6 +1042,7 @@ window.archiveDeletedAsset = function (asset, actor) {
         prepared = drafts.map(draft => {
           const asset = {
               ...draft,
+              registrationCurrency: window.CLIENT_CURRENCY,
               companyId,
               type: "individual",
               // 목업 호환용 내부 값. 사용자 유형 선택은 제공하지 않는다.
@@ -1158,7 +1162,7 @@ window.formatAssetCount = value => Number(value || 0).toLocaleString("en-US");
       let value=f.value == null || f.value==='' ? '—' : esc(f.value);
       if(f.value && f.id==='expiry') value=expiryFormat ? expiryFormat(f.value) : window.fmtDate(f.value);
       if(f.value && ['manufactured','purchaseDate'].includes(f.id)) value=window.fmtMonth(f.value);
-      if(f.value!=null && f.id==='purchasePrice') value=window.formatPrice(f.value);
+      if(f.value!=null && f.id==='purchasePrice') value=window.formatPrice(f.value, a.registrationCurrency);
       return `<div><div class="k">${esc(f.name)}</div><div class="v">${value}</div></div>`;
     }).join('');
   }
@@ -1203,7 +1207,7 @@ window.formatAssetCount = value => Number(value || 0).toLocaleString("en-US");
 // The sample Sheets remain reference files. The production export must use current
 // company definitions and authorization, never send hidden values to the client.
 window.AssetExtra.exportColumns=()=>window.AssetExtra.fields().map(f=>({id:f.id,name:f.name}));
-window.AssetExtra.exportValues=(asset,manage=window.hasPrototypeAssetManagePermission())=>Object.fromEntries(window.AssetExtra.fields().map(f=>[f.id,window.AssetExtra.visible(window.AssetExtra.category(asset),f.id,manage)?(f.id==='purchasePrice'?asset.price:window.AssetExtra.fixed.some(x=>x.id===f.id)?asset[f.id]:asset.extraValues?.[f.id])??'':'']));
+window.AssetExtra.exportValues=(asset,manage=window.hasPrototypeAssetManagePermission())=>Object.fromEntries(window.AssetExtra.fields().map(f=>[f.id,window.AssetExtra.visible(window.AssetExtra.category(asset),f.id,manage)?(f.id==='purchasePrice'?window.formatPrice(asset.price,asset.registrationCurrency):window.AssetExtra.fixed.some(x=>x.id===f.id)?asset[f.id]:asset.extraValues?.[f.id])??'':'']));
 
 
 // D-20261030: independent subcategory view / information edit / state management.

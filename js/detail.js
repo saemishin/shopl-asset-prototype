@@ -351,7 +351,7 @@
   }
   function openLabelPreview(a) {
     const back = document.createElement("div");
-    back.className = "modal-back", back.style.zIndex = 350, back.innerHTML = `
+    back.className = "modal-back qr-preview-back", back.style.zIndex = 350, back.innerHTML = `
       <div class="label-pop">
         <button class="label-pop-close" data-close aria-label="닫기">✕</button>
         ${labelSheetHtml(a)}
@@ -387,7 +387,7 @@
       toast(`"${fileName}" 다운로드 (프로토타입 — 반영 없음)`), pop.remove();
     }, setTimeout(() => {
       const close = e => {
-        !pop.contains(e.target) && e.target !== anchor && (pop.remove(), document.removeEventListener("click", close));
+        !e.target.closest(".qr-preview-back") && !pop.contains(e.target) && e.target !== anchor && (pop.remove(), document.removeEventListener("click", close));
       };
       document.addEventListener("click", close);
     });

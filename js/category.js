@@ -327,6 +327,21 @@
       ${assetSectionHtml(cat)}
     `;
   }
+  function subSaveFailure(back, scenario, deleted, limitReached = false) {
+    if (scenario === 'permission') window.hasPrototypeAssetManagePermission = () => false;
+    if (!window.hasPrototypeAssetManagePermission() || deleted) {
+      back.remove();
+      toast(window.hasPrototypeAssetManagePermission()
+        ? "설정이 변경되었습니다. 잠시 후 다시 시도해주세요." : "자산 관리 권한이 없습니다.");
+      render();
+      return true;
+    }
+    if (limitReached || scenario === 'limit' || scenario === 'system') {
+      toast("에러가 발생하였습니다. 잠시 후 다시 시도해보세요.");
+      return true;
+    }
+    return false;
+  }
   function renderSubForm(container, state, opts) {
     const typeLocked = !!opts.typeLocked;
     container.innerHTML = `
@@ -366,7 +381,19 @@
       </div>`;
 
     const caseRoot=container.closest('.modal-back');
-    window.DashboardCases?.attach(caseRoot,{when:()=>!!container.getClientRects().length,cases:[
+    const editing = !!opts.editing;
+    const saveCases = [
+      ['duplicate', '저장 시 소분류명 중복', '8-2'],
+      ['permission', '저장 시 자산 관리 권한 상실', editing ? '8-4' : '8-3'],
+      ['system', '저장 시 일시적인 시스템 오류', '8-5'],
+      ['deleted', editing ? '수정 중 소분류 삭제' : '작성 중 기존 대분류 삭제', editing ? '8-3' : '8-6'],
+      ...(!editing ? [['limit', '저장 시 회사 소분류 상한 초과', '8-4']] : [])
+    ].filter(([id]) => id !== 'deleted' || editing || opts.existingGroup);
+    window.DashboardCases?.attach(caseRoot,{reference:editing?'Web22':'Web21',when:()=>!!container.getClientRects().length,cases:[
+      ...saveCases.map(([id, label, ref]) => ['save-'+id, label, 'Case '+ref, () => {
+        state.saveScenario = id;
+        window.DashboardCases.input(caseRoot, '[data-f-name]', '저장 확인용 소분류');
+      }]),
       ['sub-name-empty','소분류명 미입력',caseRoot.querySelector('h3')?.textContent==='소분류 수정'?'2번':'3번',()=>window.DashboardCases.input(caseRoot,'[data-f-name]','')],
       ['sub-name-duplicate','같은 대분류 내 이름 중복',caseRoot.querySelector('h3')?.textContent==='소분류 수정'?'2번':'3번',()=>window.DashboardCases.input(caseRoot,'[data-f-name]',opts.siblingNames?.[0]||state.name)],
       ['sub-name-ready','소분류명 입력',caseRoot.querySelector('h3')?.textContent==='소분류 수정'?'2번':'3번',()=>window.DashboardCases.input(caseRoot,'[data-f-name]','디자인 확인용 소분류')]
@@ -819,6 +846,7 @@ function openManagementMenu(button,sel) {
     const form = back.querySelector("[data-form]"),
       saveBtn = back.querySelector("[data-save]");
     renderSubForm(form, state, {
+      editing: true,
       groupLabel: cat.group,
       typeLocked: hasAssets,
       siblingNames: categories.filter(c => c.group === cat.group && c.sub !== cat.sub).map(c => c.sub),
@@ -830,7 +858,11 @@ function openManagementMenu(button,sel) {
     }, saveBtn.onclick = () => {
       const name = categoryName(state.name);
       if (!(!name || saveBtn.disabled)) {
-        if (categories.some(c => c !== cat && c.group === cat.group && categoryName(c.sub) === name)) {
+        const scenario = state.saveScenario;
+        delete state.saveScenario;
+        if (scenario === 'deleted' && categories.includes(cat)) categories.splice(categories.indexOf(cat), 1);
+        if (subSaveFailure(back, scenario, !categories.includes(cat))) return;
+        if (scenario === 'duplicate' || categories.some(c => c !== cat && c.group === cat.group && categoryName(c.sub) === name)) {
           form.querySelector("[data-f-name]").classList.add("has-err"), form.querySelector("[data-f-name-err]").hidden = !1, saveBtn.disabled = !0;
           return;
         }
@@ -962,9 +994,7 @@ function openManagementMenu(button,sel) {
         dirty ? confirmModal("수정을 취소하시겠습니까?", "취소할 경우 수정한 내용이 저장되지 않습니다.", () => (back.remove(), render(sel))) : (back.remove(), render(sel));
       }, confirmBtn.onclick = isList ? saveAll : commitCreate;
     }
-    backBtn.onclick = guardedBack, back.addEventListener("click", e => {
-      e.target === back && (currentMode === "list" ? cancelBtn.click() : guardedBack());
-    });
+    backBtn.onclick = guardedBack;
     function renderBody() {
       body.innerHTML = draft.length ? draft.map((g, gi) => {
         const blocked = g.subs.length > 0;
@@ -1140,6 +1170,7 @@ function openManagementMenu(button,sel) {
     }
     function renderCreateForm() {
       renderSubForm(createEl, createState, {
+        existingGroup: !!draft[createGi].origName,
         groupLabel: draft[createGi].name,
         typeLocked: !1,
         siblingNames: draft[createGi].subs.map(s => s.name),
@@ -1151,6 +1182,24 @@ function openManagementMenu(button,sel) {
     function commitCreate() {
       const name = categoryName(createState.name);
       if (!name) return;
+      const parent = draft[createGi];
+      const scenario = createState.saveScenario;
+      delete createState.saveScenario;
+      if (scenario === 'deleted' && parent.origName) {
+        for (let i = categories.length - 1; i >= 0; i--) {
+          if (categories[i].group === parent.origName) categories.splice(i, 1);
+        }
+        window.DATA.emptyGroups = window.DATA.emptyGroups.filter(name => name !== parent.origName);
+      }
+      const removed = parent.origName && !categories.some(c => c.group === parent.origName)
+        && !window.DATA.emptyGroups.includes(parent.origName);
+      if (subSaveFailure(back, scenario, removed, categories.length >= categoryLimit().sub)) return;
+      if (scenario === 'duplicate' || categories.some(c => c.group === (parent.origName || parent.name) && categoryName(c.sub) === name)) {
+        createEl.querySelector('[data-f-name]').classList.add('has-err');
+        createEl.querySelector('[data-f-name-err]').hidden = false;
+        confirmBtn.disabled = true;
+        return;
+      }
       const newCat = {
         group: draft[createGi].origName || draft[createGi].name,
         sub: name,
@@ -1167,6 +1216,7 @@ function openManagementMenu(button,sel) {
           ...createState.assignTarget
         } : null
       };
+      parent.origName ||= newCat.group;
       categories.push(newCat), draft[createGi].subs.push({
         name,
         data: newCat
