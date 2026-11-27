@@ -305,10 +305,10 @@
     const actions = [];
     return canManageAssets() && actions.push("일괄 추가"), (canManageAssets() || window.DATA.categories.some(canAssignCategory)) && actions.push("일괄 배정"), actions;
   }
-  // 현황 [자산 배정] 메뉴: 직접 배정(자산 배정 Modal)·템플릿으로 배정(D-20261102-01)
+  // 현황 [자산 배정] 메뉴: 직접 배정(자산 배정 Modal)·자산 그룹으로 배정(D-20261102-01)
   function assignActions() {
     const actions = [];
-    return (canManageAssets() || window.DATA.categories.some(canAssignCategory)) && actions.push("직접 배정"), window.AssetTemplates && window.AssetTemplates.usableTemplates().length && actions.push("템플릿으로 배정"), actions;
+    return (canManageAssets() || window.DATA.categories.some(canAssignCategory)) && actions.push("직접 배정"), window.AssetTemplates && window.AssetTemplates.usableTemplates().length && actions.push("자산 그룹으로 배정"), actions;
   }
   function viewableCategories() {
     return window.DATA.categories.filter(canViewCategory);

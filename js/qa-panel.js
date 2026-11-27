@@ -35,9 +35,9 @@
   function seedTemplateList() {
     if (!['templates-many','template-picker-many'].includes(params.get('review')) || !D.templates?.length) return;
     const samples=clone(D.templates);
-    D.templates.splice(0,D.templates.length,...Array.from({length:45},(_,i)=>({...clone(samples[i%samples.length]),id:`QA-TPL-${i+1}`,name:`QA 배정 템플릿 ${String(i+1).padStart(2,'0')}`})));
+    D.templates.splice(0,D.templates.length,...Array.from({length:45},(_,i)=>({...clone(samples[i%samples.length]),id:`QA-TPL-${i+1}`,name:`QA 자산 그룹 ${String(i+1).padStart(2,'0')}`})));
   }
-  const entries=[], groups=['화면 바로가기','권한','빈 상태','상한·많은 데이터','추가·AI 입력','연결·템플릿','설정·이력'];
+  const entries=[], groups=['화면 바로가기','권한','빈 상태','상한·많은 데이터','추가·AI 입력','연결·자산 그룹','설정·이력'];
   const add=(group,id,label,page,query={},open='')=>entries.push({group,id,label,page,query,open});
   if(mobile){
     add(0,'menu','메뉴',file);add(0,'assets','자산',file,{},'mobile-assets');
@@ -80,11 +80,11 @@
   add(5,'links-empty','연결된 자산 없음',mobile?file:'asset-detail.html',{qa:'review',scenario:'links-empty',id:'A001'});
   add(5,'links-hidden','조회 불가 연결 자산',mobile?file:'asset-detail.html',{qa:'review',scenario:'links-hidden',id:'A001'});
   add(6,'tag-manager','태그 관리','category.html',{},'tag-manage');
-  add(5,'template-manager','배정 템플릿 관리','category.html',{},'templates-manage');
-  add(3,'templates-many','배정 템플릿 45개','category.html',{},'templates-many');
-  add(3,'template-picker-many','템플릿 선택 45개','assets.html',{},'template-picker-many');
-  add(5,'template-change','템플릿 배정·대상 변경 검토','assets.html',{},'template-change');
-  add(5,'template-assets','템플릿 자산 선택·개수 상한','assets.html',{},'template-assets');
+  add(5,'template-manager','자산 그룹 관리','category.html',{},'templates-manage');
+  add(3,'templates-many','자산 그룹 45개','category.html',{},'templates-many');
+  add(3,'template-picker-many','자산 그룹 선택 45개','assets.html',{},'template-picker-many');
+  add(5,'template-change','자산 그룹으로 배정·대상 변경 검토','assets.html',{},'template-change');
+  add(5,'template-assets','자산 그룹 자산 선택·개수 상한','assets.html',{},'template-assets');
   add(5,'member-target','앱 구성원 기준 상세',mobile?file:'leader.html',{qa:'review',scenario:'target',id:'A001'});
   const worksiteSample=D.assets.find(a=>(a.assignments||[])[0]?.worksite);
   add(5,'worksite-target','앱 근무지 기준 상세',mobile?file:'leader.html',{qa:'review',scenario:'target',id:worksiteSample?.id||'A027'});

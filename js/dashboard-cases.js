@@ -20,10 +20,10 @@
     ['[data-extra-name]','추가 정보 관리','Web23',1,3],
     ['#areg-name','자산 추가·수정',null,3,4],
     ['.areg-ai-modal','AI 입력','Web07',null,null],
-    ['[data-tpl-list]','배정 템플릿 관리','Web25',null,2],
-    ['[data-template-list]','템플릿 선택','Web13',null,2],
-    ['[data-ed]','배정 템플릿 편집','Web25',null,3],
-    ['[data-ta]','템플릿으로 배정','Web13',null,1],
+    ['[data-tpl-list]','자산 그룹 관리','Web25',null,2],
+    ['[data-template-list]','자산 그룹 선택','Web13',null,2],
+    ['[data-ed]','자산 그룹 편집','Web25',null,3],
+    ['[data-ta]','자산 그룹으로 배정','Web13',null,1],
     ['[data-product-manage]','품목 관리','Web 공통17',2,3],
     ['[data-stock-cancel]','자산 선택','Web 공통14',2,3],
     ['[data-ai-state]','AI 입력','Web07',null,null]
@@ -55,7 +55,7 @@
     if(title==='필터' && /(?:member|worksite)-detail/.test(location.pathname))reference=(location.pathname.includes('member')?'Web27':'Web28')+' · 11번';
     if(!reference && /삭제하시겠습니까/.test(title)){
       const behind=[...document.querySelectorAll('.modal-back')].filter(el=>el!==root&&!root.contains(el)&&el.getClientRects().length).at(-1)?.querySelector('h3')?.textContent;
-      reference=behind==='추가 정보 관리'?'Web23 · 4번':behind==='배정 템플릿 관리'?'Web25 · 4번':location.pathname.endsWith('assets.html')?(document.querySelector('[data-bulk-save]')?'Web15 · 16번':'Web02 · 15번'):'Web08 · 5번';
+      reference=behind==='추가 정보 관리'?'Web23 · 4번':behind==='자산 그룹 관리'?'Web25 · 4번':location.pathname.endsWith('assets.html')?(document.querySelector('[data-bulk-save]')?'Web15 · 16번':'Web02 · 15번'):'Web08 · 5번';
     }
     return {title:title||'현재 열린 화면',reference:reference||pageReference(),search:/^(구성원 선택|근무지 선택)$/.test(title)?1:title==='배정 자산'?2:null,list:/^(구성원 선택|근무지 선택)$/.test(title)?2:null};
   }
@@ -112,9 +112,9 @@
       add('number','고유관리번호 형식 오류',`${edit?4:5}번`,()=>input(root,'#areg-assetno-input','잘못된 번호!'));
     }
     if(root.querySelector('[data-ed] [data-name]')){
-      add('template-name-empty','템플릿 이름 미입력','3번',()=>input(root,'[data-name]',''));
-      add('template-name-duplicate','템플릿 이름 중복','3번',()=>input(root,'[data-name]',D.templates[0]?.name||''));
-      add('template-name-max','템플릿 이름 최대 길이','3번',()=>input(root,'[data-name]','검토용 이름 '.repeat(8).slice(0,30)));
+      add('template-name-empty','자산 그룹명 미입력','3번',()=>input(root,'[data-name]',''));
+      add('template-name-duplicate','자산 그룹명 중복','3번',()=>input(root,'[data-name]',D.templates[0]?.name||''));
+      add('template-name-max','자산 그룹명 최대 길이','3번',()=>input(root,'[data-name]','검토용 이름 '.repeat(8).slice(0,30)));
     }
 
     const date=root.querySelector('[data-assignment-date],[data-dtext],input[placeholder="YYYY.MM.DD"]');

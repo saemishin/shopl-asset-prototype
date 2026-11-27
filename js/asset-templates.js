@@ -1,4 +1,4 @@
-// 배정 템플릿 관리(Web_dc_25)와 자산 배정(Web_dc_13). 연결 기준은 Policy_15, 저장소는 window.AssetLinks.
+// 자산 그룹 관리(Web_dc_25)와 자산 배정(Web_dc_13). 연결 기준은 Policy_15, 저장소는 window.AssetLinks.
 (() => {
   const D = window.DATA;
   const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
@@ -146,7 +146,7 @@
     window.TargetPicker.open({ kind, members: MEMBERS.map(m => ({ ...m, color: avatarColor(m.name) })), worksites: WS_CODE, initial, onApply });
   }
 
-  // 새25 관리와 새13 선택에서 같은 템플릿 구성을 표시한다.
+  // 새25 관리와 새13 선택에서 같은 자산 그룹 구성을 표시한다.
   const templateSummaryHtml = t => `<div class="tpl-card-main"><b>${esc(t.name)}</b><span class="muted">전체 ${totalOf(t)}개</span><div class="tpl-card-items">${[t.base, ...t.items].map((x, i) => `<span class="tpl-chip${i ? "" : " base"}"><span class="tpl-chip-role">${i ? "연결 자산" : "기준"}</span><span class="tpl-chip-divider" aria-hidden="true">│</span><span class="tpl-chip-value">${esc(x.product)}${i ? `(${x.count}개)` : ""}</span></span>`).join("")}</div></div>`;
   // 정적 목업의 시드 데이터를 20개씩 표시한다. 운영에서는 같은 경계로 다음 목록을 요청한다.
   function mountTemplatePages(scrollRoot, listEl, templates, cardHtml, onAppend = () => {}) {
@@ -165,13 +165,13 @@
     };
     scrollRoot.addEventListener("scroll", onScroll, { passive: true });
     if (templates.length) append();
-    else listEl.innerHTML = '<p class="muted tpl-empty">등록된 템플릿이 없습니다.</p>';
+    else listEl.innerHTML = '<p class="muted tpl-empty">등록된 자산 그룹이 없습니다.</p>';
     return () => scrollRoot.removeEventListener("scroll", onScroll);
   }
 
-  // ── Web_dc_24 배정 템플릿 관리 ──
+  // ── Web_dc_25 자산 그룹 관리 ──
   function openTemplateManager() {
-    const back = modal(`<div class="tpl-manager-header"><h3>배정 템플릿 관리</h3><button type="button" class="btn icon-only sm" data-close aria-label="닫기">${CLOSE_ICON}</button></div><div class="body tpl-manage-body"><p class="tpl-manage-desc">함께 배정하고 연결할 자산 구성을 미리 만들어 관리합니다.</p><div class="tpl-manage-head"><button class="btn sm primary" data-tpl-add>+ 템플릿 추가</button></div><div class="link-list" data-tpl-list></div></div>`, "tpl-modal");
+    const back = modal(`<div class="tpl-manager-header"><h3>자산 그룹 관리</h3><button type="button" class="btn icon-only sm" data-close aria-label="닫기">${CLOSE_ICON}</button></div><div class="body tpl-manage-body"><p class="tpl-manage-desc">함께 배정하고 연결할 자산 구성을 미리 만들어 관리합니다.</p><div class="tpl-manage-head"><button class="btn sm primary" data-tpl-add>+ 자산 그룹 추가</button></div><div class="link-list" data-tpl-list></div></div>`, "tpl-modal");
     let dispose = () => {};
     const draw = () => {
       dispose();
@@ -191,8 +191,8 @@
     back.onclick = e => { if (e.target === back) close(); };
 
     if(window.DashboardCases){const source=JSON.parse(JSON.stringify(D.templates));const apply=rows=>{D.templates.splice(0,D.templates.length,...rows);draw();};window.DashboardCases.attach(back,{reference:'Web25',reset:()=>apply(JSON.parse(JSON.stringify(source))),cases:[
-      ['templates-empty','등록된 템플릿 없음','2번',()=>apply([])],
-      ['templates-many','템플릿 45개·20개씩 추가 로드','2번',()=>apply(Array.from({length:45},(_,i)=>({...JSON.parse(JSON.stringify(source[0])),id:'design-template-'+i,name:'디자인 템플릿 '+String(i+1).padStart(2,'0')})))]
+      ['templates-empty','등록된 자산 그룹 없음','2번',()=>apply([])],
+      ['templates-many','자산 그룹 45개·20개씩 추가 로드','2번',()=>apply(Array.from({length:45},(_,i)=>({...JSON.parse(JSON.stringify(source[0])),id:'design-template-'+i,name:'디자인 자산 그룹 '+String(i+1).padStart(2,'0')})))]
     ]});}
     draw();
   }
@@ -200,7 +200,7 @@
   function openTemplatePicker(initialId, onApply) {
     const templates = usableTemplates().slice().sort((p, q) => p.name.localeCompare(q.name, "ko"));
     let selected = templates.some(t => t.id === initialId) ? initialId : "";
-    const back = modal(`<h3>템플릿 선택</h3><div class="body tpl-picker-body"><div class="link-list" data-template-list></div></div><div class="foot"><button class="btn" data-template-cancel>취소</button><button class="btn primary" data-template-apply${selected ? "" : " disabled"}>적용</button></div>`, "tpl-modal", 360);
+    const back = modal(`<h3>자산 그룹 선택</h3><div class="body tpl-picker-body"><div class="link-list" data-template-list></div></div><div class="foot"><button class="btn" data-template-cancel>취소</button><button class="btn primary" data-template-apply${selected ? "" : " disabled"}>적용</button></div>`, "tpl-modal", 360);
     const list = back.querySelector("[data-template-list]"), apply = back.querySelector("[data-template-apply]");
     let dispose = mountTemplatePages(back.querySelector(".tpl-picker-body"), list, templates,
       t => `<label class="tpl-card tpl-select-card${t.id === selected ? " selected" : ""}"><input type="radio" name="template-pick" data-template-id="${esc(t.id)}"${t.id === selected ? " checked" : ""}>${templateSummaryHtml(t)}</label>`);
@@ -212,8 +212,8 @@
     };
 
     if(window.DashboardCases){const source=templates.slice();const review=rows=>{dispose();templates.splice(0,templates.length,...rows);selected='';apply.disabled=true;dispose=mountTemplatePages(back.querySelector('.tpl-picker-body'),list,templates,t=>`<label class="tpl-card tpl-select-card"><input type="radio" name="template-pick" data-template-id="${esc(t.id)}">${templateSummaryHtml(t)}</label>`);};window.DashboardCases.attach(back,{reference:'Web13',reset:()=>review(source),cases:[
-      ['templates-none','선택 가능한 템플릿 없음','2번',()=>review([])],
-      ['templates-paging','템플릿 45개·20개씩 추가 로드','2번',()=>review(Array.from({length:45},(_,i)=>({...source[0],id:'design-template-pick-'+i,name:'디자인 템플릿 '+String(i+1).padStart(2,'0')})))]
+      ['templates-none','선택 가능한 자산 그룹 없음','2번',()=>review([])],
+      ['templates-paging','자산 그룹 45개·20개씩 추가 로드','2번',()=>review(Array.from({length:45},(_,i)=>({...source[0],id:'design-template-pick-'+i,name:'디자인 자산 그룹 '+String(i+1).padStart(2,'0')})))]
     ]});}
     const close = () => { dispose(); back.remove(); };
     back.querySelector("[data-template-cancel]").onclick = close;
@@ -223,7 +223,7 @@
     const pick = x => ({ group: x.group, sub: x.sub, product: x.product, productId: x.productId, ...(x.count ? { count: x.count } : {}) });
     const original = tpl ? JSON.stringify({ name: tpl.name, base: pick(tpl.base), items: tpl.items.map(pick) }) : "";
     const draft = tpl ? JSON.parse(original) : { name: "", base: { group: "", sub: "", product: "" }, items: [{ group: "", sub: "", product: "", count: 1 }] };
-    const back = modal(`<h3>${tpl ? "템플릿 수정" : "템플릿 추가"}</h3><div class="body tpl-edit-body" data-ed></div><div class="foot"><button class="btn" data-cancel>취소</button><button class="btn primary" data-save disabled>저장</button></div>`, "tpl-modal wide", 340);
+    const back = modal(`<h3>${tpl ? "자산 그룹 수정" : "자산 그룹 추가"}</h3><div class="body tpl-edit-body" data-ed></div><div class="foot"><button class="btn" data-cancel>취소</button><button class="btn primary" data-save disabled>저장</button></div>`, "tpl-modal wide", 340);
     const body = back.querySelector("[data-ed]"), save = back.querySelector("[data-save]");
     const itemCount = () => draft.items.reduce((n, x) => n + (+x.count || 0), 0);
     const errors = () => {
@@ -242,21 +242,21 @@
     };
     const rowHtml = (x, i) => `<div class="tpl-item tpl-editor-asset${i < 0 ? " base" : ""}">
         <div class="tpl-item-fields tpl-editor-fields">
-          <div class="tpl-editor-field"><label>소분류</label>${categoryFieldHtml(x, `data-cat="${i}" aria-label="소분류 선택"`, "선택")}</div>
-          <div class="tpl-editor-field"><label>품목명</label>${productFieldHtml(x, `data-prod="${i}" aria-label="품목명"`, "입력")}<p class="field-err" data-row-err="${i}"${rowErr(x) ? "" : " hidden"}>${rowErr(x)}</p></div>
-          ${i < 0 ? "" : `<div class="tpl-editor-field"><label>개수</label><div class="tpl-stepper"><button type="button" data-dec="${i}" aria-label="개수 줄이기"${x.count <= 1 ? " disabled" : ""}>−</button><span>${x.count}</span><button type="button" data-inc="${i}" aria-label="개수 늘리기"${itemCount() >= MAX_ITEMS ? " disabled" : ""}>＋</button></div></div>`}
+          <div class="tpl-editor-field">${categoryFieldHtml(x, `data-cat="${i}" aria-label="소분류 선택"`, "선택")}</div>
+          <div class="tpl-editor-field">${productFieldHtml(x, `data-prod="${i}" aria-label="품목명"`, "입력")}<p class="field-err" data-row-err="${i}"${rowErr(x) ? "" : " hidden"}>${rowErr(x)}</p></div>
+          ${i < 0 ? "" : `<div class="tpl-editor-field"><div class="tpl-stepper"><button type="button" data-dec="${i}" aria-label="개수 줄이기"${x.count <= 1 ? " disabled" : ""}>−</button><span>${x.count}</span><button type="button" data-inc="${i}" aria-label="개수 늘리기"${itemCount() >= MAX_ITEMS ? " disabled" : ""}>＋</button></div></div>`}
         </div>
         ${i < 0 ? "" : `<button type="button" class="tpl-x" data-del="${i}" aria-label="자산 삭제"${draft.items.length === 1 ? " disabled" : ""}>${CLOSE_ICON}</button>`}
       </div>`;
     const draw = () => {
       const e = errors();
       body.innerHTML = `
-        <div class="field"><label>템플릿 이름</label><input type="text" maxlength="30" data-name value="${esc(draft.name)}" placeholder="입력"><p class="field-err" data-name-err${e.dup ? "" : " hidden"}>동일한 명칭이 존재합니다.</p></div>
-        <div class="tpl-section"><div class="tpl-section-head"><b>기준 자산</b><span class="muted">다른 자산이 모두 이 자산에 연결됩니다.</span></div>${rowHtml(draft.base, -1)}</div>
-        <div class="tpl-section"><div class="tpl-section-head"><b>연결할 자산</b></div>
+        <div class="field"><label>자산 그룹명</label><input type="text" maxlength="30" data-name value="${esc(draft.name)}" placeholder="입력"><p class="field-err" data-name-err${e.dup ? "" : " hidden"}>동일한 명칭이 존재합니다.</p></div>
+        <div class="tpl-section"><div class="tpl-section-head"><b>기준 자산</b><span>1</span><span class="muted">· 연결 자산 ${itemCount()}</span></div>${rowHtml(draft.base, -1)}</div>
+        <div class="tpl-section"><div class="tpl-section-head"><b>연결 자산</b><span>${itemCount()}</span></div>
           ${draft.items.map(rowHtml).join("")}
           <p class="field-err" data-over-err${e.over ? "" : " hidden"}>기준 자산을 제외한 필요 개수는 최대 ${MAX_ITEMS}개입니다.</p>
-          <button type="button" class="tpl-add-row" data-add${itemCount() >= MAX_ITEMS ? " disabled" : ""}>추가</button></div>`;
+          <button type="button" class="tpl-add-row" data-add${itemCount() >= MAX_ITEMS ? " disabled" : ""}>+ 연결 자산 추가</button></div>`;
       const at = i => i < 0 ? draft.base : draft.items[i];
       body.querySelector("[data-name]").oninput = ev => { draft.name = ev.target.value, refresh(); };
       body.querySelectorAll("[data-cat]").forEach(b => b.onclick = () => pickCategory(at(+b.dataset.cat), draw));
@@ -292,7 +292,7 @@
     draw();
   }
 
-  // ── Web_dc_13 템플릿으로 배정 ──
+  // ── Web_dc_13 자산 그룹으로 배정 ──
   const targetKey = t => t ? (t.type === "employee" ? "e:" : "w:") + t.value : null;
   const assetTargetKey = a => { const r = (a.assignments || [])[0]; return r ? (r.employee ? "e:" + r.employee : "w:" + r.worksite) : null; };
   function usableTemplates() {
@@ -304,7 +304,7 @@
   function openTemplateAssign(onDone, qaDemo = false) {
     const today = "2026-09-04"; // 프로토타입 기준일(다른 화면의 TODAY와 같음)
     const st = { kind: "", target: { employee: null, worksite: null }, tplId: "", date: "", rows: [] };
-    const back = modal(`<h3>템플릿으로 배정</h3><div class="body tpl-edit-body" data-ta></div><div class="foot"><button class="btn" data-cancel>취소</button><button class="btn primary" data-save disabled>저장</button></div>`, "tpl-modal wide tpl-assignment");
+    const back = modal(`<h3>자산 그룹으로 배정</h3><div class="body tpl-edit-body" data-ta></div><div class="foot"><button class="btn" data-cancel>취소</button><button class="btn primary" data-save disabled>저장</button></div>`, "tpl-modal wide tpl-assignment");
     const body = back.querySelector("[data-ta]"), save = back.querySelector("[data-save]");
     const curTarget = () => st.kind && st.target[st.kind] ? { type: st.kind, value: st.target[st.kind] } : null;
     const assetById = id => D.assets.find(a => a.id === id);
@@ -339,14 +339,14 @@
       const template = D.templates.find(t => t.id === st.tplId);
       back.querySelector(".modal").classList.toggle("expanded", !!st.tplId);
       body.innerHTML = `<div class="tpl-assignment-columns"><div class="tpl-assignment-form">
-        <div class="field"><label>템플릿</label><div class="link-search-field"><input type="text" class="picker-search" readonly placeholder="선택" aria-label="배정 템플릿 선택" aria-haspopup="dialog" data-template-open value="${esc(template?.name || "")}">${template ? `<button type="button" class="tpl-field-clear" data-template-clear aria-label="템플릿 선택 해제">${CLOSE_ICON}</button>` : ""}</div></div>
+        <div class="field"><label>자산 그룹</label><div class="link-search-field"><input type="text" class="picker-search" readonly placeholder="선택" aria-label="자산 그룹 선택" aria-haspopup="dialog" data-template-open value="${esc(template?.name || "")}">${template ? `<button type="button" class="tpl-field-clear" data-template-clear aria-label="자산 그룹 선택 해제">${CLOSE_ICON}</button>` : ""}</div></div>
         <div class="field"><label>배정 대상</label>
           <label class="radio-row"><input type="radio" name="ta-kind" value="employee"${st.kind === "employee" ? " checked" : ""}><span>구성원</span></label>
           ${st.kind === "employee" ? `<div class="perm-target-wrap">${targetField("employee")}</div>` : ""}
           <label class="radio-row"><input type="radio" name="ta-kind" value="worksite"${st.kind === "worksite" ? " checked" : ""}><span>근무지</span></label>
           ${st.kind === "worksite" ? `<div class="perm-target-wrap">${targetField("worksite")}</div>` : ""}</div>
         <div class="field"><label>배정일</label><input type="date" data-date value="${st.date}" max="${today}"><p class="field-help">새로 배정하는 자산에만 적용됩니다.</p></div>
-        </div>${st.rows.length ? `<section class="tpl-assignment-assets" aria-label="템플릿 자산 선택"><p class="tpl-assignment-help">템플릿에서 필요한 개수만큼 자산을 선택해주세요.</p>${st.rows.map(slotHtml).join("")}<button type="button" class="tpl-add-row" data-row-add>+ 연결 자산 추가</button></section>` : ""}</div>`;
+        </div>${st.rows.length ? `<section class="tpl-assignment-assets" aria-label="자산 그룹 자산 선택"><p class="tpl-assignment-help">자산 그룹에서 필요한 개수만큼 자산을 선택해주세요.</p>${st.rows.map(slotHtml).join("")}<button type="button" class="tpl-add-row" data-row-add>+ 연결 자산 추가</button></section>` : ""}</div>`;
       body.querySelectorAll('[name="ta-kind"]').forEach(r => r.onchange = () => { st.kind = r.value, clearPicked(), draw(); });
       body.querySelectorAll("[data-target-open]").forEach(el => el.onclick = e => {
         if (e.target.closest("[data-target-clear]")) return;
@@ -466,7 +466,7 @@
         draw();
       };
       window.DashboardCases.attach(back,{reference:'Web13',reset:()=>fixture('initial'),cases:[
-        ['initial','템플릿 미선택','1번',()=>fixture('initial')],['template','템플릿 선택·대상 미선택','1번',()=>fixture('template')],['target','대상 선택·자산 선택 활성','1번',()=>fixture('target')],['selected','자산 선택·배정일 미입력','1번',()=>fixture('selected')],['over','선택 자산이 필요 개수 초과·필드 오류','1번',()=>fixture('over')]
+        ['initial','자산 그룹 미선택','1번',()=>fixture('initial')],['template','자산 그룹 선택·대상 미선택','1번',()=>fixture('template')],['target','대상 선택·자산 선택 활성','1번',()=>fixture('target')],['selected','자산 선택·배정일 미입력','1번',()=>fixture('selected')],['over','선택 자산이 필요 개수 초과·필드 오류','1번',()=>fixture('over')]
       ]});
     }
     draw();

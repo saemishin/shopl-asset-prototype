@@ -173,11 +173,10 @@
     return null;
   }
   function treeHtml(groups, sel) {
-    const head = `
-      <div class="cat-tree-head">
-        ${window.hasPrototypeAssetManagePermission()?'<button class="btn sm" data-manage-dropdown>관리 ▾</button>':''}
-      </div>`,
-      body = groups.map(({
+    const footer = window.hasPrototypeAssetManagePermission()
+      ? '<div class="cat-tree-footer"><button type="button" class="btn sm" data-manage-dropdown>관리 ▾</button></div>'
+      : '';
+    const body = groups.map(({
         group,
         subs
       }) => {
@@ -194,7 +193,7 @@
           </button>`).join("") : '<p class="cat-tree-empty">소분류 없음</p>'}
       </div>`;
       }).join("");
-    return head + body;
+    return `<div class="cat-tree-list">${body}</div>${footer}`;
   }
   function productsOf(group, sub) {
     return window.AssetProducts.list(group,sub).map(p => {
@@ -815,8 +814,12 @@
 function openManagementMenu(button,sel) {
   document.querySelectorAll('[data-category-manage-menu]').forEach(el=>el.remove());
   const menu=document.createElement('div');menu.className='dropdown-menu';menu.dataset.categoryManageMenu='';
-  menu.innerHTML='<button type="button" data-manage-classification>분류</button><button type="button" data-manage-extra>추가 정보</button><button type="button" data-manage-product>품목</button><button type="button" data-manage-tag>태그</button><button type="button" data-manage-template>배정 템플릿</button>';
-  const rect=button.getBoundingClientRect();menu.style.cssText=`position:fixed;left:${rect.left}px;top:${rect.bottom+4}px;min-width:160px`;document.body.appendChild(menu);
+  menu.innerHTML='<button type="button" data-manage-classification>분류</button><button type="button" data-manage-extra>추가 정보</button><button type="button" data-manage-product>품목</button><button type="button" data-manage-tag>태그</button><button type="button" data-manage-template>자산 그룹</button>';
+  const rect=button.getBoundingClientRect();
+  menu.style.cssText=`position:fixed;left:${rect.left}px;min-width:160px`;
+  document.body.appendChild(menu);
+  const menuHeight=menu.offsetHeight;
+  menu.style.top=`${rect.top >= menuHeight+4 ? rect.top-menuHeight-4 : Math.max(0,Math.min(rect.bottom+4,window.innerHeight-menuHeight))}px`;
   menu.querySelector('[data-manage-classification]').onclick=()=>{menu.remove();openManageModal(sel);};
   menu.querySelector('[data-manage-extra]').onclick=()=>{menu.remove();openExtraInfoManager();};
   menu.querySelector('[data-manage-product]').onclick=()=>{menu.remove();window.openAssetProductManageModal(()=>render(sel),sel);};
