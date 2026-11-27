@@ -2177,6 +2177,13 @@ button.dthumb:hover { filter: brightness(0.94); }
 .extra-field-settings .cat-manage-fieldrow{padding:0;border-bottom:0;}
 .extra-field-settings small{display:block;color:var(--text-sub);font-size:12px;}
 .extra-field-settings .extra-private{display:inline-flex;align-items:center;gap:6px;width:fit-content;margin:2px 0 0;font-size:12px;font-weight:400;color:var(--text);cursor:pointer;}
+.private-field-options { position:relative; display:flex; align-items:center; gap:6px; }
+.private-field-help { padding:0; background:transparent; cursor:help; }
+.private-field-tip {
+  display:none; position:absolute; left:0; bottom:100%; z-index:3; width:max-content; max-width:min(250px, 100%);
+  box-sizing:border-box; padding:7px 10px; border-radius:6px; background:#25282c; color:#fff; font-size:12px; line-height:1.5;
+}
+.private-field-help:is(:hover, :focus) + .private-field-tip, .private-field-tip:hover { display:block; }
 .extra-private{font-size:12px;padding:6px 0;display:flex;align-items:center;gap:6px;}
 .extra-manager-row{display:flex;gap:8px;align-items:flex-start;padding:8px 0;}
 .extra-manager-row .field{flex:1;margin:0;}

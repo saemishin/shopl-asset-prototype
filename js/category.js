@@ -372,7 +372,6 @@
       </div>
       <div class="field sub-form-settings">
         <label>정보 설정</label>
-        <p class="hint" style="margin-top:0;margin-bottom:10px">비공개로 설정한 항목은 자산 관리 권한을 보유한 구성원만 보고 입력할 수 있습니다.</p>
         <div class="cat-manage-fieldlist" data-f-fields>
           ${[{name:'기본 정보', fields:fixedFields}, {name:'추가 정보', fields:window.DATA.extraFields.filter(f=>!f.deleted)}].filter(group=>group.fields.length).map(group => {
             const basic = group.fields === fixedFields;
@@ -382,7 +381,13 @@
               const enabled = basic ? locked || !(state.hiddenFields || []).includes(field.id) : (state.extraEnabled || []).includes(field.id);
               const toggle = `<button type="button" class="toggle-switch${enabled ? ' on' : ''}" data-field="${field.id}" ${locked ? 'disabled aria-disabled="true" data-tip="기본 항목이므로 체크를 해제할 수 없습니다."' : ''} role="switch" aria-checked="${enabled}" aria-label="${name} 노출"><span class="toggle-knob"></span></button>`;
               const description = field.description ? `<small>${window.AssetExtra.esc(field.description)}</small>` : '';
-              const privacy = publicBasicFields.includes(field) ? '<small>항상 공개되는 정보입니다.</small>' : enabled ? `<label class="extra-private"><input type="checkbox" data-private-field="${field.id}"${(state.privateFields || []).includes(field.id) ? ' checked' : ''}>비공개</label>` : '';
+              const tipId = `private-tip-${opts.editing ? 'edit' : 'add'}-${field.id}`;
+              const privacy = enabled && !locked ? `
+                <div class="private-field-options">
+                  <label class="extra-private"><input type="checkbox" data-private-field="${field.id}"${(state.privateFields || []).includes(field.id) ? ' checked' : ''}>비공개</label>
+                  <button type="button" class="help-icon private-field-help" aria-label="${name} 비공개 도움말" aria-describedby="${tipId}">?</button>
+                  <span class="private-field-tip" id="${tipId}" role="tooltip">비공개로 설정하면 자산 관리 권한이 있는 구성원만 이 정보를 조회·입력·수정할 수 있습니다.</span>
+                </div>` : '';
               return `<div class="extra-field-settings"><div class="cat-manage-fieldrow"><span>${name}</span>${toggle}</div>${description}${privacy}</div>`;
             });
             return `<details class="cat-info-settings-group" data-group="${group.name}" ${expanded.has(group.name) ? 'open' : ''}><summary>${group.name}</summary>${rows.join('')}</details>`;
