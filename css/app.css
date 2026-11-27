@@ -2618,3 +2618,6 @@ body.history-capture #prototype-qa { display: none; }
 .member-assets-table thead tr > :first-child { z-index: 2; background: #fafbfc; }
 .member-assets-table .memo-flag { margin-left: auto; }
 .member-status-menu { min-width: 154px; }
+
+.fitted-tags { contain: inline-size; }
+.member-assets-table td:nth-child(7) { min-width: 92px; }

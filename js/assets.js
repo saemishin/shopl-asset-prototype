@@ -248,22 +248,6 @@
   function memoCell(a) {
     return displayField(a,"memo") && window.AssetMemo.has(a.note) ? '<span class="memo-flag"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M9 13h5M9 17h4"/></svg></span>' : "";
   }
-  function labelsCell(labels) {
-    if (!labels?.length) return '<span class="muted">—</span>';
-    const rest = labels.length - 1;
-    return `<span class="overview-tags"><span class="tag">${bulkEsc(labels[0])}</span>${rest ? `<span>+${rest}</span>` : ""}</span>`;
-  }
-  function fitSummaryChips(scope) {
-    scope.querySelectorAll(".asset-fit-chips").forEach(box => {
-      const fit = () => {
-        const rest = box.querySelector("[data-chip-rest]"),
-          chips = [...box.children].filter(x => x !== rest);
-        chips.forEach(x => x.hidden = !1), rest.hidden = !0;
-        for (let visible = chips.length; visible > 0 && box.scrollWidth > box.clientWidth; visible--) chips[visible - 1].hidden = !0, rest.hidden = !1, rest.textContent = `+${chips.length - visible + 1}`;
-      };
-      fit(), new ResizeObserver(fit).observe(box);
-    });
-  }
   const ALL_LABELS = [...new Set(assets.flatMap(a => a.labels || []))].sort(),
     CAT_GROUPS = (() => {
       const m = /* @__PURE__ */new Map();
@@ -476,7 +460,7 @@
         <td>${st}</td>
         <td>${holderText(a)}</td>
         <td>${expiryCell(displayField(a, "expiry") ? a.expiry : "")}</td>
-        <td>${displayField(a,"tags")?labelsCell(a.labels):"—"}</td>
+        <td>${displayField(a,"tags")?window.AssetChipLayout.labelsCell(a.labels,bulkEsc):"—"}</td>
         <td>${window.fmtDate(a.createdAt)}</td>
       </tr>`;
       }).join("");
@@ -915,7 +899,7 @@
         key: fields[0].k,
         dir: fields[0].defDir
       }), render();
-    }), c.querySelectorAll("[data-worksite-link]").forEach(a => a.onclick = e => e.stopPropagation()), fitSummaryChips(c), bindRows(c), bindBulkSelect(c), c.querySelectorAll("[data-ptype]").forEach(b => b.onclick = () => {
+    }), c.querySelectorAll("[data-worksite-link]").forEach(a => a.onclick = e => e.stopPropagation()), window.AssetChipLayout.fit(c), bindRows(c), bindBulkSelect(c), c.querySelectorAll("[data-ptype]").forEach(b => b.onclick = () => {
       state.productType !== b.dataset.ptype && (state.productType = b.dataset.ptype, state.filters.category = [], state.page = 1, render());
     }), c.querySelectorAll("tbody tr[data-pkey]").forEach(tr => tr.onclick = () => {
       const g = productGroupsByKey.get(tr.dataset.pkey);

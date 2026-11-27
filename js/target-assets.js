@@ -155,7 +155,7 @@
           <td><span class="badge ${STATUS_LABEL[a.status][1]}">${STATUS_LABEL[a.status][0]}</span></td>
           <td>${x.since ? window.fmtDate(x.since) : '<span class="muted">—</span>'}</td>
           <td>${expiryCell(expiryOf(a))}</td>
-          <td>${labelsCell(member ? tags.slice(0,1) : tags)}${member && tags.length>1 ? ` <span class="tag">+${tags.length-1}</span>` : ''}</td>
+          <td>${member ? window.AssetChipLayout.labelsCell(tags,esc) : labelsCell(tags)}</td>
           ${member ? '' : `<td class="c">${window.AssetMemo.has(a.note) ? `<button type="button" class="memo-flag memo-view-btn" data-note="${a.id}" aria-label="메모 보기">${MEMO_ICON}</button>` : '<span class="muted">—</span>'}</td>`}
           <td class="c">${(n => n ? n : '<span class="muted">—</span>')(window.AssetLinks ? window.AssetLinks.view(a).visible.length : 0)}</td>
           ${options.rowActions ? `<td class="target-action-cell">${options.rowActions(a).length ? `<button type="button" class="btn icon-only target-more" data-target-more="${esc(a.id)}" aria-label="${esc(a.product)} ${esc(a.assetNo)} 더보기"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg></button>` : ''}</td>` : ''}
@@ -163,7 +163,10 @@
       }).join("");
       const emptyMsg = readItems().length ? "결과가 없습니다." : "배정 중인 자산이 없습니다.";
       table.innerHTML = `<div class="table-wrap"><table class="target-asset-table ${member ? 'member-assets-table' : ''}"><thead><tr>${member ? '<th>품목명</th><th>분류</th>' : '<th>분류</th><th>품목명</th>'}<th>고유관리번호</th><th>${member ? `<button type="button" data-status aria-haspopup="dialog" aria-expanded="false">상태 ▾${state.statusRestricted ? ' ('+state.filters.statuses.length+')' : ''}</button>` : '상태'}</th><th>배정일</th><th>유효기한</th><th>태그</th>${member ? '' : '<th class="c">메모</th>'}<th class="c">연결된 자산</th>${options.rowActions ? '<th class="target-action-cell" aria-label="자산 작업"></th>' : ""}</tr></thead><tbody>${rows || `<tr><td colspan="${(options.rowActions ? 10 : 9) - Number(member)}" style="text-align:center;color:var(--text-mut);padding:32px">${emptyMsg}</td></tr>`}</tbody></table></div>`;
-      if (member) table.querySelector('[data-status]').onclick = openStatus;
+      if (member) {
+        window.AssetChipLayout.fit(table);
+        table.querySelector('[data-status]').onclick = openStatus;
+      }
       table.querySelectorAll("[data-target-asset]").forEach(row => row.onclick = e => {
         // 메모 아이콘은 행 클릭과 분리해 조회 Modal만 연다(바깥 클릭·[X]로 닫음).
         const more = e.target.closest('[data-target-more]');
