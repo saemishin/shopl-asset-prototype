@@ -58,7 +58,7 @@
   const host=c.querySelector('.target-assets');if(!host)return;
   const name=new URLSearchParams(location.search).get('name')||"강남점";
   window.TargetAssets.wire(host,()=>collectItems(name),id=>'asset-detail.html?id='+id,{
-    download:true,
+    clearCategory:true, download:true,
     downloadUrl:"https://docs.google.com/spreadsheets/d/1vouJJMBfF1NNd_DHJz_UpCVNmEEfdjHQtZVnB4J7Bqc/edit",
     canAssign:()=>!['retired','resigned','inactive'].includes(window.DATA.targetStatuses?.worksite?.[name]) && window.DATA.categories.some(cat=>window.AssetAccess.canState({...cat,status:'stock'})),
     onAssign:refresh=>window.AssetAssignment.open({worksites:{[name]:WS_CODE[name]||''},fixedTarget:{type:'worksite',value:name,subtitle:WS_CODE[name]},onSaved:refresh,onChanged:refresh,toast}),

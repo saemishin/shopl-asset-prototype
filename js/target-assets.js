@@ -18,7 +18,6 @@
       { k: "expiry", label: "유효기한", defDir: "desc" }
     ],
     CARET = '<svg class="th-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>',
-    RESET_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 1 2.64 6.36"/><path d="M3 20v-6h6"/></svg>',
     SORT_ASC_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 18V6M5 6l-3 3M5 6l3 3"/><path d="M11 7h4M11 12h7M11 17h10"/></svg>',
     SORT_DESC_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 6v12M5 18l-3-3M5 18l3-3"/><path d="M11 7h10M11 12h7M11 17h4"/></svg>',
     MEMO_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M9 13h5M9 17h4"/></svg>';
@@ -37,10 +36,8 @@
       : '<span class="thumb empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 15 5-4 4 3 4-4 5 4"/></svg></span>';
   };
   const expiryCell = d => d ? `${window.fmtDate(d)} <span class="badge exp-${expiryKey(d)}">${EXP_LABEL[expiryKey(d)]}</span>` : '<span class="muted">—</span>';
-  const labelsCell = labels => labels && labels.length ? labels.map(l => `<span class="tag">${esc(l)}</span>`).join("") : '<span class="muted">—</span>';
 
   function wire(host, items, openUrl, options = {}) {
-    const member = options.memberLayout === true;
     const readItems = () => (typeof items === "function" ? items() : items).filter(x => !x.asset.deleted_at);
     const state = { q: "", key: "since", dir: "desc", page: 1, size: 20, filters: { categories: [], statuses: [] } };
     const tools = host.querySelector("[data-target-tools]"), table = host.querySelector("[data-target-table]"), pager = host.querySelector("[data-target-pager]");
@@ -53,7 +50,7 @@
       return readItems().filter(x => {
         const a = x.asset;
         return (!f.categories.length || f.categories.includes(`${a.group}/${a.sub}`)) &&
-          ((member ? !state.statusRestricted : !f.statuses.length) || f.statuses.includes(a.status)) &&
+          (!state.statusRestricted || f.statuses.includes(a.status)) &&
           (!state.q || `${a.product} ${a.assetNo || ""}`.toLowerCase().includes(state.q.trim().toLowerCase()));
       }).sort((x, y) => {
         const val = it => state.key === "since" ? it.since : state.key === "expiry" ? expiryOf(it.asset) : it.asset[state.key];
@@ -68,35 +65,32 @@
     const activeCount = () => state.filters.categories.length + state.filters.statuses.length;
 
     function drawTools(count) {
-      const cur = SORT_FIELDS.find(f => f.k === state.key), n = activeCount();
-      const chips = [
-        ...state.filters.categories.map(v => ({ k: "categories", v, label: v.replace("/", " › ") })),
-        ...state.filters.statuses.map(v => ({ k: "statuses", v, label: STATUS_LABEL[v][0] }))
-      ];
+      const cur = SORT_FIELDS.find(f => f.k === state.key);
+      const selectedCategories = state.filters.categories;
+      const firstCategory = window.DATA.categories.find(c => c.group+'/'+c.sub === selectedCategories[0]);
+      const categoryLabel = firstCategory ? esc(firstCategory.sub) + (selectedCategories.length > 1 ? ' +' + (selectedCategories.length - 1) : '') : '전체';
       const searchBox = `<div class="searchbox${state.q ? " has-term" : ""}"${!readItems().length && !state.q && !activeCount() ? ' style="display:none"' : ""}>
               <input class="search${state.q ? " expanded" : ""}" data-search placeholder="${state.q ? "품목명, 고유관리번호" : "검색"}" value="${esc(state.q)}">
               <button class="search-clear" data-search-clear type="button" aria-label="검색어 지우기">✕</button>
             </div>`;
       tools.innerHTML = `
         <div class="countrow">
-          ${member ? searchBox : ''}
-          <span class="total">${member && state.q ? '검색 결과' : '전체'} <b>${count}</b></span>
+          ${searchBox}
+          <span class="total">${state.q.trim() ? '검색 결과' : '전체'} <b>${count}</b></span>
           <div class="sortbar">
-            ${member ? '<span>정렬</span>' : ''}
+            <span>정렬</span>
             <button class="sort-key-btn" data-sort-key>${cur.label}${CARET}</button>
             <div class="sort-dir-group">
               <button class="sort-dir-btn ${state.dir === "asc" ? "active" : ""}" data-dir="asc" aria-label="오름차순">${SORT_ASC_ICON}</button>
               <button class="sort-dir-btn ${state.dir === "desc" ? "active" : ""}" data-dir="desc" aria-label="내림차순">${SORT_DESC_ICON}</button>
             </div>
           </div>
-          ${member ? `<button class="btn sm" data-category aria-label="분류 선택">${state.filters.categories.length ? esc(window.DATA.categories.find(c=>c.group+'/'+c.sub===state.filters.categories[0])?.sub || '') + (state.filters.categories.length>1 ? ' +'+(state.filters.categories.length-1) : '') : '전체'}</button>` : `<button class="filter-btn ${n ? "set" : ""}" data-filter>▤ 필터${n ? ` <b>${n}</b>` : ""}</button>`}
+          <div class="overview-scope"><button class="btn sm" data-category aria-label="분류 선택: ${categoryLabel}">${categoryLabel}</button>${options.clearCategory && selectedCategories.length ? '<button class="btn sm" data-clear-category aria-label="전체 분류로 복귀">×</button>' : ''}</div>
           <div class="right">
-            ${member ? "" : searchBox}
             ${options.canAssign?.() ? '<button class="btn primary" data-target-assign>배정</button>' : ''}
             ${options.download ? `<button class="btn" data-target-download${count ? '' : ' disabled'}>다운로드</button>` : ''}
           </div>
-        </div>
-        ${!member && chips.length ? `<div class="filterbar"><button class="filter-reset" data-filter-reset aria-label="필터 전체 해제">${RESET_ICON}</button>${chips.map(c => `<span class="fchip">${esc(c.label)}<button data-clear="${c.k}" data-value="${esc(c.v)}">✕</button></span>`).join("")}</div>` : ""}`;
+        </div>`;
       tools.querySelector("[data-target-assign]")?.addEventListener("click", () => options.onAssign(draw));
       // 정적 프로토타입: 현재 조회 결과를 생성하지 않고 확정된 대상별 샘플을 연다.
       tools.querySelector("[data-target-download]")?.addEventListener("click", () => {
@@ -110,19 +104,20 @@
       tools.querySelector("[data-search-clear]").onclick = () => { state.q = ""; state.page = 1; draw(); tools.querySelector("[data-search]").focus(); };
       tools.querySelector("[data-sort-key]").onclick = e => openSortMenu(e.currentTarget);
       tools.querySelectorAll(".sort-dir-btn").forEach(b => b.onclick = () => { state.dir = b.dataset.dir; state.page = 1; draw(); });
-      if (member) {
-        tools.querySelector('[data-category]').onclick = () => {
-          const allowed = new Set(categoryValues());
-          window.openAssetCategoryScopeModal({categories:window.DATA.categories.filter(c=>allowed.has(c.group+'/'+c.sub)),
-            selected:state.filters.categories.length ? state.filters.categories : [...allowed], onApply:picked=>{state.filters.categories=picked; state.page=1; draw();}});
-        };
-      } else tools.querySelector("[data-filter]").onclick = openFilter;
-      const reset = tools.querySelector("[data-filter-reset]");
-      reset && (reset.onclick = () => { state.filters = { categories: [], statuses: [] }; state.page = 1; draw(); });
-      tools.querySelectorAll("[data-clear]").forEach(b => b.onclick = () => {
-        state.filters[b.dataset.clear] = state.filters[b.dataset.clear].filter(v => v !== b.dataset.value);
-        state.page = 1; draw();
-      });
+      const applyCategories = picked => {
+        state.filters.categories = picked;
+        state.page = 1;
+        draw();
+      };
+      tools.querySelector('[data-clear-category]')?.addEventListener('click', () => applyCategories([]));
+      tools.querySelector('[data-category]').onclick = () => {
+        const allowed = new Set(categoryValues());
+        window.openAssetCategoryScopeModal({
+          categories: window.DATA.categories.filter(c => allowed.has(c.group+'/'+c.sub)),
+          selected: selectedCategories.length ? selectedCategories : [...allowed],
+          onApply: applyCategories
+        });
+      };
     }
 
     function drawPager(total) {
@@ -146,40 +141,26 @@
         const a = x.asset;
         const categoryCell = `<td>${esc(a.group)} <span class="muted">›</span> ${esc(a.sub)}</td>`;
         const visibleField = key => window.AssetExtra.visible(window.AssetExtra.category(a),key);
-        const memo = member && visibleField('memo') && window.AssetMemo.has(a.note) ? `<span class="memo-flag" aria-label="메모 있음">${MEMO_ICON}</span>` : '';
+        const memo = visibleField('memo') && window.AssetMemo.has(a.note) ? `<span class="memo-flag" aria-label="메모 있음">${MEMO_ICON}</span>` : '';
         const productCell = `<td><div class="prodcell">${thumb(a)}<span class="pname">${esc(a.product)}</span>${memo}</div></td>`;
-        const tags = member && !visibleField('tags') ? [] : (a.labels || []);
+        const tags = !visibleField('tags') ? [] : (a.labels || []);
         return `<tr class="clickable" data-target-asset="${a.id}">
-          ${member ? productCell + categoryCell : categoryCell + productCell}
+          ${productCell}${categoryCell}
           <td>${a.assetNo ? esc(a.assetNo) : '<span class="muted">—</span>'}</td>
           <td><span class="badge ${STATUS_LABEL[a.status][1]}">${STATUS_LABEL[a.status][0]}</span></td>
           <td>${x.since ? window.fmtDate(x.since) : '<span class="muted">—</span>'}</td>
           <td>${expiryCell(expiryOf(a))}</td>
-          <td>${member ? window.AssetChipLayout.labelsCell(tags,esc) : labelsCell(tags)}</td>
-          ${member ? '' : `<td class="c">${window.AssetMemo.has(a.note) ? `<button type="button" class="memo-flag memo-view-btn" data-note="${a.id}" aria-label="메모 보기">${MEMO_ICON}</button>` : '<span class="muted">—</span>'}</td>`}
+          <td>${window.AssetChipLayout.labelsCell(tags,esc)}</td>
           <td class="c">${(n => n ? n : '<span class="muted">—</span>')(window.AssetLinks ? window.AssetLinks.view(a).visible.length : 0)}</td>
           ${options.rowActions ? `<td class="target-action-cell">${options.rowActions(a).length ? `<button type="button" class="btn icon-only target-more" data-target-more="${esc(a.id)}" aria-label="${esc(a.product)} ${esc(a.assetNo)} 더보기"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg></button>` : ''}</td>` : ''}
         </tr>`;
       }).join("");
       const emptyMsg = readItems().length ? "결과가 없습니다." : "배정 중인 자산이 없습니다.";
-      table.innerHTML = `<div class="table-wrap"><table class="target-asset-table ${member ? 'member-assets-table' : ''}"><thead><tr>${member ? '<th>품목명</th><th>분류</th>' : '<th>분류</th><th>품목명</th>'}<th>고유관리번호</th><th>${member ? `<button type="button" data-status aria-haspopup="dialog" aria-expanded="false">상태 ▾${state.statusRestricted ? ' ('+state.filters.statuses.length+')' : ''}</button>` : '상태'}</th><th>배정일</th><th>유효기한</th><th>태그</th>${member ? '' : '<th class="c">메모</th>'}<th class="c">연결된 자산</th>${options.rowActions ? '<th class="target-action-cell" aria-label="자산 작업"></th>' : ""}</tr></thead><tbody>${rows || `<tr><td colspan="${(options.rowActions ? 10 : 9) - Number(member)}" style="text-align:center;color:var(--text-mut);padding:32px">${emptyMsg}</td></tr>`}</tbody></table></div>`;
-      if (member) {
-        table.querySelector('[data-status]').onclick = openStatus;
-      }
+      table.innerHTML = `<div class="table-wrap"><table class="target-asset-table member-assets-table"><thead><tr><th>품목명</th><th>분류</th><th>고유관리번호</th><th><button type="button" data-status aria-haspopup="dialog" aria-expanded="false">상태 ▾${state.statusRestricted ? ' ('+state.filters.statuses.length+')' : ''}</button></th><th>배정일</th><th>유효기한</th><th>태그</th><th class="c">연결된 자산</th>${options.rowActions ? '<th class="target-action-cell" aria-label="자산 작업"></th>' : ""}</tr></thead><tbody>${rows || `<tr><td colspan="${options.rowActions ? 9 : 8}" style="text-align:center;color:var(--text-mut);padding:32px">${emptyMsg}</td></tr>`}</tbody></table></div>`;
+      table.querySelector('[data-status]').onclick = openStatus;
       table.querySelectorAll("[data-target-asset]").forEach(row => row.onclick = e => {
-        // 메모 아이콘은 행 클릭과 분리해 조회 Modal만 연다(바깥 클릭·[X]로 닫음).
         const more = e.target.closest('[data-target-more]');
         if(more){e.stopPropagation();openActionMenu(more,readItems().find(x=>x.asset.id===more.dataset.targetMore).asset);return;}
-        const note = e.target.closest("[data-note]");
-        if (note) {
-          const a = readItems().find(x => x.asset.id === note.dataset.note).asset, view = document.createElement("div");
-          view.className = "modal-back";
-          view.innerHTML = `<div class="modal help-modal"><div class="help-modal-head"><h3>메모</h3><button class="btn" data-close aria-label="닫기">×</button></div><div class="body">${window.AssetMemo.render(a.note)}</div></div>`;
-          document.body.appendChild(view);
-          view.querySelector("[data-close]").onclick = () => view.remove();
-          view.onclick = ev => { if (ev.target === view) view.remove(); };
-          return;
-        }
         window.open(openUrl(row.dataset.targetAsset), "_blank", "noopener");
       });
       drawPager(list.length);
@@ -247,97 +228,12 @@
       });
     }
 
-    // 현황 필터 Modal(왼쪽 항목·오른쪽 옵션)에서 분류·상태만 추려 제공한다(D-20261029-37).
-    function openFilter() {
-      const draft = { categories: [...state.filters.categories], statuses: [...state.filters.statuses] };
-      const GROUPS = [{ k: "categories", name: "분류" }, { k: "statuses", name: "상태" }];
-      let group = "categories", query = "";
-      const back = document.createElement("div");
-      back.className = "modal-back";
-      back.innerHTML = `<div class="modal lg"><h3>필터</h3><div class="fmodal"><div class="groups" data-groups></div><div class="opts" data-opts></div></div><div class="foot"><span class="sum" data-sum></span><button class="btn" data-close>취소</button><button class="btn primary" data-apply>적용</button></div></div>`;
-      document.body.appendChild(back);
-      const catGroups = () => {
-        const map = new Map();
-        categoryValues().forEach(v => { const [g, s] = v.split("/"); map.has(g) || map.set(g, []); map.get(g).push(s); });
-        return map;
-      };
-      const summary = k => {
-        const labels = k === "categories" ? draft.categories.map(v => v.replace("/", " › ")) : draft.statuses.map(v => STATUS_LABEL[v][0]);
-        return labels.length ? `${labels[0]}${labels.length > 1 ? ` +${labels.length - 1}` : ""}` : "";
-      };
-      const visible = () => {
-        if (group === "statuses") return STATUS_ORDER;
-        const q = query.trim().toLowerCase(), out = [];
-        catGroups().forEach((subs, g) => {
-          const gm = !q || g.toLowerCase().includes(q);
-          subs.filter(s => gm || s.toLowerCase().includes(q)).forEach(s => out.push(`${g}/${s}`));
-        });
-        return out;
-      };
-      const optRow = (checked, label, val, cls = "") => `<label class="opt ${cls}"><input type="checkbox" data-v="${esc(val)}" ${checked ? "checked" : ""}>${label}</label>`;
-      function drawGroups() {
-        back.querySelector("[data-groups]").innerHTML = GROUPS.map(g => {
-          const s = summary(g.k);
-          return `<button data-g="${g.k}" class="${g.k === group ? "active" : ""}"><span class="g-text"><span class="g-name">${g.name}</span>${s ? `<span class="g-sum">${esc(s)}</span>` : ""}</span>${draft[g.k].length ? '<span class="dot"></span>' : ""}</button>`;
-        }).join("");
-        back.querySelectorAll("[data-g]").forEach(b => b.onclick = () => { group = b.dataset.g; query = ""; drawGroups(); drawOpts(); });
-      }
-      function drawSum() {
-        const n = draft.categories.length + draft.statuses.length;
-        back.querySelector("[data-sum]").textContent = `선택됨 ${n}`;
-      }
-      function drawOpts() {
-        const box = back.querySelector("[data-opts]");
-        box.innerHTML = `${group === "categories" ? `<input type="text" class="picker-search" data-q placeholder="검색" value="${esc(query)}">` : ""}<div data-dyn></div>`;
-        const q = box.querySelector("[data-q]");
-        q && (q.oninput = e => { query = e.target.value; renderDyn(); });
-        renderDyn();
-      }
-      function renderDyn() {
-        const dyn = back.querySelector("[data-dyn]"), q = query.trim().toLowerCase();
-        let html = "";
-        if (group === "categories") {
-          catGroups().forEach((subs, g) => {
-            const gm = !q || g.toLowerCase().includes(q), filtered = subs.filter(s => gm || s.toLowerCase().includes(q));
-            if (!filtered.length) return;
-            const all = filtered.every(s => draft.categories.includes(`${g}/${s}`));
-            html += (gm ? optRow(all, `<b>${esc(g)}</b>`, `grp:${g}`) : "") + filtered.map(s => optRow(draft.categories.includes(`${g}/${s}`), esc(s), `${g}/${s}`, gm ? "child" : "")).join("");
-          });
-          html ||= `<p class="muted" style="padding:12px 2px">결과가 없습니다.</p>`;
-        } else {
-          html = STATUS_ORDER.map(v => optRow(draft.statuses.includes(v), STATUS_LABEL[v][0], v)).join("");
-        }
-        const vis = visible(), allChecked = vis.length > 0 && vis.every(v => draft[group].includes(v));
-        dyn.innerHTML = `<div class="picker-toolbar"><label class="picker-check"><input type="checkbox" data-all ${allChecked ? "checked" : ""}><span>전체</span></label><span class="right"><button class="filter-reset" data-group-reset aria-label="이 항목 초기화">${RESET_ICON}</button></span></div>${html}`;
-        dyn.querySelector("[data-all]").onchange = e => {
-          const vals = visible();
-          draft[group] = e.target.checked ? [...new Set([...draft[group], ...vals])] : draft[group].filter(v => !vals.includes(v));
-          renderDyn(); drawGroups(); drawSum();
-        };
-        dyn.querySelector("[data-group-reset]").onclick = () => { draft[group] = []; renderDyn(); drawGroups(); drawSum(); };
-        dyn.querySelectorAll("input[data-v]").forEach(cb => cb.onchange = () => {
-          const v = cb.dataset.v;
-          if (v.startsWith("grp:")) {
-            const g = v.slice(4), keys = (catGroups().get(g) || []).map(s => `${g}/${s}`);
-            draft.categories = cb.checked ? [...new Set([...draft.categories, ...keys])] : draft.categories.filter(k => !keys.includes(k));
-          } else {
-            draft[group] = cb.checked ? [...draft[group], v] : draft[group].filter(x => x !== v);
-          }
-          renderDyn(); drawGroups(); drawSum();
-        });
-      }
-      back.querySelector("[data-close]").onclick = () => back.remove();
-      back.querySelector("[data-apply]").onclick = () => { state.filters = draft; state.page = 1; back.remove(); draw(); };
-      drawGroups(); drawOpts(); drawSum();
-    }
-
-
     if(window.PrototypeCases){
       const ref=location.pathname.includes('member-detail')?'Web27':'Web28';
       // page provider is in the target detail module; supplemental actions remain on its current context.
       window.DashboardCases?.pageActions(ref,[
         ['target-search-empty','자산 검색 결과 없음','4·7번',()=>{state.q='일치하는 자산 없음 999';state.page=1;draw();}],
-        ['target-filter',member ? '상태 헤더 필터 적용' : '상태 필터 적용·선택 칩','11번',()=>{state.q='';state.statusRestricted=true;state.filters.statuses=['assigned'];state.page=1;draw();}],
+        ['target-filter','상태 헤더 필터 적용','11번',()=>{state.q='';state.statusRestricted=true;state.filters.statuses=['assigned'];state.page=1;draw();}],
         ['target-clear','검색·필터 초기화','4·11번',()=>{state.q='';state.statusRestricted=false;state.filters={categories:[],statuses:[]};state.page=1;draw();}]
       ]);
     }
