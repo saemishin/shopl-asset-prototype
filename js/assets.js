@@ -61,6 +61,7 @@
     },
     MEMBER_INFO = {
       김민수: {
+        worksite: "본사", attribute: "정규직",
         team: "개발팀",
         empNo: "2021001",
         phone: "010-2001-1234",
@@ -68,6 +69,7 @@
         jobTitle: "매니저"
       },
       이서연: {
+        worksite: "판교점", attribute: "정규직",
         team: "디자인팀",
         empNo: "2021015",
         phone: "010-3412-5678",
@@ -75,6 +77,7 @@
         jobTitle: "주임"
       },
       박지훈: {
+        worksite: "강남점", attribute: "정규직", role: "리더",
         team: "영업팀",
         empNo: "2020032",
         phone: "010-8823-9910",
@@ -110,6 +113,7 @@
         jobTitle: "주임"
       },
       오세훈: {
+        worksite: "역삼점", attribute: "계약직",
         team: "운영팀",
         empNo: "2018014",
         phone: "010-7712-3345",
@@ -389,13 +393,13 @@
   const targetModes={employee:'summary',worksite:'summary'};
   const isTargetFull=()=>['employee','worksite'].includes(state.view)&&targetModes[state.view]==='full';
   window.addEventListener('pageshow',e=>{if(e.persisted&&isTargetFull()){targetModes.employee='summary';targetModes.worksite='summary';render();}});
-  function targetModeToggleHtml(){return `<div class="target-view-row"><div class="seg-toggle" role="tablist">${[['summary','요약'],['full','종합']].map(([k,t])=>`<button type="button" role="tab" data-target-mode="${k}" class="${targetModes[state.view]===k?'active':''}" aria-selected="${targetModes[state.view]===k}">${t}</button>`).join('')}</div>${isTargetFull()?classificationScopeHtml():''}</div>`;}
+  function targetModeToggleHtml(memberFilter){return `<div class="target-view-row"><div class="seg-toggle" role="tablist">${[['summary','요약'],['full','종합']].map(([k,t])=>`<button type="button" role="tab" data-target-mode="${k}" class="${targetModes[state.view]===k?'active':''}" aria-selected="${targetModes[state.view]===k}">${t}</button>`).join('')}</div>${isTargetFull()?classificationScopeHtml():''}${state.view === 'employee' ? memberFilter : ''}</div>`;}
   function scopedCategories(){const chosen=classificationScopes[state.view]||[];return viewableCategories().filter(c=>c.type==='individual'&&(!chosen.length||chosen.includes(`${c.group}/${c.sub}`)));}
   function classificationScopeHtml() {
     const chosen = classificationScopes[state.view] || [];
     const first = viewableCategories().find(c => chosen.includes(`${c.group}/${c.sub}`));
     const label = first ? bulkEsc(first.sub) + (chosen.length > 1 ? ' +' + (chosen.length - 1) : '') : '전체';
-    const clearable = state.view === 'all' || state.view === 'product';
+    const clearable = ['all','product','employee'].includes(state.view);
     return `<div class="overview-scope">${clearable ? '' : '<span>분류</span>'}<button type="button" class="btn sm" id="classification-scope" aria-label="분류 선택: ${label}">${label} ▾</button>${clearable && first ? '<button class="btn sm" id="scope-clear" aria-label="전체 분류로 복귀">×</button>' : ''}</div>`;
   }
   const rememberOverview = () => sessionStorage.setItem("asset-overview-return", JSON.stringify(state));
@@ -442,6 +446,9 @@
 }
   function activeFilterCount() {
     const f = state.filters;
+    if (state.view === 'employee' && f.member) {
+      return Object.values(f.member.values).reduce((n,values) => n + values.length,0) + Number(!f.member.leaders) + Number(!f.member.retired);
+    }
     return f.status.length + f.expiry.length + f.labels.length + f.note.length;
   }
   function pageSlice(arr) {
@@ -616,6 +623,34 @@
     }).join("");
     return { head, rows: body, cols: fixedHeads.length + cats.length };
   }
+  function employeeFullTable(heads, cells, rows) {
+    const groups = new Map();
+    for (const cat of scopedCategories()) {
+      if (!groups.has(cat.group)) groups.set(cat.group, []);
+      groups.get(cat.group).push(cat);
+    }
+    const categories = [...groups.values()].flat();
+    const fixed = [...heads, {label:'총합', w:72}];
+    let left = 0;
+    const attrs = fixed.map(({w}, i) => {
+      const style = `class="tf-sticky${i === heads.length ? ' tf-sticky-last num' : ''}" style="left:${left}px;min-width:${w}px;max-width:${w}px"`;
+      left += w; return style;
+    });
+    const head = `<tr>${fixed.map((h,i) => `<th rowspan="2" ${attrs[i]}>${h.label}</th>`).join('')}${[...groups].map(([name,cats]) => `<th class="tf-group" scope="colgroup" colspan="${cats.length}">${bulkEsc(name)}</th>`).join('')}</tr>
+      <tr>${categories.map(c => `<th class="num tf-sub">${bulkEsc(c.sub)}</th>`).join('')}</tr>`;
+    const body = rows.map(row => {
+      const counts = new Map();
+      const key = c => JSON.stringify([c.group,c.sub]);
+      for (const {asset} of row.items) counts.set(key(asset), (counts.get(key(asset)) || 0) + 1);
+      const values = categories.map(c => counts.get(key(c)) || 0);
+      const fixedCells = [...cells(row),values.reduce((sum,n) => sum+n,0)];
+      return `<tr class="clickable" data-mkey="${bulkEsc(row.name)}">${fixedCells.map((v,i) => `<td ${attrs[i]}>${v}</td>`).join('')}${values.map(n => `<td class="num${n ? '' : ' tf-zero'}">${n}</td>`).join('')}</tr>`;
+    }).join('');
+    return {head, rows:body, cols:fixed.length + categories.length};
+  }
+  function memberProfileTrigger(name) {
+    return `<button type="button" class="acard-id member-profile-trigger" data-profile="${bulkEsc(name)}" popovertarget="member-profile">${memberIdentity(name)}</button>`;
+  }
   function view_employee(list) {
     const map = /* @__PURE__ */new Map();
     list.forEach(a => {
@@ -635,6 +670,7 @@
     const head = `<tr><th>이름</th>${window.ASSET_MEMBER_NUMBER_ENABLED !== !1 ? "<th>사번</th>" : ""}<th>휴대폰번호</th><th class="num">배정 자산 수</th><th>배정 자산</th></tr>`,
       q = state.search.trim().toLowerCase(),
       rowsArr = [...map.values()].filter(r => {
+        if (!memberMatches(r.name)) return false;
         if (!q) return !0;
         const info = MEMBER_INFO[r.name] || {};
         return r.name.toLowerCase().includes(q) || (info.empNo || "").toLowerCase().includes(q) || (info.phone || "").includes(q);
@@ -645,13 +681,13 @@
     if (isTargetFull()) {
       const withNo = window.ASSET_MEMBER_NUMBER_ENABLED !== !1,
         heads = [{ label: "이름", w: 170 }, ...(withNo ? [{ label: "사번", w: 100 }] : []), { label: "휴대폰번호", w: 140 }],
-        t = targetFullTable(heads, r => { const info = MEMBER_INFO[r.name] || {}; return [`<div class="acard-id">${memberIdentity(r.name)}</div>`, ...(withNo ? [info.empNo || '<span class="muted">—</span>'] : []), info.phone || '<span class="muted">—</span>']; }, paged, "data-mkey");
+        t = employeeFullTable(heads, r => { const info = MEMBER_INFO[r.name] || {}; return [memberProfileTrigger(r.name), ...(withNo ? [info.empNo || '<span class="muted">—</span>'] : []), info.phone || '<span class="muted">—</span>']; }, paged);
       return { ...t, count: rowsArr.length };
     }
     const rows = paged.map(r => {
       const info = MEMBER_INFO[r.name] || {};
       return `<tr class="clickable" data-mkey="${r.name}">
-        <td><div class="acard-id">${memberIdentity(r.name)}</div></td>
+        <td>${memberProfileTrigger(r.name)}</td>
         ${window.ASSET_MEMBER_NUMBER_ENABLED !== !1 ? `<td>${info.empNo || '<span class="muted">—</span>'}</td>` : ""}
         <td>${info.phone || '<span class="muted">—</span>'}</td>
         <td class="num">${r.items.length}</td>
@@ -761,7 +797,7 @@
   }
   function filterChips(){const f=state.filters,chips=[],push=(k,label,v)=>chips.push(`<span class="fchip">${label}<button data-clear='${JSON.stringify({k,v})}'>✕</button></span>`);f.status.forEach(v=>push('status',STATUS_LABEL[v][0],v));f.expiry.forEach(v=>push('expiry',EXP_LABEL[v],v));f.labels.forEach(v=>push('labels',v,v));f.note.forEach(v=>push('note',v==='has'?'있음':'없음',v));return chips.length?`<div class="filterbar"><button class="filter-reset" id="filter-reset" aria-label="필터 전체 해제">${RESET_ICON}</button>${chips.join('')}</div>`:'';}
   function tableInner(v) {
-    const filtering = activeFilterCount() > 0 || !!state.statFilter || !!state.search.trim(),
+    const filtering = (isTargetFull() && classificationScopes[state.view].length > 0) || activeFilterCount() > 0 || !!state.statFilter || !!state.search.trim(),
       emptyMsg = hasViewScope() ? filtering ? "결과가 없습니다." : ["employee", "worksite"].includes(state.view) ? "표시할 목록이 없습니다." : state.view === "product" ? "등록된 품목이 없습니다." : "등록된 자산이 없습니다." : "조회 가능한 자산이 없습니다.",
       empty = `<tr><td colspan="${v.cols ? v.cols : state.view === "product" ? 8 : state.view === "employee" ? 4 : state.view === "worksite" ? 3 : canManageAssets() ? 10 : 9}" style="text-align:center;color:var(--text-mut);padding:32px">${emptyMsg}</td></tr>`;
     return `<table class="${state.view === "product" ? `tbl-product tbl-product-${state.productType}` : `tbl-${state.view}${isTargetFull() ? " tbl-target-full" : ""}`}"><thead>${v.head}</thead><tbody>${v.rows || empty}</tbody></table>`;
@@ -836,7 +872,8 @@
     const c = document.getElementById("content"),
       v = currentView(),
       nAct = state.view === "product" ? state.filters.category.length : activeFilterCount();
-    const showAssetActions = state.view === "all" || state.view === "product";
+    const showAssetActions = ["all","product","employee"].includes(state.view);
+    const filterButton = `<button class="filter-btn ${nAct ? "set" : ""}" id="btn-filter" ${state.view==='product'?'hidden':''}>▤ ${state.view === "product" ? "분류" : state.view === "employee" ? "구성원" : state.view === "worksite" ? "근무지" : "필터"}${nAct ? ` <b>${nAct}</b>` : ""}</button>`;
     const searchBox = `<div class="searchbox${state.search ? " has-term" : ""}">
             <input class="search${state.search ? " expanded" : ""}" id="search-input"
               placeholder="${state.search ? SEARCH_PLACEHOLDER[state.view] : "검색"}" value="${state.search.replace(/"/g, "&quot;")}">
@@ -860,7 +897,7 @@
       </div>
 
       ${state.view === 'product' ? classificationScopeHtml() : ''}
-      ${['employee','worksite'].includes(state.view)?targetModeToggleHtml():''}
+      ${['employee','worksite'].includes(state.view)?targetModeToggleHtml(filterButton):''}
       ${state.view === "all" ? statsHtml() : ""}
       ${state.view === "product" ? typeToggleHtml() : ""}
 
@@ -868,7 +905,7 @@
         ${showAssetActions ? searchBox : ""}
         <span class="total">전체 <b>${v.count}</b></span>
         ${sortHtml()}
-        <button class="filter-btn ${nAct ? "set" : ""}" id="btn-filter" ${state.view==='product'?'hidden':''}>▤ ${state.view === "product" ? "분류" : state.view === "employee" ? "구성원" : state.view === "worksite" ? "근무지" : "필터"}${nAct ? ` <b>${nAct}</b>` : ""}</button>
+        ${state.view === "employee" ? "" : filterButton}
         <div class="right">
           ${showAssetActions ? "" : searchBox}
           ${state.view === "all" ? `<button type="button" class="btn sm" id="overview-download" popovertarget="overview-download-menu" ${v.count ? "" : "disabled"}>다운로드 ▾</button>
@@ -881,6 +918,7 @@
       ${filterChips()}
 
       <div class="table-wrap">${tableInner(v)}</div>
+      ${state.view === 'employee' ? '<div id="member-profile" popover class="member-profile-card"></div>' : ''}
 
       ${pagerHtml(v.count, state.view === "all" && canManageAssets() ? '<button class="btn sm" id="btn-bulk-delete" disabled>삭제</button>' : "")}
     `, c.querySelector('#classification-scope') && (c.querySelector('#classification-scope').onclick=openCategoryFilterModal), c.querySelectorAll('[data-target-mode]').forEach(b=>b.onclick=()=>{targetModes[state.view]=b.dataset.targetMode;state.page=1;render();}), c.querySelectorAll(".subtabs [data-view]").forEach(b => b.onclick = () => {
@@ -951,6 +989,14 @@
       state.filters = emptyFilters(), state.statFilter = null, state.page = 1, render();
     }), c.querySelectorAll(".pager button[data-page]").forEach(b => b.onclick = () => {
       state.page = +b.dataset.page, render();
+    });
+    c.querySelectorAll('[data-profile]').forEach(button => button.onclick = e => {
+      e.stopPropagation();
+      const name = button.dataset.profile, info = MEMBER_INFO[name] || {};
+      const card = c.querySelector('#member-profile'), rect = button.getBoundingClientRect();
+      card.innerHTML = `<strong>${bulkEsc(name)}</strong><p>${bulkEsc([info.team,info.jobTitle].filter(Boolean).join(' · '))}</p><p>${bulkEsc(info.phone || '—')}</p><a href="member-detail.html?name=${encodeURIComponent(name)}">구성원 상세</a>`;
+      card.style.left = Math.min(rect.left,window.innerWidth - 232) + 'px';
+      card.style.top = (rect.bottom + 134 < window.innerHeight ? rect.bottom : Math.max(0, rect.top - 134)) + 'px';
     });
     const pageSizeSel = document.getElementById("page-size");
     pageSizeSel && (pageSizeSel.onchange = () => {
@@ -1956,43 +2002,80 @@
       onApply:applyClassificationScope
     });
   }
-  function openMemberFilterModal() {
-    let cat = "그룹";
-    function nodeRow(n, isChild) {
-      const kids = n.children ? n.children.map(c => nodeRow(c, !0)).join("") : "";
-      return `<label class="opt ${isChild ? "child" : ""}"><input type="checkbox" checked>${n.name}</label>${kids}`;
-    }
-    function optsHtml() {
-      return cat === "그룹" ? MEMBER_GROUP_TREE.map(n => nodeRow(n, !1)).join("") : MEMBER_JOB_TITLES.map(j => `<label class="opt"><input type="checkbox" checked>${j}</label>`).join("");
-    }
-    const back = modal(`
-      <div class="modal lg">
-        <h3>직원 필터</h3>
-        <div class="fmodal">
-          <div class="groups" id="mf-groups">
-            ${["그룹", "직무/직급"].map(g => `<button data-g="${g}" class="${g === cat ? "active" : ""}">
-              <span class="g-text"><span class="g-name">${g}</span></span>
-            </button>`).join("")}
-          </div>
-          <div class="opts">
-            <input type="text" class="picker-search" placeholder="검색">
-            <div class="picker-toolbar">
-              <label class="picker-check"><input type="checkbox" checked><span>하위그룹도 한번에 체크</span></label>
-              <span class="right"><button class="filter-reset" aria-label="초기화">${RESET_ICON}</button></span>
-            </div>
-            <div id="mf-opts-list">${optsHtml()}</div>
-          </div>
-        </div>
-        <div class="foot">
-          <button class="btn" data-close>취소</button>
-          <button class="btn primary" id="mf-apply">적용</button>
-        </div>
-      </div>`);
-    back.querySelectorAll("#mf-groups button").forEach(b => b.onclick = () => {
-      cat = b.dataset.g, back.querySelectorAll("#mf-groups button").forEach(x => x.classList.toggle("active", x === b)), back.querySelector("#mf-opts-list").innerHTML = optsHtml();
-    }), back.querySelector("#mf-apply").onclick = () => {
-      back.remove(), toast('"직원 필터" 적용 (프로토타입 — 실제 반영 없음)');
+  // 구성원 기능의 데모 설정과 데이터를 사용하며, 분류 선택은 종합 보기의 집계에만 적용한다.
+  function memberFilterFields(name) {
+    const info = MEMBER_INFO[name] || {};
+    return {
+      '그룹': info.team, '직무/직급': info.jobTitle, '등급': info.grade,
+      '직원': name, '근무지': info.worksite, '사용자 지정 속성': info.attribute
     };
+  }
+  function visibleMemberGroup(group) {
+    const scope = window.AssetPrototypeActor.memberGroups;
+    return window.AssetPrototypeActor.role === 'admin' || !scope || scope.includes(group);
+  }
+  function memberMatches(name) {
+    const fields = memberFilterFields(name);
+    if (!visibleMemberGroup(fields['그룹'])) return false;
+    const filter = state.filters.member;
+    if (!filter) return true;
+    if (!filter.leaders && MEMBER_INFO[name]?.role === '리더') return false;
+    if (!filter.retired && ['retired','resigned','inactive'].includes(window.DATA.targetStatuses.employee[name])) return false;
+    return Object.entries(filter.values).every(([field, values]) =>
+      !values.length || values.includes(fields[field]));
+  }
+  function openMemberFilterModal() {
+    const draft = structuredClone(state.filters.member || {values:{}, leaders:true, retired:true});
+    const names = [...new Set(viewableAssets().flatMap(a => (a.assignments || []).map(r => r.employee)).filter(Boolean))];
+    const fields = Object.keys(memberFilterFields('')).filter(field =>
+      !(field === '등급' && window.ASSET_MEMBER_GRADE_ENABLED === false ||
+        field === '직무/직급' && window.ASSET_MEMBER_JOB_TITLE_ENABLED === false));
+    let field = fields[0], reset = false, descendants = true;
+    const back = modal(`<div class="modal lg" role="dialog" aria-label="구성원 필터"><h3>구성원 필터</h3>
+      <div class="fmodal"><div class="groups" data-fields></div><div class="opts">
+      <input class="picker-search" type="search" placeholder="검색">
+      <div class="picker-toolbar"><label data-tree><input type="checkbox" checked> 하위 그룹도 함께 선택</label>
+      <button class="filter-reset" aria-label="초기화">${RESET_ICON}</button></div><div data-values></div></div></div>
+      <div class="picker-toolbar"><label><input type="checkbox" data-include="leaders"> 리더 포함</label>
+      <label><input type="checkbox" data-include="retired"> 퇴사자 포함</label></div>
+      <div class="foot"><button class="btn" data-close>취소</button><button class="btn primary" data-apply>적용</button></div></div>`);
+    const query = back.querySelector('.picker-search'), apply = back.querySelector('[data-apply]');
+    const groups = MEMBER_GROUP_TREE.flatMap(function flatten(node) {
+      return [node, ...(node.children || []).flatMap(flatten)];
+    });
+    function draw() {
+      const picked = draft.values[field] || [];
+      const candidates = field === '그룹' ? groups.map(node => node.name)
+        : [...new Set(names.filter(name => visibleMemberGroup(MEMBER_INFO[name]?.team)).map(name => memberFilterFields(name)[field]).filter(Boolean))].sort();
+      back.querySelector('[data-fields]').innerHTML = fields.map(f => `<button data-field="${f}" class="${f === field ? 'active' : ''}">${f}</button>`).join('');
+      back.querySelector('[data-tree]').hidden = field !== '그룹';
+      back.querySelector('[data-values]').innerHTML = candidates.filter(v => v.toLowerCase().includes(query.value.trim().toLowerCase())).map(v =>
+        `<label class="opt"><input type="checkbox" value="${bulkEsc(v)}" ${picked.includes(v) ? 'checked' : ''} ${field === '그룹' && !visibleMemberGroup(v) ? 'disabled' : ''}>${bulkEsc(v)}</label>`).join('') || '<p class="muted">결과가 없습니다.</p>';
+      apply.disabled = !reset && !Object.values(draft.values).some(values => values.length);
+    }
+    back.querySelector('[data-fields]').onclick = e => {
+      const target = e.target.closest('[data-field]'); if (!target) return;
+      field = target.dataset.field; query.value = ''; draw();
+    };
+    back.querySelector('[data-values]').onchange = e => {
+      const box = e.target, picked = new Set(draft.values[field] || []);
+      const toggle = value => box.checked ? picked.add(value) : picked.delete(value);
+      toggle(box.value);
+      if (field === '그룹' && descendants) {
+        const visit = node => (node.children || []).forEach(c => { if (visibleMemberGroup(c.name)) toggle(c.name); visit(c); });
+        visit(groups.find(node => node.name === box.value));
+      }
+      draft.values[field] = [...picked]; draw();
+    };
+    query.oninput = draw;
+    back.querySelector('[data-tree] input').onchange = e => { descendants = e.target.checked; };
+    back.querySelector('.filter-reset').onclick = () => { draft.values[field] = []; reset = true; draw(); };
+    back.querySelectorAll('[data-include]').forEach(box => {
+      box.checked = draft[box.dataset.include];
+      box.onchange = () => { draft[box.dataset.include] = box.checked; };
+    });
+    apply.onclick = () => { state.filters.member = draft; state.page = 1; back.remove(); render(); };
+    draw();
   }
   const WS_PROVINCES = ["도 미지정", "강원도", "경기도", "경상남도", "경상북도", "광주광역시", "대구광역시", "대전광역시", "부산광역시", "서울특별시", "세종특별자치시", "울산광역시", "인천광역시", "전라남도", "전라북도", "제주특별자치도", "충청남도", "충청북도"];
   function openWorksiteFilterModal() {
@@ -2189,7 +2272,8 @@
         render();
       };
       const cases=[['default','기본 데이터','7·8번',()=>apply('default')],['empty','배정·자산 관계 없음','7번',()=>apply('empty')],['search-empty','검색 결과 없음','5번',()=>apply('search-empty')],['many','다수 행·페이지네이션',view==='product'?'8번':'10번',()=>apply('many')],['view','조회만 가능','도입부',()=>apply('view')],['partial','일부 소분류만 조회 가능','도입부',()=>apply('partial')],['no-view','조회 가능한 소분류 없음','도입부',()=>apply('no-view')]];
-      if(view==='product')cases.push(['manage','자산 관리 권한','상단 작업 버튼 · Web02 1~3번',()=>apply('manage')],['state','조회·배정 및 상태 관리 가능','상단 작업 버튼 · Web02 2·3번',()=>apply('state')]);
+      if(view==='product'||view==='employee')cases.push(['manage','자산 관리 권한','상단 작업 버튼 · Web02 1~3번',()=>apply('manage')],['state','조회·배정 및 상태 관리 가능','상단 작업 버튼 · Web02 2·3번',()=>apply('state')]);
+      if(view==='employee')cases.push(['filter','구성원 필터','6·11번',()=>{apply('default');openMemberFilterModal();}],['profile','구성원 프로필','9번',()=>{apply('default');document.querySelector('[data-profile]')?.click();}]);
       if(view!=='product')cases.push(['full','종합 보기','1번',()=>apply('full')],['summary','요약 보기','1번',()=>apply('default')],['no-code',view==='employee'?'사번 사용 OFF':'근무지 코드 사용 OFF','4·9번',()=>apply('no-code')]);
       P.fixture({id:'overview-'+view,title:'현황 > '+title,reference:'Web'+num,matches:()=>activeScreen==='list'&&state.view===view,reset:()=>apply('default'),cases:cases.map(x=>{if(view!=='product'&&x[0]==='search-empty')x[2]='7번';if(view!=='product'&&['default','empty'].includes(x[0]))x[2]='9번';return x;})});
     }

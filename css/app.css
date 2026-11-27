@@ -2426,6 +2426,8 @@ fieldset.asset-fixed-inputs{border:0;padding:0;margin:0;min-width:0;}
 .cat-manage-desc { margin:0; padding:14px 20px 0; }
 /* 현황 구성원별·근무지별 요약/전체 보기(D-20261030-35) */
 .target-view-row { display:flex; align-items:center; gap:12px; margin:4px 0 14px; }
+.member-profile-trigger { border:0; background:transparent; padding:0; text-align:left; cursor:pointer; font:inherit; }
+.member-profile-card { position:fixed; inset:auto; margin:0; width:216px; padding:12px; border:1px solid var(--line); border-radius:8px; }
 .target-view-row .overview-scope { margin:0; }
 .seg-toggle { display:inline-flex; padding:4px; border-radius:10px; background:#f1f3f5; gap:2px; }
 .seg-toggle button { min-width:72px; height:30px; padding:0 14px; border:0; border-radius:7px; background:transparent; color:var(--text-mut); font-size:13px; font-weight:500; cursor:pointer; }
