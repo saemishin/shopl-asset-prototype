@@ -3,6 +3,11 @@
     COMPANY_PLAN_KEY = "shopl_proto_companyPlan",
     QA_PLAN = new URLSearchParams(location.search).get("plan");
   let reviewPlan=null, reviewUse=null;
+  let reviewCase = null;
+  function canChangeSetting() {
+    const role = new URLSearchParams(location.search).get("role") || window.AssetPrototypeActor.role;
+    return reviewCase !== "leader" && role === "admin";
+  }
   function companyPlan() {
     if(reviewPlan!==null)return reviewPlan;
     return QA_PLAN || localStorage.getItem(COMPANY_PLAN_KEY) || "Enterprise";
@@ -68,6 +73,10 @@
   }
   const HELP_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 0 1 4.6-1.4c.6.9.3 1.7-.4 2.3-.7.6-1.2 1-1.2 2.1"/><path d="M12 17h.01"/></svg>',
     TABS = [{
+      key: "attendance", label: "출퇴근 및 방문"
+    }, {
+      key: "payroll", label: "급여"
+    }, {
       key: "document",
       label: "문서"
     }, {
@@ -80,12 +89,12 @@
       key: "goal",
       label: "목표 및 평가"
     }, {
+      key: "expense", label: "비용"
+    }, {
       key: "asset",
       label: "자산"
     }];
   function cardHtml({
-    icon,
-    color,
     title,
     help,
     detail,
@@ -94,7 +103,7 @@
   }, isOn, extraAttrs) {
     return `
       <div class="ufs-row"${extraAttrs || ""}>
-        <div class="ufs-illust" style="background:${color}"><span>${icon}</span></div>
+        <div class="ufs-illust" aria-hidden="true"></div>
         <div class="ufs-body">
           <div class="ufs-title-row">
             <span class="ufs-title">${title}</span>
@@ -103,7 +112,7 @@
           </div>
           <ul class="ufs-desc">${desc.map(d => `<li>${d}</li>`).join("")}</ul>
         </div>
-        <button type="button" class="toggle-switch ufs-switch${isOn ? " on" : ""}" data-toggle role="switch" aria-checked="${isOn}" aria-label="${title} 사용 여부"><span class="toggle-knob"></span></button>
+        <button type="button" class="toggle-switch ufs-switch${isOn ? " on" : ""}" data-toggle ${canChangeSetting() ? "" : "disabled"} role="switch" aria-checked="${isOn}" aria-label="${title} 사용 여부"><span class="toggle-knob"></span></button>
       </div>`;
   }
   function render() {
@@ -115,8 +124,6 @@
       if (state.tab === "asset") {
         const on = assetMgmtOn();
         return cardHtml({
-          icon: "📦",
-          color: "#eaf1ff",
           title: "자산 관리",
           help: !1,
           detail: !0,
@@ -128,10 +135,10 @@
     }
     function draw() {
       c.innerHTML = `
-        <div class="ufs-tabs">
+        <div class="ufs-panel"><div class="ufs-tabs">
           ${TABS.map(t => `<button class="ufs-tab ${state.tab === t.key ? "active" : ""}" data-ufs-tab="${t.key}">${t.label}</button>`).join("")}
         </div>
-        <div class="ufs-panel">${bodyHtml()}</div>`, c.querySelectorAll("[data-ufs-tab]").forEach(b => b.onclick = () => {
+        ${bodyHtml()}</div>`, c.querySelectorAll("[data-ufs-tab]").forEach(b => b.onclick = () => {
         state.tab = b.dataset.ufsTab, draw();
       });
       const assetRow = c.querySelector("[data-asset-mgmt-row]");
@@ -141,10 +148,22 @@
             openUpgradeModal();
             return;
           }
-          assetMgmtOn() ? confirmModal("사용 안 함으로 설정하시겠습니까?", "사용 안 함으로 설정할 경우 '자산' 메뉴가 비노출 되며, 직원들이 앱에서 더 이상 자산을 관리할 수 없게 됩니다.", () => {
-            setAssetMgmtOn(!1), toast("상태가 변경되었습니다."), draw(), Shell.refreshNav({ active: "features" });
-          }) : confirmModal("사용함으로 설정하시겠습니까?", "", () => {
-            setAssetMgmtOn(!0), toast("상태가 변경되었습니다."), draw(), Shell.refreshNav({ active: "features" }), openTurnOnInfoModal();
+          const nextValue = !assetMgmtOn();
+          const title = nextValue ? "사용함으로 설정하시겠습니까?" : "사용 안 함으로 설정하시겠습니까?";
+          const message = nextValue ? "" : "사용 안 함으로 설정할 경우 '자산' 메뉴가 비노출 되며, 직원들이 앱에서 더 이상 자산을 관리할 수 없게 됩니다.";
+          confirmModal(title, message, () => {
+            if (!canChangeSetting()) return;
+            try {
+              if (reviewCase === "save-error") throw new Error("Simulated save failure");
+              setAssetMgmtOn(nextValue);
+            } catch {
+              toast("에러가 발생하였습니다. 잠시 후 다시 시도해보세요.");
+              return;
+            }
+            toast("상태가 변경되었습니다.");
+            draw();
+            Shell.refreshNav({ active: "features" });
+            if (nextValue) openTurnOnInfoModal();
           });
         };
         const detailBtn = assetRow.querySelector("[data-detail]");
@@ -157,9 +176,16 @@
   }
 
   if(window.PrototypeCases){
-    const apply=(plan,on)=>{reviewPlan=plan;reviewUse=on;render();};
-    window.PrototypeCases.fixture({id:'feature-settings',title:'기능 설정 > 자산',reference:'Web29',matches:()=>!!document.querySelector('[data-asset-mgmt-row]'),reset:()=>{reviewPlan=null;reviewUse=null;render();},cases:[
-      ['on','사용 가능 요금제·사용 중','2번',()=>apply('Enterprise',true)],['off','사용 가능 요금제·미사용','2번',()=>apply('Pro',false)],['lite','Lite 요금제·업그레이드 안내','2번',()=>apply('Lite',false)],['trial','Trial 요금제','2번',()=>apply('Trial',true)]
+    function apply(plan, on, scenario = null) {
+      reviewPlan = plan;
+      reviewUse = on;
+      reviewCase = scenario;
+      render();
+    }
+    window.PrototypeCases.fixture({id:'feature-settings',title:'기능 설정 > 자산',reference:'Web29',matches:()=>!!document.querySelector('[data-asset-mgmt-row]'),reset:()=>apply(null,null),cases:[
+      ['on','사용 가능 요금제·사용 중','2번',()=>apply('Enterprise',true)],['off','사용 가능 요금제·미사용','2번',()=>apply('Pro',false)],['lite','Lite 요금제·업그레이드 안내','2번',()=>apply('Lite',false)],['trial','Trial 요금제','2번',()=>apply('Trial',true)],
+      ['leader','자산 관리 권한을 가진 리더','Policy02 · 3절',()=>apply('Enterprise',true,'leader')],
+      ['save-error','사용 설정 저장 실패','Case 2-2-4',()=>apply('Pro',false,'save-error')]
     ]});
   }
   window.FeatureSettingsScreen = {
