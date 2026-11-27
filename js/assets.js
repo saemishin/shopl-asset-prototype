@@ -630,23 +630,23 @@
       groups.get(cat.group).push(cat);
     }
     const categories = [...groups.values()].flat();
-    const fixed = [...heads, {label:'총합', w:72}];
-    let left = 0;
-    const attrs = fixed.map(({w}, i) => {
-      const style = `class="tf-sticky${i === heads.length ? ' tf-sticky-last num' : ''}" style="left:${left}px;min-width:${w}px;max-width:${w}px"`;
-      left += w; return style;
+    const columns = [...heads, {label:'총합', w:72}];
+    const attrs = columns.map(({w}, i) => {
+      const width = `min-width:${w}px;max-width:${w}px`;
+      if (i === 0) return `class="tf-sticky tf-sticky-last" style="left:0;${width}"`;
+      return `${i === heads.length ? 'class="num" ' : ''}style="${width}"`;
     });
-    const head = `<tr>${fixed.map((h,i) => `<th rowspan="2" ${attrs[i]}>${h.label}</th>`).join('')}${[...groups].map(([name,cats]) => `<th class="tf-group" scope="colgroup" colspan="${cats.length}">${bulkEsc(name)}</th>`).join('')}</tr>
+    const head = `<tr>${columns.map((h,i) => `<th rowspan="2" ${attrs[i]}>${h.label}</th>`).join('')}${[...groups].map(([name,cats]) => `<th class="tf-group" scope="colgroup" colspan="${cats.length}">${bulkEsc(name)}</th>`).join('')}</tr>
       <tr>${categories.map(c => `<th class="num tf-sub">${bulkEsc(c.sub)}</th>`).join('')}</tr>`;
     const body = rows.map(row => {
       const counts = new Map();
       const key = c => JSON.stringify([c.group,c.sub]);
       for (const {asset} of row.items) counts.set(key(asset), (counts.get(key(asset)) || 0) + 1);
       const values = categories.map(c => counts.get(key(c)) || 0);
-      const fixedCells = [...cells(row),values.reduce((sum,n) => sum+n,0)];
-      return `<tr class="clickable" data-mkey="${bulkEsc(row.name)}">${fixedCells.map((v,i) => `<td ${attrs[i]}>${v}</td>`).join('')}${values.map(n => `<td class="num${n ? '' : ' tf-zero'}">${n}</td>`).join('')}</tr>`;
+      const leadingCells = [...cells(row),values.reduce((sum,n) => sum+n,0)];
+      return `<tr class="clickable" data-mkey="${bulkEsc(row.name)}">${leadingCells.map((v,i) => `<td ${attrs[i]}>${v}</td>`).join('')}${values.map(n => `<td class="num${n ? '' : ' tf-zero'}">${n}</td>`).join('')}</tr>`;
     }).join('');
-    return {head, rows:body, cols:fixed.length + categories.length};
+    return {head, rows:body, cols:columns.length + categories.length};
   }
   function memberProfileTrigger(name) {
     return `<button type="button" class="acard-id member-profile-trigger" data-profile="${bulkEsc(name)}" popovertarget="member-profile">${memberIdentity(name)}</button>`;
