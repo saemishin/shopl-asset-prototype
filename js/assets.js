@@ -393,13 +393,13 @@
   const targetModes={employee:'summary',worksite:'summary'};
   const isTargetFull=()=>['employee','worksite'].includes(state.view)&&targetModes[state.view]==='full';
   window.addEventListener('pageshow',e=>{if(e.persisted&&isTargetFull()){targetModes.employee='summary';targetModes.worksite='summary';render();}});
-  function targetModeToggleHtml(memberFilter){return `<div class="target-view-row"><div class="seg-toggle" role="tablist">${[['summary','요약'],['full','종합']].map(([k,t])=>`<button type="button" role="tab" data-target-mode="${k}" class="${targetModes[state.view]===k?'active':''}" aria-selected="${targetModes[state.view]===k}">${t}</button>`).join('')}</div>${isTargetFull()?classificationScopeHtml():''}${state.view === 'employee' ? memberFilter : ''}</div>`;}
+  function targetModeToggleHtml(filterButton){return `<div class="target-view-row"><div class="seg-toggle" role="tablist">${[['summary','요약'],['full','종합']].map(([k,t])=>`<button type="button" role="tab" data-target-mode="${k}" class="${targetModes[state.view]===k?'active':''}" aria-selected="${targetModes[state.view]===k}">${t}</button>`).join('')}</div>${isTargetFull()?classificationScopeHtml():''}${filterButton}</div>`;}
   function scopedCategories(){const chosen=classificationScopes[state.view]||[];return viewableCategories().filter(c=>c.type==='individual'&&(!chosen.length||chosen.includes(`${c.group}/${c.sub}`)));}
   function classificationScopeHtml() {
     const chosen = classificationScopes[state.view] || [];
     const first = viewableCategories().find(c => chosen.includes(`${c.group}/${c.sub}`));
     const label = first ? bulkEsc(first.sub) + (chosen.length > 1 ? ' +' + (chosen.length - 1) : '') : '전체';
-    const clearable = ['all','product','employee'].includes(state.view);
+    const clearable = ['all','product','employee','worksite'].includes(state.view);
     return `<div class="overview-scope">${clearable ? '' : '<span>분류</span>'}<button type="button" class="btn sm" id="classification-scope" aria-label="분류 선택: ${label}">${label} ▾</button>${clearable && first ? '<button class="btn sm" id="scope-clear" aria-label="전체 분류로 복귀">×</button>' : ''}</div>`;
   }
   const rememberOverview = () => sessionStorage.setItem("asset-overview-return", JSON.stringify(state));
@@ -446,6 +446,7 @@
 }
   function activeFilterCount() {
     const f = state.filters;
+    if (state.view === 'worksite') return Object.values(f.worksite || {}).reduce((n,values) => n + values.length, 0);
     if (state.view === 'employee' && f.member) {
       return Object.values(f.member.values).reduce((n,values) => n + values.length,0) + Number(!f.member.leaders) + Number(!f.member.retired);
     }
@@ -563,7 +564,7 @@
       asset
     })));
   }
-  function openMemberUnavailableModal() {
+  function openMemberUnavailableModal(view = "employee") {
     const back = modal(`
       <div class="modal sm" role="dialog" aria-modal="true" aria-describedby="member-unavailable-body">
         <div class="body" id="member-unavailable-body">설정이 변경되었습니다. 잠시 후 다시 시도해주세요.</div>
@@ -575,7 +576,7 @@
     back.addEventListener("keydown", event => {
       (event.key === "Escape" || event.key === "Tab") && (event.preventDefault(), confirm.focus());
     }), confirm.onclick = () => {
-      back.remove(), state.view = "employee", state.search = "", state.filters = emptyFilters(), state.statFilter = null, state.sort = {
+      back.remove(), state.view = view, state.search = "", state.filters = emptyFilters(), state.statFilter = null, state.sort = {
         key: "name",
         dir: "asc"
       }, state.pageSize = 20, state.page = 1, render();
@@ -609,21 +610,7 @@
       url.searchParams.delete("qa"), url.searchParams.delete("scenario"), location.href = url.toString();
     }, document.body.appendChild(panel);
   }
-  // 종합 보기: 고정 컬럼(구성원 이름·사번·휴대폰번호 / 근무지명·코드) 뒤에 분류 범위의 소분류를 컬럼으로 두고 배정 수를 표시한다.
-  function targetFullTable(fixedHeads, fixedCells, rows, keyAttr) {
-    const cats = scopedCategories();
-    let left = 0;
-    const stick = fixedHeads.map(h => { const st = `left:${left}px;min-width:${h.w}px;max-width:${h.w}px`; left += h.w; return st; });
-    // 소분류 헤더 한 칸에 대분류명(위)·소분류명(아래)을 두 줄로 적는다(D-20261030-35).
-    const head = `<tr>${fixedHeads.map((h, i) => `<th class="tf-sticky${i === fixedHeads.length - 1 ? " tf-sticky-last" : ""}" style="${stick[i]}">${h.label}</th>`).join("")}${cats.map(c => `<th class="num tf-sub"><span class="tf-group-name">${c.group}</span><span>${c.sub}</span></th>`).join("")}</tr>`;
-    const body = rows.map(r => {
-      const counts = new Map();
-      r.items.forEach(it => { const k = `${it.asset.group}/${it.asset.sub}`; counts.set(k, (counts.get(k) || 0) + 1); });
-      return `<tr class="clickable" ${keyAttr}="${r.name}">${fixedCells(r).map((cell, i) => `<td class="tf-sticky${i === fixedHeads.length - 1 ? " tf-sticky-last" : ""}" style="${stick[i]}">${cell}</td>`).join("")}${cats.map(c => { const n = counts.get(`${c.group}/${c.sub}`) || 0; return `<td class="num${n ? "" : " tf-zero"}">${n}</td>`; }).join("")}</tr>`;
-    }).join("");
-    return { head, rows: body, cols: fixedHeads.length + cats.length };
-  }
-  function employeeFullTable(heads, cells, rows) {
+  function targetFullTable(heads, cells, rows, keyAttr) {
     const groups = new Map();
     for (const cat of scopedCategories()) {
       if (!groups.has(cat.group)) groups.set(cat.group, []);
@@ -644,7 +631,7 @@
       for (const {asset} of row.items) counts.set(key(asset), (counts.get(key(asset)) || 0) + 1);
       const values = categories.map(c => counts.get(key(c)) || 0);
       const leadingCells = [...cells(row),values.reduce((sum,n) => sum+n,0)];
-      return `<tr class="clickable" data-mkey="${bulkEsc(row.name)}">${leadingCells.map((v,i) => `<td ${attrs[i]}>${v}</td>`).join('')}${values.map(n => `<td class="num${n ? '' : ' tf-zero'}">${n}</td>`).join('')}</tr>`;
+      return `<tr class="clickable" ${keyAttr}="${bulkEsc(row.name)}">${leadingCells.map((v,i) => `<td ${attrs[i]}>${v}</td>`).join('')}${values.map(n => `<td class="num${n ? '' : ' tf-zero'}">${n}</td>`).join('')}</tr>`;
     }).join('');
     return {head, rows:body, cols:columns.length + categories.length};
   }
@@ -681,7 +668,7 @@
     if (isTargetFull()) {
       const withNo = window.ASSET_MEMBER_NUMBER_ENABLED !== !1,
         heads = [{ label: "이름", w: 170 }, ...(withNo ? [{ label: "사번", w: 100 }] : []), { label: "휴대폰번호", w: 140 }],
-        t = employeeFullTable(heads, r => { const info = MEMBER_INFO[r.name] || {}; return [memberProfileTrigger(r.name), ...(withNo ? [info.empNo || '<span class="muted">—</span>'] : []), info.phone || '<span class="muted">—</span>']; }, paged);
+        t = targetFullTable(heads, r => { const info = MEMBER_INFO[r.name] || {}; return [memberProfileTrigger(r.name), ...(withNo ? [info.empNo || '<span class="muted">—</span>'] : []), info.phone || '<span class="muted">—</span>']; }, paged, 'data-mkey');
       return { ...t, count: rowsArr.length };
     }
     const rows = paged.map(r => {
@@ -704,7 +691,7 @@
     const map = /* @__PURE__ */new Map();
     list.forEach(a => {
       (a.assignments || []).forEach(x => {
-        x.worksite && (map.has(x.worksite) || map.set(x.worksite, {
+        x.worksite && worksiteMatches(x.worksite) && (map.has(x.worksite) || map.set(x.worksite, {
           name: x.worksite,
           code: WS_CODE[x.worksite] || "",
           items: []
@@ -724,12 +711,12 @@
     worksiteRowsByName = new Map(paged.map(r => [r.name, r]));
     if (isTargetFull()) {
       const withCode = window.ASSET_WORKSITE_CODE_ENABLED !== !1,
-        heads = [{ label: "근무지명", w: 160 }, ...(withCode ? [{ label: "근무지 코드", w: 110 }] : [])],
-        t = targetFullTable(heads, r => [`<a href="worksite-detail.html?name=${encodeURIComponent(r.name)}" target="_blank" rel="noopener" data-worksite-link>${r.name}</a>`, ...(withCode ? [r.code || '<span class="muted">—</span>'] : [])], paged, "data-wkey");
+        heads = [{label:'근무지', w:200}],
+        t = targetFullTable(heads, r => [worksiteLink(r.name) + (withCode ? `<div class="acard-sub">${bulkEsc(r.code || '—')}</div>` : '')], paged, 'data-wkey');
       return { ...t, count: rowsArr.length };
     }
-    const rows = paged.map(r => `<tr class="clickable" data-wkey="${r.name}">
-      <td><a href="worksite-detail.html?name=${encodeURIComponent(r.name)}" target="_blank" rel="noopener" data-worksite-link>${r.name}</a></td>
+    const rows = paged.map(r => `<tr class="clickable" data-wkey="${bulkEsc(r.name)}">
+      <td>${worksiteLink(r.name)}</td>
       ${window.ASSET_WORKSITE_CODE_ENABLED !== !1 ? `<td>${r.code || '<span class="muted">—</span>'}</td>` : ""}
       <td class="num">${r.items.length}</td>
       <td>${assetsSummaryCell(r.items)}</td>
@@ -872,7 +859,7 @@
     const c = document.getElementById("content"),
       v = currentView(),
       nAct = state.view === "product" ? state.filters.category.length : activeFilterCount();
-    const showAssetActions = ["all","product","employee"].includes(state.view);
+    const showAssetActions = ["all","product","employee","worksite"].includes(state.view);
     const filterButton = `<button class="filter-btn ${nAct ? "set" : ""}" id="btn-filter" ${state.view==='product'?'hidden':''}>▤ ${state.view === "product" ? "분류" : state.view === "employee" ? "구성원" : state.view === "worksite" ? "근무지" : "필터"}${nAct ? ` <b>${nAct}</b>` : ""}</button>`;
     const searchBox = `<div class="searchbox${state.search ? " has-term" : ""}">
             <input class="search${state.search ? " expanded" : ""}" id="search-input"
@@ -905,7 +892,7 @@
         ${showAssetActions ? searchBox : ""}
         <span class="total">전체 <b>${v.count}</b></span>
         ${sortHtml()}
-        ${state.view === "employee" ? "" : filterButton}
+        ${['employee','worksite'].includes(state.view) ? "" : filterButton}
         <div class="right">
           ${showAssetActions ? "" : searchBox}
           ${state.view === "all" ? `<button type="button" class="btn sm" id="overview-download" popovertarget="overview-download-menu" ${v.count ? "" : "disabled"}>다운로드 ▾</button>
@@ -944,8 +931,7 @@
       }
       openAssignedAssetsModal(`<div class="acard-id">${memberIdentity(r.name)}</div>`, items);
     }), c.querySelectorAll("tbody tr[data-wkey]").forEach(tr => tr.onclick = () => {
-      const r = worksiteRowsByName.get(tr.dataset.wkey),
-        codeHtml = r.code || '<span class="muted">—</span>';
+      const r = worksiteRowsByName.get(tr.dataset.wkey);
       if (r) {
         const current = viewableAssets().flatMap(asset => (asset.assignments || []).filter(x => x.worksite === r.name).map(x => ({
           asset,
@@ -953,11 +939,11 @@
           since: x.since,
           qty: 1
         })));
-        if (!current.length) {
-          openMemberUnavailableModal();
+        if (!visibleWorksite(r.name) || !current.length) {
+          openMemberUnavailableModal("worksite");
           return;
         }
-        openAssignedAssetsModal(`<div><a class="cat-unit-product" href="worksite-detail.html?name=${encodeURIComponent(r.name)}" target="_blank" rel="noopener">${r.name}</a><div class="acard-sub">${codeHtml}</div></div>`, current);
+        openAssignedAssetsModal(`<div>${worksiteLink(r.name)}${window.ASSET_WORKSITE_CODE_ENABLED !== false ? `<div class="acard-sub">${bulkEsc(r.code || '—')}</div>` : ''}</div>`, current);
       }
     }), c.querySelectorAll("[data-stub]").forEach(el => el.onclick = () => toast(`"${el.dataset.stub}" — 이후 단계에서 정의`));
     const si = document.getElementById("search-input"),
@@ -2077,32 +2063,97 @@
     apply.onclick = () => { state.filters.member = draft; state.page = 1; back.remove(); render(); };
     draw();
   }
-  const WS_PROVINCES = ["도 미지정", "강원도", "경기도", "경상남도", "경상북도", "광주광역시", "대구광역시", "대전광역시", "부산광역시", "서울특별시", "세종특별자치시", "울산광역시", "인천광역시", "전라남도", "전라북도", "제주특별자치도", "충청남도", "충청북도"];
+  // 회사별 설정과 근무지 데이터는 프로토타입의 데모 값으로 시작한다.
+  const worksiteSettings = window.ASSET_WORKSITE_FILTER_SETTINGS || {
+    enabled: ['도', '도시', '근무지 그룹', '등급', '유통사 및 채널'],
+    extraFields: ['운영 형태'],
+    records: {
+      '강남점': {'근무지 그룹':'매장', '등급':'A', '운영 형태':'직영', '유통사 및 채널':'자사 / 오프라인'},
+      '역삼점': {'근무지 그룹':'매장', '등급':'B', '운영 형태':'가맹', '유통사 및 채널':'협력사 / 오프라인'},
+      '판교점': {'근무지 그룹':'매장', '등급':'A', '운영 형태':'직영', '유통사 및 채널':'자사 / 온라인'},
+      '본사': {'근무지 그룹':'본부'}
+    }
+  };
+  function inactiveWorksite(name) {
+    return window.DATA.targetStatuses.worksite[name] === 'inactive';
+  }
+  function visibleWorksite(name) {
+    const actor = window.AssetPrototypeActor;
+    if (inactiveWorksite(name)) return actor.canViewInactiveWorksites ?? (actor.role === 'admin');
+    return actor.role === 'admin' || !actor.viewableWorksites || actor.viewableWorksites.includes(name);
+  }
+  function worksiteValue(name, field) {
+    const [province, city] = (WS_ADDRESS[name] || '').split(' ');
+    if (field === '근무지') return name;
+    if (field === '도') return province || '도 미지정';
+    if (field === '도시') return city ? province + ' / ' + city : '도시 미지정';
+    return worksiteSettings.records[name]?.[field] || '미등록';
+  }
+  function worksiteMatches(name) {
+    return visibleWorksite(name) && Object.entries(state.filters.worksite || {}).every(
+      ([field, values]) => !values.length || values.includes(worksiteValue(name, field)));
+  }
+  function worksiteLink(name) {
+    const title = (inactiveWorksite(name) ? '[비활성] ' : '') + name;
+    return `<a href="worksite-detail.html?name=${encodeURIComponent(name)}" target="_blank" rel="noopener" data-worksite-link>${bulkEsc(title)}</a>`;
+  }
   function openWorksiteFilterModal() {
-    const back = modal(`
-      <div class="modal lg">
-        <h3>근무지 필터</h3>
-        <div class="fmodal">
-          <div class="groups" id="wf-groups">
-            <button class="active"><span class="g-text"><span class="g-name">도</span></span></button>
-          </div>
-          <div class="opts">
-            <input type="text" class="picker-search" placeholder="검색">
-            <div class="picker-toolbar">
-              <label class="picker-check"><input type="checkbox" checked><span>전체</span></label>
-              <span class="right"><button class="filter-reset" aria-label="초기화">${RESET_ICON}</button></span>
-            </div>
-            <div>${WS_PROVINCES.map(p => `<label class="opt"><input type="checkbox" checked>${p}</label>`).join("")}</div>
-          </div>
-        </div>
-        <div class="foot">
-          <button class="btn" data-close>취소</button>
-          <button class="btn primary" id="wf-apply">적용</button>
-        </div>
-      </div>`);
-    back.querySelector("#wf-apply").onclick = () => {
-      back.remove(), toast('"근무지 필터" 적용 (프로토타입 — 실제 반영 없음)');
+    const draft = structuredClone(state.filters.worksite || {});
+    const actor = window.AssetPrototypeActor;
+    const names = [...new Set([...Object.keys(WS_CODE), ...Object.keys(worksiteSettings.records),
+      ...viewableAssets().flatMap(a => (a.assignments || []).map(x => x.worksite))])]
+      .filter(name => name && visibleWorksite(name));
+    const extras = worksiteSettings.extraFields.filter(f => !actor.viewableWorksiteFields || actor.viewableWorksiteFields.includes(f));
+    const fields = ['도', '도시', ...extras, '근무지 그룹', '등급', '유통사 및 채널', '근무지']
+      .filter(f => f === '근무지' || extras.includes(f) || worksiteSettings.enabled.includes(f))
+      .filter(f => f === '근무지' || names.length);
+    let field = fields[0], reset = false;
+    const back = modal(`<div class="modal lg" role="dialog" aria-label="근무지 필터"><h3>근무지 필터</h3>
+      <div class="fmodal"><div class="groups" data-fields></div><div class="opts">
+      <input class="picker-search" type="search" placeholder="검색"><div class="picker-toolbar">
+      <label><input type="checkbox" data-all> 전체</label><button class="btn sm" data-managed>내 담당 근무지</button>
+      <button class="filter-reset" aria-label="초기화">${RESET_ICON}</button></div><div data-values></div></div></div>
+      <div class="foot"><button class="btn" data-close>취소</button><button class="btn primary" data-apply>적용</button></div></div>`);
+    const el = sel => back.querySelector(sel);
+    const query = el('.picker-search'), all = el('[data-all]'), apply = el('[data-apply]');
+    function options() {
+      return [...new Set(names.filter(n => field !== '근무지' || !inactiveWorksite(n)).map(n => worksiteValue(n, field)))]
+        .sort((a,b) => a.localeCompare(b,'ko')).filter(v => v.toLowerCase().includes(query.value.trim().toLowerCase()));
+    }
+    function select(values, checked) {
+      const picked = new Set(draft[field] || []);
+      for (const value of values) checked ? picked.add(value) : picked.delete(value);
+      draft[field] = [...picked];
+      draw();
+    }
+    function draw() {
+      const picked = draft[field] || [], values = options();
+      el('[data-fields]').innerHTML = fields.map(f => `<button data-field="${bulkEsc(f)}" class="${f === field ? 'active' : ''}">${bulkEsc(f)}</button>`).join('');
+      const managed = actor.managedWorksites || [];
+      el('[data-managed]').hidden = field !== '근무지' || !values.some(n => managed.includes(n));
+      all.checked = !!values.length && values.every(v => picked.includes(v));
+      all.indeterminate = !all.checked && values.some(v => picked.includes(v));
+      let group;
+      el('[data-values]').innerHTML = values.map(v => {
+        const split = ['도시','유통사 및 채널'].includes(field) ? v.split(' / ') : [v];
+        const parent = split.length > 1 ? split[0] : '';
+        const heading = parent && parent !== group ? `<strong>${bulkEsc(parent)}</strong>` : '';
+        group = parent;
+        return heading + `<label class="opt"><input type="checkbox" value="${bulkEsc(v)}" ${picked.includes(v) ? 'checked' : ''}>${bulkEsc(split.at(-1))}</label>`;
+      }).join('') || '<p class="muted">결과가 없습니다.</p>';
+      apply.disabled = !reset && !Object.values(draft).some(values => values.length);
+    }
+    el('[data-fields]').onclick = e => {
+      const button = e.target.closest('[data-field]');
+      if (button) { field = button.dataset.field; query.value = ''; draw(); }
     };
+    query.oninput = draw;
+    all.onchange = () => select(options(), all.checked);
+    el('[data-values]').onchange = e => select([e.target.value], e.target.checked);
+    el('[data-managed]').onclick = () => select(options().filter(n => actor.managedWorksites?.includes(n)), true);
+    el('.filter-reset').onclick = () => { draft[field] = []; reset = true; draw(); };
+    apply.onclick = () => { state.filters.worksite = draft; state.page = 1; back.remove(); render(); };
+    draw();
   }
   function modal(html, {
     closeOnBackdrop = !1
@@ -2272,7 +2323,8 @@
         render();
       };
       const cases=[['default','기본 데이터','7·8번',()=>apply('default')],['empty','배정·자산 관계 없음','7번',()=>apply('empty')],['search-empty','검색 결과 없음','5번',()=>apply('search-empty')],['many','다수 행·페이지네이션',view==='product'?'8번':'10번',()=>apply('many')],['view','조회만 가능','도입부',()=>apply('view')],['partial','일부 소분류만 조회 가능','도입부',()=>apply('partial')],['no-view','조회 가능한 소분류 없음','도입부',()=>apply('no-view')]];
-      if(view==='product'||view==='employee')cases.push(['manage','자산 관리 권한','상단 작업 버튼 · Web02 1~3번',()=>apply('manage')],['state','조회·배정 및 상태 관리 가능','상단 작업 버튼 · Web02 2·3번',()=>apply('state')]);
+      cases.push(['manage','자산 관리 권한','상단 작업 버튼 · Web02 1~3번',()=>apply('manage')],['state','조회·배정 및 상태 관리 가능','상단 작업 버튼 · Web02 2·3번',()=>apply('state')]);
+      if(view==='worksite')cases.push(['filter','근무지 필터','6·11번',()=>{apply('default');openWorksiteFilterModal();}]);
       if(view==='employee')cases.push(['filter','구성원 필터','6·11번',()=>{apply('default');openMemberFilterModal();}],['profile','구성원 프로필','9번',()=>{apply('default');document.querySelector('[data-profile]')?.click();}]);
       if(view!=='product')cases.push(['full','종합 보기','1번',()=>apply('full')],['summary','요약 보기','1번',()=>apply('default')],['no-code',view==='employee'?'사번 사용 OFF':'근무지 코드 사용 OFF','4·9번',()=>apply('no-code')]);
       P.fixture({id:'overview-'+view,title:'현황 > '+title,reference:'Web'+num,matches:()=>activeScreen==='list'&&state.view===view,reset:()=>apply('default'),cases:cases.map(x=>{if(view!=='product'&&x[0]==='search-empty')x[2]='7번';if(view!=='product'&&['default','empty'].includes(x[0]))x[2]='9번';return x;})});
