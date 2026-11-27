@@ -164,7 +164,6 @@
       const emptyMsg = readItems().length ? "결과가 없습니다." : "배정 중인 자산이 없습니다.";
       table.innerHTML = `<div class="table-wrap"><table class="target-asset-table ${member ? 'member-assets-table' : ''}"><thead><tr>${member ? '<th>품목명</th><th>분류</th>' : '<th>분류</th><th>품목명</th>'}<th>고유관리번호</th><th>${member ? `<button type="button" data-status aria-haspopup="dialog" aria-expanded="false">상태 ▾${state.statusRestricted ? ' ('+state.filters.statuses.length+')' : ''}</button>` : '상태'}</th><th>배정일</th><th>유효기한</th><th>태그</th>${member ? '' : '<th class="c">메모</th>'}<th class="c">연결된 자산</th>${options.rowActions ? '<th class="target-action-cell" aria-label="자산 작업"></th>' : ""}</tr></thead><tbody>${rows || `<tr><td colspan="${(options.rowActions ? 10 : 9) - Number(member)}" style="text-align:center;color:var(--text-mut);padding:32px">${emptyMsg}</td></tr>`}</tbody></table></div>`;
       if (member) {
-        window.AssetChipLayout.fit(table);
         table.querySelector('[data-status]').onclick = openStatus;
       }
       table.querySelectorAll("[data-target-asset]").forEach(row => row.onclick = e => {

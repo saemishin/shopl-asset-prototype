@@ -1,8 +1,8 @@
 (() => {
   function labelsCell(labels, escape) {
     if (!labels?.length) return '<span class="muted">—</span>';
-    const chips = labels.map(label => `<span class="tag">${escape(label)}</span>`).join('');
-    return `<span class="asset-fit-chips fitted-tags">${chips}<span class="tag" data-chip-rest hidden></span></span>`;
+    const rest = labels.length - 1;
+    return `<span class="fitted-tags"><span class="tag">${escape(labels[0])}</span>${rest ? `<span class="tag">+${rest}</span>` : ''}</span>`;
   }
   function fitSummaryChips(scope) {
     scope.querySelectorAll(".asset-fit-chips").forEach(box => {

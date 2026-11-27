@@ -2619,5 +2619,8 @@ body.history-capture #prototype-qa { display: none; }
 .member-assets-table .memo-flag { margin-left: auto; }
 .member-status-menu { min-width: 154px; }
 
-.fitted-tags { contain: inline-size; }
+.fitted-tags { display: flex; align-items: center; gap: 4px; contain: inline-size; }
+.fitted-tags .tag { margin: 0; white-space: nowrap; }
+.fitted-tags > :first-child { display: block; min-width: 0; line-height: 20px; overflow: hidden; text-overflow: ellipsis; }
+.fitted-tags > :nth-child(2) { flex: none; }
 .member-assets-table td:nth-child(7) { min-width: 92px; }
