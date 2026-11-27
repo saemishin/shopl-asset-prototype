@@ -395,8 +395,8 @@
     const chosen = classificationScopes[state.view] || [];
     const first = viewableCategories().find(c => chosen.includes(`${c.group}/${c.sub}`));
     const label = first ? bulkEsc(first.sub) + (chosen.length > 1 ? ' +' + (chosen.length - 1) : '') : '전체';
-    const overview = state.view === 'all';
-    return `<div class="overview-scope">${overview ? '' : '<span>분류</span>'}<button type="button" class="btn sm" id="classification-scope" aria-label="분류 선택: ${label}">${label} ▾</button>${overview && first ? '<button class="btn sm" id="scope-clear" aria-label="전체 분류로 복귀">×</button>' : ''}</div>`;
+    const clearable = state.view === 'all' || state.view === 'product';
+    return `<div class="overview-scope">${clearable ? '' : '<span>분류</span>'}<button type="button" class="btn sm" id="classification-scope" aria-label="분류 선택: ${label}">${label} ▾</button>${clearable && first ? '<button class="btn sm" id="scope-clear" aria-label="전체 분류로 복귀">×</button>' : ''}</div>`;
   }
   const rememberOverview = () => sessionStorage.setItem("asset-overview-return", JSON.stringify(state));
   let productGroupsByKey = /* @__PURE__ */new Map(),
@@ -501,8 +501,8 @@
     return view_product_individual(list);
   }
   function view_product_individual(list) {
-    const head = `<tr><th>분류</th><th>품목명</th><th class="num">자산 수</th>
-      <th class="num">배정 중</th><th class="num">수리/점검 중</th><th class="num">분실</th><th class="num">폐기</th><th class="num">배정 가능</th></tr>`,
+    const head = `<tr><th>품목명</th><th>분류</th><th class="num">자산 수</th>
+      ${STATUS_ORDER.map(status => `<th class="num"><span class="product-status ${status}">${STATUS_LABEL[status][0]}</span></th>`).join("")}</tr>`,
       groups = groupByProduct(list.filter(a => !0)),
       sorted = sortList(groups),
       paged = pageSlice(sorted);
@@ -518,8 +518,8 @@
       return g.list.forEach(a => {
         counts[a.status] = (counts[a.status] || 0) + 1;
       }), `<tr class="clickable" data-pkey="${productKey(g)}">
-        <td>${g.group} <span class="muted">›</span> ${g.sub}</td>
         <td><div class="prodcell">${thumb([...g.list].sort((a, b) => String(a.assetNo || "").localeCompare(String(b.assetNo || ""))).find(a => window.assetPhotos(a).length) || g.list[0])}<span class="pname">${window.AssetExtra.esc(g.product)}</span></div></td>
+        <td>${g.group} <span class="muted">›</span> ${g.sub}</td>
         <td class="num">${g.list.length}</td>
         <td class="num">${counts.assigned}</td>
         <td class="num">${counts.repair}</td>
@@ -836,6 +836,7 @@
     const c = document.getElementById("content"),
       v = currentView(),
       nAct = state.view === "product" ? state.filters.category.length : activeFilterCount();
+    const showAssetActions = state.view === "all" || state.view === "product";
     const searchBox = `<div class="searchbox${state.search ? " has-term" : ""}">
             <input class="search${state.search ? " expanded" : ""}" id="search-input"
               placeholder="${state.search ? SEARCH_PLACEHOLDER[state.view] : "검색"}" value="${state.search.replace(/"/g, "&quot;")}">
@@ -850,7 +851,7 @@
 
       <div class="subtabs">
         ${[["all", "전체"], ["product", "품목별"], ["employee", "구성원별"], ["worksite", "근무지별"]].map(([k, t]) => `<button data-view="${k}" class="${state.view === k ? "active" : ""}">${t}</button>`).join("")}
-        ${state.view === "all" ? `
+        ${showAssetActions ? `
         <div class="sub-actions">
           ${canManageAssets() ? '<button class="btn primary sm" id="btn-add">＋ 자산 추가</button>' : ""}
           ${canManageAssets() || window.DATA.categories.some(canAssignCategory) ? '<button class="btn sm" id="btn-assign">＋ 자산 배정 <span class="chev">▾</span></button>' : ""}
@@ -864,12 +865,12 @@
       ${state.view === "product" ? typeToggleHtml() : ""}
 
       <div class="countrow">
-        ${state.view === "all" ? searchBox : ""}
+        ${showAssetActions ? searchBox : ""}
         <span class="total">전체 <b>${v.count}</b></span>
         ${sortHtml()}
         <button class="filter-btn ${nAct ? "set" : ""}" id="btn-filter" ${state.view==='product'?'hidden':''}>▤ ${state.view === "product" ? "분류" : state.view === "employee" ? "구성원" : state.view === "worksite" ? "근무지" : "필터"}${nAct ? ` <b>${nAct}</b>` : ""}</button>
         <div class="right">
-          ${state.view === "all" ? "" : searchBox}
+          ${showAssetActions ? "" : searchBox}
           ${state.view === "all" ? `<button type="button" class="btn sm" id="overview-download" popovertarget="overview-download-menu" ${v.count ? "" : "disabled"}>다운로드 ▾</button>
             <div popover id="overview-download-menu" class="overview-download-menu">
               <button type="button" id="btn-list-dl">다운로드</button><button type="button" id="btn-qr-dl">QR 다운로드</button>
@@ -882,7 +883,7 @@
       <div class="table-wrap">${tableInner(v)}</div>
 
       ${pagerHtml(v.count, state.view === "all" && canManageAssets() ? '<button class="btn sm" id="btn-bulk-delete" disabled>삭제</button>' : "")}
-    `, c.querySelector('#classification-scope') && (c.querySelector('#classification-scope').onclick=openCategoryFilterModal), c.querySelectorAll('[data-target-mode]').forEach(b=>b.onclick=()=>{targetModes[state.view]=b.dataset.targetMode;state.page=1;render();}), c.querySelectorAll(".subtabs button").forEach(b => b.onclick = () => {
+    `, c.querySelector('#classification-scope') && (c.querySelector('#classification-scope').onclick=openCategoryFilterModal), c.querySelectorAll('[data-target-mode]').forEach(b=>b.onclick=()=>{targetModes[state.view]=b.dataset.targetMode;state.page=1;render();}), c.querySelectorAll(".subtabs [data-view]").forEach(b => b.onclick = () => {
       state.view = b.dataset.view, ["employee","worksite"].includes(state.view) && (targetModes[state.view]="summary"), state.page = 1, state.filters = emptyFilters(), state.statFilter = null, state.search = "", state.productType = "individual";
       const fields = sortFieldsFor(state.view);
       fields.some(f => f.k === state.sort.key) || (state.sort = {
@@ -969,6 +970,8 @@
       });
       menu.addEventListener('click', () => menu.hidePopover());
       c.querySelector('#btn-qr-dl').onclick = openQrDownloadModal;
+    }
+    if (showAssetActions) {
       c.querySelector('#scope-clear')?.addEventListener('click', () => applyClassificationScope([]));
       const addButton = document.getElementById("btn-add");
       addButton && (addButton.onclick = () => {
@@ -2170,6 +2173,7 @@
         if(view!=='product')targetModes[view]='summary';
         if(key==='empty'){assets.splice(0);if(view==='product')window.DATA.products.splice(0);}
         if(key==='search-empty')state.search='검색 일치 없음 999';
+        if(key==='state'||key==='manage')C.access(key);
         if(key==='private')C.access('private');
         if(['view','partial','no-view'].includes(key))C.access('view');
         if(['partial','no-view'].includes(key))window.DATA.categories.forEach((c,i)=>c.view=key==='partial'&&i===0?'회사의 모든 구성원':'관리자만');
@@ -2185,6 +2189,7 @@
         render();
       };
       const cases=[['default','기본 데이터','7·8번',()=>apply('default')],['empty','배정·자산 관계 없음','7번',()=>apply('empty')],['search-empty','검색 결과 없음','5번',()=>apply('search-empty')],['many','다수 행·페이지네이션',view==='product'?'8번':'10번',()=>apply('many')],['view','조회만 가능','도입부',()=>apply('view')],['partial','일부 소분류만 조회 가능','도입부',()=>apply('partial')],['no-view','조회 가능한 소분류 없음','도입부',()=>apply('no-view')]];
+      if(view==='product')cases.push(['manage','자산 관리 권한','상단 작업 버튼 · Web02 1~3번',()=>apply('manage')],['state','조회·배정 및 상태 관리 가능','상단 작업 버튼 · Web02 2·3번',()=>apply('state')]);
       if(view!=='product')cases.push(['full','종합 보기','1번',()=>apply('full')],['summary','요약 보기','1번',()=>apply('default')],['no-code',view==='employee'?'사번 사용 OFF':'근무지 코드 사용 OFF','4·9번',()=>apply('no-code')]);
       P.fixture({id:'overview-'+view,title:'현황 > '+title,reference:'Web'+num,matches:()=>activeScreen==='list'&&state.view===view,reset:()=>apply('default'),cases:cases.map(x=>{if(view!=='product'&&x[0]==='search-empty')x[2]='7번';if(view!=='product'&&['default','empty'].includes(x[0]))x[2]='9번';return x;})});
     }
