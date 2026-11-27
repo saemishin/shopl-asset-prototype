@@ -2612,3 +2612,9 @@ body.history-capture #prototype-qa { display: none; }
   .sub-settings-modal .cat-manage-create { display: block; }
   .sub-settings-modal .sub-form-settings { border-left: 0; border-top: 1px solid var(--line); }
 }
+
+.target-assets .member-assets-table { min-width: 1180px; }
+.member-assets-table tr > :first-child:not([colspan]) { position: sticky; left: 0; z-index: 1; background: var(--panel); box-shadow: inset -1px 0 0 var(--line); min-width: 200px; }
+.member-assets-table thead tr > :first-child { z-index: 2; background: #fafbfc; }
+.member-assets-table .memo-flag { margin-left: auto; }
+.member-status-menu { min-width: 154px; }

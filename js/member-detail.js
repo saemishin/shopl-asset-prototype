@@ -111,7 +111,7 @@
   const host=c.querySelector('.target-assets');if(!host)return;
   const name=new URLSearchParams(location.search).get('name')||"김민수";
   window.TargetAssets.wire(host,()=>collectItems(name),id=>'asset-detail.html?id='+id,{
-    download:true,
+    memberLayout:true, download:true,
     downloadUrl:"https://docs.google.com/spreadsheets/d/1kCRiwcq3_HNrDBseW9imWi4qJKwMzD23uGLzy_4Bm1s/edit",
     canAssign:()=>!['retired','resigned','inactive'].includes(window.DATA.targetStatuses?.employee?.[name]) && window.DATA.categories.some(cat=>window.AssetAccess.canState({...cat,status:'stock'})),
     onAssign:refresh=>window.AssetAssignment.open({members:[{name,...(MEMBER_INFO[name]||{})}],fixedTarget:{type:'employee',value:name,subtitle:MEMBER_INFO[name]?.team,color:avatarColor(name)},onSaved:refresh,onChanged:refresh,toast}),
@@ -133,7 +133,7 @@
       </div>
       <nav class="mdetail-tabs" aria-label="구성원 상세 메뉴">
         <span class="mdetail-tab active" aria-current="page">정보</span>
-        <span class="mdetail-tab">근태</span>
+        <span class="mdetail-tab">출퇴근</span>
         <span class="mdetail-tab">업무 <span class="bchev">▾</span></span>
       </nav>
       <section class="mdetail-panel">
