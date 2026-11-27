@@ -419,25 +419,19 @@ input { font: inherit; }
 /* ============ table ============ */
 .table-wrap { border: 1px solid var(--line); border-radius: var(--radius); overflow-x: auto; background: var(--panel); }
 table { width: 100%; border-collapse: collapse; font-size: 12.5px; min-width: 880px; }
-/* 전체 탭 테이블(체크박스 포함10컬럼)은 필터링으로 행이 바뀌어도 컬럼 폭이 안 흔들리도록 폭 고정.
-   nth-child는 순서 그대로라 컬럼 순서를 바꿀 때마다(체크박스-분류-품목명-고유관리번호-상태-
-   배정 현황-유효기한-태그-메모-등록일) 이 폭 지정도 같이 옮겨줘야 함 — 안 그러면 폭이 엉뚱한 컬럼에
-   붙어서 "분류"처럼 긴 텍스트가 좁은 폭에 끼이거나 반대로 체크박스 컬럼이 너무 넓어지는 문제가 생김
-   (실제로 겪음 — 체크박스 컬럼을 추가하면서 이 폭 지정을 안 옮겨서 발생). 메모(9번째)는 아이콘 한 칸이라
-   의도적으로 폭 지정 없이 나머지를 가져가게 둠(전체 합이 100%가 안 되는 것도 의도) */
-.tbl-all {
-  table-layout: fixed;
-}
-.tbl-all th:nth-child(1), .tbl-all td:nth-child(1) { width: 4%; }
-.tbl-all th:nth-child(2), .tbl-all td:nth-child(2) { width: 12%; }
-.tbl-all th:nth-child(3), .tbl-all td:nth-child(3) { width: 16%; }
-.tbl-all th:nth-child(4), .tbl-all td:nth-child(4) { width: 12%; }
-.tbl-all th:nth-child(5), .tbl-all td:nth-child(5) { width: 9%; }
-.tbl-all th:nth-child(6), .tbl-all td:nth-child(6) { width: 12%; }
-.tbl-all th:nth-child(7), .tbl-all td:nth-child(7) { width: 11%; }
-.tbl-all th:nth-child(8), .tbl-all td:nth-child(8) { width: 11%; }
-.tbl-all th:nth-child(9), .tbl-all td:nth-child(9) { width: 4%; }
-.tbl-all th:nth-child(10), .tbl-all td:nth-child(10) { width: 9%; }
+.tbl-all { table-layout:fixed; }
+.tbl-all th.td-check, .tbl-all th.overview-no { width:4%; }
+.tbl-all th:nth-last-child(8) { width:17%; }
+.tbl-all .memo-flag { margin-left:auto; flex:none; }
+.overview-holder, .overview-tags { display:flex; align-items:center; gap:4px; }
+.overview-avatar { width:24px; height:24px; border-radius:50%; object-fit:cover; }
+.overview-tags .tag { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.overview-tags > :last-child:not(.tag) { flex:none; }
+.statcard-title:has(.overview-scope) { display:flex; align-items:center; gap:8px; }
+.statcard-title .overview-scope { margin:0; gap:2px; }
+.overview-download-menu { position:fixed; inset:auto; margin:0; padding:4px; min-width:128px; border:1px solid var(--line); border-radius:6px; background:var(--panel); }
+.overview-download-menu button { display:block; width:100%; padding:8px; text-align:left; }
+.overview-download-menu button:hover { background:var(--primary-weak); }
 /* 품목별 테이블의 컬럼 폭을 고정한다. */
 .tbl-product { table-layout: fixed; }
 /* 자산 수 등 숫자 컬럼은 폭이 넓어서 우측 정렬하면 옆 칸과 붙어 보임 — 왼쪽 정렬이 더 보기 편함(분류 화면의 품목 테이블과 동일한 이유) */

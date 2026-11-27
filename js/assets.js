@@ -222,31 +222,32 @@
     const k = expiryKey(d);
     return `${window.fmtDate(d)} <span class="badge exp-${k}">${EXP_LABEL[k]}</span>`;
   }
-  const IC_EMP = '<svg class="hi" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5.5 20c0-4 3-6.5 6.5-6.5s6.5 2.5 6.5 6.5"/></svg>',
-    IC_WS = '<svg class="hi" viewBox="0 0 24 24"><path d="M4 20V9.5L12 4l8 5.5V20"/><path d="M9.5 20v-5h5v5"/></svg>';
   function holderText(a) {
-    {
-      const as = a.assignments || [];
-      if (!as.length) return '<span class="muted">—</span>';
-      const sorted2 = [...as].sort((p, q) => p.since === q.since ? 0 : p.since < q.since ? 1 : -1),
-        targets2 = [];
-      return sorted2.forEach(x => {
-        x.employee && targets2.push(`${IC_EMP}${x.employee}`), x.worksite && targets2.push(`${IC_WS}${x.worksite}`);
-      }), sorted2.length === 1 ? targets2.join(" ") : `${targets2[0]} <span class="muted">+${targets2.length - 1}</span>`;
+    const assignment = a.assignments?.[0];
+    if (assignment?.employee) {
+      const name = assignment.employee;
+      const photo = MEMBER_INFO[name]?.photoUrl;
+      const avatar = photo
+        ? `<img class="overview-avatar" src="${bulkEsc(photo)}" alt="">`
+        : window.pickerAvatarHtml(bulkEsc(name), avatarColor(name));
+      return `<span class="overview-holder">${avatar}${bulkEsc(name)}</span>`;
     }
+    return assignment?.worksite ? bulkEsc(assignment.worksite) : '<span class="muted">—</span>';
   }
   function thumb(a) {
     const ph = window.assetPhotos(a);
     return ph.length ? `<span class="thumb" style="background:${ph[a._primary || 0].color}"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10" r="1.6"/><path d="m21 16-5-5-9 8"/></svg></span>` : '<span class="thumb empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 15 5-4 4 3 4-4 5 4"/></svg></span>';
   }
   function prodCell(a) {
-    return `<div class="prodcell">${thumb(a)}<span class="pname">${a.product}</span></div>`;
+    return `<div class="prodcell">${thumb(a)}<span class="pname">${bulkEsc(a.product)}</span>${memoCell(a)}</div>`;
   }
   function memoCell(a) {
     return displayField(a,"memo") && window.AssetMemo.has(a.note) ? '<span class="memo-flag"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M9 13h5M9 17h4"/></svg></span>' : "";
   }
   function labelsCell(labels) {
-    return !labels || !labels.length ? '<span class="muted">—</span>' : `<span class="asset-fit-chips">${labels.map(l => `<span class="tag">${l}</span>`).join("")}<span class="muted" data-chip-rest hidden></span></span>`;
+    if (!labels?.length) return '<span class="muted">—</span>';
+    const rest = labels.length - 1;
+    return `<span class="overview-tags"><span class="tag">${bulkEsc(labels[0])}</span>${rest ? `<span>+${rest}</span>` : ""}</span>`;
   }
   function fitSummaryChips(scope) {
     scope.querySelectorAll(".asset-fit-chips").forEach(box => {
@@ -308,7 +309,7 @@
   // 현황 [자산 배정] 메뉴: 직접 배정(자산 배정 Modal)·자산 그룹으로 배정(D-20261102-01)
   function assignActions() {
     const actions = [];
-    return (canManageAssets() || window.DATA.categories.some(canAssignCategory)) && actions.push("직접 배정"), window.AssetTemplates && window.AssetTemplates.usableTemplates().length && actions.push("자산 그룹으로 배정"), actions;
+    return (canManageAssets() || window.DATA.categories.some(canAssignCategory)) && actions.push("직접 배정"), window.AssetTemplates && (canManageAssets() || window.AssetTemplates.usableTemplates().length) && actions.push("자산 그룹으로 배정"), actions;
   }
   function viewableCategories() {
     return window.DATA.categories.filter(canViewCategory);
@@ -390,7 +391,13 @@
   window.addEventListener('pageshow',e=>{if(e.persisted&&isTargetFull()){targetModes.employee='summary';targetModes.worksite='summary';render();}});
   function targetModeToggleHtml(){return `<div class="target-view-row"><div class="seg-toggle" role="tablist">${[['summary','요약'],['full','종합']].map(([k,t])=>`<button type="button" role="tab" data-target-mode="${k}" class="${targetModes[state.view]===k?'active':''}" aria-selected="${targetModes[state.view]===k}">${t}</button>`).join('')}</div>${isTargetFull()?classificationScopeHtml():''}</div>`;}
   function scopedCategories(){const chosen=classificationScopes[state.view]||[];return viewableCategories().filter(c=>c.type==='individual'&&(!chosen.length||chosen.includes(`${c.group}/${c.sub}`)));}
-  function classificationScopeHtml(){const chosen=classificationScopes[state.view]||[],first=viewableCategories().find(c=>chosen.includes(`${c.group}/${c.sub}`));return `<div class="overview-scope"><span>분류</span><button type="button" class="btn sm" id="classification-scope">${first?`${first.sub}${chosen.length>1?' +'+(chosen.length-1):''}`:'전체'} ▾</button></div>`;}
+  function classificationScopeHtml() {
+    const chosen = classificationScopes[state.view] || [];
+    const first = viewableCategories().find(c => chosen.includes(`${c.group}/${c.sub}`));
+    const label = first ? bulkEsc(first.sub) + (chosen.length > 1 ? ' +' + (chosen.length - 1) : '') : '전체';
+    const overview = state.view === 'all';
+    return `<div class="overview-scope">${overview ? '' : '<span>분류</span>'}<button type="button" class="btn sm" id="classification-scope" aria-label="분류 선택: ${label}">${label} ▾</button>${overview && first ? '<button class="btn sm" id="scope-clear" aria-label="전체 분류로 복귀">×</button>' : ''}</div>`;
+  }
   const rememberOverview = () => sessionStorage.setItem("asset-overview-return", JSON.stringify(state));
   let productGroupsByKey = /* @__PURE__ */new Map(),
     memberRowsByName = /* @__PURE__ */new Map(),
@@ -448,20 +455,20 @@
     const canDelete = canManageAssets(),
       head = `<tr>
       ${canDelete ? '<th class="td-check"><input type="checkbox" data-check-all aria-label="전체 선택"></th>' : ""}
-      <th>분류</th><th>품목명</th><th>고유관리번호</th><th>상태</th>
-      <th>배정 대상</th><th>유효기한</th><th>태그</th><th class="c">메모</th><th>등록일</th></tr>`,
-      rows = pageSlice(sortList(list)).map(a => {
+      <th class="overview-no">No.</th><th>품목명</th><th>분류</th><th>고유관리번호</th><th>상태</th>
+      <th>배정 대상</th><th>유효기한</th><th>태그</th><th>등록일</th></tr>`,
+      rows = pageSlice(sortList(list)).map((a, index) => {
         const st = `<span class="badge ${STATUS_LABEL[a.status][1]}">${STATUS_LABEL[a.status][0]}</span>`;
         return `<tr class="clickable" data-id="${a.id}">
         ${canDelete ? `<td class="td-check"><input type="checkbox" data-check data-id="${a.id}" aria-label="선택"></td>` : ""}
-        <td>${a.group} <span class="muted">›</span> ${a.sub}</td>
+        <td>${(state.page - 1) * state.pageSize + index + 1}</td>
         <td>${prodCell(a)}</td>
+        <td>${a.group} <span class="muted">›</span> ${a.sub}</td>
         <td>${a.assetNo || '<span class="muted">—</span>'}</td>
         <td>${st}</td>
         <td>${holderText(a)}</td>
         <td>${expiryCell(displayField(a, "expiry") ? a.expiry : "")}</td>
         <td>${displayField(a,"tags")?labelsCell(a.labels):"—"}</td>
-        <td class="c">${memoCell(a)}</td>
         <td>${window.fmtDate(a.createdAt)}</td>
       </tr>`;
       }).join("");
@@ -730,13 +737,14 @@
       document.addEventListener("click", close);
     });
   }
+  function pageNumbers(page, totalPages) {
+    const start = Math.max(1, Math.min(page - 2, totalPages - 4));
+    return Array.from({length: Math.min(totalPages, 5)}, (_, i) => start + i);
+  }
   function pagerHtml(total, leftActionsHtml = "") {
     const totalPages = Math.max(1, Math.ceil(total / state.pageSize)),
       p = state.page,
-      winStart = Math.max(1, Math.min(p - 2, totalPages - 4)),
-      winEnd = Math.min(totalPages, Math.max(p + 2, winStart + 4)),
-      pages = [];
-    for (let i = Math.max(1, winStart); i <= winEnd; i++) pages.push(i);
+      pages = pageNumbers(p, totalPages);
     const btn = (label, target, disabled, cls = "") => `<button data-page="${target}" ${disabled ? "disabled" : ""} class="${cls}">${label}</button>`;
     return `
       <div class="pager">
@@ -828,6 +836,11 @@
     const c = document.getElementById("content"),
       v = currentView(),
       nAct = state.view === "product" ? state.filters.category.length : activeFilterCount();
+    const searchBox = `<div class="searchbox${state.search ? " has-term" : ""}">
+            <input class="search${state.search ? " expanded" : ""}" id="search-input"
+              placeholder="${state.search ? SEARCH_PLACEHOLDER[state.view] : "검색"}" value="${state.search.replace(/"/g, "&quot;")}">
+            <button class="search-clear" id="search-clear" type="button" aria-label="검색어 지우기">✕</button>
+          </div>`;
     c.innerHTML = `
       <div class="tabs">
         <a class="active">현황</a>
@@ -845,23 +858,22 @@
         </div>` : ""}
       </div>
 
-      ${['all','product'].includes(state.view)?classificationScopeHtml():''}
+      ${state.view === 'product' ? classificationScopeHtml() : ''}
       ${['employee','worksite'].includes(state.view)?targetModeToggleHtml():''}
       ${state.view === "all" ? statsHtml() : ""}
       ${state.view === "product" ? typeToggleHtml() : ""}
 
       <div class="countrow">
+        ${state.view === "all" ? searchBox : ""}
         <span class="total">전체 <b>${v.count}</b></span>
         ${sortHtml()}
         <button class="filter-btn ${nAct ? "set" : ""}" id="btn-filter" ${state.view==='product'?'hidden':''}>▤ ${state.view === "product" ? "분류" : state.view === "employee" ? "구성원" : state.view === "worksite" ? "근무지" : "필터"}${nAct ? ` <b>${nAct}</b>` : ""}</button>
         <div class="right">
-          <div class="searchbox${state.search ? " has-term" : ""}">
-            <input class="search${state.search ? " expanded" : ""}" id="search-input"
-              placeholder="${state.search ? SEARCH_PLACEHOLDER[state.view] : "검색"}" value="${state.search.replace(/"/g, "&quot;")}">
-            <button class="search-clear" id="search-clear" type="button" aria-label="검색어 지우기">✕</button>
-          </div>
-          ${state.view === "all" ? '<button class="btn sm" id="btn-qr-dl">▦ QR 다운로드</button>' : ""}
-          <button class="btn sm" id="btn-list-dl">⬇ 다운로드</button>
+          ${state.view === "all" ? "" : searchBox}
+          ${state.view === "all" ? `<button type="button" class="btn sm" id="overview-download" popovertarget="overview-download-menu" ${v.count ? "" : "disabled"}>다운로드 ▾</button>
+            <div popover id="overview-download-menu" class="overview-download-menu">
+              <button type="button" id="btn-list-dl">다운로드</button><button type="button" id="btn-qr-dl">QR 다운로드</button>
+            </div>` : '<button class="btn sm" id="btn-list-dl">⬇ 다운로드</button>'}
         </div>
       </div>
 
@@ -947,7 +959,17 @@
     if (sortKeyBtn && (sortKeyBtn.onclick = () => openSortKeyMenu(sortKeyBtn)), c.querySelectorAll(".sort-dir-btn").forEach(b => b.onclick = () => {
       state.sort.dir = b.dataset.dir, state.page = 1, render();
     }), document.getElementById("btn-filter").onclick = state.view === "product" ? openCategoryFilterModal : state.view === "employee" ? openMemberFilterModal : state.view === "worksite" ? openWorksiteFilterModal : openFilterModal, state.view === "all") {
-      document.getElementById("btn-qr-dl").onclick = openQrDownloadModal;
+      const trigger = c.querySelector('#overview-download');
+      const menu = c.querySelector('#overview-download-menu');
+      menu.addEventListener('beforetoggle', event => {
+        if (event.newState !== 'open') return;
+        const rect = trigger.getBoundingClientRect();
+        menu.style.top = (rect.bottom + 4) + 'px';
+        menu.style.right = (window.innerWidth - rect.right) + 'px';
+      });
+      menu.addEventListener('click', () => menu.hidePopover());
+      c.querySelector('#btn-qr-dl').onclick = openQrDownloadModal;
+      c.querySelector('#scope-clear')?.addEventListener('click', () => applyClassificationScope([]));
       const addButton = document.getElementById("btn-add");
       addButton && (addButton.onclick = () => {
         canManageAssets() && window.openAssetAddModal();
@@ -1014,7 +1036,7 @@
   }
   function statsHtml() {
     const s = computeStats();
-    return '<div class="statwrap"><div class="statrow2">' + statCard("자산 현황", [statCol({
+    return '<div class="statwrap"><div class="statrow2">' + statCard("자산 현황" + classificationScopeHtml(), [statCol({
       k: "배정 중",
       v: s.rate + "%",
       sub: s.assigned + "/" + s.assignable,
@@ -1042,7 +1064,7 @@
       filter: {
         status: ["repair"]
       }
-    })]) + statCard("유효기한", [statCol({
+    }), statCol({
       k: "만료 예정",
       v: s.expSoon,
       cls: "warn",
@@ -1917,15 +1939,18 @@
       state.filters = draft, state.statFilter = null, state.page = 1, back.remove(), render();
     }, drawGroups(), drawOpts();
   }
+  function applyClassificationScope(picked) {
+    classificationScopes[state.view] = picked;
+    try { localStorage.setItem(scopeStorageKey(state.view), JSON.stringify(picked)); } catch {}
+    state.statFilter = null;
+    state.page = 1;
+    render();
+  }
   function openCategoryFilterModal() {
     return window.openAssetCategoryScopeModal({
       categories:viewableCategories().filter(cat => cat.type === state.productType),
       selected:classificationScopes[state.view] || [],
-      onApply:picked => {
-        classificationScopes[state.view]=picked;
-        try { localStorage.setItem(scopeStorageKey(state.view),JSON.stringify(picked)); } catch {}
-        state.statFilter=null; state.page=1; render();
-      }
+      onApply:applyClassificationScope
     });
   }
   function openMemberFilterModal() {
@@ -2053,10 +2078,12 @@
         cb.checked ? sel.add(cb.dataset.id) : sel.delete(cb.dataset.id), renderList();
       }), m.querySelector("#qr-pager").innerHTML = `
         <button data-qp="prev" ${page === 1 ? "disabled" : ""}>‹</button>
-        <span style="padding:0 6px;font-size:12.5px;color:var(--text-sub)">${page} / ${totalPages}</span>
+        ${pageNumbers(page, totalPages).map(n => `<button data-qp="${n}" class="${n === page ? 'active' : ''}" ${n === page ? 'aria-current="page"' : ''}>${n}</button>`).join('')}
         <button data-qp="next" ${page === totalPages ? "disabled" : ""}>›</button>
       `, m.querySelectorAll("[data-qp]").forEach(b => b.onclick = () => {
-        page += b.dataset.qp === "prev" ? -1 : 1, renderList();
+        const target = b.dataset.qp;
+        page = target === "prev" ? page - 1 : target === "next" ? page + 1 : Number(target);
+        renderList();
       }), m.querySelector("#qr-sum").textContent = `선택됨 ${sel.size}`, m.querySelector("#qr-go").disabled = sel.size === 0;
     }
     m.querySelector("#qr-go").onclick = () => {
