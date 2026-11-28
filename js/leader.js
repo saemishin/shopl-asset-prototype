@@ -988,6 +988,7 @@
   }
   function assetsScreenHtml(state) {
     const groups = categoryTree();
+    const hasCategories = window.DATA.categories.length || window.DATA.emptyGroups?.length;
     return `
       <div class="mapp-topbar">
         <button type="button" class="mapp-back" data-mapp-back aria-label="뒤로">←</button>
@@ -1002,7 +1003,7 @@
             <button type="button" class="mapp-ws-cat-row" data-sub-open data-sub="${sub}">
               <span>${sub}</span>
               <span class="mapp-ws-cat-count">${countForSub(sub)}<span class="mapp-menu-chev">›</span></span>
-            </button>`).join("") : '<p class="mapp-ws-empty">소분류 없음</p>'}</div>`).join("") : '<p class="mapp-ws-empty">조회 가능한 자산이 없습니다.</p>'}
+            </button>`).join("") : '<p class="mapp-ws-empty">소분류 없음</p>'}</div>`).join("") : `<p class="mapp-ws-empty">${hasCategories ? "조회 가능한 자산이 없습니다." : "등록된 분류가 없습니다."}</p>`}
       </div>
       ${addFabHtml()}`;
   }
@@ -1043,10 +1044,10 @@
         ${subItems.length ? MappAssetFilter.buttonHtml(popupFilters) : ""}
       </div>
       <div class="mapp-body">
+        ${MappAssetFilter.appliedHtml(popupFilters, filterGroups)}
         ${subSwitchButtonHtml(sub)}
         ${subItems.length ? `<div class="mapp-search"><input type="text" data-mapp-search placeholder="${searchPlaceholder}"></div>` : ""}
-        ${MappAssetFilter.appliedHtml(popupFilters, filterGroups)}
-        <div class="mapp-count">전체 <b data-leader-result-count>${items.length}</b></div>
+        <div class="mapp-count"${items.length ? "" : " hidden"}>전체 <b data-leader-result-count>${items.length}</b></div>
         ${items.length ? `<div class="mapp-card-list">${items.map(x => assetCardHtml(x)).join("")}</div><p class="mapp-ws-empty" data-mapp-empty hidden>결과가 없습니다.</p>` : `<p class="mapp-ws-empty" data-mapp-empty>${emptyMsg}</p>`}
       </div>
       ${addFabHtml(sub)}`;
@@ -2120,6 +2121,7 @@
           worksite: !1
         },
         menuScroll: 0,
+        hubScroll: 0,
         sub: null,
         statusFilter: "all",
         popupFilters: MappAssetFilter.empty(),
@@ -2185,9 +2187,12 @@
           return;
         } else state.screen === "sub-detail" ? (state.screen = "assets", state.sub = null, state.statusFilter = "all", state.popupFilters = MappAssetFilter.empty(), state.subSearch = "") : state.screen = "menu";
         draw();
+        if (state.screen === "assets") root.querySelector(".mapp-screen").scrollTop = state.hubScroll;
       });
       const gotoAssets = root.querySelector('[data-mapp-goto="assets"]');
       gotoAssets && (gotoAssets.onclick = () => {
+        state.collapsedGroups.clear();
+        state.hubScroll = 0;
         state.screen = "assets", draw();
       }), root.querySelectorAll("[data-mapp-tab]").forEach(b => b.onclick = () => {
         b.dataset.mappTab === "menu" && (state.screen = "menu", draw());
@@ -2197,6 +2202,7 @@
           state.sub = sub, state.statusFilter = "all", state.popupFilters = MappAssetFilter.empty(), state.subSearch = "", state.listScroll = 0, draw(), root.querySelector(".mapp-screen").scrollTop = 0;
         });
       }), root.querySelectorAll("[data-sub-open]").forEach(b => b.onclick = () => {
+        state.hubScroll = root.querySelector(".mapp-screen").scrollTop;
         state.screen = "sub-detail", state.sub = b.dataset.sub, state.statusFilter = "all", state.popupFilters = MappAssetFilter.empty(), state.subSearch = "", draw();
       }), root.querySelectorAll("[data-asset-plus-open]").forEach(b => b.onclick = () => {
         const currentCategory = state.screen === "sub-detail" && window.DATA.categories.find(c => c.sub === state.sub) || null;
@@ -2250,7 +2256,11 @@
             });
           reveal(), shown < matching.length && (list.append(sentinel), observer.observe(sentinel));
           const count = root.querySelector("[data-leader-result-count]");
-          count && (count.textContent = visibleCount), emptyMsg && cards.length && (emptyMsg.hidden = visibleCount > 0);
+          if (count) {
+            count.textContent = visibleCount;
+            count.parentElement.hidden = visibleCount === 0;
+          }
+          if (emptyMsg && cards.length) emptyMsg.hidden = visibleCount > 0;
         };
         searchInput.addEventListener("input", applySearch), applySearch();
       }

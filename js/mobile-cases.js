@@ -1,7 +1,7 @@
 /* 앱 리더·직원 디자인 검토용. URL 이동·팝업 열기·Toast 시연 없이 현재 화면의 메모리만 변경한다. */
 (() => {
   const D=window.DATA, clone=x=>JSON.parse(JSON.stringify(x)), attached=new WeakMap(), activeByRoot=new WeakMap();
-  const baseline=clone({assets:D.assets,categories:D.categories,links:D.links,tags:D.tags,extraFields:D.extraFields});
+  const baseline=clone({assets:D.assets,categories:D.categories,emptyGroups:D.emptyGroups,links:D.links,tags:D.tags,extraFields:D.extraFields});
   const originalManage=window.hasPrototypeAssetManagePermission;
   const api=window.MobileCases={plan:null,featureUse:null,managed:null};
   window.hasPrototypeAssetManagePermission=()=>api.managed===null?originalManage():api.managed;
@@ -99,8 +99,12 @@
       item('history-registration','자산 등록 이력만',shared(7)+' · 2번',()=>{const a=asset(),event=registration(a);a.status='stock';a.assignments=[];a._assignmentHistory=[];D.links.splice(0,D.links.length,...D.links.filter(p=>!p.includes(a.id)));state.detailTarget=null;a._activityLog=[event];redraw();}),
       item('history-long','이력 다수 · 스크롤',shared(7)+' · 2번',()=>{const a=asset(),event=registration(a),logs=(a._activityLog||[]).filter(e=>e.script!=='자산 등록');a._activityLog=[...Array.from({length:20},(_,i)=>clone(logs.length?logs[i%logs.length]:{d:event.d,who:me,script:'자산 정보 수정: 메모 수정',before:'',after:'검토용 메모'})),event];redraw();})])];}
     // Each data scenario starts from a stable seed, including after an empty/permission scenario.
-    function listData(many){
+    function restoreCategories(){
       D.categories.splice(0,D.categories.length,...clone(baseline.categories));
+      D.emptyGroups.splice(0,D.emptyGroups.length,...baseline.emptyGroups);
+    }
+    function listData(many){
+      restoreCategories();
       D.assets.splice(0,D.assets.length,...clone(baseline.assets));
       D.links.splice(0,D.links.length,...clone(baseline.links));
       api.managed=null;
@@ -155,11 +159,14 @@
         const hub=mode==='leader'&&s==='assets';
         const sections=[group(hub?'분류 트리 데이터':'목록 데이터',[
           item('list-empty',hub?'자산 0건 · 분류별 건수 0':'표시할 자산 없음',listRef,()=>listData(false)),
+          ...(hub ? [item('no-categories','등록된 분류 없음',ref(mode,2)+' · Case 2-4',()=>{
+            D.categories.splice(0);D.emptyGroups.splice(0);redraw();
+          })] : []),
           item('list-long',hub?'분류 다수 · 스크롤':s==='member-profile'?'배정 자산 다수 · 전체 보기':'자산 다수 · 스크롤',listRef,()=>listData(true))
         ])];
         if(!directory&&mode==='leader')sections.push(group('소분류 조회 범위',[
-          item('view-none','조회 가능한 소분류 없음',ref(mode,2)+' · 2번',()=>{api.managed=false;D.categories.forEach(c=>c.view='관리자만');redraw();}),
-          item('view-partial','일부 소분류만 조회',ref(mode,2)+' · 2번',()=>{api.managed=false;D.categories.forEach((c,i)=>c.view=i<2?'회사의 모든 구성원':'관리자만');redraw();})]));
+          item('view-none','조회 가능한 소분류 없음',ref(mode,2)+' · 2번',()=>{restoreCategories();api.managed=false;D.categories.forEach(c=>c.view='관리자만');redraw();}),
+          item('view-partial','일부 소분류만 조회',ref(mode,2)+' · 2번',()=>{restoreCategories();api.managed=false;D.categories.forEach((c,i)=>c.view=i<2?'회사의 모든 구성원':'관리자만');redraw();})]));
         if(s==='sub-detail'&&mode==='leader')sections.push(group('소분류 선택 버튼',[
           item('switch-many','같은 대분류 후보 2개 이상',ref(mode,3)+' · Case 9-1',()=>{baseCats();redraw();}),
           item('switch-single','같은 대분류 후보가 현재 소분류 하나뿐',ref(mode,3)+' · Case 9-2',()=>{baseCats();api.managed=false;const g=D.categories.find(c=>c.sub===state.sub)?.group;D.categories.forEach(c=>{if(c.group===g)c.view=c.sub===state.sub?'회사의 모든 구성원':'관리자만';});redraw();}),
