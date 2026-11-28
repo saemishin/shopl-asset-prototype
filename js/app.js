@@ -544,8 +544,6 @@
       ${items.length ? MappAssetFilter.appliedHtml(filters, filterGroups) : ""}
       <div class="mapp-wsdetail-head">
         <div class="mapp-wsdetail-name">${ws}</div>
-        <div class="mapp-wsdetail-code">${WS_CODE[ws] || ""}</div>
-        <div class="mapp-wsdetail-address">${WS_ADDRESS[ws] || ""}</div>
         <div class="mapp-wsdetail-sub">${group} <span class="mapp-cat-sep">›</span> ${sub}</div>
       </div>
       <div class="mapp-body">
