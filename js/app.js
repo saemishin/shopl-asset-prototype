@@ -539,8 +539,9 @@
     return `
       <div class="mapp-topbar">
         <button type="button" class="mapp-back" data-mapp-back aria-label="뒤로">←</button>
-        ${MappAssetFilter.buttonHtml(filters)}
+        ${items.length ? MappAssetFilter.buttonHtml(filters) : ""}
       </div>
+      ${items.length ? MappAssetFilter.appliedHtml(filters, filterGroups) : ""}
       <div class="mapp-wsdetail-head">
         <div class="mapp-wsdetail-name">${ws}</div>
         <div class="mapp-wsdetail-code">${WS_CODE[ws] || ""}</div>
@@ -548,11 +549,10 @@
         <div class="mapp-wsdetail-sub">${group} <span class="mapp-cat-sep">›</span> ${sub}</div>
       </div>
       <div class="mapp-body">
-        <div class="mapp-search">
-          <input type="text" data-mapp-search placeholder="${searchPlaceholder}">
-        </div>
-        ${MappAssetFilter.appliedHtml(filters, filterGroups)}
-        <div class="mapp-count">전체 <b data-worksite-result-count>${filtered.length}</b></div>
+        ${items.length ? `<div class="mapp-search">
+          <input type="search" data-mapp-search aria-label="자산 검색" placeholder="${searchPlaceholder}"><button type="button" data-list-search-clear aria-label="검색어 지우기" hidden>×</button>
+        </div>` : ""}
+        <div class="mapp-count"${filtered.length ? "" : " hidden"}>전체 (<b data-worksite-result-count>${filtered.length}</b>)</div>
         ${filtered.length ? `
           <div class="mapp-card-list" data-mapp-card-list>${filtered.map(x => worksiteCard(x, false)).join("")}</div>
           <p class="mapp-empty" data-mapp-empty hidden>결과가 없습니다.</p>
@@ -1721,7 +1721,7 @@ function openLeaderQr(a) {
           if (count) {
             const total = cards.filter(card => !card.hidden).length;
             count.textContent = total;
-            if (count.hasAttribute("data-mine-result-count")) count.parentElement.hidden = total === 0;
+            count.parentElement.hidden = total === 0;
           }
         };
         searchInput.addEventListener("input", applySearch), applySearch();
@@ -1729,6 +1729,7 @@ function openLeaderQr(a) {
       const clearSearch = root.querySelector("[data-list-search-clear]");
       if (clearSearch) {
         const input = clearSearch.previousElementSibling;
+        clearSearch.hidden = !input.value;
         input.addEventListener("input", () => { clearSearch.hidden = !input.value; });
         clearSearch.onclick = () => {
           input.value = "";

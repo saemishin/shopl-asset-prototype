@@ -8,13 +8,15 @@ window.worksiteAssetCardHtml = function (item, { directory, cardThumb, escape, s
     : `data-asset-card data-asset-id="${id}"`;
   const hasPhoto = window.assetPhotos(asset).length > 0;
   const date = item.since ? escape(item.since.replaceAll("-", ".")) : "—";
+  const badge = `<span class="badge ${status[1]}">${escape(status[0])}</span>`;
   return `<div class="mapp-card" ${attributes}>
     <button type="button" class="mapp-card-thumb-btn" data-worksite-thumb="${id}" aria-label="${hasPhoto ? "사진 보기" : "자산 상세 보기"}">${cardThumb(asset)}</button>
     <button type="button" class="mapp-card-body" style="text-align:left; padding:0; overflow:hidden">
+      ${directory ? "" : badge}
       <span style="display:block" class="mapp-card-title">${escape(asset.product)}</span>
       <span style="display:block" class="mapp-card-sub">${escape(asset.assetNo || "—")}</span>
       <span style="display:block" class="mapp-card-sub">배정일: ${date}</span>
     </button>
-    <span class="badge ${status[1]}">${escape(status[0])}</span>
+    ${directory ? badge : ""}
   </div>`;
 };
