@@ -348,9 +348,7 @@
         <div><div class="acard-name">${x.employee}</div><div class="acard-sub">${MEMBER_TEAM[x.employee] || '<span class="muted">—</span>'}</div></div>` : `<span class="acard-avatar ws"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 20V9.5L12 4l8 5.5V20"/><path d="M9.5 20v-5h5v5"/></svg></span>
       <div><div class="acard-name">${x.worksite}</div><div class="acard-sub">${WS_CODE[x.worksite] || '<span class="muted">—</span>'}</div></div>`;
   }
-  const typeBadge = x => `<span class="acard-type" title="${x.employee ? "구성원" : "근무지"}">${x.employee ? IC_EMP : IC_WS}</span>`,
-    IC_PERSON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="8" r="3.5"/><path d="M5.5 20c0-4 3-6.5 6.5-6.5s6.5 2.5 6.5 6.5"/></svg>',
-    IC_WORKSITE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 20V9.5L12 4l8 5.5V20"/><path d="M9.5 20v-5h5v5"/></svg>';
+  const typeBadge = x => `<span class="acard-type" title="${x.employee ? "구성원" : "근무지"}">${x.employee ? IC_EMP : IC_WS}</span>`;
   function collectMyItems(name) {
     const items = [];
     return assets.forEach(a => {
@@ -372,17 +370,17 @@
       return bySub || p.asset.product.localeCompare(q.asset.product, "ko") || (p.asset.assetNo || "").localeCompare(q.asset.assetNo || "", "ko");
     });
   }
-  function itemsForWorksite(ws, sub) {
+  function assignedItemsForWorksite(ws, sub) {
     const items = [];
-    return assets.forEach(a => {
-      sub && a.sub !== sub || hasViewPermission(a) && (a.assignments || []).forEach(x => {
-        x.worksite === ws && items.push({
-          since: x.since,
-          qty: 1,
-          asset: a
-        });
-      });
-    }), sortItems(items);
+    for (const asset of assets) {
+      if (asset.deleted_at || (sub && asset.sub !== sub)) continue;
+      const record = asset.assignments?.find(x => x.worksite === ws);
+      if (record) items.push({ since: record.since, qty: 1, asset });
+    }
+    return items;
+  }
+  function visibleWorksiteItems(items) {
+    return sortItems(items.filter(item => hasViewPermission(item.asset)));
   }
   function groupItemsBySub(items) {
     const order = [],
@@ -413,11 +411,10 @@
     }) => ws).map(({
       ws,
       label
-    }) => ({
-      worksite: ws,
-      label,
-      items: itemsForWorksite(ws)
-    }));
+    }) => {
+      const assignedItems = assignedItemsForWorksite(ws);
+      return { worksite: ws, label, hasAssignments: assignedItems.length > 0, items: visibleWorksiteItems(assignedItems) };
+    });
   }
   const THUMB_EMPTY = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 15 5-4 4 3 4-4 5 4"/></svg>';
   function cardThumb(a) {
@@ -433,10 +430,10 @@
         <div class="mapp-card" data-asset-card data-asset-id="${a.id}">
           ${cardThumbBtn(a)}
           <div class="mapp-card-body">
+            <span class="badge ${STATUS_LABEL[a.status][1]}">${STATUS_LABEL[a.status][0]}</span>
             <div class="mapp-card-title">${a.product}</div>
             <div class="mapp-card-sub">${a.assetNo || "—"}</div>
           </div>
-          <span class="badge ${STATUS_LABEL[a.status][1]}">${STATUS_LABEL[a.status][0]}</span>
         </div>`;
   }
   function findRecord(a, target) {
@@ -458,8 +455,8 @@
     const mineActive = active === "mine";
     return `
       <div class="mapp-seg-tabs">
-        <button type="button" class="mapp-seg-tab${mineActive ? " active" : " icon-only"}" data-mapp-asset-tab="mine" aria-label="내 자산">${mineActive ? "내 자산" : IC_PERSON}</button>
-        <button type="button" class="mapp-seg-tab${mineActive ? " icon-only" : " active"}" data-mapp-asset-tab="worksite" aria-label="근무지 자산">${mineActive ? IC_WORKSITE : "근무지 자산"}</button>
+        <button type="button" class="mapp-seg-tab${mineActive ? " active" : ""}" data-mapp-asset-tab="mine" aria-pressed="${mineActive}">내 자산</button>
+        <button type="button" class="mapp-seg-tab${mineActive ? "" : " active"}" data-mapp-asset-tab="worksite" aria-pressed="${!mineActive}">근무지 자산</button>
       </div>`;
   }
   function myAssetsScreenHtml(items) {
@@ -471,15 +468,13 @@
       </div>
       ${assetTabsHtml("mine")}
       <div class="mapp-body">
-        <div class="mapp-search">
-          <input type="text" data-mapp-search placeholder="품목명/고유관리번호">
-        </div>
-        <div class="mapp-count">전체 <b data-mine-result-count>${items.length}</b></div>
+        ${items.length ? '<div class="mapp-search"><input type="search" aria-label="내 자산 검색" data-mapp-search placeholder="품목명/고유관리번호"><button type="button" data-list-search-clear aria-label="검색어 지우기" hidden>×</button></div>' : ""}
+        <div class="mapp-count"${items.length ? "" : " hidden"}>전체 (<b data-mine-result-count>${items.length}</b>)</div>
         ${items.length ? `
           <div data-mapp-card-list>${sections.map(sec => `
             <div class="mapp-cat-section" data-cat-section>
               <button type="button" class="mapp-cat-section-head" data-cat-collapse aria-expanded="true" aria-label="접기/펼치기">
-                <span>${sec.group} <span class="mapp-cat-sep">›</span> ${sec.sub}</span>
+                <span class="mapp-category-path"><span>${esc(sec.group)}</span><span class="mapp-cat-sep">›</span><span>${esc(sec.sub)}</span></span>
                 <span class="mapp-cat-section-count" data-cat-result-count>${sec.items.length}</span>
                 ${CHEV_DOWN}
               </button>
@@ -497,7 +492,7 @@
   function worksiteCategoryTreeHtml(wsName, items) {
     return groupItemsBySub(items).map(sec => `
       <button type="button" class="mapp-ws-cat-row" data-ws-cat-open data-ws="${wsName}" data-sub="${sec.sub}">
-        <span>${sec.group} <span class="mapp-cat-sep">›</span> ${sec.sub}</span>
+        <span class="mapp-category-path"><span>${esc(sec.group)}</span><span class="mapp-cat-sep">›</span><span>${esc(sec.sub)}</span></span>
         <span class="mapp-ws-cat-count">${sec.items.length}<span class="mapp-menu-chev">›</span></span>
       </button>`).join("");
   }
@@ -514,8 +509,8 @@
           <button type="button" class="mapp-ws-collapse" data-ws-collapse aria-expanded="true" aria-label="접기/펼치기">${CHEV_DOWN}</button>
         </div>
         <div data-ws-collapsible>
-          <div class="mapp-ws-count">전체 <b>${group.items.length}</b></div>
-          ${hasItems ? `<div class="mapp-ws-cat-tree">${worksiteCategoryTreeHtml(group.worksite, group.items)}</div>` : '<p class="mapp-ws-empty">배정 중인 자산이 없습니다.</p>'}
+          <div class="mapp-ws-count">전체 (<b>${group.items.length}</b>)</div>
+          ${hasItems ? `<div class="mapp-ws-cat-tree">${worksiteCategoryTreeHtml(group.worksite, group.items)}</div>` : `<p class="mapp-ws-empty">${group.hasAssignments ? "조회할 수 있는 자산이 없습니다." : "배정 중인 자산이 없습니다."}</p>`}
         </div>
       </div>`;
   }
@@ -528,9 +523,9 @@
       ${assetTabsHtml("worksite")}
       <div class="mapp-body">
         ${groups.length ? `<div class="mapp-search">
-          <input type="text" data-mapp-ws-search placeholder="근무지명/코드/주소">
+          <input type="search" aria-label="근무지 검색" data-mapp-ws-search placeholder="근무지명/코드/주소"><button type="button" data-list-search-clear aria-label="검색어 지우기" hidden>×</button>
         </div>` : ""}
-        <div class="mapp-count">전체 <b data-worksite-count>${groups.length}</b></div>
+        <div class="mapp-count"${groups.length ? "" : " hidden"}>전체 (<b data-worksite-count>${groups.length}</b>)</div>
         ${groups.length ? `<div class="mapp-ws-list" data-mapp-ws-list>${groups.map(worksiteCardHtml).join("")}</div>
         <p class="mapp-empty" data-mapp-ws-empty hidden>결과가 없습니다.</p>` : '<p class="mapp-empty">표시할 목록이 없습니다.</p>'}
       </div>`;
@@ -1541,7 +1536,7 @@ function openLeaderQr(a) {
       const items = sortItems(collectMyItems(ME)),
         worksiteGroups = collectWorksiteGroups(ME),
         showTabBar = state.screen === "menu",
-        screenHtml = state.screen === "menu" ? menuScreenHtml(state.menuExpanded) : state.screen === "member-profile" ? directoryProfileScreenHtml("member", state) : state.screen === "worksite-profile" ? directoryProfileScreenHtml("worksite", state) : state.screen === "directory-member-assets" ? directoryMemberAssetsScreenHtml(state) : state.screen === "directory-worksite-assets" ? directoryWorksiteAssetsScreenHtml(state) : state.screen === "plan-features" ? planFeaturesScreenHtml() : state.screen === "asset-feature" ? assetFeatureScreenHtml() : state.screen === "worksite-detail" ? worksiteDetailScreenHtml(state.wsDetail, state.wsDetailSub, itemsForWorksite(state.wsDetail, state.wsDetailSub), state.wsFilters) : state.screen === "asset-detail" ? assetDetailScreenHtml(assets.find(x => x.id === state.detailAssetId), state.detailTarget) : state.screen === "asset-parties" ? partiesScreenHtml(assets.find(x => x.id === state.detailAssetId), state.detailTarget) : state.screen === "asset-history" ? historyScreenHtml(assets.find(x => x.id === state.detailAssetId), state.detailTarget) : state.assetTab === "mine" ? myAssetsScreenHtml(items) : worksiteAssetsScreenHtml(worksiteGroups);
+        screenHtml = state.screen === "menu" ? menuScreenHtml(state.menuExpanded) : state.screen === "member-profile" ? directoryProfileScreenHtml("member", state) : state.screen === "worksite-profile" ? directoryProfileScreenHtml("worksite", state) : state.screen === "directory-member-assets" ? directoryMemberAssetsScreenHtml(state) : state.screen === "directory-worksite-assets" ? directoryWorksiteAssetsScreenHtml(state) : state.screen === "plan-features" ? planFeaturesScreenHtml() : state.screen === "asset-feature" ? assetFeatureScreenHtml() : state.screen === "worksite-detail" ? worksiteDetailScreenHtml(state.wsDetail, state.wsDetailSub, visibleWorksiteItems(assignedItemsForWorksite(state.wsDetail, state.wsDetailSub)), state.wsFilters) : state.screen === "asset-detail" ? assetDetailScreenHtml(assets.find(x => x.id === state.detailAssetId), state.detailTarget) : state.screen === "asset-parties" ? partiesScreenHtml(assets.find(x => x.id === state.detailAssetId), state.detailTarget) : state.screen === "asset-history" ? historyScreenHtml(assets.find(x => x.id === state.detailAssetId), state.detailTarget) : state.assetTab === "mine" ? myAssetsScreenHtml(items) : worksiteAssetsScreenHtml(worksiteGroups);
       root.innerHTML = `
         <div class="mapp-stage">
           <div class="mapp-phone">
@@ -1723,9 +1718,23 @@ function openLeaderQr(a) {
             }
           }), q || (searchFoldState = null), emptyMsg && cards.length && (emptyMsg.hidden = anyVisible);
           const count = root.querySelector("[data-worksite-result-count], [data-mine-result-count]");
-          count && (count.textContent = cards.filter(card => !card.hidden).length);
+          if (count) {
+            const total = cards.filter(card => !card.hidden).length;
+            count.textContent = total;
+            if (count.hasAttribute("data-mine-result-count")) count.parentElement.hidden = total === 0;
+          }
         };
         searchInput.addEventListener("input", applySearch), applySearch();
+      }
+      const clearSearch = root.querySelector("[data-list-search-clear]");
+      if (clearSearch) {
+        const input = clearSearch.previousElementSibling;
+        input.addEventListener("input", () => { clearSearch.hidden = !input.value; });
+        clearSearch.onclick = () => {
+          input.value = "";
+          input.dispatchEvent(new Event("input", { bubbles: true }));
+          input.focus();
+        };
       }
       const wsSearchInput = root.querySelector("[data-mapp-ws-search]");
       if (wsSearchInput) {
@@ -1738,7 +1747,10 @@ function openLeaderQr(a) {
             wsCards.forEach(card => {
               const hay = `${card.dataset.wsName}${card.dataset.wsCode}${card.dataset.wsAddress}`.toLowerCase();
               card.hidden = !(!q || hay.includes(q)), card.hidden || count++;
-            }), wsCount.textContent = count, wsEmpty.hidden = count > 0;
+            });
+            wsCount.textContent = count;
+            wsCount.parentElement.hidden = count === 0;
+            wsEmpty.hidden = count > 0;
           };
         wsSearchInput.addEventListener("input", applyWorksiteSearch), applyWorksiteSearch();
       }

@@ -164,6 +164,23 @@
           })] : []),
           item('list-long',hub?'분류 다수 · 스크롤':s==='member-profile'?'배정 자산 다수 · 전체 보기':'자산 다수 · 스크롤',listRef,()=>listData(true))
         ])];
+        if(mode==='employee' && s==='assets' && state.assetTab==='worksite'){
+          sections.push(group('근무지 카드 빈 상태',[
+            item('ws-no-assignments','실제 배정 0건',listRef+' · 카드 4-3',()=>listData(false)),
+            item('ws-hidden-assignments','배정 있음 · 조회 가능 0건',ref(mode,2)+' · 4-3번',()=>{
+              const sites=worksites(), ws=sites.fixed||sites.assigned[0];
+              const asset=clone(baseline.assets.find(a=>!a.deleted_at));
+              asset.status='assigned';
+              asset.assignments=[{worksite:ws,employee:null,since:'2026-09-01'}];
+              D.assets.splice(0,D.assets.length,asset);
+              D.links.splice(0);
+              D.categories.splice(0,D.categories.length,...clone(baseline.categories));
+              D.categories.forEach(c=>{c.view='관리자만';});
+              api.managed=false;
+              redraw();
+            },!(worksites().fixed||worksites().assigned.length))
+          ]));
+        }
         if(!directory&&mode==='leader')sections.push(group('소분류 조회 범위',[
           item('view-none','조회 가능한 소분류 없음',ref(mode,2)+' · 2번',()=>{restoreCategories();api.managed=false;D.categories.forEach(c=>c.view='관리자만');redraw();}),
           item('view-partial','일부 소분류만 조회',ref(mode,2)+' · 2번',()=>{restoreCategories();api.managed=false;D.categories.forEach((c,i)=>c.view=i<2?'회사의 모든 구성원':'관리자만');redraw();})]));
