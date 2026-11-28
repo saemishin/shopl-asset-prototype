@@ -28,5 +28,12 @@ window.MemberAssetViews = (() => {
     return `<header class="member-assets-profile"><span class="mapp-directory-avatar" style="background:${color}">${avatar}</span>
       <div><strong>${esc(name)}</strong><small>${esc(info.team || "")}</small></div></header>`;
   }
-  return { recent, list, profile };
+  function infoCards(assetCard) {
+    const labels = ["추가 정보", "그룹 및 권한", "근무 정보", "개인 정보", "급여 정보", "자산", "기기 및 앱 정보"];
+    return labels.map(label => {
+      if (label === "자산") return assetCard;
+      return `<details class="mapp-directory-info member-info"><summary>${label}</summary><p>등록된 ${label}가 없습니다.</p></details>`;
+    }).join("");
+  }
+  return { recent, list, profile, infoCards };
 })();
