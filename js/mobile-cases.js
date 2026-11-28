@@ -147,7 +147,7 @@
       if(s?.startsWith('asset-add'))return[s==='asset-add-category'?'분류 선택':s==='asset-add-tags'?'태그 관리':state.addDraft?.editingId?'자산 수정':'자산 추가',shared(1)];
       if(s==='member-profile'||s==='directory-member-assets')return['구성원 상세 · 자산',shared(8)];
       if(s==='worksite-profile'||s==='directory-worksite-assets')return['근무지 상세 · 자산',shared(9)];
-      if(s==='plan-features'||s==='asset-feature')return['요금제 및 기능 · 자산 관리',shared(10)];
+      if(s==='plan-features'||s==='asset-feature'||s==='asset-plan-guide')return['요금제 및 기능 · 자산 관리',shared(10)];
       if(s==='worksite-detail')return['근무지 자산 · 소분류',ref(mode,3)];
       if(s==='sub-detail')return['소분류 상세',ref(mode,3)];
       if(s==='asset-parties')return['배정 현황',shared(3)];
@@ -157,7 +157,7 @@
       summary:'현재 화면에서 확인할 조건을 선택하세요. 다른 화면이나 팝업으로 이동하지 않습니다.',reset,
       sections:()=>{
         const s=state.screen;
-        if(s==='menu'||s==='plan-features'||s==='asset-feature')return[featureCases()];
+        if(s==='menu'||s==='plan-features'||s==='asset-feature'||s==='asset-plan-guide')return[featureCases()];
         if(s==='asset-detail'&&tab()==='history')return historyCases();
         if(s==='asset-detail'&&tab()==='info')return detailCases().filter(g=>g.title!=='연결된 자산');
         if(s==='asset-detail'||s==='asset-parties')return detailCases();

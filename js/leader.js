@@ -96,13 +96,21 @@
       <div class="mapp-plan-hero"><div class="mapp-topbar"><button type="button" class="mapp-back" data-mapp-back aria-label="뒤로">←</button></div>${ASSET_FEATURE_ART}</div>
       <div class="mapp-plan-detail-body">
         <section class="mapp-plan-info-card"><div class="mapp-plan-toggle-row">
-          ${planAllows("Pro") ? "" : '<span class="mapp-plan-tier">Pro 이상</span>'}
           <button type="button" class="toggle-switch${on ? " on" : ""}" data-plan-toggle role="switch" aria-label="자산 관리 사용 여부" aria-checked="${on}"><span class="toggle-knob"></span></button></div>
+          ${planAllows("Pro") ? "" : '<span class="mapp-plan-tier">Pro 이상</span>'}
           <h1>자산 관리</h1>${ASSET_FEATURE_DESCRIPTION.map(text => `<p>${text}</p>`).join("")}</section>
         <section class="mapp-plan-info-card mapp-plan-settings"><h2>세부 기능 설정</h2><ul><li>자산 관리 권한</li></ul>
           <p class="mapp-plan-guide">세부 기능은 대시보드에서 설정할 수 있습니다.<br>(대시보드 &gt; 자산 &gt; 설정)</p>
           <button type="button" class="mapp-plan-dashboard" data-plan-dashboard>대시보드 링크 보기</button></section>
       </div></div>`;
+  }
+  function assetPlanGuideHtml() {
+    return `<div class="mapp-plan-page">
+      <div class="mapp-topbar"><button type="button" class="mapp-back" data-mapp-back aria-label="뒤로">←</button></div>
+      <section class="mapp-upgrade-guide"><h1>Pro 요금제에서 제공하는 기능입니다.</h1>
+        <p>대시보드 [결제] 페이지에서 요금제를 업그레이드해 보세요!</p>
+        <button type="button" class="mapp-plan-dashboard" data-plan-dashboard>대시보드 링크 보기</button>
+      </section></div>`;
   }
   function openPlanDialog({
     title,
@@ -175,16 +183,8 @@
     toggle && (toggle.onclick = () => {
       if (!canConfigureFeatures()) return;
       if (!planAllows("Pro")) {
-        openPlanDialog({
-          title: "Pro 요금제에서 제공하는 기능입니다.",
-          body: "<p>대시보드 [결제] 페이지에서 요금제를 업그레이드해 보세요!</p>",
-          actions: [{
-            label: "취소"
-          }, {
-            label: "대시보드 링크 보기",
-            run: openPlanDashboardLink
-          }]
-        });
+        state.screen = "asset-plan-guide";
+        draw();
         return;
       }
       const on = assetMgmtEnabled();
@@ -2173,9 +2173,10 @@
       Object.assign(state,{screen:'asset-detail',detailAssetId:sample.id,detailTarget:new URLSearchParams(location.search).get('scenario')==='target'?(()=>{const r=(sample.assignments||[])[0];return r?{type:r.employee?'employee':'worksite',value:r.employee||r.worksite}:null;})():null,detailFrom:{screen:'menu'}});
     }
     function draw() {
-      ["plan-features", "asset-feature"].includes(state.screen) && !canConfigureFeatures() && (state.screen = "menu");
+      if (state.screen === "asset-plan-guide" && planAllows("Pro")) state.screen = "asset-feature";
+      ["plan-features", "asset-feature", "asset-plan-guide"].includes(state.screen) && !canConfigureFeatures() && (state.screen = "menu");
       const showTabBar = state.screen === "menu",
-        screenHtml = state.screen === "menu" ? menuScreenHtml(state.menuExpanded) : state.screen === "member-profile" ? directoryProfileScreenHtml("member", state) : state.screen === "worksite-profile" ? directoryProfileScreenHtml("worksite", state) : state.screen === "directory-member-assets" ? directoryMemberAssetsScreenHtml(state) : state.screen === "directory-worksite-assets" ? directoryWorksiteAssetsScreenHtml(state) : state.screen === "plan-features" ? planFeaturesScreenHtml() : state.screen === "asset-feature" ? assetFeatureScreenHtml() : state.screen === "sub-detail" ? subDetailScreenHtml(state.sub, state.statusFilter, state.popupFilters) : state.screen === "asset-detail" ? leaderAssetDetailHtml(assets.find(a => a.id === state.detailAssetId), state.detailTarget) : state.screen === "asset-history" ? historyScreenHtml(assets.find(a => a.id === state.detailAssetId), state.detailTarget) : state.screen === "asset-add" ? assetAddScreenHtml(state.addDraft) : state.screen === "asset-add-category" ? assetAddCategoryScreenHtml(state.addDraft) : state.screen === "asset-add-tags" ? assetAddTagManageScreenHtml(state.tagManageDraft) : assetsScreenHtml(state);
+        screenHtml = state.screen === "menu" ? menuScreenHtml(state.menuExpanded) : state.screen === "member-profile" ? directoryProfileScreenHtml("member", state) : state.screen === "worksite-profile" ? directoryProfileScreenHtml("worksite", state) : state.screen === "directory-member-assets" ? directoryMemberAssetsScreenHtml(state) : state.screen === "directory-worksite-assets" ? directoryWorksiteAssetsScreenHtml(state) : state.screen === "plan-features" ? planFeaturesScreenHtml() : state.screen === "asset-plan-guide" ? assetPlanGuideHtml() : state.screen === "asset-feature" ? assetFeatureScreenHtml() : state.screen === "sub-detail" ? subDetailScreenHtml(state.sub, state.statusFilter, state.popupFilters) : state.screen === "asset-detail" ? leaderAssetDetailHtml(assets.find(a => a.id === state.detailAssetId), state.detailTarget) : state.screen === "asset-history" ? historyScreenHtml(assets.find(a => a.id === state.detailAssetId), state.detailTarget) : state.screen === "asset-add" ? assetAddScreenHtml(state.addDraft) : state.screen === "asset-add-category" ? assetAddCategoryScreenHtml(state.addDraft) : state.screen === "asset-add-tags" ? assetAddTagManageScreenHtml(state.tagManageDraft) : assetsScreenHtml(state);
       root.innerHTML = `
         <div class="mapp-stage">
           <div class="mapp-phone">
@@ -2202,6 +2203,11 @@
         }
         if (["member-profile", "worksite-profile"].includes(state.screen)) {
           state.screen = "menu", draw(), root.querySelector(".mapp-screen").scrollTop = state.menuScroll;
+          return;
+        }
+        if (state.screen === "asset-plan-guide") {
+          state.screen = "asset-feature";
+          draw();
           return;
         }
         if (state.screen === "asset-feature") {
