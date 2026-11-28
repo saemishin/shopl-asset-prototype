@@ -231,6 +231,7 @@
   const chips = arr => arr && arr.length ? arr.map(l => `<span class="tag">${l}</span>`).join("") : '<span class="muted">—</span>',
     memoHtml = note => window.AssetMemo.render(note),
     ME = new URLSearchParams(location.search).get("me") || "김민수",
+    worksitePhotos = { 본사: "images/worksite-hq.png" },
     WS_CODE = {
       강남점: "GN-01",
       판교점: "PG-01",
@@ -542,9 +543,12 @@
         ${items.length ? MappAssetFilter.buttonHtml(filters) : ""}
       </div>
       ${items.length ? MappAssetFilter.appliedHtml(filters, filterGroups) : ""}
-      <div class="mapp-wsdetail-head">
-        <div class="mapp-wsdetail-name">${ws}</div>
-        <div class="mapp-wsdetail-sub">${group} <span class="mapp-cat-sep">›</span> ${sub}</div>
+      <div class="mapp-wsdetail-head employee-worksite-header">
+        ${worksitePhotos[ws] ? `<img src="${esc(worksitePhotos[ws])}" alt="" width="30" height="30">` : ""}
+        <div>
+          <div class="mapp-wsdetail-name">${esc(ws)}</div>
+          <div class="mapp-wsdetail-sub">${esc(group)} › ${esc(sub)}</div>
+        </div>
       </div>
       <div class="mapp-body">
         ${items.length ? `<div class="mapp-search">
@@ -1765,7 +1769,7 @@ function openLeaderQr(a) {
         b.setAttribute("aria-expanded", String(!expanded)), body.hidden = expanded, b.classList.toggle("collapsed", expanded);
       });
     }
-    window.MobileCases?.bind({mode:'employee',state,draw,me:ME,directoryTarget,worksites:()=>myWorksites(ME),setDirectory(value){DIRECTORY_CASE=value;DEMO_DIRECTORY_MEMBER=value==='retired'?'오세훈':'김민수';}});
+    window.MobileCases?.bind({mode:'employee',state,draw,me:ME,directoryTarget,worksitePhotos,worksites:()=>myWorksites(ME),setDirectory(value){DIRECTORY_CASE=value;DEMO_DIRECTORY_MEMBER=value==='retired'?'오세훈':'김민수';}});
     window.addEventListener("storage", event => {
       ([ASSET_MGMT_FLAG_KEY, COMPANY_PLAN_KEY].includes(event.key) || event.key === null) && draw();
     }), draw();

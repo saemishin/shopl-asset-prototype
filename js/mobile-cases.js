@@ -17,11 +17,17 @@
   const ref=(mode,n)=>`App(${mode==='leader'?'L':'E'})${String(n).padStart(2,'0')}`;
   const common=n=>`App 공통${String(n).padStart(2,'0')}`;
   const shared=n=>`App(E,L)${String(n).padStart(2,'0')}`;
-  api.bind=({mode,state,draw,me,setDirectory,directoryTarget,worksites})=>{
+  api.bind=({mode,state,draw,me,setDirectory,directoryTarget,worksites,worksitePhotos})=>{
+    const defaultWorksitePhotos = {...worksitePhotos};
     const asset=()=>D.assets.find(a=>a.id===state.detailAssetId);
     const tab=()=>state.screen==='asset-detail'?(document.querySelector('#app [data-detail-tab].active')?.dataset.detailTab||'assignment'):null;
     function redraw(){const selectedTab=tab();draw();if(selectedTab)document.querySelector('#app [data-detail-tab="'+selectedTab+'"]')?.click();window.PrototypeCases.refresh();}
-    function reset(){restore();setDirectory?.(null);if(state.popupFilters)state.popupFilters=MappAssetFilter.empty();if(state.wsFilters)state.wsFilters=MappAssetFilter.empty();state.statusFilter='all';state.subSearch=state.wsSearch='';redraw();}
+    function reset(){
+      if (worksitePhotos) {
+        for (const site of Object.keys(worksitePhotos)) delete worksitePhotos[site];
+        Object.assign(worksitePhotos, defaultWorksitePhotos);
+      }
+      restore();setDirectory?.(null);if(state.popupFilters)state.popupFilters=MappAssetFilter.empty();if(state.wsFilters)state.wsFilters=MappAssetFilter.empty();state.statusFilter='all';state.subSearch=state.wsSearch='';redraw();}
     function permissions(kind){
       api.managed=kind==='manage';
       for(const c of D.categories){c.view='회사의 모든 구성원';c.edit=['info','both'].includes(kind)?'회사의 모든 구성원':'관리자만';c.assign=['state','both'].includes(kind)?'회사의 모든 구성원':'관리자만';}
@@ -164,6 +170,12 @@
           })] : []),
           item('list-long',hub?'분류 다수 · 스크롤':s==='member-profile'?'배정 자산 다수 · 전체 보기':'자산 다수 · 스크롤',listRef,()=>listData(true))
         ])];
+        if (mode === 'employee' && s === 'worksite-detail') {
+          sections.push(group('근무지 사진', [
+            item('worksite-photo-on','사진 있음',ref(mode,3)+' · 3번',()=>{worksitePhotos[state.wsDetail]=defaultWorksitePhotos.본사;redraw();}),
+            item('worksite-photo-off','사진 없음',ref(mode,3)+' · 3번',()=>{delete worksitePhotos[state.wsDetail];redraw();})
+          ]));
+        }
         if(mode==='employee' && s==='assets' && state.assetTab==='worksite'){
           sections.push(group('근무지 카드 빈 상태',[
             item('ws-no-assignments','실제 배정 0건',listRef+' · 카드 4-3',()=>listData(false)),
