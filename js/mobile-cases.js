@@ -110,7 +110,12 @@
       D.emptyGroups.splice(0,D.emptyGroups.length,...baseline.emptyGroups);
     }
     function listData(many){
+      const selected = state.screen === 'directory-worksite-assets' ? state.directoryCategory : null;
+      const selectedCategory = selected && D.categories.find(c=>c.group===selected.group && c.sub===selected.sub);
       restoreCategories();
+      if(selectedCategory && !D.categories.some(c=>c.group===selected.group && c.sub===selected.sub)) {
+        D.categories.push(clone(selectedCategory));
+      }
       D.assets.splice(0,D.assets.length,...clone(baseline.assets));
       D.links.splice(0,D.links.length,...clone(baseline.links));
       api.managed=null;
@@ -123,7 +128,7 @@
       const target=directory?directoryTarget(member?'member':'worksite'):s==='worksite-detail'?{type:'worksite',value:state.wsDetail}:mode==='employee'?state.assetTab==='mine'?{type:'employee',value:me}:{type:'worksite',value:worksites().fixed||worksites().assigned[0]}:null;
       const sub=s==='sub-detail'?state.sub:s==='worksite-detail'?state.wsDetailSub:s==='directory-worksite-assets'?state.directoryCategory?.sub:null;
       const tree=hub||s==='worksite-profile'||(mode==='employee'&&s==='assets'&&state.assetTab==='worksite');
-      const category=D.categories.find(c=>c.sub===sub)||D.categories.find(c=>window.AssetAccess.scope(c,'view',me))||D.categories[0];
+      const category=selectedCategory||D.categories.find(c=>c.sub===sub)||D.categories.find(c=>window.AssetAccess.scope(c,'view',me))||D.categories[0];
       if(!category){redraw();return;}
       const base=clone(baseline.assets.find(a=>a.group===category.group&&a.sub===category.sub&&!a.deleted_at)||baseline.assets.find(a=>!a.deleted_at));
       D.assets.splice(0);D.links.splice(0);
@@ -170,10 +175,12 @@
           })] : []),
           item('list-long',hub?'분류 다수 · 스크롤':s==='member-profile'?'배정 자산 다수 · 전체 보기':'자산 다수 · 스크롤',listRef,()=>listData(true))
         ])];
-        if (mode === 'employee' && s === 'worksite-detail') {
+        if (s === 'directory-worksite-assets' || (mode === 'employee' && s === 'worksite-detail')) {
+          const site = directory ? directoryTarget('worksite').value : state.wsDetail;
+          const photoRef = directory ? shared(9)+' · 5번' : ref(mode,3)+' · 3번';
           sections.push(group('근무지 사진', [
-            item('worksite-photo-on','사진 있음',ref(mode,3)+' · 3번',()=>{worksitePhotos[state.wsDetail]=defaultWorksitePhotos.본사;redraw();}),
-            item('worksite-photo-off','사진 없음',ref(mode,3)+' · 3번',()=>{delete worksitePhotos[state.wsDetail];redraw();})
+            item('worksite-photo-on','사진 있음',photoRef,()=>{worksitePhotos[site]=defaultWorksitePhotos.본사;redraw();}),
+            item('worksite-photo-off','사진 없음',photoRef,()=>{delete worksitePhotos[site];redraw();})
           ]));
         }
         if(mode==='employee' && s==='assets' && state.assetTab==='worksite'){

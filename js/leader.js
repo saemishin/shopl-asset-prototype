@@ -777,6 +777,7 @@
   let DIRECTORY_CASE = new URLSearchParams(location.search).get("directory");
   let DEMO_DIRECTORY_MEMBER = DIRECTORY_CASE === "retired" ? "오세훈" : "김민수",
     DEMO_DIRECTORY_WORKSITE = "강남점";
+  const worksitePhotos = { 본사: "images/worksite-hq.png" };
   function directoryMenuHtml(kind, expanded) {
     const member = kind === "member",
       label = member ? "구성원" : "근무지";
@@ -851,8 +852,8 @@
   function directoryAssetSectionHtml(kind, state, category) {
     const items = directoryItems(kind).filter(item => !category || item.asset.group === category.group && item.asset.sub === category.sub);
     if (!items.length) return `<p class="mapp-directory-empty">배정 중인 자산이 없습니다.</p>`;
-    return `<div class="mapp-directory-asset-tools"><span>전체 <b data-directory-count>${items.length}</b></span>
-      <div class="mapp-directory-search"><input type="search" data-directory-search placeholder="품목명/고유관리번호" aria-label="자산 검색" value="${directoryEsc(state.directorySearch || "")}"><button type="button" data-directory-search-clear aria-label="검색어 지우기"${state.directorySearch ? "" : " hidden"}>×</button></div></div>
+    return `<div class="mapp-directory-asset-tools">
+      <div class="mapp-directory-search"><input type="search" data-directory-search placeholder="품목명/고유관리번호" aria-label="자산 검색" value="${directoryEsc(state.directorySearch || "")}"><button type="button" data-directory-search-clear aria-label="검색어 지우기"${state.directorySearch ? "" : " hidden"}>×</button></div><b>전체 (<span data-directory-count>${items.length}</span>)</b></div>
       <div class="mapp-card-list">${items.map(x => worksiteCard(x, true)).join("")}</div>
       <p class="mapp-directory-empty" data-directory-search-empty hidden>결과가 없습니다.</p>`;
   }
@@ -873,13 +874,13 @@
         sub: item.asset.sub,
         count: 0
       }), groups.get(key).count++;
-    }), `<div class="mapp-count">전체 <b>${items.length}</b></div>${items.length ? `<div class="mapp-ws-cat-tree">${[...groups.values()].sort((x, y) => window.DATA.categories.findIndex(c => c.group === x.group && c.sub === x.sub) - window.DATA.categories.findIndex(c => c.group === y.group && c.sub === y.sub)).map(category => `<button type="button" class="mapp-ws-cat-row" data-directory-sub-open data-group="${directoryEsc(category.group)}" data-sub="${directoryEsc(category.sub)}"><span>${directoryEsc(category.group)} <span class="mapp-cat-sep">›</span> ${directoryEsc(category.sub)}</span><span class="mapp-ws-cat-count">${category.count}<span class="mapp-menu-chev">›</span></span></button>`).join("")}</div>` : '<p class="mapp-directory-empty">배정 중인 자산이 없습니다.</p>'}`;
+    }), `${items.length ? `<div class="mapp-ws-cat-tree">${[...groups.values()].sort((x, y) => window.DATA.categories.findIndex(c => c.group === x.group && c.sub === x.sub) - window.DATA.categories.findIndex(c => c.group === y.group && c.sub === y.sub)).map(category => `<button type="button" class="mapp-ws-cat-row" data-directory-sub-open data-group="${directoryEsc(category.group)}" data-sub="${directoryEsc(category.sub)}"><span>${directoryEsc(category.group)} <span class="mapp-cat-sep">›</span> ${directoryEsc(category.sub)}</span><span class="mapp-ws-cat-count">${category.count}<span class="mapp-menu-chev">›</span></span></button>`).join("")}</div>` : '<p class="mapp-directory-empty">배정 중인 자산이 없습니다.</p>'}`;
   }
   function directoryWorksiteAssetsScreenHtml(state) {
     const ws = DEMO_DIRECTORY_WORKSITE,
       category = state.directoryCategory;
     return `<div class="mapp-directory-page"><div class="mapp-topbar"><button type="button" class="mapp-back" data-mapp-back aria-label="뒤로">←</button></div>
-      <div class="mapp-wsdetail-head"><div class="mapp-directory-context">${ws}</div><div class="mapp-wsdetail-sub">${directoryEsc(category.group)} <span class="mapp-cat-sep">›</span> ${directoryEsc(category.sub)}</div></div>
+      <div class="mapp-wsdetail-head employee-worksite-header">${worksitePhotos[ws] ? `<img src="${directoryEsc(worksitePhotos[ws])}" width="30" height="30" alt="">` : ""}<div><div class="mapp-wsdetail-name">${ws}</div><div class="mapp-wsdetail-sub">${directoryEsc(category.group)} <span class="mapp-cat-sep">›</span> ${directoryEsc(category.sub)}</div></div></div>
       <div class="mapp-directory-member-assets">${directoryAssetAvailable("worksite") ? directoryAssetSectionHtml("worksite", state, category) : '<p class="mapp-directory-empty">배정 중인 자산이 없습니다.</p>'}</div></div>`;
   }
   function directoryProfileScreenHtml(kind, state) {
@@ -893,14 +894,17 @@
       asset = directoryAssetAvailable(kind),
       otherMenus = directoryTaskMenus(kind),
       memberAssets = member && asset ? directoryItems("member") : [],
-      assetCard=asset?`<section class="mapp-directory-task-card" style="position:relative">${canAssignAny()&&!(member?DIRECTORY_CASE==="retired":DIRECTORY_CASE==="inactive")?'<button type="button" class="btn sm" data-directory-assign style="position:absolute;top:10px;right:44px;z-index:1" aria-label="자산 배정">' + (member ? "+" : "배정") + '</button>':''}<button class="mapp-directory-fold" data-directory-fold="asset" aria-expanded="true"><strong>자산${member ? " " + memberAssets.length : ""}</strong><span>⌃</span></button><div class="mapp-directory-fold-body">${member?MemberAssetViews.recent(memberAssets, STATUS_LABEL):directoryWorksiteSummaryHtml()}</div></section>`:'',
+      assetCard=asset?`<section class="mapp-directory-task-card" style="position:relative">${canAssignAny()&&!(member?DIRECTORY_CASE==="retired":DIRECTORY_CASE==="inactive")?'<button type="button" class="btn sm" data-directory-assign style="position:absolute;top:10px;right:44px;z-index:1" aria-label="자산 배정">+</button>':''}<button class="mapp-directory-fold" data-directory-fold="asset" aria-expanded="true"><strong>자산 ${member ? memberAssets.length : directoryItems("worksite").length}</strong><span>⌃</span></button><div class="mapp-directory-fold-body">${member?MemberAssetViews.recent(memberAssets, STATUS_LABEL):directoryWorksiteSummaryHtml()}</div></section>`:'',
       taskBody=otherMenus.map(([key,label])=>`<button class="mapp-directory-nav-card" data-directory-placeholder><span class="mapp-directory-task-icon ${key}">${directoryIcon(key)}</span><strong>${label}</strong></button>`).join(''),
       rows = member ? [["그룹", info.team], ["직무", "매니저"], ["직급", "Lv.3"], ["사번", info.empNo], ["휴대폰번호", info.phone]] : [["근무지 코드", WS_CODE[name]], ["주소", WS_ADDRESS[name]]];
+    const worksiteInfoCards = ["추가 정보", "고급 정보"].map(label =>
+      `<details class="mapp-directory-info"><summary>${label}</summary><p>등록된 ${label}가 없습니다.</p></details>`
+    ).join("");
     return `<div class="mapp-directory-page">
       ${member ? `<div class="mapp-topbar"><button type="button" class="mapp-back" data-mapp-back aria-label="뒤로">←</button><div class="mapp-directory-top-actions"><button type="button" data-directory-placeholder aria-label="검색"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="10" cy="10" r="7"/><path d="m15 15 6 6"/></svg></button><button type="button" data-directory-placeholder aria-label="더보기">⋮</button></div></div>
         <header class="mapp-directory-member-header"><div class="mapp-directory-member-top"><span class="mapp-directory-avatar" style="background:${avatarColor(name)}">${info.photo ? `<img src="${directoryEsc(info.photo)}" alt="">` : directoryEsc(name[0])}</span><div class="mapp-directory-contact"><button type="button" data-directory-placeholder aria-label="전화">☎</button><button type="button" data-directory-placeholder aria-label="채팅">${directoryIcon("board")}</button></div></div><h1>${name}</h1><p>${directoryEsc(info.team)}</p>${DIRECTORY_CASE === "retired" ? '<span class="mapp-directory-working" style="color:#8a8f98">퇴사</span>' : '<span class="mapp-directory-working">● 근무 중 ›</span>'}</header>` : `<div class="mapp-directory-site-hero"><div class="mapp-topbar"><button type="button" class="mapp-back" data-mapp-back aria-label="뒤로">←</button><div class="mapp-directory-top-actions"><button type="button" data-directory-placeholder aria-label="검색"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="10" cy="10" r="7"/><path d="m15 15 6 6"/></svg></button></div></div><div class="mapp-directory-map" aria-label="근무지 위치"><svg viewBox="0 0 200 120" aria-hidden="true"><rect width="200" height="120" fill="#e6e9e6"/><path d="M-20 100 140 0M0 40l210 60M70 0l50 120M-10 100l220-90" stroke="#fff" stroke-width="12"/><path d="M100 30a16 16 0 0 0-16 16c0 16 16 29 16 29s16-13 16-29a16 16 0 0 0-16-16Z" fill="#333"/><circle cx="100" cy="46" r="8" fill="#e6e9e6"/></svg></div><div class="mapp-directory-site-photo">${directoryIcon("asset")}<span>${name}</span></div></div><header class="mapp-directory-site-header"><div class="mapp-directory-site-status"><span${DIRECTORY_CASE === "inactive" ? ' style="color:#8a8f98"' : ""}>${DIRECTORY_CASE === "inactive" ? "비활성" : "활성"} ›</span><span class="mapp-directory-favorite" aria-label="즐겨찾는 근무지">★</span></div><h1>${name}</h1><small>${WS_CODE[name] || "—"}</small><p>${WS_ADDRESS[name] || "주소 없음"}<button type="button" data-directory-address-copy aria-label="주소 복사">▣</button></p></header>`}
       <div class="mapp-directory-tabs" role="tablist" aria-label="${member ? "구성원" : "근무지"} 상세">${tabs.filter(([key]) => key !== "work" || taskVisible).map(([key, label]) => `<button type="button" role="tab" aria-selected="${selected === key}" class="${selected === key ? "active" : ""}" data-directory-tab="${key}">${label}</button>`).join("")}</div>
-      <div class="mapp-directory-task-body">${selected === "work" ? taskBody : selected === "info" ? `${member ? '<details class="mapp-directory-info member-info"><summary>기본 정보</summary>' : '<section class="mapp-directory-info"><h2>기본 정보</h2>'}<dl>${rows.map(([label, value]) => `<div><dt>${label}</dt><dd>${directoryEsc(value || "—")}</dd></div>`).join("")}</dl>${member ? '</details>' : '</section>'}${member ? MemberAssetViews.infoCards(assetCard) : assetCard}` : '<p class="mapp-directory-empty">근무 내역이 없습니다.</p>'}</div></div>`;
+      <div class="mapp-directory-task-body">${selected === "work" ? taskBody : selected === "info" ? `${member ? '<details class="mapp-directory-info member-info"><summary>기본 정보</summary>' : '<section class="mapp-directory-info"><h2>기본 정보</h2>'}<dl>${rows.map(([label, value]) => `<div><dt>${label}</dt><dd>${directoryEsc(value || "—")}</dd></div>`).join("")}</dl>${member ? '</details>' : '</section>'}${member ? MemberAssetViews.infoCards(assetCard) : worksiteInfoCards + assetCard}` : '<p class="mapp-directory-empty">근무 내역이 없습니다.</p>'}</div></div>`;
   }
   function wireDirectoryProfile(root, state, draw) {
     root.querySelectorAll("[data-directory-tab]").forEach(button => button.onclick = () => {
@@ -912,7 +916,7 @@
       directoryAssetAvailable("worksite") && (state.directoryScroll = root.querySelector(".mapp-screen").scrollTop, state.directoryCategory = {
         group: button.dataset.group,
         sub: button.dataset.sub
-      }, state.directorySearch = "", state.screen = "directory-worksite-assets", draw());
+      }, state.directorySearch = "", state.directoryRowsShown = 20, state.screen = "directory-worksite-assets", draw());
     });
     const copy = root.querySelector("[data-directory-address-copy]");
     copy && (copy.onclick = async () => {
@@ -924,12 +928,11 @@
     });
     const search = root.querySelector("[data-directory-search]");
     root.querySelector('[data-directory-assign]')?.addEventListener('click',()=>openMultiAssignPage('',()=>draw(),directoryTarget(state.screen==='worksite-profile'?'worksite':'member')));
-    root.querySelectorAll('[data-directory-member-viewall]').forEach(button=>button.onclick=()=>{state.screen='directory-member-assets';state.directorySearch='';state.memberRowsShown=20;draw();});
+    root.querySelectorAll('[data-directory-member-viewall]').forEach(button=>button.onclick=()=>{state.screen='directory-member-assets';state.directorySearch='';state.directoryRowsShown=20;draw();});
     if (!search) return;
     const clear = root.querySelector("[data-directory-search-clear]");
-    const memberList = state.screen === "directory-member-assets";
     const screen = root.querySelector(".mapp-screen");
-    let shown = memberList ? state.memberRowsShown || 20 : 20;
+    let shown = state.directoryRowsShown || 20;
     let lastQuery = search.value.trim().toLowerCase();
     const sentinel = document.createElement("div");
     sentinel.style.height = "1px";
@@ -948,10 +951,8 @@
       matches.slice(0, shown).forEach(row => { row.hidden = false; });
       const count = root.querySelector("[data-directory-count]");
       count.textContent = matches.length;
-      if (memberList) {
-        state.memberRowsShown = shown;
-        count.parentElement.hidden = matches.length === 0;
-      }
+      state.directoryRowsShown = shown;
+      count.parentElement.hidden = matches.length === 0;
       root.querySelector("[data-directory-search-empty]").hidden = matches.length > 0;
       clear.hidden = !search.value;
       sentinel.hidden = shown >= matches.length;
@@ -2801,7 +2802,7 @@
         }, updateTagManageValidity2();
       }
     }
-    window.MobileCases?.bind({mode:'leader',state,draw,me:ME,directoryTarget,setDirectory(value){DIRECTORY_CASE=value;DEMO_DIRECTORY_MEMBER=value==='retired'?'오세훈':'김민수';}});
+    window.MobileCases?.bind({mode:'leader',state,draw,me:ME,directoryTarget,worksitePhotos,setDirectory(value){DIRECTORY_CASE=value;DEMO_DIRECTORY_MEMBER=value==='retired'?'오세훈':'김민수';}});
     window.addEventListener("storage", event => {
       ([ASSET_MGMT_FLAG_KEY, COMPANY_PLAN_KEY].includes(event.key) || event.key === null) && draw();
     }), draw();

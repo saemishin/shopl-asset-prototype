@@ -12,11 +12,10 @@ window.worksiteAssetCardHtml = function (item, { directory, cardThumb, escape, s
   return `<div class="mapp-card" ${attributes}>
     <button type="button" class="mapp-card-thumb-btn" data-worksite-thumb="${id}" aria-label="${hasPhoto ? "사진 보기" : "자산 상세 보기"}">${cardThumb(asset)}</button>
     <button type="button" class="mapp-card-body" style="text-align:left; padding:0; overflow:hidden">
-      ${directory ? "" : badge}
+      ${badge}
       <span style="display:block" class="mapp-card-title">${escape(asset.product)}</span>
       <span style="display:block" class="mapp-card-sub">${escape(asset.assetNo || "—")}</span>
       <span style="display:block" class="mapp-card-sub">배정일: ${date}</span>
     </button>
-    ${directory ? badge : ""}
   </div>`;
 };
