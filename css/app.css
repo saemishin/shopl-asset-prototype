@@ -2636,3 +2636,18 @@ body.history-capture #prototype-qa { display: none; }
 .fitted-tags > :first-child { display: block; min-width: 0; line-height: 20px; overflow: hidden; text-overflow: ellipsis; }
 .fitted-tags > :nth-child(2) { flex: none; }
 .member-assets-table td:nth-child(7) { min-width: 92px; }
+
+/* 구성원 상세 > 자산 */
+.member-info { margin: 12px 0; }
+.member-info summary { cursor: pointer; font-weight: 600; }
+.member-assets-profile { display: flex; align-items: center; gap: 8px; padding: 8px 16px; }
+.member-assets-profile .mapp-directory-avatar { width: 30px; height: 30px; border-radius: 50%; font-size: 13px; overflow: hidden; }
+.mapp-directory-avatar img { border-radius: inherit; width: 100%; height: 100%; object-fit: cover; }
+.member-assets-profile small { display: block; color: var(--text-sub); }
+.mapp-directory-asset-row.member-asset-row { display: flex; flex-direction: column; gap: 3px; align-items: flex-start; padding: 16px; margin: 8px 0; border: 0; border-radius: 12px; background: var(--panel); }
+.mapp-directory-fold-body .member-asset-row { background: #f7f8f9; }
+.member-asset-row .badge { flex: none; }
+.member-asset-row .member-asset-path { display: flex; gap: 4px; max-width: 100%; }
+.member-asset-path span, .member-asset-number { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.member-asset-row strong { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; font-weight: 600; }
+.member-view-all { width: 100%; }

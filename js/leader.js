@@ -850,20 +850,19 @@
   }
   function directoryAssetSectionHtml(kind, state, category) {
     const items = directoryItems(kind).filter(item => !category || item.asset.group === category.group && item.asset.sub === category.sub);
-    if (!items.length) return `${kind === "member" ? '<div class="mapp-count">전체 <b>0</b></div>' : ""}<p class="mapp-directory-empty">배정 중인 자산이 없습니다.</p>`;
-    const cat = category && window.DATA.categories.find(c => c.group === category.group && c.sub === category.sub);
+    if (!items.length) return `<p class="mapp-directory-empty">배정 중인 자산이 없습니다.</p>`;
     return `<div class="mapp-directory-asset-tools"><span>전체 <b data-directory-count>${items.length}</b></span>
       <div class="mapp-directory-search"><input type="search" data-directory-search placeholder="품목명/고유관리번호" aria-label="자산 검색" value="${directoryEsc(state.directorySearch || "")}"><button type="button" data-directory-search-clear aria-label="검색어 지우기"${state.directorySearch ? "" : " hidden"}>×</button></div></div>
-      <div class="${kind === "worksite" ? "mapp-card-list" : "mapp-directory-asset-list"}">${items.map(x => {
-      if (kind === "worksite") return worksiteCard(x, true);
-      const a = x.asset,
-        status = STATUS_LABEL[a.status] || [a.status, ""];
-      return `<button type="button" class="mapp-directory-asset-row" data-search="${directoryEsc(`${a.product} ${a.assetNo||''}`.toLowerCase())}" data-directory-asset="${directoryEsc(a.id)}"><span style="display:flex;flex-direction:column;gap:2px;min-width:0"><small class="mapp-directory-asset-category">${directoryEsc(a.group)} › ${directoryEsc(a.sub)}</small><strong>${directoryEsc(a.product)}</strong><small>${directoryEsc(a.assetNo || "—")}</small><small>배정일: ${x.since ? x.since.replaceAll("-", ".") : "—"}</small></span><span class="badge ${status[1]}">${status[0]}</span></button>`;
-    }).join("")}</div>
+      <div class="mapp-card-list">${items.map(x => worksiteCard(x, true)).join("")}</div>
       <p class="mapp-directory-empty" data-directory-search-empty hidden>결과가 없습니다.</p>`;
   }
-  function directoryMemberRecentHtml(state){const items=directoryItems('member');return `<div class="mapp-count">전체 <b>${items.length}</b></div>${items.length?items.slice(0,5).map(x=>`<button class="mapp-directory-asset-row" data-directory-asset="${x.asset.id}"><span style="display:flex;flex-direction:column;gap:2px;min-width:0"><small class="mapp-directory-asset-category">${directoryEsc(x.asset.group)} › ${directoryEsc(x.asset.sub)}</small><strong>${directoryEsc(x.asset.product)}</strong><small>${directoryEsc(x.asset.assetNo)}</small><small>배정일: ${x.since?x.since.replaceAll('-','.'):'—'}</small></span><span class="badge ${STATUS_LABEL[x.asset.status][1]}">${STATUS_LABEL[x.asset.status][0]}</span></button>`).join('')+'<button class="btn" data-directory-member-viewall>전체 보기</button>':'<p class="mapp-directory-empty">배정 중인 자산이 없습니다.</p>'}`;}
-  function directoryMemberAssetsScreenHtml(state){return `<div class="mapp-topbar"><button class="mapp-back" data-mapp-back aria-label="뒤로">←</button><span class="mapp-topbar-title">배정 자산</span></div><div class="mapp-body">${directoryAssetSectionHtml('member',state)}</div>`;}
+  function directoryMemberAssetsScreenHtml(state) {
+    const name = directoryTarget("member").value;
+    const info = MEMBERS.find(person => person.name === name) || {};
+    return `<div class="mapp-topbar"><button class="mapp-back" data-mapp-back aria-label="뒤로">←</button><span class="mapp-topbar-title">배정 자산</span></div>
+      ${MemberAssetViews.profile(name, info, avatarColor(name))}
+      <div class="mapp-body">${MemberAssetViews.list(directoryItems("member"), state.directorySearch, STATUS_LABEL)}</div>`;
+  }
   function directoryWorksiteSummaryHtml() {
     const items = directoryItems("worksite"),
       groups = /* @__PURE__ */new Map();
@@ -890,17 +889,18 @@
       taskVisible = directoryTaskVisible(kind);
     state.directoryTab === "work" && !taskVisible && (state.directoryTab = "info");
     const selected = state.directoryTab || (taskVisible ? "work" : "info"),
-      tabs = member ? [["info", "정보"], ["attendance", "근태"], ["work", "업무"]] : [["attendance", "근무"], ["work", "업무"], ["info", "정보"]],
+      tabs = member ? [["info", "정보"], ["attendance", "출퇴근"], ["work", "업무"]] : [["attendance", "근무"], ["work", "업무"], ["info", "정보"]],
       asset = directoryAssetAvailable(kind),
       otherMenus = directoryTaskMenus(kind),
-      assetCard=asset?`<section class="mapp-directory-task-card" style="position:relative">${canAssignAny()&&!(member?DIRECTORY_CASE==="retired":DIRECTORY_CASE==="inactive")?'<button type="button" class="btn sm" data-directory-assign style="position:absolute;top:10px;right:44px;z-index:1">배정</button>':''}<button class="mapp-directory-fold" data-directory-fold="asset" aria-expanded="true"><strong>자산</strong><span>⌃</span></button><div class="mapp-directory-fold-body">${member?directoryMemberRecentHtml(state):directoryWorksiteSummaryHtml()}</div></section>`:'',
+      memberAssets = member && asset ? directoryItems("member") : [],
+      assetCard=asset?`<section class="mapp-directory-task-card" style="position:relative">${canAssignAny()&&!(member?DIRECTORY_CASE==="retired":DIRECTORY_CASE==="inactive")?'<button type="button" class="btn sm" data-directory-assign style="position:absolute;top:10px;right:44px;z-index:1" aria-label="자산 배정">' + (member ? "+" : "배정") + '</button>':''}<button class="mapp-directory-fold" data-directory-fold="asset" aria-expanded="true"><strong>자산${member ? " " + memberAssets.length : ""}</strong><span>⌃</span></button><div class="mapp-directory-fold-body">${member?MemberAssetViews.recent(memberAssets, STATUS_LABEL):directoryWorksiteSummaryHtml()}</div></section>`:'',
       taskBody=otherMenus.map(([key,label])=>`<button class="mapp-directory-nav-card" data-directory-placeholder><span class="mapp-directory-task-icon ${key}">${directoryIcon(key)}</span><strong>${label}</strong></button>`).join(''),
       rows = member ? [["그룹", info.team], ["직무", "매니저"], ["직급", "Lv.3"], ["사번", info.empNo], ["휴대폰번호", info.phone]] : [["근무지 코드", WS_CODE[name]], ["주소", WS_ADDRESS[name]]];
     return `<div class="mapp-directory-page">
       ${member ? `<div class="mapp-topbar"><button type="button" class="mapp-back" data-mapp-back aria-label="뒤로">←</button><div class="mapp-directory-top-actions"><button type="button" data-directory-placeholder aria-label="검색"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="10" cy="10" r="7"/><path d="m15 15 6 6"/></svg></button><button type="button" data-directory-placeholder aria-label="더보기">⋮</button></div></div>
-        <header class="mapp-directory-member-header"><div class="mapp-directory-member-top"><span class="mapp-directory-avatar" style="background:${avatarColor(name)}">${name[0]}</span><div class="mapp-directory-contact"><button type="button" data-directory-placeholder aria-label="전화">☎</button><button type="button" data-directory-placeholder aria-label="채팅">${directoryIcon("board")}</button></div></div><h1>${name}</h1><p>${directoryEsc(info.team)}</p>${DIRECTORY_CASE === "retired" ? '<span class="mapp-directory-working" style="color:#8a8f98">퇴사</span>' : '<span class="mapp-directory-working">● 근무 중 ›</span>'}</header>` : `<div class="mapp-directory-site-hero"><div class="mapp-topbar"><button type="button" class="mapp-back" data-mapp-back aria-label="뒤로">←</button><div class="mapp-directory-top-actions"><button type="button" data-directory-placeholder aria-label="검색"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="10" cy="10" r="7"/><path d="m15 15 6 6"/></svg></button></div></div><div class="mapp-directory-map" aria-label="근무지 위치"><svg viewBox="0 0 200 120" aria-hidden="true"><rect width="200" height="120" fill="#e6e9e6"/><path d="M-20 100 140 0M0 40l210 60M70 0l50 120M-10 100l220-90" stroke="#fff" stroke-width="12"/><path d="M100 30a16 16 0 0 0-16 16c0 16 16 29 16 29s16-13 16-29a16 16 0 0 0-16-16Z" fill="#333"/><circle cx="100" cy="46" r="8" fill="#e6e9e6"/></svg></div><div class="mapp-directory-site-photo">${directoryIcon("asset")}<span>${name}</span></div></div><header class="mapp-directory-site-header"><div class="mapp-directory-site-status"><span${DIRECTORY_CASE === "inactive" ? ' style="color:#8a8f98"' : ""}>${DIRECTORY_CASE === "inactive" ? "비활성" : "활성"} ›</span><span class="mapp-directory-favorite" aria-label="즐겨찾는 근무지">★</span></div><h1>${name}</h1><small>${WS_CODE[name] || "—"}</small><p>${WS_ADDRESS[name] || "주소 없음"}<button type="button" data-directory-address-copy aria-label="주소 복사">▣</button></p></header>`}
+        <header class="mapp-directory-member-header"><div class="mapp-directory-member-top"><span class="mapp-directory-avatar" style="background:${avatarColor(name)}">${info.photo ? `<img src="${directoryEsc(info.photo)}" alt="">` : directoryEsc(name[0])}</span><div class="mapp-directory-contact"><button type="button" data-directory-placeholder aria-label="전화">☎</button><button type="button" data-directory-placeholder aria-label="채팅">${directoryIcon("board")}</button></div></div><h1>${name}</h1><p>${directoryEsc(info.team)}</p>${DIRECTORY_CASE === "retired" ? '<span class="mapp-directory-working" style="color:#8a8f98">퇴사</span>' : '<span class="mapp-directory-working">● 근무 중 ›</span>'}</header>` : `<div class="mapp-directory-site-hero"><div class="mapp-topbar"><button type="button" class="mapp-back" data-mapp-back aria-label="뒤로">←</button><div class="mapp-directory-top-actions"><button type="button" data-directory-placeholder aria-label="검색"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="10" cy="10" r="7"/><path d="m15 15 6 6"/></svg></button></div></div><div class="mapp-directory-map" aria-label="근무지 위치"><svg viewBox="0 0 200 120" aria-hidden="true"><rect width="200" height="120" fill="#e6e9e6"/><path d="M-20 100 140 0M0 40l210 60M70 0l50 120M-10 100l220-90" stroke="#fff" stroke-width="12"/><path d="M100 30a16 16 0 0 0-16 16c0 16 16 29 16 29s16-13 16-29a16 16 0 0 0-16-16Z" fill="#333"/><circle cx="100" cy="46" r="8" fill="#e6e9e6"/></svg></div><div class="mapp-directory-site-photo">${directoryIcon("asset")}<span>${name}</span></div></div><header class="mapp-directory-site-header"><div class="mapp-directory-site-status"><span${DIRECTORY_CASE === "inactive" ? ' style="color:#8a8f98"' : ""}>${DIRECTORY_CASE === "inactive" ? "비활성" : "활성"} ›</span><span class="mapp-directory-favorite" aria-label="즐겨찾는 근무지">★</span></div><h1>${name}</h1><small>${WS_CODE[name] || "—"}</small><p>${WS_ADDRESS[name] || "주소 없음"}<button type="button" data-directory-address-copy aria-label="주소 복사">▣</button></p></header>`}
       <div class="mapp-directory-tabs" role="tablist" aria-label="${member ? "구성원" : "근무지"} 상세">${tabs.filter(([key]) => key !== "work" || taskVisible).map(([key, label]) => `<button type="button" role="tab" aria-selected="${selected === key}" class="${selected === key ? "active" : ""}" data-directory-tab="${key}">${label}</button>`).join("")}</div>
-      <div class="mapp-directory-task-body">${selected === "work" ? taskBody : selected === "info" ? `<section class="mapp-directory-info"><h2>기본 정보</h2><dl>${rows.map(([label, value]) => `<div><dt>${label}</dt><dd>${directoryEsc(value || "—")}</dd></div>`).join("")}</dl></section>${assetCard}` : '<p class="mapp-directory-empty">근무 내역이 없습니다.</p>'}</div></div>`;
+      <div class="mapp-directory-task-body">${selected === "work" ? taskBody : selected === "info" ? `${member ? '<details class="mapp-directory-info member-info"><summary>기본 정보</summary>' : '<section class="mapp-directory-info"><h2>기본 정보</h2>'}<dl>${rows.map(([label, value]) => `<div><dt>${label}</dt><dd>${directoryEsc(value || "—")}</dd></div>`).join("")}</dl>${member ? '</details>' : '</section>'}${assetCard}${member ? '<details class="mapp-directory-info member-info"><summary>추가 정보</summary><p>등록된 추가 정보가 없습니다.</p></details>' : ''}` : '<p class="mapp-directory-empty">근무 내역이 없습니다.</p>'}</div></div>`;
   }
   function wireDirectoryProfile(root, state, draw) {
     root.querySelectorAll("[data-directory-tab]").forEach(button => button.onclick = () => {
@@ -924,13 +924,43 @@
     });
     const search = root.querySelector("[data-directory-search]");
     root.querySelector('[data-directory-assign]')?.addEventListener('click',()=>openMultiAssignPage('',()=>draw(),directoryTarget(state.screen==='worksite-profile'?'worksite':'member')));
-    root.querySelectorAll('[data-directory-member-viewall]').forEach(button=>button.onclick=()=>{state.screen='directory-member-assets';state.directorySearch='';draw();});
+    root.querySelectorAll('[data-directory-member-viewall]').forEach(button=>button.onclick=()=>{state.screen='directory-member-assets';state.directorySearch='';state.memberRowsShown=20;draw();});
     if (!search) return;
     const clear = root.querySelector("[data-directory-search-clear]");
-    let shown=20,lastQuery=null;
-    const sentinel=document.createElement("div");sentinel.style.height="1px";search.closest(".mapp-directory-member-assets, .mapp-body")?.appendChild(sentinel);
-    function filter(){state.directorySearch=search.value;const q=search.value.trim().toLowerCase();if(q!==lastQuery){shown=20;lastQuery=q;}const rows=[...root.querySelectorAll('[data-directory-asset]')],matched=rows.filter(row=>!q||(row.dataset.search||'').includes(q));rows.forEach(row=>row.hidden=true);matched.slice(0,shown).forEach(row=>row.hidden=false);const count=root.querySelector('[data-directory-count]');if(count)count.textContent=matched.length;const empty=root.querySelector('[data-directory-search-empty]');if(empty)empty.hidden=matched.length>0;clear.hidden=!search.value;sentinel.hidden=shown>=matched.length;}
-    new IntersectionObserver(entries=>{if(entries.some(e=>e.isIntersecting)&&!sentinel.hidden){shown+=20;filter();}},{root:root.querySelector(".mapp-screen")}).observe(sentinel);
+    const memberList = state.screen === "directory-member-assets";
+    const screen = root.querySelector(".mapp-screen");
+    let shown = memberList ? state.memberRowsShown || 20 : 20;
+    let lastQuery = search.value.trim().toLowerCase();
+    const sentinel = document.createElement("div");
+    sentinel.style.height = "1px";
+    search.closest(".mapp-directory-member-assets, .mapp-body")?.appendChild(sentinel);
+    function filter() {
+      state.directorySearch = search.value;
+      const query = search.value.trim().toLowerCase();
+      if (query !== lastQuery) {
+        shown = 20;
+        lastQuery = query;
+        screen.scrollTop = 0;
+      }
+      const rows = [...root.querySelectorAll("[data-directory-asset]")];
+      const matches = rows.filter(row => !query || (row.dataset.search || "").includes(query));
+      rows.forEach(row => { row.hidden = true; });
+      matches.slice(0, shown).forEach(row => { row.hidden = false; });
+      const count = root.querySelector("[data-directory-count]");
+      count.textContent = matches.length;
+      if (memberList) {
+        state.memberRowsShown = shown;
+        count.parentElement.hidden = matches.length === 0;
+      }
+      root.querySelector("[data-directory-search-empty]").hidden = matches.length > 0;
+      clear.hidden = !search.value;
+      sentinel.hidden = shown >= matches.length;
+    }
+    const observer = new IntersectionObserver(entries => {
+      if (!sentinel.isConnected) { observer.disconnect(); return; }
+      if (entries.some(entry => entry.isIntersecting) && !sentinel.hidden) { shown += 20; filter(); }
+    }, {root: screen});
+    observer.observe(sentinel);
     search.addEventListener("input", filter), clear.onclick = () => {
       search.value = "", filter(), search.focus();
     }, filter();
@@ -1173,6 +1203,7 @@
   }
   const MEMBERS = [{
       name: "김민수",
+      photo: "images/member-profile-sample.png",
       team: "개발팀",
       empNo: "2021001",
       phone: "010-2001-1234"
